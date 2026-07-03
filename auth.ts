@@ -34,6 +34,27 @@ async function getAuthorization(userId: string) {
   };
 }
 
+async function findUserByIdentifier(identifier: string) {
+  const normalized = identifier.trim();
+  const adminUser = await prisma.user.findFirst({
+    where: {
+      username: {
+        equals: normalized.toLowerCase(),
+        mode: "insensitive"
+      }
+    }
+  });
+
+  if (adminUser) return adminUser;
+
+  const employee = await prisma.employee.findUnique({
+    where: { nationalId: normalized },
+    include: { user: true }
+  });
+
+  return employee?.user ?? null;
+}
+
 export const authConfig = {
   adapter: PrismaAdapter(prisma),
   session: {
@@ -49,7 +70,7 @@ export const authConfig = {
     Credentials({
       name: "Credentials",
       credentials: {
-        email: { label: "Email", type: "email" },
+        identifier: { label: "Username or National ID", type: "text" },
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
@@ -59,11 +80,9 @@ export const authConfig = {
           return null;
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email: parsed.data.email }
-        });
+        const user = await findUserByIdentifier(parsed.data.identifier);
 
-        if (!user?.passwordHash || !user.isActive || !user.emailVerified) {
+        if (!user?.passwordHash || !user.isActive) {
           return null;
         }
 

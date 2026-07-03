@@ -65,21 +65,100 @@ async function main() {
     if (!roleId) continue;
     await prisma.rolePermission.createMany({ data: permissionKeys.map((permissionKey) => { const permissionId = permissions.get(permissionKey); return permissionId ? { roleId, permissionId } : null; }).filter((value): value is { roleId: string; permissionId: string } => Boolean(value)), skipDuplicates: true });
   }
-  const adminEmail = process.env.SEED_ADMIN_EMAIL ?? "admin@example.com";
-  const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? "ChangeMe123!";
+  const adminUsername = "admin";
+  const adminEmail = process.env.SEED_ADMIN_EMAIL ?? "admin@lana.local";
+  const adminPassword = "Admin@123456";
   const adminRoleId = roles.get("SUPER_ADMIN");
-  const admin = await prisma.user.upsert({ where: { email: adminEmail }, update: { name: process.env.SEED_ADMIN_NAME ?? "System Administrator", isActive: true, emailVerified: new Date() }, create: { name: process.env.SEED_ADMIN_NAME ?? "System Administrator", email: adminEmail, emailVerified: new Date(), passwordHash: await hashPassword(adminPassword), isActive: true } });
+  const adminPasswordHash = await hashPassword(adminPassword);
+  const existingAdmin = await prisma.user.findFirst({
+    where: { OR: [{ username: adminUsername }, { email: adminEmail }] }
+  });
+  const admin = existingAdmin
+    ? await prisma.user.update({
+        where: { id: existingAdmin.id },
+        data: {
+          name: "System Administrator",
+          username: adminUsername,
+          email: adminEmail,
+          emailVerified: new Date(),
+          passwordHash: adminPasswordHash,
+          isActive: true
+        }
+      })
+    : await prisma.user.create({
+        data: {
+          name: "System Administrator",
+          username: adminUsername,
+          email: adminEmail,
+          emailVerified: new Date(),
+          passwordHash: adminPasswordHash,
+          isActive: true
+        }
+      });
   if (adminRoleId) await prisma.userRole.createMany({ data: [{ userId: admin.id, roleId: adminRoleId }], skipDuplicates: true });
   for (const department of departments) await client.department.upsert({ where: { code: department.code }, update: department, create: department });
   for (const branch of branches) await client.branch.upsert({ where: { code: branch.code }, update: branch, create: branch });
   for (const employmentType of employmentTypes) await client.employmentType.upsert({ where: { code: employmentType.code }, update: employmentType, create: employmentType });
   for (const nationality of nationalities) await client.nationality.upsert({ where: { code: nationality.code }, update: nationality, create: nationality });
   const hrDepartment = await client.department.findUnique({ where: { code: "HR" } });
-  await client.position.upsert({ where: { code: "HR-MGR" }, update: { title: "HR Manager", departmentId: hrDepartment?.id }, create: { title: "HR Manager", code: "HR-MGR", departmentId: hrDepartment?.id } });
+  const headOffice = await client.branch.findUnique({ where: { code: "HQ" } });
+  const fullTime = await client.employmentType.findUnique({ where: { code: "FULL_TIME" } });
+  const saudiNationality = await client.nationality.findUnique({ where: { code: "SA" } });
+  const hrManagerPosition = await client.position.upsert({ where: { code: "HR-MGR" }, update: { title: "HR Manager", departmentId: hrDepartment?.id }, create: { title: "HR Manager", code: "HR-MGR", departmentId: hrDepartment?.id } });
+  const employeeRoleId = roles.get("EMPLOYEE");
+  const employeeNationalId = "1000000001";
+  const employeePasswordHash = await hashPassword("Employee@123456");
+  const employeeUser = await prisma.user.upsert({
+    where: { email: "employee.1000000001@lana.local" },
+    update: {
+      name: "Lana Employee",
+      passwordHash: employeePasswordHash,
+      isActive: true
+    },
+    create: {
+      name: "Lana Employee",
+      email: "employee.1000000001@lana.local",
+      emailVerified: new Date(),
+      passwordHash: employeePasswordHash,
+      isActive: true
+    }
+  });
+  if (employeeRoleId) await prisma.userRole.createMany({ data: [{ userId: employeeUser.id, roleId: employeeRoleId }], skipDuplicates: true });
+  await prisma.employee.upsert({
+    where: { nationalId: employeeNationalId },
+    update: {
+      employeeNumber: "EMP-0001",
+      firstName: "Lana",
+      lastName: "Employee",
+      phone: "+966500000001",
+      status: "ACTIVE",
+      userId: employeeUser.id,
+      departmentId: typeof hrDepartment?.id === "string" ? hrDepartment.id : undefined,
+      positionId: typeof hrManagerPosition?.id === "string" ? hrManagerPosition.id : undefined,
+      branchId: typeof headOffice?.id === "string" ? headOffice.id : undefined,
+      employmentTypeId: typeof fullTime?.id === "string" ? fullTime.id : undefined,
+      nationalityId: typeof saudiNationality?.id === "string" ? saudiNationality.id : undefined
+    },
+    create: {
+      employeeNumber: "EMP-0001",
+      nationalId: employeeNationalId,
+      firstName: "Lana",
+      lastName: "Employee",
+      phone: "+966500000001",
+      hireDate: new Date("2026-01-01T00:00:00.000Z"),
+      status: "ACTIVE",
+      userId: employeeUser.id,
+      departmentId: typeof hrDepartment?.id === "string" ? hrDepartment.id : undefined,
+      positionId: typeof hrManagerPosition?.id === "string" ? hrManagerPosition.id : undefined,
+      branchId: typeof headOffice?.id === "string" ? headOffice.id : undefined,
+      employmentTypeId: typeof fullTime?.id === "string" ? fullTime.id : undefined,
+      nationalityId: typeof saudiNationality?.id === "string" ? saudiNationality.id : undefined
+    }
+  });
   await client.reportDefinition.upsert({ where: { code: "HEADCOUNT" }, update: { name: "Headcount", module: "employees" }, create: { name: "Headcount", code: "HEADCOUNT", module: "employees", description: "Employee headcount by status and organization" } });
   await client.appSetting.upsert({ where: { key: "company.name" }, update: { value: "HRMS Foundation" }, create: { key: "company.name", value: "HRMS Foundation", description: "Company display name" } });
   await client.announcement.upsert({ where: { id: "seed-announcement-welcome" }, update: { title: "Welcome to HRMS", body: "The HRMS platform is ready for your team.", isPublished: true, publishedAt: new Date() }, create: { id: "seed-announcement-welcome", title: "Welcome to HRMS", body: "The HRMS platform is ready for your team.", isPublished: true, publishedAt: new Date() } });
-  console.info("Seeded HRMS data. Admin login: " + adminEmail);
+  console.info("Seeded Lana HRMS data. Admin username: admin. Employee national ID: " + employeeNationalId);
 }
 
 main().catch((error) => { console.error(error); process.exit(1); }).finally(async () => { await prisma.$disconnect(); });

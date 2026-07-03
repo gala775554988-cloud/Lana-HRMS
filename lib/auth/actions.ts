@@ -4,8 +4,7 @@ import { AuthError } from "next-auth";
 import { signIn, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
-import { addMinutes, createSecureToken, hashToken } from "@/lib/tokens";
-import { sendTransactionalEmail } from "@/lib/mail";
+import { hashToken } from "@/lib/tokens";
 import {
   emailVerificationSchema,
   forgotPasswordSchema,
@@ -19,11 +18,7 @@ type ActionState = {
 };
 
 const genericResetMessage =
-  "If an account exists for that email, password reset instructions have been sent.";
-
-function getAppUrl() {
-  return process.env.APP_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000";
-}
+  "If the account exists, HR administrators can issue a secure password reset token.";
 
 export async function loginAction(input: unknown): Promise<ActionState> {
   const parsed = loginSchema.safeParse(input);
@@ -34,7 +29,7 @@ export async function loginAction(input: unknown): Promise<ActionState> {
 
   try {
     await signIn("credentials", {
-      email: parsed.data.email,
+      identifier: parsed.data.identifier,
       password: parsed.data.password,
       redirect: false
     });
@@ -42,7 +37,7 @@ export async function loginAction(input: unknown): Promise<ActionState> {
     return { success: true, message: "Signed in successfully." };
   } catch (error) {
     if (error instanceof AuthError) {
-      return { success: false, message: "Invalid email, password, or account status." };
+      return { success: false, message: "Invalid username, national ID, password, or account status." };
     }
 
     throw error;
@@ -57,35 +52,8 @@ export async function forgotPasswordAction(input: unknown): Promise<ActionState>
   const parsed = forgotPasswordSchema.safeParse(input);
 
   if (!parsed.success) {
-    return { success: false, message: parsed.error.errors[0]?.message ?? "Invalid email." };
+    return { success: false, message: parsed.error.errors[0]?.message ?? "Invalid account identifier." };
   }
-
-  const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
-
-  if (!user?.isActive) {
-    return { success: true, message: genericResetMessage };
-  }
-
-  await prisma.passwordResetToken.updateMany({
-    where: { userId: user.id, usedAt: null },
-    data: { usedAt: new Date() }
-  });
-
-  const token = createSecureToken();
-  await prisma.passwordResetToken.create({
-    data: {
-      userId: user.id,
-      tokenHash: hashToken(token),
-      expiresAt: addMinutes(new Date(), 30)
-    }
-  });
-
-  const resetUrl = `${getAppUrl()}/reset-password?token=${token}`;
-  await sendTransactionalEmail({
-    to: user.email,
-    subject: "Reset your HRMS password",
-    text: `Use this secure link to reset your password: ${resetUrl}`
-  });
 
   return { success: true, message: genericResetMessage };
 }
@@ -147,6 +115,5 @@ export async function verifyEmailAction(input: unknown): Promise<ActionState> {
     })
   ]);
 
-  return { success: true, message: "Email verified. You can sign in now." };
+  return { success: true, message: "Account verified. You can sign in now." };
 }
-

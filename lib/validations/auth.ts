@@ -9,12 +9,16 @@ const passwordSchema = z
   .regex(/[^a-zA-Z0-9]/, "Password must include a symbol.");
 
 export const loginSchema = z.object({
-  email: z.string().email("Enter a valid email address.").trim().toLowerCase(),
+  identifier: z
+    .string()
+    .min(2, "Enter your username or national ID.")
+    .max(64, "Identifier is too long.")
+    .trim(),
   password: z.string().min(1, "Password is required.")
 });
 
 export const forgotPasswordSchema = z.object({
-  email: z.string().email("Enter a valid email address.").trim().toLowerCase()
+  identifier: z.string().min(2, "Enter your username or national ID.").trim()
 });
 
 export const resetPasswordSchema = z

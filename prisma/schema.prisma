@@ -11,7 +11,8 @@ datasource db {
 model User {
   id                    String                   @id @default(cuid())
   name                  String?
-  email                 String                   @unique
+  username              String?                  @unique
+  email                 String?                  @unique
   emailVerified         DateTime?
   image                 String?
   passwordHash          String?
@@ -28,6 +29,7 @@ model User {
   auditLogs               AuditLog[]
   notifications           Notification[]
 
+  @@index([username])
   @@index([email])
 }
 
@@ -225,9 +227,11 @@ model Nationality {
 model Employee {
   id               String             @id @default(cuid())
   employeeNumber   String             @unique
+  nationalId       String             @unique
   firstName        String
   lastName         String
   email            String?            @unique
+  profilePhotoUrl  String?
   phone            String?
   gender           String?
   dateOfBirth      DateTime?
@@ -263,6 +267,7 @@ model Employee {
   leaveRequests     LeaveRequest[]
   attendanceRecords AttendanceRecord[]
 
+  @@index([nationalId])
   @@index([firstName, lastName])
   @@index([status])
   @@index([departmentId])
@@ -599,6 +604,7 @@ model Candidate {
   updatedAt    DateTime        @updatedAt
   jobOpening   JobOpening?     @relation(fields: [jobOpeningId], references: [id], onDelete: SetNull)
 
+  @@index([firstName, lastName])
   @@index([email])
   @@index([status])
 }
