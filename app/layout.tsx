@@ -45,7 +45,8 @@ export default async function RootLayout({
   const cookieStore = await cookies();
   const headerLocale = requestHeaders.get("x-lana-locale");
   const cookieLocale = cookieStore.get("lana-locale")?.value;
-  const locale: Locale = isLocale(headerLocale ?? undefined)
+const locale: Locale =
+  isLocale(headerLocale)
     ? headerLocale
     : isLocale(cookieLocale)
       ? cookieLocale
