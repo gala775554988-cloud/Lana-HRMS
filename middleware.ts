@@ -1,29 +1,49 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { authRoutes, DEFAULT_LOGIN_REDIRECT, publicRoutes } from "@/config/auth";
+import { defaultLocale, getLocaleFromPath, stripLocaleFromPath, withLocale, type Locale } from "@/lib/i18n";
 
 export async function middleware(request: NextRequest) {
   const { nextUrl } = request;
+  const pathLocale = getLocaleFromPath(nextUrl.pathname);
+  const cookieLocale = request.cookies.get("lana-locale")?.value;
+  const activeLocale: Locale = pathLocale ?? (cookieLocale === "ar" ? "ar" : defaultLocale);
+  const normalizedPath = stripLocaleFromPath(nextUrl.pathname);
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-lana-locale", activeLocale);
   const token = await getToken({
     req: request,
     secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET
   });
   const isLoggedIn = Boolean(token?.sub);
-  const isAuthRoute = authRoutes.some((route) => nextUrl.pathname.startsWith(route));
+  const isAuthRoute = authRoutes.some((route) => normalizedPath.startsWith(route));
   const isPublicRoute = publicRoutes.some(
-    (route) => route === nextUrl.pathname || nextUrl.pathname.startsWith(route + "/")
+    (route) => route === normalizedPath || normalizedPath.startsWith(route + "/")
   );
 
   if (isAuthRoute && isLoggedIn) {
-    return NextResponse.redirect(new URL(DEFAULT_LOGIN_REDIRECT, nextUrl));
+    const response = NextResponse.redirect(new URL(pathLocale ? withLocale(DEFAULT_LOGIN_REDIRECT, activeLocale) : DEFAULT_LOGIN_REDIRECT, nextUrl));
+    response.cookies.set("lana-locale", activeLocale, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
+    return response;
   }
 
   if (!isLoggedIn && !isPublicRoute) {
-    const callbackUrl = encodeURIComponent(nextUrl.pathname + nextUrl.search);
-    return NextResponse.redirect(new URL("/login?callbackUrl=" + callbackUrl, nextUrl));
+    const callbackPath = (pathLocale ? withLocale(normalizedPath, activeLocale) : normalizedPath) + nextUrl.search;
+    const loginPath = pathLocale ? withLocale("/login", activeLocale) : "/login";
+    const response = NextResponse.redirect(new URL(loginPath + "?callbackUrl=" + encodeURIComponent(callbackPath), nextUrl));
+    response.cookies.set("lana-locale", activeLocale, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
+    return response;
   }
 
-  return NextResponse.next();
+  if (pathLocale) {
+    const rewriteUrl = nextUrl.clone();
+    rewriteUrl.pathname = normalizedPath;
+    const response = NextResponse.rewrite(rewriteUrl, { request: { headers: requestHeaders } });
+    response.cookies.set("lana-locale", activeLocale, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
+    return response;
+  }
+
+  return NextResponse.next({ request: { headers: requestHeaders } });
 }
 
 export const config = {

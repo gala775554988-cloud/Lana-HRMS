@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
+import { cookies, headers } from "next/headers";
 import { siteConfig } from "@/config/site";
+import { defaultLocale, getDirection, isLocale, type Locale } from "@/lib/i18n";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -34,13 +36,23 @@ export const viewport: Viewport = {
   ]
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const requestHeaders = await headers();
+  const cookieStore = await cookies();
+  const headerLocale = requestHeaders.get("x-lana-locale");
+  const cookieLocale = cookieStore.get("lana-locale")?.value;
+  const locale: Locale = isLocale(headerLocale ?? undefined)
+    ? headerLocale
+    : isLocale(cookieLocale)
+      ? cookieLocale
+      : defaultLocale;
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={locale} dir={getDirection(locale)} suppressHydrationWarning>
       <body>{children}</body>
     </html>
   );
