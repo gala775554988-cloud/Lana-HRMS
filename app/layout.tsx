@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { cookies, headers } from "next/headers";
 import { siteConfig } from "@/config/site";
-import { defaultLocale, getDirection, isLocale, type Locale } from "@/lib/i18n";
+import { getDirection, normalizeLocale } from "@/lib/i18n";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -45,12 +45,7 @@ export default async function RootLayout({
   const cookieStore = await cookies();
   const headerLocale = requestHeaders.get("x-lana-locale");
   const cookieLocale = cookieStore.get("lana-locale")?.value;
-const locale: Locale =
-  isLocale(headerLocale)
-    ? headerLocale
-    : isLocale(cookieLocale)
-      ? cookieLocale
-      : defaultLocale;
+  const locale = normalizeLocale(headerLocale ?? cookieLocale);
 
   return (
     <html lang={locale} dir={getDirection(locale)} suppressHydrationWarning>

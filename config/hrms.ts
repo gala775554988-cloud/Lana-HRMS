@@ -147,6 +147,7 @@ export function getHrmsModule(key: string) {
 }
 
 export const hrmsNavigation = hrmsModules.map((resource) => ({
+  key: resource.key,
   href: "/" + resource.key,
   label: resource.title,
   resource: resource.permissionResource

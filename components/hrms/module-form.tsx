@@ -12,8 +12,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { Dictionary } from "@/lib/i18n";
 
-export function ModuleForm({ resource, initialValues, recordId }: { resource: HrmsModule; initialValues?: Record<string, unknown>; recordId?: string }) {
+export function ModuleForm({ resource, dictionary, initialValues, recordId }: { resource: HrmsModule; dictionary: Dictionary; initialValues?: Record<string, unknown>; recordId?: string }) {
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -41,7 +42,7 @@ export function ModuleForm({ resource, initialValues, recordId }: { resource: Hr
                 <textarea id={field.name} className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" {...form.register(field.name)} />
               ) : field.type === "select" ? (
                 <select id={field.name} className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" {...form.register(field.name)}>
-                  <option value="">Select</option>
+                  <option value="">{dictionary.form.select}</option>
                   {field.options?.map((option) => <option key={option} value={option}>{option}</option>)}
                 </select>
               ) : field.type === "boolean" ? (
@@ -54,7 +55,7 @@ export function ModuleForm({ resource, initialValues, recordId }: { resource: Hr
           );
         })}
       </div>
-      <Button type="submit" disabled={isPending}>{isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}{recordId ? "Save changes" : "Create record"}</Button>
+      <Button type="submit" disabled={isPending}>{isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}{recordId ? dictionary.form.saveChanges : dictionary.form.createRecord}</Button>
     </form>
   );
 }

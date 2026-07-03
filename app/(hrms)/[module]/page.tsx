@@ -3,6 +3,7 @@ import { Filter, Plus, Search } from "lucide-react";
 import { notFound } from "next/navigation";
 import { getHrmsModule } from "@/config/hrms";
 import { listModuleRecords } from "@/lib/hrms/actions";
+import { getRequestDictionary } from "@/lib/i18n-server";
 import { ModuleForm } from "@/components/hrms/module-form";
 import { ModuleTable } from "@/components/hrms/module-table";
 import { FileUpload } from "@/components/hrms/file-upload";
@@ -15,6 +16,8 @@ export default async function ResourcePage({ params, searchParams }: { params: P
   const query = await searchParams;
   const resource = getHrmsModule(resourceKey);
   if (!resource) notFound();
+  const { dictionary } = await getRequestDictionary();
+  const resourceTitle = resource.key in dictionary.nav ? dictionary.nav[resource.key as keyof typeof dictionary.nav] : resource.title;
 
   const filters = Object.fromEntries(resource.filterFields.map((field) => [field, typeof query[field] === "string" ? query[field] as string : undefined]));
   const page = Number(query.page ?? 1);
@@ -27,7 +30,7 @@ export default async function ResourcePage({ params, searchParams }: { params: P
       <div className="flex flex-col gap-4 rounded-2xl border bg-background p-6 shadow-sm lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-2">
           <Badge variant="outline">HRMS Module</Badge>
-          <h1 className="text-3xl font-semibold tracking-tight">{resource.title}</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">{resourceTitle}</h1>
           <p className="max-w-2xl text-muted-foreground">{resource.description}</p>
         </div>
         <Button asChild variant="outline"><Link href="/reports">Open reports</Link></Button>
@@ -48,7 +51,7 @@ export default async function ResourcePage({ params, searchParams }: { params: P
       {resource.key === "documents" || resource.key === "candidates" ? <FileUpload /> : null}
       <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
         <div className="space-y-4">
-          <ModuleTable resource={resource} records={data.records as (Record<string, unknown> & { id: string })[]} />
+          <ModuleTable resource={resource} records={data.records as (Record<string, unknown> & { id: string })[]} dictionary={dictionary} />
           <div className="flex flex-col gap-3 rounded-lg border bg-background p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
             <span>Page {data.page} of {data.pageCount} - {data.total} records</span>
             <div className="flex gap-2">
@@ -57,7 +60,7 @@ export default async function ResourcePage({ params, searchParams }: { params: P
             </div>
           </div>
         </div>
-        <Card className="shadow-sm"><CardHeader><CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />Create {resource.title}</CardTitle><CardDescription>Add a new record with validation, RBAC, and audit logging.</CardDescription></CardHeader><CardContent><ModuleForm resource={resource} /></CardContent></Card>
+        <Card className="shadow-sm"><CardHeader><CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />Create {resourceTitle}</CardTitle><CardDescription>Add a new record with validation, RBAC, and audit logging.</CardDescription></CardHeader><CardContent><ModuleForm resource={resource} dictionary={dictionary} /></CardContent></Card>
       </div>
     </section>
   );

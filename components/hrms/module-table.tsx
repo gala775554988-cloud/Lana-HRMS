@@ -9,6 +9,7 @@ import type { HrmsModule } from "@/config/hrms";
 import { deleteModuleRecord } from "@/lib/hrms/actions";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/hrms/empty-state";
+import type { Dictionary } from "@/lib/i18n";
 
 type Row = Record<string, unknown> & { id: string };
 
@@ -19,23 +20,23 @@ function display(value: unknown) {
   return String(value);
 }
 
-export function ModuleTable({ resource, records }: { resource: HrmsModule; records: Row[] }) {
+export function ModuleTable({ resource, records, dictionary }: { resource: HrmsModule; records: Row[]; dictionary: Dictionary }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const helper = createColumnHelper<Row>();
   const columns = useMemo(() => [
     ...resource.tableFields.map((field) => helper.accessor((row) => row[field], { id: field, header: field.replace(/([A-Z])/g, " $1"), cell: (info) => display(info.getValue()) })),
-    helper.display({ id: "actions", header: "Actions", cell: ({ row }) => (
+    helper.display({ id: "actions", header: dictionary.table.actions, cell: ({ row }) => (
       <div className="flex justify-end gap-2">
-        <Button asChild size="sm" variant="outline"><Link href={"/" + resource.key + "/" + row.original.id}>Open</Link></Button>
-        <Button size="sm" variant="destructive" disabled={isPending} onClick={() => startTransition(async () => { await deleteModuleRecord(resource.key, row.original.id); router.refresh(); })}>Delete</Button>
+        <Button asChild size="sm" variant="outline"><Link href={"/" + resource.key + "/" + row.original.id}>{dictionary.table.open}</Link></Button>
+        <Button size="sm" variant="destructive" disabled={isPending} onClick={() => startTransition(async () => { await deleteModuleRecord(resource.key, row.original.id); router.refresh(); })}>{dictionary.table.delete}</Button>
       </div>
     )})
-  ], [helper, isPending, resource, router]);
+  ], [dictionary, helper, isPending, resource, router]);
   const table = useReactTable({ data: records, columns, getCoreRowModel: getCoreRowModel() });
 
   if (!records.length) {
-    return <EmptyState icon={FileSearch} title="No records found" description="Create the first record or adjust your search and filters to widen the result set." />;
+    return <EmptyState icon={FileSearch} title={dictionary.table.noRecords} description={dictionary.table.noRecordsDescription} />;
   }
 
   return (

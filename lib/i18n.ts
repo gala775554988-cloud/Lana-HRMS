@@ -10,6 +10,12 @@ export function isLocale(
   return value === "en" || value === "ar";
 }
 
+export function normalizeLocale(value: string | null | undefined): Locale {
+  const candidate = value ?? undefined;
+  if (isLocale(candidate)) return candidate;
+  return defaultLocale;
+}
+
 export function getLocaleFromPath(pathname: string): Locale | null {
   const segment = pathname.split("/").filter(Boolean)[0];
   return isLocale(segment) ? segment : null;
@@ -95,3 +101,5 @@ export const dictionaries = {
 export function getDictionary(locale: Locale) {
   return dictionaries[locale];
 }
+
+export type Dictionary = ReturnType<typeof getDictionary>;

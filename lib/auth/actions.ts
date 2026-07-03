@@ -1,6 +1,7 @@
 'use server';
 
 import { AuthError } from "next-auth";
+import { redirect } from "next/navigation";
 import { signIn, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
@@ -33,8 +34,6 @@ export async function loginAction(input: unknown): Promise<ActionState> {
       password: parsed.data.password,
       redirect: false
     });
-
-    return { success: true, message: "Signed in successfully." };
   } catch (error) {
     if (error instanceof AuthError) {
       return { success: false, message: "Invalid username, national ID, password, or account status." };
@@ -42,6 +41,8 @@ export async function loginAction(input: unknown): Promise<ActionState> {
 
     throw error;
   }
+
+  redirect("/dashboard");
 }
 
 export async function logoutAction() {

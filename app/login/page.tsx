@@ -1,12 +1,15 @@
 import { Suspense } from "react";
 import { AuthCard } from "@/components/auth/auth-card";
+import { getRequestDictionary } from "@/lib/i18n-server";
 import { LoginForm } from "./login-form";
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  const { locale, dictionary } = await getRequestDictionary();
+
   return (
-    <AuthCard title="Sign in" description="Administrators sign in with username. Employees sign in with national ID.">
+    <AuthCard title={dictionary.auth.title} description={dictionary.auth.description} locale={locale} dictionary={dictionary}>
       <Suspense>
-        <LoginForm />
+        <LoginForm dictionary={dictionary} />
       </Suspense>
     </AuthCard>
   );

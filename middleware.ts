@@ -1,13 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { authRoutes, DEFAULT_LOGIN_REDIRECT, publicRoutes } from "@/config/auth";
-import { defaultLocale, getLocaleFromPath, stripLocaleFromPath, withLocale, type Locale } from "@/lib/i18n";
+import { getLocaleFromPath, normalizeLocale, stripLocaleFromPath, withLocale } from "@/lib/i18n";
 
 export async function middleware(request: NextRequest) {
   const { nextUrl } = request;
   const pathLocale = getLocaleFromPath(nextUrl.pathname);
   const cookieLocale = request.cookies.get("lana-locale")?.value;
-  const activeLocale: Locale = pathLocale ?? (cookieLocale === "ar" ? "ar" : defaultLocale);
+  const activeLocale = pathLocale ?? normalizeLocale(cookieLocale);
   const normalizedPath = stripLocaleFromPath(nextUrl.pathname);
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-lana-locale", activeLocale);

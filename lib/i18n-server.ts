@@ -1,5 +1,5 @@
 import { cookies, headers } from "next/headers";
-import { defaultLocale, getDictionary, isLocale, type Locale } from "@/lib/i18n";
+import { getDictionary, normalizeLocale, type Locale } from "@/lib/i18n";
 
 export async function getRequestLocale(): Promise<Locale> {
   const requestHeaders = await headers();
@@ -7,9 +7,7 @@ export async function getRequestLocale(): Promise<Locale> {
   const headerLocale = requestHeaders.get("x-lana-locale");
   const cookieLocale = cookieStore.get("lana-locale")?.value;
 
-  if (isLocale(headerLocale ?? undefined)) return headerLocale;
-  if (isLocale(cookieLocale)) return cookieLocale;
-  return defaultLocale;
+  return normalizeLocale(headerLocale ?? cookieLocale);
 }
 
 export async function getRequestDictionary() {
