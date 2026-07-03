@@ -1,12 +1,14 @@
-'use client';
+"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useTransition } from "react";
+import { FileSearch } from "lucide-react";
 import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import type { HrmsModule } from "@/config/hrms";
 import { deleteModuleRecord } from "@/lib/hrms/actions";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/hrms/empty-state";
 
 type Row = Record<string, unknown> & { id: string };
 
@@ -32,15 +34,19 @@ export function ModuleTable({ resource, records }: { resource: HrmsModule; recor
   ], [helper, isPending, resource, router]);
   const table = useReactTable({ data: records, columns, getCoreRowModel: getCoreRowModel() });
 
+  if (!records.length) {
+    return <EmptyState icon={FileSearch} title="No records found" description="Create the first record or adjust your search and filters to widen the result set." />;
+  }
+
   return (
-    <div className="overflow-hidden rounded-lg border bg-background">
+    <div className="overflow-hidden rounded-lg border bg-background shadow-sm">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-muted/60">
-            {table.getHeaderGroups().map((group) => <tr key={group.id}>{group.headers.map((header) => <th key={header.id} className="px-4 py-3 text-left font-medium">{flexRender(header.column.columnDef.header, header.getContext())}</th>)}</tr>)}
+          <thead className="bg-muted/70">
+            {table.getHeaderGroups().map((group) => <tr key={group.id}>{group.headers.map((header) => <th key={header.id} className="px-4 py-3 text-start font-semibold text-muted-foreground">{flexRender(header.column.columnDef.header, header.getContext())}</th>)}</tr>)}
           </thead>
           <tbody>
-            {table.getRowModel().rows.length ? table.getRowModel().rows.map((row) => <tr key={row.id} className="border-t">{row.getVisibleCells().map((cell) => <td key={cell.id} className="px-4 py-3 align-top">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>) : <tr><td colSpan={columns.length} className="px-4 py-10 text-center text-muted-foreground">No records found.</td></tr>}
+            {table.getRowModel().rows.map((row) => <tr key={row.id} className="border-t transition-colors hover:bg-muted/40">{row.getVisibleCells().map((cell) => <td key={cell.id} className="px-4 py-3 align-top">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}
           </tbody>
         </table>
       </div>

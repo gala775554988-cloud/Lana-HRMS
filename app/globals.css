@@ -54,5 +54,18 @@
 
   body {
     @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  [dir="rtl"] .rtl-flip {
+    transform: scaleX(-1);
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.18);
   }
 }
