@@ -583,6 +583,38 @@ export const dictionaries = {
       reports: "تعريفات تقارير قابلة لإعادة الاستخدام لتحليلات الموارد البشرية.",
       settings: "إعدادات التطبيق وقيم التكوين على مستوى النظام.",
       "audit-logs": "سجل غير قابل للتغيير للتغييرات الحساسة في نظام الموارد البشرية."
+    },
+    record: {
+      title: "ملف السجل",
+      details: "التفاصيل",
+      detailsDesc: "القيم الحالية لهذا السجل.",
+      edit: "تعديل",
+      editDesc: "يتم التحقق من التغييرات وتسجيلها.",
+      back: "رجوع",
+      employeeProfile: "ملف الموظف",
+      employeeProfileDesc: "المستندات، العقود، الحضور، الإجازات، والأصول المخصصة.",
+      recentRecords: "السجلات الأخيرة",
+      noData: "لا توجد بيانات"
+    },
+    settings: {
+      title: "إعدادات الشركة",
+      branding: "العلامة التجارية",
+      companyLogo: "شعار الشركة",
+      companyLogoDesc: "ارفع شعارًا سيظهر في الرأس والتقارير.",
+      uploadLogo: "رفع الشعار",
+      currentLogo: "الشعار الحالي",
+      logoUrl: "رابط الشعار",
+      saveBranding: "حفظ العلامة التجارية",
+      saved: "تم حفظ الإعدادات بنجاح."
+    },
+    upload: {
+      selectFile: "اختر ملف",
+      upload: "رفع",
+      uploading: "جاري الرفع…",
+      uploaded: "تم الرفع بنجاح",
+      error: "فشل الرفع",
+      photo: "رفع صورة",
+      logo: "رفع شعار"
     }
   }
 } as const;
