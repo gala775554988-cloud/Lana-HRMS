@@ -37,23 +37,94 @@ async function getAuthorization(userId: string) {
 
 async function findUserByIdentifier(identifier: string) {
   const normalized = identifier.trim();
-  const adminUser = await prisma.user.findFirst({
+  const lower = normalized.toLowerCase();
+
+  // 1. Admin by username
+  const byUsername = await prisma.user.findFirst({
     where: {
-      username: {
-        equals: normalized.toLowerCase(),
-        mode: "insensitive"
-      }
+      OR: [
+        { username: normalized },
+        { username: { equals: lower, mode: "insensitive" } }
+      ]
     }
   });
+  if (byUsername) return byUsername;
 
-  if (adminUser) return adminUser;
-
-  const employee = await prisma.employee.findUnique({
+  // 2. Employee by nationalId (primary for employees)
+  let employee = await prisma.employee.findUnique({
     where: { nationalId: normalized },
     include: { user: true }
   });
 
-  return employee?.user ?? null;
+  // 3. Fallback: by employeeNumber
+  if (!employee) {
+    employee = await prisma.employee.findFirst({
+      where: { employeeNumber: normalized },
+      include: { user: true }
+    });
+  }
+
+  if (employee) {
+    // If employee exists but has no linked user or the user has no password, auto-repair it
+    if (!employee.user || !employee.user.passwordHash) {
+      // Create or repair the user account for this employee
+      const defaultPass = `Emp@${normalized.slice(-4).padStart(4, "0")}`;
+      const passwordHash = await (await import("./lib/password")).hashPassword(defaultPass);
+
+      const userEmail = employee.email || `employee.${normalized}@lana.local`;
+
+      const user = await prisma.user.upsert({
+        where: { email: userEmail.toLowerCase() },
+        update: {
+          passwordHash,
+          isActive: true,
+          name: `${employee.firstName} ${employee.lastName}`.trim()
+        },
+        create: {
+          email: userEmail.toLowerCase(),
+          name: `${employee.firstName} ${employee.lastName}`.trim(),
+          passwordHash,
+          emailVerified: new Date(),
+          isActive: true
+        }
+      });
+
+      // Link employee to user if not linked
+      if (!employee.userId || employee.userId !== user.id) {
+        await prisma.employee.update({
+          where: { id: employee.id },
+          data: { userId: user.id }
+        });
+      }
+
+      // Assign EMPLOYEE role
+      const employeeRole = await prisma.role.findUnique({ where: { name: "EMPLOYEE" } });
+      if (employeeRole) {
+        await prisma.userRole.upsert({
+          where: { userId_roleId: { userId: user.id, roleId: employeeRole.id } },
+          update: {},
+          create: { userId: user.id, roleId: employeeRole.id }
+        });
+      }
+
+      return user;
+    }
+
+    return employee.user;
+  }
+
+  // 4. Direct user lookup
+  const directUser = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { email: { equals: lower, mode: "insensitive" } },
+        { username: { equals: lower, mode: "insensitive" } }
+      ]
+    }
+  });
+  if (directUser) return directUser;
+
+  return null;
 }
 
 export const authConfig = {
@@ -83,7 +154,18 @@ export const authConfig = {
 
         const user = await findUserByIdentifier(parsed.data.identifier);
 
-        if (!user?.passwordHash || !user.isActive) {
+        if (!user) {
+          console.log("[Auth] No user found for identifier:", parsed.data.identifier);
+          return null;
+        }
+
+        if (!user.isActive) {
+          console.log("[Auth] User is inactive:", user.id);
+          return null;
+        }
+
+        if (!user.passwordHash) {
+          console.log("[Auth] No passwordHash for user:", user.id);
           return null;
         }
 
@@ -93,6 +175,7 @@ export const authConfig = {
         );
 
         if (!passwordValid) {
+          console.log("[Auth] Password mismatch for user:", user.id);
           return null;
         }
 
