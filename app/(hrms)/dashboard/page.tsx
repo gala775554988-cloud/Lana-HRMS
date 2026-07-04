@@ -1,4 +1,4 @@
-import { Activity, Bell, BriefcaseBusiness, CalendarClock, Users } from "lucide-react";
+import { Activity, Bell, BriefcaseBusiness, CalendarClock, Users, User } from "lucide-react";
 import Link from "next/link";
 import { DashboardCharts } from "@/components/hrms/dashboard-charts";
 import { Badge } from "@/components/ui/badge";
@@ -23,45 +23,28 @@ export default async function DashboardPage() {
   const isOnlyEmployee = userRoles.length === 1 && userRoles.includes("EMPLOYEE");
 
   if (isOnlyEmployee) {
+    // Redirect employees to the beautiful new mobile-style employee portal
     return (
-      <div className="space-y-8">
-        {/* Welcome with Name */}
-        <div className="rounded-2xl bg-gradient-to-br from-slate-900 to-slate-700 p-8 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-white/70 text-sm">تم تسجيل الدخول باسم</p>
-              <h1 className="text-4xl font-bold mt-1">{session?.user?.name || "موظف"}</h1>
-            </div>
-            <div className="text-right">
-              <Badge variant="secondary" className="bg-white/20 text-white">EMPLOYEE</Badge>
-            </div>
+      <div className="min-h-[70vh] flex flex-col items-center justify-center text-center p-8 bg-[#0A0A12] text-white rounded-3xl">
+        <div className="max-w-xs mx-auto">
+          <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center mb-6">
+            <User className="h-8 w-8 text-white" />
           </div>
+          
+          <h1 className="text-3xl font-bold mb-2">مرحباً {session?.user?.name || "موظف"}</h1>
+          <p className="text-white/70 mb-8">استمتع بتجربة بوابتك الشخصية الجديدة</p>
+          
           <Link 
             href="/my" 
-            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-white text-slate-900 px-6 py-3 font-medium hover:bg-white/90 transition"
+            className="inline-flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 transition-colors w-full py-3.5 rounded-2xl font-semibold text-lg shadow-lg"
           >
-            بوابتي الشخصية →
+            افتح بوابتي الشخصية <span className="text-xl">→</span>
           </Link>
+          
+          <p className="text-xs text-white/50 mt-6">
+            الحضور • الإجازات • الرواتب • الطلبات • الملف الشخصي
+          </p>
         </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>الوصول السريع</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <Link href="/my" className="p-4 border rounded-xl hover:bg-accent flex items-center gap-3">
-                📸 معلوماتي + رفع الصورة
-              </Link>
-              <Link href="/my" className="p-4 border rounded-xl hover:bg-accent flex items-center gap-3">
-                🗓️ طلب إجازة
-              </Link>
-              <Link href="/my" className="p-4 border rounded-xl hover:bg-accent flex items-center gap-3">
-                💰 طلب سلفة
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     );
   }

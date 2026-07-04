@@ -19,6 +19,10 @@ export async function AppShell({ children, companyLogo }: { children: ReactNode;
   const visibleNavigation = hrmsNavigation.filter((item) => hasPermission(session.user.permissions, { action: "read", resource: item.resource }));
   const navLabels = dictionary.nav;
 
+  const userRoles = (session.user.roles as string[]) || [];
+  const isOnlyEmployee = userRoles.length === 1 && userRoles.includes("EMPLOYEE");
+  const isEmployeePortal = isOnlyEmployee; // Employee on /my will get a streamlined experience below
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,hsl(var(--primary)/0.08),transparent_34rem),linear-gradient(180deg,hsl(var(--background)),hsl(var(--muted)/0.35))] text-foreground">
       <header className="sticky top-0 z-20 border-b bg-background/85 backdrop-blur-xl">

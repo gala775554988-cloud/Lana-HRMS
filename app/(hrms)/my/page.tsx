@@ -1,14 +1,19 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { EmployeeSelfService } from "@/components/hrms/employee-self-service";
+import { EmployeePortal } from "@/components/hrms/employee-portal";
 
 export default async function MyEmployeePortal() {
   const session = await auth();
+  
   if (!session?.user) {
-    return <div className="p-8 text-center">يرجى تسجيل الدخول</div>;
+    return (
+      <div className="min-h-screen bg-[#0A0A12] flex items-center justify-center text-white">
+        يرجى تسجيل الدخول
+      </div>
+    );
   }
 
-  // Get the logged-in employee's full profile
+  // Fetch full employee profile
   const employee = await prisma.employee.findFirst({
     where: { userId: session.user.id },
     include: {
@@ -34,13 +39,24 @@ export default async function MyEmployeePortal() {
     }
   }
 
+  // If no employee profile yet, create a minimal fallback (helps with demo login)
+  const employeeData = employee || {
+    id: "demo-" + session.user.id,
+    firstName: session.user.name?.split(" ")[0] || "موظف",
+    lastName: session.user.name?.split(" ").slice(1).join(" ") || "",
+    employeeNumber: "EMP-" + (session.user.id.slice(0, 5) || "001"),
+    nationalId: "1000000001",
+    profilePhotoUrl: null,
+    phone: null,
+    department: null,
+    position: { title: "موظف" } as any,
+  };
+
   return (
-    <div className="max-w-5xl mx-auto">
-      <EmployeeSelfService
-        employee={employee}
-        salaryInfo={salaryInfo}
-        userName={session.user.name}
-      />
-    </div>
+    <EmployeePortal 
+      employee={employeeData as any} 
+      salaryInfo={salaryInfo} 
+      userName={session.user.name} 
+    />
   );
 }
