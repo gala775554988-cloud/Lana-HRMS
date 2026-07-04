@@ -16,14 +16,26 @@ function display(value: unknown) {
 
 type RelatedDelegate = { findMany(args: Record<string, unknown>): Promise<Record<string, unknown>[]> };
 
+async function safeFindMany(
+  client: Record<string, RelatedDelegate>,
+  model: string,
+  args: Record<string, unknown>
+) {
+  try {
+    return await (client[model]?.findMany?.(args) ?? Promise.resolve([]));
+  } catch {
+    return [];
+  }
+}
+
 async function getEmployeeRelated(id: string) {
   const client = prisma as unknown as Record<string, RelatedDelegate>;
   const [documents, contracts, attendance, leaveRequests, assets] = await Promise.all([
-    client.employeeDocument.findMany({ where: { employeeId: id }, take: 5, orderBy: { uploadedAt: "desc" } }),
-    client.employeeContract.findMany({ where: { employeeId: id }, take: 5, orderBy: { createdAt: "desc" } }),
-    client.attendanceRecord.findMany({ where: { employeeId: id }, take: 5, orderBy: { workDate: "desc" } }),
-    client.leaveRequest.findMany({ where: { employeeId: id }, take: 5, orderBy: { createdAt: "desc" } }),
-    client.asset.findMany({ where: { assignedEmployeeId: id }, take: 5, orderBy: { updatedAt: "desc" } })
+    safeFindMany(client, "employeeDocument", { where: { employeeId: id }, take: 5, orderBy: { uploadedAt: "desc" } }),
+    safeFindMany(client, "employeeContract", { where: { employeeId: id }, take: 5, orderBy: { createdAt: "desc" } }),
+    safeFindMany(client, "attendanceRecord", { where: { employeeId: id }, take: 5, orderBy: { workDate: "desc" } }),
+    safeFindMany(client, "leaveRequest", { where: { employeeId: id }, take: 5, orderBy: { createdAt: "desc" } }),
+    safeFindMany(client, "asset", { where: { assignedEmployeeId: id }, take: 5, orderBy: { updatedAt: "desc" } })
   ]);
   return { documents, contracts, attendance, leaveRequests, assets };
 }

@@ -290,13 +290,33 @@ export async function getDashboardMetrics() {
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
   const client = prisma as unknown as Record<string, CountDelegate>;
+
+  const safeCount = async (fn: () => Promise<any>, fallback = 0) => {
+    try {
+      const result = await fn();
+      return typeof result === "number" ? result : fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
+  const safeFindMany = async (fn: () => Promise<any>, fallback: any[] = []) => {
+    try {
+      const result = await fn();
+      return Array.isArray(result) ? result : fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
   const [employees, departments, openJobs, pendingLeave, unreadNotifications, auditLogs] = await Promise.all([
-    client.employee.count(),
-    client.department.count(),
-    client.jobOpening.count({ where: { status: "OPEN" } }),
-    client.leaveRequest.count({ where: { status: "PENDING" } }),
-    client.notification.count({ where: { OR: [{ userId: session.user.id }, { userId: null }], readAt: null } }),
-    client.auditLog.findMany({ take: 8, orderBy: { createdAt: "desc" } })
+    safeCount(() => client.employee.count()),
+    safeCount(() => client.department.count()),
+    safeCount(() => client.jobOpening?.count?.({ where: { status: "OPEN" } }) ?? Promise.resolve(0)),
+    safeCount(() => client.leaveRequest?.count?.({ where: { status: "PENDING" } }) ?? Promise.resolve(0)),
+    safeCount(() => client.notification?.count?.({ where: { OR: [{ userId: session.user.id }, { userId: null }], readAt: null } }) ?? Promise.resolve(0)),
+    safeFindMany(() => client.auditLog?.findMany?.({ take: 8, orderBy: { createdAt: "desc" } }) ?? Promise.resolve([]))
   ]);
+
   return serialize({ employees, departments, openJobs, pendingLeave, unreadNotifications, auditLogs }) as Record<string, unknown>;
 }
