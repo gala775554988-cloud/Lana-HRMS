@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 import { ThemeToggle } from "@/components/hrms/theme-toggle";
 
-export async function AppShell({ children }: { children: ReactNode }) {
+export async function AppShell({ children, companyLogo }: { children: ReactNode; companyLogo?: string | null }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
   const { locale, dictionary } = await getRequestDictionary();
@@ -24,7 +24,15 @@ export async function AppShell({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-20 border-b bg-background/85 backdrop-blur-xl">
         <div className="flex min-h-16 items-center justify-between gap-4 px-4 lg:px-8">
           <Link href="/dashboard" className="flex items-center gap-3 font-semibold" aria-label="HRMS dashboard">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm"><Building2 className="h-5 w-5" /></span>
+            {companyLogo ? (
+              <img 
+                src={companyLogo} 
+                alt="Company logo" 
+                className="h-9 w-auto rounded-lg object-contain shadow-sm max-w-[140px]" 
+              />
+            ) : (
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm"><Building2 className="h-5 w-5" /></span>
+            )}
             <span className="hidden sm:block">Lana HRMS</span>
           </Link>
           <div className="flex min-w-0 flex-1 items-center justify-center px-4">

@@ -1,13 +1,18 @@
+'use client';
+
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getRequestDictionary } from "@/lib/i18n-server";
 import { FileUpload } from "@/components/hrms/file-upload";
 import Link from "next/link";
 
-export default async function SettingsPage() {
-  const { dictionary } = await getRequestDictionary();
-  const t = (dictionary as any).settings || {
+export default function SettingsPage() {
+  const [logoUrl, setLogoUrl] = useState("");
+  const [savedMessage, setSavedMessage] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  const t = {
     title: "Company Settings",
     branding: "Branding",
     companyLogo: "Company Logo",
@@ -17,6 +22,36 @@ export default async function SettingsPage() {
     logoUrl: "Logo URL",
     saveBranding: "Save Branding",
     saved: "Settings saved successfully."
+  };
+
+  const handleLogoUploaded = async (url: string) => {
+    setLogoUrl(url);
+    await saveLogoToServer(url);
+  };
+
+  const saveLogoToServer = async (url: string) => {
+    setIsSaving(true);
+    try {
+      const res = await fetch("/api/settings/logo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+
+      if (res.ok) {
+        setSavedMessage(t.saved);
+        setTimeout(() => setSavedMessage(""), 2500);
+      }
+    } catch (e) {
+      console.error("Failed to save logo");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const saveManualUrl = async () => {
+    if (!logoUrl.trim()) return;
+    await saveLogoToServer(logoUrl.trim());
   };
 
   return (
@@ -36,18 +71,26 @@ export default async function SettingsPage() {
             <label className="text-sm font-medium mb-2 block">{t.companyLogo}</label>
             <div className="flex flex-col gap-4 md:flex-row md:items-end">
               <div className="flex-1">
-                <FileUpload />
+                <FileUpload onUploaded={handleLogoUploaded} />
               </div>
               
               <div className="text-sm">
                 <div className="font-medium mb-1">{t.currentLogo}</div>
                 <div className="flex items-center gap-2">
-                  <img 
-                    src="/uploads/default-logo.png" 
-                    alt="Company logo" 
-                    className="h-12 w-auto border rounded bg-white p-1" 
-                    onError={(e) => { (e.target as HTMLImageElement).src = "https://placehold.co/120x48?text=LOGO" }} 
-                  />
+                  {logoUrl ? (
+                    <img 
+                      src={logoUrl} 
+                      alt="Company logo" 
+                      className="h-12 w-auto border rounded bg-white p-1 max-w-[140px] object-contain" 
+                    />
+                  ) : (
+                    <img 
+                      src="/uploads/default-logo.png" 
+                      alt="Company logo" 
+                      className="h-12 w-auto border rounded bg-white p-1" 
+                      onError={(e) => { (e.target as HTMLImageElement).src = "https://placehold.co/120x48?text=LOGO" }} 
+                    />
+                  )}
                   <span className="text-xs text-muted-foreground">Default or last uploaded</span>
                 </div>
               </div>
@@ -57,15 +100,28 @@ export default async function SettingsPage() {
           <div className="pt-2">
             <label className="text-sm font-medium block mb-1.5">{t.logoUrl}</label>
             <div className="flex gap-2">
-              <Input placeholder="https://.../logo.png" className="flex-1" />
-              <Button variant="outline">{t.saveBranding}</Button>
+              <Input 
+                placeholder="https://.../logo.png" 
+                value={logoUrl} 
+                onChange={(e) => setLogoUrl(e.target.value)} 
+                className="flex-1" 
+              />
+              <Button 
+                variant="outline" 
+                onClick={saveManualUrl}
+                disabled={isSaving || !logoUrl.trim()}
+              >
+                {t.saveBranding}
+              </Button>
             </div>
             <p className="text-[10px] text-muted-foreground mt-1">You can also paste a direct URL to the logo.</p>
           </div>
 
-          <div className="pt-3 border-t text-xs text-muted-foreground">
-            {t.saved}
-          </div>
+          {savedMessage && (
+            <div className="pt-3 border-t text-xs text-emerald-600 font-medium">
+              {savedMessage}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -76,3 +132,4 @@ export default async function SettingsPage() {
     </section>
   );
 }
+
