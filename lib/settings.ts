@@ -37,7 +37,7 @@ export async function setAppSetting(key: string, value: unknown, description?: s
 export async function getCompanyLogo(): Promise<string | null> {
   const setting = await getAppSetting("company.logo");
   if (setting && typeof setting === "object" && setting && "url" in setting) {
-    return (setting as any).url;
+    return (setting as any).url as string | null;
   }
   if (typeof setting === "string") return setting;
   return null;
