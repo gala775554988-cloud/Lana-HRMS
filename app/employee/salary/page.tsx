@@ -1,8 +1,14 @@
 import { getCurrentEmployee, getPayrollSummary } from "@/lib/employee/data";
-import { SalaryPage } from "@/components/employee/SalaryPage";
+import { SalaryView } from "@/components/employee/SalaryView";
 
-export default async function Salary() {
+export default async function SalaryPage() {
   const employee = await getCurrentEmployee();
-  const payroll = employee ? await getPayrollSummary(employee.id) : { baseSalary: 12500, currency: "SAR" };
-  return <SalaryPage employee={employee} payroll={payroll} />;
+  const payroll = employee ? await getPayrollSummary(employee.id) : null;
+
+  return (
+    <div>
+      <h1 className="text-2xl font-semibold mb-6">الرواتب</h1>
+      <SalaryView payroll={payroll} />
+    </div>
+  );
 }

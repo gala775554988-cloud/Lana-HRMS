@@ -1,8 +1,14 @@
-import { getCurrentEmployee, getRequestSummary } from "@/lib/employee/data";
-import { RequestsPage } from "@/components/employee/RequestsPage";
+import { getCurrentEmployee } from "@/lib/employee/data";
+import { RequestsCenter } from "@/components/employee/RequestsCenter";
 
-export default async function Requests() {
+export default async function RequestsPage() {
   const employee = await getCurrentEmployee();
-  const summary = employee ? await getRequestSummary(employee.id) : { pending: 0, approved: 0, rejected: 0 };
-  return <RequestsPage employee={employee} summary={summary} />;
+  if (!employee) return <div>خطأ</div>;
+
+  return (
+    <div>
+      <h1 className="text-2xl font-semibold mb-6">مركز الطلبات</h1>
+      <RequestsCenter employeeId={employee.id} />
+    </div>
+  );
 }
