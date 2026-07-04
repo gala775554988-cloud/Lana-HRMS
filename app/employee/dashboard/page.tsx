@@ -9,6 +9,8 @@ import { RecentRequests } from "@/components/employee/RecentRequests";
 import { LatestNotifications } from "@/components/employee/LatestNotifications";
 import { DashboardContentSkeleton } from "@/components/employee/skeletons";
 
+export const dynamic = 'force-dynamic';
+
 export default async function EmployeeDashboard() {
   const session = await auth();
   if (!session?.user) redirect("/login");
@@ -19,17 +21,12 @@ export default async function EmployeeDashboard() {
   });
 
   if (!employee) {
-    return (
-      <div className="p-8 text-center text-slate-500">
-        لم يتم العثور على بيانات الموظف.
-      </div>
-    );
+    return <div className="p-8 text-center">لم يتم العثور على بيانات الموظف.</div>;
   }
 
   return (
     <div className="space-y-8">
       <DashboardHeader employee={employee as any} />
-
       <Suspense fallback={<DashboardContentSkeleton />}>
         <DashboardContent employeeId={employee.id} />
       </Suspense>
@@ -37,15 +34,11 @@ export default async function EmployeeDashboard() {
   );
 }
 
-// 100% SELF-CONTAINED — NO getEmployeeDashboardData
 async function DashboardContent({ employeeId }: { employeeId: string }) {
   let data: any = null;
 
   try {
-    const emp = await prisma.employee.findUnique({
-      where: { id: employeeId },
-      select: { userId: true },
-    });
+    const emp = await prisma.employee.findUnique({ where: { id: employeeId }, select: { userId: true } });
     const userId = emp?.userId;
 
     const [
@@ -70,10 +63,7 @@ async function DashboardContent({ employeeId }: { employeeId: string }) {
       prisma.leaveRequest.count({ where: { employeeId, status: "REJECTED" } }),
       prisma.leaveRequest.findMany({ where: { employeeId }, orderBy: { createdAt: "desc" }, take: 5 }),
       prisma.overtimeRequest.findMany({ where: { employeeId }, orderBy: { createdAt: "desc" }, take: 2 }),
-      prisma.auditLog.findMany({
-        where: { entity: { in: ["leave","loan","overtime","expense"] }, metadata: { path: ["employeeId"], equals: employeeId } },
-        orderBy: { createdAt: "desc" }, take: 6,
-      }),
+      prisma.auditLog.findMany({ where: { entity: { in: ["leave","loan","overtime","expense"] }, metadata: { path: ["employeeId"], equals: employeeId } }, orderBy: { createdAt: "desc" }, take: 6 }),
       prisma.notification.findMany({ where: { userId: userId ?? undefined }, orderBy: { createdAt: "desc" }, take: 5 }),
     ]);
 
@@ -97,8 +87,8 @@ async function DashboardContent({ employeeId }: { employeeId: string }) {
         ...(notifs || []).map((n: any) => ({ id: n.id, title: n.title, createdAt: n.createdAt.toISOString() })),
       ].slice(0, 5),
     };
-  } catch (e: any) {
-    console.error("[Dashboard] Error:", e?.message);
+  } catch (e) {
+    console.error("[Dashboard] Error:", e);
     data = null;
   }
 
