@@ -14,8 +14,59 @@ const kpiMeta = [
 ];
 
 export default async function DashboardPage() {
+  const session = await import("@/auth").then(m => m.auth());
   const metrics = await getDashboardMetrics();
   const { dictionary } = await getRequestDictionary();
+
+  const userRoles = (session?.user?.roles as string[]) || [];
+  const isOnlyEmployee = userRoles.length === 1 && userRoles.includes("EMPLOYEE");
+
+  if (isOnlyEmployee) {
+    return (
+      <div className="space-y-8">
+        {/* Welcome with Name */}
+        <div className="rounded-2xl bg-gradient-to-br from-slate-900 to-slate-700 p-8 text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-white/70 text-sm">تم تسجيل الدخول باسم</p>
+              <h1 className="text-4xl font-bold mt-1">{session?.user?.name || "موظف"}</h1>
+            </div>
+            <div className="text-right">
+              <Badge variant="secondary" className="bg-white/20 text-white">EMPLOYEE</Badge>
+            </div>
+          </div>
+          <a 
+            href="/my" 
+            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-white text-slate-900 px-6 py-3 font-medium hover:bg-white/90 transition"
+          >
+            بوابتي الشخصية →
+          </a>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>الوصول السريع</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <a href="/my" className="p-4 border rounded-xl hover:bg-accent flex items-center gap-3">
+                <User className="h-5 w-5" />
+                <span>معلوماتي + رفع الصورة</span>
+              </a>
+              <a href="/my" className="p-4 border rounded-xl hover:bg-accent flex items-center gap-3">
+                <Calendar className="h-5 w-5" />
+                <span>طلب إجازة</span>
+              </a>
+              <a href="/my" className="p-4 border rounded-xl hover:bg-accent flex items-center gap-3">
+                <CreditCard className="h-5 w-5" />
+                <span>طلب سلفة</span>
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
   const auditLogs = (metrics.auditLogs as Record<string, unknown>[] | undefined) ?? [];
 
   return (
