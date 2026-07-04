@@ -3,12 +3,13 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Calendar, Clock, FileText, DollarSign } from 'lucide-react';
+import type { AttendanceSummary, LeaveBalance, PayrollSummary, RequestSummary } from '@/types/employee';
 
 interface Props {
-  attendance: any;
-  leaveBalance: any;
-  payroll: any;
-  requests: any;
+  attendance: AttendanceSummary;
+  leaveBalance: LeaveBalance;
+  payroll: PayrollSummary;
+  requests: RequestSummary;
 }
 
 export function KpiCards({ attendance, leaveBalance, payroll, requests }: Props) {

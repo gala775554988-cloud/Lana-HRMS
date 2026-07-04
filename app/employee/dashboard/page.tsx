@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import { getCurrentEmployee, getAttendanceSummary, getLeaveBalance, getPayrollSummary, getRequestSummary, getRecentNotifications } from "@/lib/employee/data";
+import { getCurrentEmployee } from "@/lib/employee/data";
 import { DashboardHeader } from "@/components/employee/DashboardHeader";
 import { KpiCards } from "@/components/employee/KpiCards";
 import { QuickActions } from "@/components/employee/QuickActions";
@@ -28,17 +28,24 @@ export default async function EmployeeDashboard() {
 }
 
 async function DashboardContent({ employeeId }: { employeeId: string }) {
-  const [attendance, leaveBalance, payroll, requests, notifications] = await Promise.all([
+  const { 
+    getAttendanceSummary, 
+    getLeaveBalance, 
+    getPayrollSummary, 
+    getRequestSummary, 
+    getRecentNotifications 
+  } = await import("@/lib/employee/data");
+
+  // Only load KPIs first (fast)
+  const [attendance, leaveBalance, payroll, requests] = await Promise.all([
     getAttendanceSummary(employeeId),
     getLeaveBalance(employeeId),
     getPayrollSummary(employeeId),
     getRequestSummary(employeeId),
-    getRecentNotifications(employeeId),
   ]);
 
   return (
     <>
-      {/* KPI Cards */}
       <KpiCards 
         attendance={attendance} 
         leaveBalance={leaveBalance} 
@@ -46,18 +53,35 @@ async function DashboardContent({ employeeId }: { employeeId: string }) {
         requests={requests} 
       />
 
-      {/* Quick Actions + Notifications */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <QuickActions />
-        </div>
-        <div>
-          <LatestNotifications notifications={notifications} />
-        </div>
-      </div>
+      <QuickActions />
 
-      {/* Recent Requests */}
-      <RecentRequests employeeId={employeeId} />
+      {/* Lazy loaded sections */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Suspense fallback={<div className="h-64 animate-pulse bg-slate-100 rounded-2xl" />}>
+          <LatestNotificationsLazy employeeId={employeeId} />
+        </Suspense>
+
+        <Suspense fallback={<div className="h-64 animate-pulse bg-slate-100 rounded-2xl" />}>
+          <RecentRequestsLazy employeeId={employeeId} />
+        </Suspense>
+      </div>
     </>
   );
+}
+
+// Lazy loaded components
+async function LatestNotificationsLazy({ employeeId }: { employeeId: string }) {
+  const { getRecentNotifications } = await import("@/lib/employee/data");
+  const notifications = await getRecentNotifications(employeeId);
+  return <LatestNotifications notifications={notifications} />;
+}
+
+async function RecentRequestsLazy({ employeeId }: { employeeId: string }) {
+  const { prisma } = await import("@/lib/prisma");
+  const requests = await prisma.leaveRequest.findMany({
+    where: { employeeId },
+    orderBy: { createdAt: "desc" },
+    take: 5,
+  });
+  return <RecentRequests requests={requests} />;
 }

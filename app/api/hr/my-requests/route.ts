@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { createWorkflow } from "@/lib/employee/workflow";
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -8,34 +9,43 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   }
 
+  const body = await request.json();
+  const { type, employeeId, ...data } = body;
+
+  const employee = await prisma.employee.findFirst({
+    where: { id: employeeId, userId: session.user.id },
+  });
+
+  if (!employee) {
+    return NextResponse.json({ success: false, message: "Access denied" }, { status: 403 });
+  }
+
+  let result: any;
+  const requestType = type.toUpperCase();
+
   try {
-    const body = await request.json();
-    const { type, employeeId, ...data } = body;
-
-    // Security: verify the employee belongs to this user
-    const employee = await prisma.employee.findFirst({
-      where: {
-        id: employeeId,
-        userId: session.user.id,
-      },
-    });
-
-    if (!employee) {
-      return NextResponse.json({ success: false, message: "Employee not found or access denied" }, { status: 403 });
-    }
-
-    let result;
-
     switch (type) {
       case "leave":
         result = await prisma.leaveRequest.create({
           data: {
             employeeId,
-            leaveTypeId: data.leaveType || "annual", // fallback
+            leaveTypeId: data.leaveTypeId || "annual",
             startDate: new Date(data.startDate),
             endDate: new Date(data.endDate),
-            days: 1, // calculate properly in real app
+            days: data.days || 1,
             reason: data.reason,
+            status: "PENDING",
+          },
+        });
+        break;
+
+      case "expense":
+        result = await prisma.expenseRequest.create({
+          data: {
+            employeeId,
+            amount: data.amount,
+            category: data.category || "general",
+            description: data.description,
             status: "PENDING",
           },
         });
@@ -51,38 +61,31 @@ export async function POST(request: Request) {
             installmentAmount: Math.round(data.amount / 12),
             currency: "SAR",
             issuedAt: new Date(),
-            status: "ACTIVE", // loan requests start as ACTIVE (no PENDING in enum)
+            status: "ACTIVE",
             notes: data.notes,
           },
         });
         break;
 
-      case "overtime":
-        result = await prisma.overtimeRequest.create({
+      case "letter":
+        result = await prisma.letterRequest.create({
           data: {
             employeeId,
-            workDate: new Date(),
-            hours: data.hours || 2,
-            rate: 1.5,
-            reason: data.details || "طلب أوفر تايم",
+            letterType: data.letterType || "salary",
+            purpose: data.purpose,
             status: "PENDING",
           },
         });
         break;
 
       default:
-        // Generic request (complaint, residence, delegation)
-        result = await prisma.announcement.create({
-          data: {
-            title: `طلب ${type} من ${employee.firstName}`,
-            body: data.details || JSON.stringify(data),
-            audience: "HR",
-            isPublished: false,
-          },
-        });
+        return NextResponse.json({ success: false, message: "Unknown request type" }, { status: 400 });
     }
 
-    // Create audit log
+    // === CRITICAL: Create Workflow automatically ===
+    await createWorkflow(employeeId, requestType, result.id);
+
+    // Audit
     await prisma.auditLog.create({
       data: {
         actorUserId: session.user.id,
@@ -93,12 +96,9 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json({ success: true, id: result.id });
+    return NextResponse.json({ success: true, id: result.id, type });
   } catch (error: any) {
     console.error("Request creation failed:", error);
-    return NextResponse.json(
-      { success: false, message: error.message || "Failed to create request" },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 }
