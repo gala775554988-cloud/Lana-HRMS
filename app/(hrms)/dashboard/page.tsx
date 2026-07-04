@@ -1,4 +1,4 @@
-import { Activity, Bell, BriefcaseBusiness, CalendarClock, Users } from "lucide-react";
+import { Activity, Bell, BriefcaseBusiness, CalendarClock, Users, User, Calendar, CreditCard } from "lucide-react";
 import Link from "next/link";
 import { DashboardCharts } from "@/components/hrms/dashboard-charts";
 import { Badge } from "@/components/ui/badge";
