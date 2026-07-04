@@ -64,6 +64,8 @@ export async function AppShell({ children, companyLogo }: { children: ReactNode;
             {visibleNavigation.map((item) => (
               <Link key={item.href} href={item.href} className="block whitespace-nowrap rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">{item.key in navLabels ? navLabels[item.key as keyof typeof navLabels] : item.label}</Link>
             ))}
+            {/* Self-service link for employees */}
+            <Link href="/my" className="block whitespace-nowrap rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">بوابتي الشخصية</Link>
           </nav>
         </aside>
         <main className="min-w-0 p-4 lg:p-8">{children}</main>
