@@ -3,7 +3,7 @@ const moduleResources = [
 ] as const;
 
 export const authRoutes = ["/login", "/forgot-password", "/reset-password", "/verify-email"];
-export const publicRoutes = ["/", ...authRoutes];
+export const publicRoutes = [...authRoutes];
 export const DEFAULT_LOGIN_REDIRECT = "/dashboard";
 
 export const permissions = Object.fromEntries(

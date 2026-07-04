@@ -110,15 +110,39 @@ export const authConfig = {
     })
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user?.id) {
         token.sub = user.id;
+        token.name = user.name ?? token.name;
+        token.email = user.email ?? token.email;
+        token.picture = user.image ?? token.picture;
+
+        try {
+          const authorization = await getAuthorization(user.id);
+          token.roles = authorization.roles;
+          token.permissions = authorization.permissions;
+        } catch {
+          // Edge runtime or DB unavailable (e.g., middleware): keep existing token claims
+          token.roles = token.roles ?? [];
+          token.permissions = token.permissions ?? [];
+        }
       }
 
-      if (token.sub) {
-        const authorization = await getAuthorization(token.sub);
-        token.roles = authorization.roles;
-        token.permissions = authorization.permissions;
+      // Do NOT hit the database on every JWT invocation (middleware runs on Edge).
+      // Roles/permissions are established at sign-in and persist in the JWT.
+      // If roles are missing for any reason, default to empty arrays to avoid Edge DB access.
+      if (!token.roles) token.roles = [];
+      if (!token.permissions) token.permissions = [];
+
+      // Optional: allow explicit session update to refresh authorization server-side
+      if (trigger === "update" && token.sub) {
+        try {
+          const authorization = await getAuthorization(token.sub);
+          token.roles = authorization.roles;
+          token.permissions = authorization.permissions;
+        } catch {
+          // ignore Edge / DB errors during update
+        }
       }
 
       return token;
@@ -126,14 +150,14 @@ export const authConfig = {
     async session({ session, token }) {
       if (session.user && token.sub) {
         session.user.id = token.sub;
-        session.user.roles = token.roles ?? [];
-        session.user.permissions = token.permissions ?? [];
+        session.user.roles = (token.roles as string[]) ?? [];
+        session.user.permissions = (token.permissions as string[]) ?? [];
+        session.user.name = token.name ?? session.user.name;
+        session.user.email = token.email ?? session.user.email;
+        session.user.image = (token.picture as string | null) ?? session.user.image;
       }
 
       return session;
-    },
-    authorized({ auth }) {
-      return Boolean(auth?.user);
     }
   }
 } satisfies NextAuthConfig;
