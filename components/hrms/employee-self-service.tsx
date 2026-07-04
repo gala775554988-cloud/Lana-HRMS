@@ -177,7 +177,7 @@ export function EmployeeSelfService({ employee, salaryInfo, userName }: Props) {
                   ) : (
                      <RequestForm 
                       type={req.key} 
-                      onSubmit={(d: Record<string, unknown>) => handleSubmit(req.key, d)} 
+                      onSubmit={(d: any) => handleSubmit(req.key, d)} 
                       onCancel={() => setActiveForm(null)} 
                       loading={submitting} 
                     />
