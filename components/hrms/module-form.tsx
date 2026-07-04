@@ -13,8 +13,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Dictionary } from "@/lib/i18n";
+import type { Locale } from "@/lib/i18n";
 
-export function ModuleForm({ resource, dictionary, initialValues, recordId }: { resource: HrmsModule; dictionary: Dictionary; initialValues?: Record<string, unknown>; recordId?: string }) {
+export function ModuleForm({ resource, dictionary, initialValues, recordId, locale = "en" }: { resource: HrmsModule; dictionary: Dictionary; initialValues?: Record<string, unknown>; recordId?: string; locale?: Locale }) {
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -29,15 +30,19 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId }: { 
     });
   }
 
+  const fieldsDict = dictionary.fields as Record<string, string>;
+  const getFieldLabel = (name: string, fallback: string) => fieldsDict[name] ?? fallback;
+
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" dir={locale === "ar" ? "rtl" : "ltr"}>
       {message ? <Alert><AlertDescription>{message}</AlertDescription></Alert> : null}
       <div className="grid gap-4 md:grid-cols-2">
         {resource.fields.map((field) => {
           const error = form.formState.errors[field.name]?.message as string | undefined;
+          const label = getFieldLabel(field.name, field.label);
           return (
             <div key={field.name} className={field.type === "textarea" ? "space-y-2 md:col-span-2" : "space-y-2"}>
-              <Label htmlFor={field.name}>{field.label}</Label>
+              <Label htmlFor={field.name}>{label}</Label>
               {field.type === "textarea" ? (
                 <textarea id={field.name} className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" {...form.register(field.name)} />
               ) : field.type === "select" ? (

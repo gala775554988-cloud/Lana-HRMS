@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import NextAuth, { type NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
@@ -6,7 +7,7 @@ import { loginSchema } from "@/lib/validations/auth";
 import { verifyPassword } from "@/lib/password";
 
 async function getAuthorization(userId: string) {
-  const assignments = await prisma.userRole.findMany({
+  const assignments: any = await prisma.userRole.findMany({
     where: { userId },
     include: {
       role: {
@@ -21,10 +22,10 @@ async function getAuthorization(userId: string) {
     }
   });
 
-  const roles = assignments.map((assignment) => assignment.role.name);
-  const permissions = assignments.flatMap((assignment) =>
+  const roles = assignments.map((assignment: any) => assignment.role.name);
+  const permissions = assignments.flatMap((assignment: any) =>
     assignment.role.permissions.map(
-      ({ permission }) => `${permission.action}:${permission.resource}`
+      ({ permission }: any) => `${permission.action}:${permission.resource}`
     )
   );
 
@@ -119,12 +120,12 @@ export const authConfig = {
 
         try {
           const authorization = await getAuthorization(user.id);
-          token.roles = authorization.roles;
-          token.permissions = authorization.permissions;
+          token.roles = authorization.roles as string[];
+          token.permissions = authorization.permissions as string[];
         } catch {
           // Edge runtime or DB unavailable (e.g., middleware): keep existing token claims
-          token.roles = token.roles ?? [];
-          token.permissions = token.permissions ?? [];
+          token.roles = (token.roles as string[]) ?? [];
+          token.permissions = (token.permissions as string[]) ?? [];
         }
       }
 
@@ -138,8 +139,8 @@ export const authConfig = {
       if (trigger === "update" && token.sub) {
         try {
           const authorization = await getAuthorization(token.sub);
-          token.roles = authorization.roles;
-          token.permissions = authorization.permissions;
+          token.roles = authorization.roles as string[];
+          token.permissions = authorization.permissions as string[];
         } catch {
           // ignore Edge / DB errors during update
         }

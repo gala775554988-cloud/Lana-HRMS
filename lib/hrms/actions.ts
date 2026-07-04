@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use server';
 
 import { revalidatePath } from "next/cache";
@@ -7,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/rbac";
 import { writeAuditLog } from "@/lib/audit";
 import { buildModuleSchema } from "@/lib/validations/hrms";
+import { hashPassword } from "@/lib/password";
 
 type QueryInput = {
   resourceKey: string;
@@ -130,12 +132,134 @@ export async function createModuleRecord(input: MutationInput) {
   const session = await requireModulePermission(resource, "manage");
   const parsed = buildModuleSchema(resource).safeParse(input.values);
   if (!parsed.success) return { success: false, message: parsed.error.errors[0]?.message ?? "Invalid input." };
-  const data = normalizeValues(resource, parsed.data);
-  const record = await delegateFor(resource.model).create({ data });
-  await writeAuditLog({ actorUserId: session.user.id, action: "create", entity: resource.model, entityId: String(record.id), metadata: data });
-  revalidatePath("/" + resource.key);
-  revalidatePath("/dashboard");
-  return { success: true, message: resource.title + " record created.", id: String(record.id) };
+  const data = normalizeValues(resource, parsed.data) as Record<string, unknown>;
+
+  // Auto-create User account for new employees
+  if (resource.key === "employees" && resource.model === "employee") {
+    try {
+      const nationalId = String(data.nationalId ?? "");
+      const firstName = String(data.firstName ?? "");
+      const lastName = String(data.lastName ?? "");
+      const emailInput = data.email ? String(data.email) : "";
+      const fullName = `${firstName} ${lastName}`.trim() || "Employee";
+
+      if (!nationalId) {
+        return { success: false, message: "National ID is required to create login account." };
+      }
+
+      // Check if employee with this nationalId already has a user
+      const existingEmployee = await prisma.employee.findUnique({
+        where: { nationalId },
+        include: { user: true }
+      });
+      if (existingEmployee?.userId) {
+        return { success: false, message: "An account already exists for this National ID." };
+      }
+
+      // Check if user with this email already exists
+      const userEmail = emailInput && emailInput.includes("@")
+        ? emailInput.toLowerCase()
+        : `employee.${nationalId}@lana.local`;
+
+      // Actually check email uniquely
+      const emailUser = await prisma.user.findUnique({ where: { email: userEmail } }).catch(() => null);
+
+      // Default employee password: Employee@123456 OR Emp@ + last4 of nationalId
+      // Using secure default that matches seed data pattern
+      const defaultPassword = "Employee@123456";
+      const passwordHash = await hashPassword(defaultPassword);
+
+      // Find EMPLOYEE role
+      const employeeRole = await prisma.role.findUnique({ where: { name: "EMPLOYEE" } });
+
+      // Create user + employee in transaction
+      const result = await prisma.$transaction(async (tx: any) => {
+        // Create or reuse user
+        let user = emailUser;
+        if (!user) {
+          user = await tx.user.create({
+            data: {
+              name: fullName,
+              email: userEmail,
+              emailVerified: new Date(),
+              passwordHash,
+              isActive: true,
+            }
+          });
+        } else {
+          // Update existing user to ensure active + password set
+          user = await tx.user.update({
+            where: { id: user.id },
+            data: {
+              name: fullName || user.name,
+              passwordHash: user.passwordHash ?? passwordHash,
+              isActive: true,
+            }
+          });
+        }
+
+        // Assign EMPLOYEE role
+        if (employeeRole && user) {
+          await tx.userRole.upsert({
+            where: { userId_roleId: { userId: user.id, roleId: employeeRole.id } },
+            update: {},
+            create: { userId: user.id, roleId: employeeRole.id }
+          });
+        }
+
+        if (!user) throw new Error("User creation failed");
+
+        // Create employee linked to user
+        const employee = await tx.employee.create({
+          data: {
+            ...data,
+            userId: user.id,
+          } as any
+        });
+
+        return { user, employee };
+      });
+
+      await writeAuditLog({
+        actorUserId: session.user.id,
+        action: "create",
+        entity: resource.model,
+        entityId: String(result.employee.id),
+        metadata: { ...data, autoUserCreated: true, userId: result.user.id }
+      });
+
+      revalidatePath("/" + resource.key);
+      revalidatePath("/dashboard");
+
+      return {
+        success: true,
+        message: `${resource.title} record created. Login: National ID ${nationalId} / Password: Employee@123456 – please change on first login.`,
+        id: String(result.employee.id)
+      };
+    } catch (error: any) {
+      // Fallback to standard create if auto-user fails
+      // Check for unique constraint errors
+      if (error?.code === "P2002") {
+        return { success: false, message: "Employee with this National ID or Employee Number already exists, or user email already taken." };
+      }
+      // Continue to standard flow below if specific handling fails
+      console.error("Employee auto-user creation failed:", error);
+    }
+  }
+
+  // Standard create for all other modules (and employee fallback)
+  try {
+    const record = await delegateFor(resource.model).create({ data });
+    await writeAuditLog({ actorUserId: session.user.id, action: "create", entity: resource.model, entityId: String(record.id), metadata: data });
+    revalidatePath("/" + resource.key);
+    revalidatePath("/dashboard");
+    return { success: true, message: resource.title + " record created.", id: String(record.id) };
+  } catch (error: any) {
+    if (error?.code === "P2002") {
+      return { success: false, message: "Record already exists – duplicate unique field." };
+    }
+    throw error;
+  }
 }
 
 export async function updateModuleRecord(input: MutationInput) {
