@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 
-export async function getAppSetting(key: string, defaultValue: any = null) {
+export async function getAppSetting(key: string, defaultValue: unknown = null) {
   try {
     const setting = await prisma.appSetting.findUnique({
       where: { key }
@@ -12,17 +12,19 @@ export async function getAppSetting(key: string, defaultValue: any = null) {
   }
 }
 
-export async function setAppSetting(key: string, value: any, description?: string) {
+export async function setAppSetting(key: string, value: unknown, description?: string) {
   try {
+    const jsonValue = typeof value === 'object' && value !== null ? value : { value };
+    
     return await prisma.appSetting.upsert({
       where: { key },
       update: { 
-        value: typeof value === 'object' ? value : { value },
+        value: jsonValue,
         ...(description && { description })
       },
       create: { 
         key, 
-        value: typeof value === 'object' ? value : { value },
+        value: jsonValue,
         description: description || key 
       }
     });

@@ -1,4 +1,5 @@
 import { Activity, Bell, BriefcaseBusiness, CalendarClock, Users } from "lucide-react";
+import Link from "next/link";
 import { DashboardCharts } from "@/components/hrms/dashboard-charts";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,12 +36,12 @@ export default async function DashboardPage() {
               <Badge variant="secondary" className="bg-white/20 text-white">EMPLOYEE</Badge>
             </div>
           </div>
-          <a 
+          <Link 
             href="/my" 
             className="mt-6 inline-flex items-center gap-2 rounded-lg bg-white text-slate-900 px-6 py-3 font-medium hover:bg-white/90 transition"
           >
             بوابتي الشخصية →
-          </a>
+          </Link>
         </div>
 
         <Card>
@@ -49,18 +50,15 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <a href="/my" className="p-4 border rounded-xl hover:bg-accent flex items-center gap-3">
-                <User className="h-5 w-5" />
-                <span>معلوماتي + رفع الصورة</span>
-              </a>
-              <a href="/my" className="p-4 border rounded-xl hover:bg-accent flex items-center gap-3">
-                <Calendar className="h-5 w-5" />
-                <span>طلب إجازة</span>
-              </a>
-              <a href="/my" className="p-4 border rounded-xl hover:bg-accent flex items-center gap-3">
-                <CreditCard className="h-5 w-5" />
-                <span>طلب سلفة</span>
-              </a>
+              <Link href="/my" className="p-4 border rounded-xl hover:bg-accent flex items-center gap-3">
+                📸 معلوماتي + رفع الصورة
+              </Link>
+              <Link href="/my" className="p-4 border rounded-xl hover:bg-accent flex items-center gap-3">
+                🗓️ طلب إجازة
+              </Link>
+              <Link href="/my" className="p-4 border rounded-xl hover:bg-accent flex items-center gap-3">
+                💰 طلب سلفة
+              </Link>
             </div>
           </CardContent>
         </Card>

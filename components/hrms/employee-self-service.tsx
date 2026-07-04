@@ -14,7 +14,17 @@ import {
 import { EmployeePhotoUpload } from './employee-photo-upload';
 
 interface Props {
-  employee: any;
+  employee: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    employeeNumber: string;
+    nationalId: string;
+    profilePhotoUrl?: string | null;
+    phone?: string | null;
+    department?: { name: string } | null;
+    position?: { title: string } | null;
+  } | null;
   salaryInfo?: { baseSalary: number; currency: string } | null;
   userName?: string | null;
 }
@@ -39,7 +49,7 @@ export function EmployeeSelfService({ employee, salaryInfo, userName }: Props) {
     { key: 'delegation', label: 'انتداب', icon: MapPin, desc: 'طلب انتداب' },
   ];
 
-  const handleSubmit = async (type: string, formData: any) => {
+  const handleSubmit = async (type: string, formData: Record<string, string | number | undefined>) => {
     setSubmitting(true);
     setMessage('');
 
@@ -97,7 +107,7 @@ export function EmployeeSelfService({ employee, salaryInfo, userName }: Props) {
             <div className="w-full md:w-48">
               <EmployeePhotoUpload
                 employeeId={employee.id}
-                currentPhoto={employee.profilePhotoUrl}
+                currentPhoto={employee.profilePhotoUrl ?? undefined}
                 onUploaded={() => window.location.reload()}
               />
             </div>
@@ -165,9 +175,9 @@ export function EmployeeSelfService({ employee, salaryInfo, userName }: Props) {
                       فتح النموذج
                     </Button>
                   ) : (
-                    <RequestForm 
+                     <RequestForm 
                       type={req.key} 
-                      onSubmit={(d) => handleSubmit(req.key, d)} 
+                      onSubmit={(d: Record<string, unknown>) => handleSubmit(req.key, d)} 
                       onCancel={() => setActiveForm(null)} 
                       loading={submitting} 
                     />
@@ -182,8 +192,8 @@ export function EmployeeSelfService({ employee, salaryInfo, userName }: Props) {
   );
 }
 
-function RequestForm({ type, onSubmit, onCancel, loading }: any) {
-  const [form, setForm] = useState<any>({});
+function RequestForm({ type, onSubmit, onCancel, loading }: { type: string; onSubmit: (data: Record<string, unknown>) => void; onCancel: () => void; loading: boolean }) {
+  const [form, setForm] = useState<Record<string, unknown>>({});
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();

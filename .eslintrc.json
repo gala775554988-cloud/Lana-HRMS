@@ -1,0 +1,9 @@
+{
+  "extends": "next/core-web-vitals",
+  "rules": {
+    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/no-empty-object-type": "warn",
+    "@next/next/no-html-link-for-pages": "error",
+    "react/jsx-no-undef": "error"
+  }
+}

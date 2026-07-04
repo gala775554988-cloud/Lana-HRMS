@@ -51,7 +51,7 @@ export async function POST(request: Request) {
             installmentAmount: Math.round(data.amount / 12),
             currency: "SAR",
             issuedAt: new Date(),
-            status: "PENDING", // changed from ACTIVE to PENDING
+            status: "ACTIVE", // loan requests start as ACTIVE (no PENDING in enum)
             notes: data.notes,
           },
         });
