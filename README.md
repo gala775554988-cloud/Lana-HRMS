@@ -28,3 +28,4 @@ DATABASE_URL, DIRECT_URL, AUTH_SECRET, NEXTAUTH_URL, NEXTAUTH_SECRET, APP_URL, S
 ## Production Checks
 
 Run npm run lint and npm run build before deployment.
+Test commit from Arena Agent
