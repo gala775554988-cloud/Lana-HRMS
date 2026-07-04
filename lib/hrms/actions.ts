@@ -142,6 +142,14 @@ export async function createModuleRecord(input: MutationInput) {
       const lastName = String(data.lastName ?? "");
       const emailInput = data.email ? String(data.email) : "";
       const fullName = `${firstName} ${lastName}`.trim() || "Employee";
+      // password handling
+      const inputPassword = typeof data.password === "string" && data.password.length >= 6 ? data.password : "";
+      const inputPasswordConfirm = typeof (data as any).passwordConfirm === "string" ? (data as any).passwordConfirm : "";
+      if (inputPassword && inputPassword !== inputPasswordConfirm) {
+        return { success: false, message: "Password confirmation does not match." };
+      }
+      // strip password fields from employee data
+      const { password, passwordConfirm, ...employeeData } = data as any;
 
       if (!nationalId) {
         return { success: false, message: "National ID is required to create login account." };
@@ -164,9 +172,9 @@ export async function createModuleRecord(input: MutationInput) {
       // Actually check email uniquely
       const emailUser = await prisma.user.findUnique({ where: { email: userEmail } }).catch(() => null);
 
-      // Default employee password: Employee@123456 OR Emp@ + last4 of nationalId
-      // Using secure default that matches seed data pattern
-      const defaultPassword = "Employee@123456";
+      // Default employee password: Emp@ + last 4 of nationalId, fallback Employee@123456
+      const last4 = nationalId.slice(-4).padStart(4, "0");
+      const defaultPassword = inputPassword || `Emp@${last4}` || "Employee@123456";
       const passwordHash = await hashPassword(defaultPassword);
 
       // Find EMPLOYEE role
@@ -192,7 +200,7 @@ export async function createModuleRecord(input: MutationInput) {
             where: { id: user.id },
             data: {
               name: fullName || user.name,
-              passwordHash: user.passwordHash ?? passwordHash,
+              passwordHash: inputPassword ? passwordHash : (user.passwordHash ?? passwordHash),
               isActive: true,
             }
           });
@@ -212,12 +220,12 @@ export async function createModuleRecord(input: MutationInput) {
         // Create employee linked to user
         const employee = await tx.employee.create({
           data: {
-            ...data,
+            ...employeeData,
             userId: user.id,
           } as any
         });
 
-        return { user, employee };
+        return { user, employee, usedPassword: defaultPassword };
       });
 
       await writeAuditLog({
@@ -225,7 +233,7 @@ export async function createModuleRecord(input: MutationInput) {
         action: "create",
         entity: resource.model,
         entityId: String(result.employee.id),
-        metadata: { ...data, autoUserCreated: true, userId: result.user.id }
+        metadata: { ...employeeData, autoUserCreated: true, userId: result.user.id }
       });
 
       revalidatePath("/" + resource.key);
@@ -233,7 +241,7 @@ export async function createModuleRecord(input: MutationInput) {
 
       return {
         success: true,
-        message: `${resource.title} record created. Login: National ID ${nationalId} / Password: Employee@123456 – please change on first login.`,
+        message: `${resource.title} record created. Login: National ID ${nationalId} / Password: ${result.usedPassword}`,
         id: String(result.employee.id)
       };
     } catch (error: any) {
@@ -268,9 +276,45 @@ export async function updateModuleRecord(input: MutationInput) {
   const session = await requireModulePermission(resource, "manage");
   const parsed = buildModuleSchema(resource).safeParse(input.values);
   if (!parsed.success) return { success: false, message: parsed.error.errors[0]?.message ?? "Invalid input." };
-  const data = normalizeValues(resource, parsed.data);
-  const record = await delegateFor(resource.model).update({ where: { id: input.id }, data });
-  await writeAuditLog({ actorUserId: session.user.id, action: "update", entity: resource.model, entityId: input.id, metadata: data });
+  const data = normalizeValues(resource, parsed.data) as Record<string, unknown>;
+
+  // Handle employee password update
+  if (resource.key === "employees" && resource.model === "employee") {
+    const inputPassword = typeof data.password === "string" ? data.password : "";
+    const inputPasswordConfirm = typeof (data as any).passwordConfirm === "string" ? (data as any).passwordConfirm : "";
+    if (inputPassword || inputPasswordConfirm) {
+      if (inputPassword.length < 6) {
+        return { success: false, message: "Password must be at least 6 characters." };
+      }
+      if (inputPassword !== inputPasswordConfirm) {
+        return { success: false, message: "Password confirmation does not match." };
+      }
+    }
+    // strip password fields
+    delete (data as any).password;
+    delete (data as any).passwordConfirm;
+
+    // update employee record first
+    const record = await delegateFor(resource.model).update({ where: { id: input.id }, data });
+
+    // if password provided, update linked user
+    if (inputPassword) {
+      const employee = await prisma.employee.findUnique({ where: { id: input.id }, select: { userId: true } });
+      if (employee?.userId) {
+        const passwordHash = await hashPassword(inputPassword);
+        await prisma.user.update({ where: { id: employee.userId }, data: { passwordHash } });
+      }
+    }
+
+    await writeAuditLog({ actorUserId: session.user.id, action: "update", entity: resource.model, entityId: input.id, metadata: { ...data, passwordChanged: Boolean(inputPassword) } });
+    revalidatePath("/" + resource.key);
+    revalidatePath("/" + resource.key + "/" + input.id);
+    return { success: true, message: resource.title + " record updated." + (inputPassword ? " Password updated." : ""), id: String(record.id) };
+  }
+
+  const dataClean = data;
+  const record = await delegateFor(resource.model).update({ where: { id: input.id }, data: dataClean });
+  await writeAuditLog({ actorUserId: session.user.id, action: "update", entity: resource.model, entityId: input.id, metadata: dataClean });
   revalidatePath("/" + resource.key);
   revalidatePath("/" + resource.key + "/" + input.id);
   return { success: true, message: resource.title + " record updated.", id: String(record.id) };

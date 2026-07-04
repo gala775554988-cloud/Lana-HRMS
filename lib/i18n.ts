@@ -178,6 +178,8 @@ export const dictionaries = {
       isPaid: "Paid",
       isRecurring: "Recurring",
       isPublished: "Published",
+      password: "Password",
+      passwordConfirm: "Confirm password",
       // Employee
       employeeId: "Employee",
       employeeNumber: "Employee number",
@@ -458,6 +460,8 @@ export const dictionaries = {
       isPaid: "مدفوع",
       isRecurring: "متكرر",
       isPublished: "منشور",
+      password: "كلمة المرور",
+      passwordConfirm: "تأكيد كلمة المرور",
       employeeId: "الموظف",
       employeeNumber: "الرقم الوظيفي",
       nationalId: "الهوية الوطنية",

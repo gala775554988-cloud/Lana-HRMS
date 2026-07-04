@@ -1,4 +1,4 @@
-export type FieldType = "text" | "email" | "textarea" | "date" | "number" | "boolean" | "select";
+export type FieldType = "text" | "email" | "textarea" | "date" | "number" | "boolean" | "select" | "password";
 
 export type ModuleField = {
   name: string;
@@ -42,6 +42,8 @@ export const hrmsModules = [
       { name: "firstName", label: "First name", type: "text", required: true },
       { name: "lastName", label: "Last name", type: "text", required: true },
       { name: "email", label: "Email (optional)", type: "email" },
+      { name: "password", label: "Password", type: "password" },
+      { name: "passwordConfirm", label: "Confirm password", type: "password" },
       { name: "profilePhotoUrl", label: "Profile photo URL", type: "text" },
       { name: "phone", label: "Phone", type: "text" },
       { name: "gender", label: "Gender", type: "select", options: ["Female", "Male", "Not specified"] },
