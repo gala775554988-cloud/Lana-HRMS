@@ -71,37 +71,62 @@ async function DashboardContent({ employeeId, userId }: { employeeId: string; us
   let hasError = false;
 
   try {
-    const [
-      attendanceToday,
-      attendanceMonth,
-      pendingCount,
-      approvedCount,
-      rejectedCount,
-      recentLeaves,
-      auditLogs,
-      notifs,
-    ] = await prisma.$transaction([
-      prisma.attendanceRecord.findFirst({
+    // Use individual queries with individual error handling instead of transaction
+    // This is more resilient if some tables are missing
+    
+    let attendanceToday = null;
+    let attendanceMonth: any[] = [];
+    let pendingCount = 0;
+    let approvedCount = 0;
+    let rejectedCount = 0;
+    let recentLeaves: any[] = [];
+    let auditLogs: any[] = [];
+    let notifs: any[] = [];
+
+    // Safe individual queries
+    try {
+      attendanceToday = await prisma.attendanceRecord.findFirst({
         where: { employeeId, workDate: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } },
-      }),
-      prisma.attendanceRecord.findMany({
+      }).catch(() => null);
+    } catch {}
+
+    try {
+      attendanceMonth = await prisma.attendanceRecord.findMany({
         where: { employeeId, workDate: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) } },
-      }),
-      prisma.leaveRequest.count({ where: { employeeId, status: "PENDING" } }),
-      prisma.leaveRequest.count({ where: { employeeId, status: "APPROVED" } }),
-      prisma.leaveRequest.count({ where: { employeeId, status: "REJECTED" } }),
-      prisma.leaveRequest.findMany({ where: { employeeId }, orderBy: { createdAt: "desc" }, take: 5 }),
-      prisma.auditLog.findMany({
+      }).catch(() => []);
+    } catch {}
+
+    try {
+      [pendingCount, approvedCount, rejectedCount] = await Promise.all([
+        prisma.leaveRequest.count({ where: { employeeId, status: "PENDING" } }).catch(() => 0),
+        prisma.leaveRequest.count({ where: { employeeId, status: "APPROVED" } }).catch(() => 0),
+        prisma.leaveRequest.count({ where: { employeeId, status: "REJECTED" } }).catch(() => 0),
+      ]);
+    } catch {}
+
+    try {
+      recentLeaves = await prisma.leaveRequest.findMany({
+        where: { employeeId },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      }).catch(() => []);
+    } catch {}
+
+    try {
+      auditLogs = await prisma.auditLog.findMany({
         where: { entity: { in: ["leave", "loan", "overtime", "expense"] }, metadata: { path: ["employeeId"], equals: employeeId } },
         orderBy: { createdAt: "desc" },
         take: 6,
-      }),
-      prisma.notification.findMany({
+      }).catch(() => []);
+    } catch {}
+
+    try {
+      notifs = await prisma.notification.findMany({
         where: { userId },
         orderBy: { createdAt: "desc" },
         take: 5,
-      }),
-    ]);
+      }).catch(() => []);
+    } catch {}
 
     // Calculate attendance hours
     let totalHours = 0;
@@ -129,7 +154,7 @@ async function DashboardContent({ employeeId, userId }: { employeeId: string; us
     recentRequests = (recentLeaves || []).map((l: any) => ({
       id: l.id,
       kind: "إجازة",
-      status: l.status,
+      status: l.status || "PENDING",
       createdAt: l.createdAt,
     }));
 
@@ -141,7 +166,7 @@ async function DashboardContent({ employeeId, userId }: { employeeId: string; us
       })),
       ...(notifs || []).map((n: any) => ({
         id: n.id,
-        title: n.title,
+        title: n.title || "إشعار",
         createdAt: n.createdAt.toISOString(),
       })),
     ].slice(0, 5);
