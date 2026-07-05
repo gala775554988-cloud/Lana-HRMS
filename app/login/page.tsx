@@ -8,9 +8,10 @@ export default async function LoginPage() {
   const { locale, dictionary } = await getRequestDictionary();
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
-      <div className="w-full max-w-md space-y-6">
-        {/* Normal Login */}
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
+      <div className="w-full max-w-md">
+        
+        {/* Main Login Form */}
         <AuthCard 
           title={dictionary.auth.title} 
           description={dictionary.auth.description} 
@@ -26,26 +27,21 @@ export default async function LoginPage() {
           </div>
         </AuthCard>
 
-        {/* Super Admin Login - "بطل خارق" */}
-        <div className="text-center">
-          <div className="mb-2">
-            <span className="inline-block px-3 py-1 text-xs font-medium bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full">
-              👑 دخول المسؤولين
-            </span>
-          </div>
-          
+        {/* Super Admin Login - Placed UNDER the form */}
+        <div className="mt-6 text-center">
           <Link 
             href="/login" 
-            className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-medium bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all shadow-sm"
           >
-            <span>تسجيل الدخول كمسؤول (لوحة التحكم الكاملة)</span>
-            <span className="text-lg">→</span>
+            <span className="text-lg">👑</span>
+            <span>دخول المسؤولين (لوحة التحكم الكاملة)</span>
           </Link>
           
-          <p className="mt-1 text-[10px] text-slate-400">
+          <p className="mt-2 text-xs text-slate-500">
             استخدم البريد الإلكتروني + كلمة المرور
           </p>
         </div>
+
       </div>
     </div>
   );
