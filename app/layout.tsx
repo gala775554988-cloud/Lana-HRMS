@@ -3,6 +3,7 @@ import { cookies, headers } from "next/headers";
 import { siteConfig } from "@/config/site";
 import { getDirection, normalizeLocale } from "@/lib/i18n";
 import "./globals.css";
+import { SessionProvider } from "next-auth/react";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.APP_URL ?? "http://localhost:3000"),
@@ -49,7 +50,11 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} dir={getDirection(locale)} suppressHydrationWarning>
-      <body>{children}</body>
+      <body>
+        <SessionProvider>
+          {children}
+        </SessionProvider>
+      </body>
     </html>
   );
 }

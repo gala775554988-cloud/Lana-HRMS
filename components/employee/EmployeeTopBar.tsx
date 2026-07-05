@@ -12,7 +12,7 @@ interface Props {
 }
 
 export function EmployeeTopBar({ user, employee }: Props) {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [isDark, setIsDark] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const router = useRouter();
