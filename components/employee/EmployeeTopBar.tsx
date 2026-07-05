@@ -17,8 +17,9 @@ export function EmployeeTopBar({ user, employee }: Props) {
   const [searchQuery, setSearchQuery] = useState('');
   const router = useRouter();
 
-  // Prefer session image for immediate update
-  const avatarUrl = (session?.user as any)?.image || employee?.profilePhotoUrl;
+  // Safe access to prevent crashes
+  const sessionUser = session?.user as any;
+  const avatarUrl = sessionUser?.image || employee?.profilePhotoUrl || null;
 
   const toggleTheme = () => {
     const newDark = !isDark;
@@ -77,10 +78,10 @@ export function EmployeeTopBar({ user, employee }: Props) {
           <Link href="/employee/profile" className="flex items-center gap-2 pl-2 ml-1 border-l border-slate-200 dark:border-slate-700">
             <div className="hidden sm:block text-right text-xs leading-tight">
               <div className="font-medium truncate max-w-[110px]">
-                {user?.name || employee?.firstName || 'موظف'}
+                {user?.name || (employee as any)?.firstName || 'موظف'}
               </div>
               <div className="text-slate-500 text-[10px]">
-                {employee?.employeeNumber || '---'}
+                {(employee as any)?.employeeNumber || '---'}
               </div>
             </div>
             {avatarUrl ? (

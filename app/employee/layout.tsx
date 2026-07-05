@@ -5,6 +5,7 @@ import { getCurrentEmployee } from "@/lib/employee/data";
 import { EmployeeTopBar } from "@/components/employee/EmployeeTopBar";
 import { EmployeeDesktopSidebar } from "@/components/employee/EmployeeDesktopSidebar";
 import { EmployeeMobileBottomNav } from "@/components/employee/EmployeeMobileBottomNav";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 export default async function EmployeeLayout({ children }: { children: ReactNode }) {
   const session = await auth();
@@ -38,7 +39,9 @@ export default async function EmployeeLayout({ children }: { children: ReactNode
         {/* Main Content */}
         <div className="flex-1 min-w-0">
           <main className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 lg:pb-8">
-            {children}
+            <ErrorBoundary>
+              {children}
+            </ErrorBoundary>
           </main>
         </div>
       </div>
