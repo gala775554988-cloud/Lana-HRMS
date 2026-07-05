@@ -25,22 +25,21 @@ export default async function LoginPage() {
           <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
             <strong>ملاحظة للموظفين:</strong> استخدم <span className="font-mono font-bold">رقم الهوية الوطنية</span> كاسم مستخدم.
           </div>
-        </AuthCard>
 
-        {/* Super Admin Login - Placed UNDER the form */}
-        <div className="mt-6 text-center">
-          <Link 
-            href="/login" 
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-medium bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all shadow-sm"
-          >
-            <span className="text-lg">👑</span>
-            <span>دخول المسؤولين (لوحة التحكم الكاملة)</span>
-          </Link>
-          
-          <p className="mt-2 text-xs text-slate-500">
-            استخدم البريد الإلكتروني + كلمة المرور
-          </p>
-        </div>
+          {/* Small Admin Login Button - Under Sign in */}
+          <div className="mt-5 pt-4 border-t text-center">
+            <Link 
+              href="/login" 
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-purple-600 transition-colors"
+            >
+              <span>👑</span>
+              <span>دخول المسؤولين (لوحة التحكم الكاملة)</span>
+            </Link>
+            <p className="mt-1 text-[10px] text-slate-400">
+              البريد الإلكتروني + كلمة المرور
+            </p>
+          </div>
+        </AuthCard>
 
       </div>
     </div>
