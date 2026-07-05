@@ -1,20 +1,45 @@
-import Link from "next/link";
-import { AuthCard } from "@/components/auth/auth-card";
-import { Button } from "@/components/ui/button";
-import { logoutAction } from "@/lib/auth/actions";
-import { getRequestDictionary } from "@/lib/i18n-server";
+'use client';
 
-export default async function LogoutPage() {
-  const { locale, dictionary } = await getRequestDictionary();
+import { signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { AuthCard } from "@/components/auth/auth-card";
+
+export default function LogoutPage() {
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await signOut({ 
+      redirect: true,
+      callbackUrl: "/login" 
+    });
+  };
 
   return (
-    <AuthCard title="Sign out" description="End the current HRMS session on this device." locale={locale} dictionary={dictionary}>
-      <form action={logoutAction} className="space-y-4">
-        <Button type="submit" className="w-full">{dictionary.common.signOut}</Button>
-        <Button asChild variant="outline" className="w-full">
-          <Link href="/">Stay signed in</Link>
-        </Button>
-      </form>
-    </AuthCard>
+    <div className="flex min-h-screen items-center justify-center bg-slate-50">
+      <div className="w-full max-w-md">
+        <AuthCard 
+          title="تسجيل الخروج" 
+          description="هل أنت متأكد من تسجيل الخروج من الحساب؟"
+        >
+          <div className="space-y-4">
+            <Button 
+              onClick={handleLogout} 
+              className="w-full"
+            >
+              نعم، سجل خروجي
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={() => router.back()}
+            >
+              إلغاء
+            </Button>
+          </div>
+        </AuthCard>
+      </div>
+    </div>
   );
 }
