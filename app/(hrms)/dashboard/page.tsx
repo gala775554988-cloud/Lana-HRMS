@@ -24,19 +24,27 @@ export default async function HrmsDashboard() {
 
   if (!isAdmin) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="text-center max-w-md">
+      <div className="flex min-h-[60vh] items-center justify-center bg-slate-50">
+        <div className="text-center max-w-md bg-white p-8 rounded-3xl shadow">
           <div className="text-6xl mb-4">🔒</div>
-          <h1 className="text-2xl font-semibold mb-2">Access Denied</h1>
+          <h1 className="text-2xl font-bold mb-2">غير مصرح لك</h1>
           <p className="text-slate-600 mb-6">
-            You do not have permission to access the HRMS Dashboard.
+            هذه الصفحة مخصصة للمسؤولين فقط. أنت مسجل الدخول كموظف.
           </p>
-          <a 
-            href="/employee/dashboard" 
-            className="inline-block px-6 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700"
-          >
-            Go to Employee Portal
-          </a>
+          <div className="flex flex-col gap-3">
+            <a 
+              href="/employee/dashboard" 
+              className="inline-block px-6 py-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 font-medium"
+            >
+              الذهاب إلى بوابة الموظف
+            </a>
+            <a 
+              href="/login" 
+              className="text-sm text-slate-500 hover:underline"
+            >
+              تسجيل الدخول بحساب مسؤول
+            </a>
+          </div>
         </div>
       </div>
     );

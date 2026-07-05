@@ -53,10 +53,18 @@ export function LoginForm({ dictionary, isAdminMode = false }: { dictionary: Dic
         </Alert>
       ) : null}
       <div className="space-y-2">
-        <Label htmlFor="identifier">{dictionary.auth.identifier}</Label>
+        <Label htmlFor="identifier">{identifierLabel}</Label>
         <div className="relative">
           <UserRound className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground rtl:left-auto rtl:right-3" aria-hidden="true" />
-          <Input id="identifier" type="text" autoComplete="username" className="h-11 pl-9 rtl:pl-3 rtl:pr-9" placeholder={dictionary.auth.identifierPlaceholder} aria-invalid={Boolean(form.formState.errors.identifier)} {...form.register("identifier")} />
+          <Input 
+            id="identifier" 
+            type={isAdminMode ? "email" : "text"} 
+            autoComplete={isAdminMode ? "email" : "username"} 
+            className="h-11 pl-9 rtl:pl-3 rtl:pr-9" 
+            placeholder={identifierPlaceholder} 
+            aria-invalid={Boolean(form.formState.errors.identifier)} 
+            {...form.register("identifier")} 
+          />
         </div>
         {form.formState.errors.identifier ? <p className="text-sm text-destructive" role="alert">{form.formState.errors.identifier.message}</p> : null}
       </div>
