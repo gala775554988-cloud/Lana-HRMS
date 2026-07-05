@@ -15,33 +15,59 @@ export default function ProfilePicturePage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validate file type and size
+    if (!file.type.startsWith('image/')) {
+      alert('الرجاء اختيار صورة فقط');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('حجم الصورة يجب أن يكون أقل من 5 ميجابايت');
+      return;
+    }
+
     setUploading(true);
 
     const formData = new FormData();
     formData.append('file', file);
 
     try {
-      const uploadRes = await fetch('/api/uploads', { method: 'POST', body: formData });
+      const uploadRes = await fetch('/api/uploads', { 
+        method: 'POST', 
+        body: formData 
+      });
+
+      if (!uploadRes.ok) {
+        const errorData = await uploadRes.json().catch(() => ({}));
+        throw new Error(errorData.message || 'فشل في رفع الملف');
+      }
+
       const uploadData = await uploadRes.json();
 
       if (uploadData.url) {
-        // 1. Update employee record
-        await fetch('/api/employee/profile', {
+        // Update employee record
+        const profileRes = await fetch('/api/employee/profile', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ profilePhotoUrl: uploadData.url }),
         });
 
-        // 2. Update session (this makes header update immediately)
+        if (!profileRes.ok) {
+          throw new Error('فشل في تحديث بيانات الموظف');
+        }
+
+        // Update session
         await update({ image: uploadData.url });
 
-        // 3. Update local state
+        // Update local state
         setPhotoUrl(uploadData.url);
 
         alert('تم تحديث الصورة الشخصية بنجاح');
+      } else {
+        throw new Error('لم يتم إرجاع رابط الصورة');
       }
-    } catch (err) {
-      alert('فشل في رفع الصورة');
+    } catch (err: any) {
+      console.error('Upload error:', err);
+      alert(err.message || 'فشل في رفع الصورة. يرجى المحاولة مرة أخرى.');
     } finally {
       setUploading(false);
     }

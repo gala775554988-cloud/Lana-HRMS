@@ -15,10 +15,24 @@ export default async function EmployeeDashboard() {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const employee = await prisma.employee.findFirst({
-    where: { userId: session.user.id },
-    include: { department: true, position: true, branch: true },
-  });
+  let employee = null;
+
+  try {
+    employee = await prisma.employee.findFirst({
+      where: { userId: session.user.id },
+      include: { department: true, position: true, branch: true },
+    });
+  } catch (error) {
+    console.error("[EmployeeDashboard] Failed to fetch employee:", error);
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="text-center max-w-md">
+          <p className="text-lg text-slate-600">حدث خطأ في تحميل بيانات الموظف</p>
+          <p className="mt-2 text-sm text-slate-400">يرجى التواصل مع الموارد البشرية أو المحاولة لاحقاً</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!employee) {
     return (
