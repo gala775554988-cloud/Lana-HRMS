@@ -4,7 +4,7 @@ const moduleResources = [
 
 export const authRoutes = ["/login", "/forgot-password", "/reset-password", "/verify-email"];
 export const publicRoutes = [...authRoutes];
-export const DEFAULT_LOGIN_REDIRECT = "/dashboard"; // Single clean entry point for role-based redirect
+export const DEFAULT_LOGIN_REDIRECT = "/"; // Root page handles role-based redirection to correct dashboard
 
 export const permissions = Object.fromEntries(
   moduleResources.flatMap((resource) => [

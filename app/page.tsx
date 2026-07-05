@@ -6,11 +6,11 @@ import { redirect } from "next/navigation";
 export default async function HomePage() {
   const session = await auth();
 
-  // If logged in, redirect based on role
+  // If user is logged in, redirect directly to the correct dashboard (no /dashboard route)
   if (session?.user) {
     const roles = (session.user.roles as string[]) || [];
     const isEmployee = roles.includes("EMPLOYEE") || roles.length === 0;
-    
+
     if (isEmployee) {
       redirect("/employee/dashboard");
     } else {
