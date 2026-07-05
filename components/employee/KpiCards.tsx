@@ -13,6 +13,11 @@ interface Props {
 }
 
 export function KpiCards({ attendance, leaveBalance, payroll, requests }: Props) {
+  const safeAttendance = attendance || { todayStatus: 'absent', hoursToday: 0 };
+  const safeLeave = leaveBalance || { annual: { remaining: 30, total: 30 } };
+  const safePayroll = payroll || { baseSalary: 0, currency: 'SAR' };
+  const safeRequests = requests || { pending: 0, approved: 0 };
+
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       <Card className="border-slate-200 dark:border-slate-800">
@@ -20,8 +25,10 @@ export function KpiCards({ attendance, leaveBalance, payroll, requests }: Props)
           <div className="flex items-center gap-2 text-sm text-slate-500 mb-1">
             <Clock className="h-4 w-4" /> الحضور اليوم
           </div>
-          <div className="text-3xl font-semibold tracking-tight">{attendance.hoursToday.toFixed(1)}h</div>
-          <div className="text-xs text-emerald-600 mt-1">{attendance.todayStatus}</div>
+          <div className="text-3xl font-semibold tracking-tight">
+            {(safeAttendance.hoursToday || 0).toFixed(1)}h
+          </div>
+          <div className="text-xs text-emerald-600 mt-1">{safeAttendance.todayStatus || 'absent'}</div>
         </CardContent>
       </Card>
 
@@ -30,8 +37,12 @@ export function KpiCards({ attendance, leaveBalance, payroll, requests }: Props)
           <div className="flex items-center gap-2 text-sm text-slate-500 mb-1">
             <Calendar className="h-4 w-4" /> رصيد الإجازات
           </div>
-          <div className="text-3xl font-semibold tracking-tight">{leaveBalance.annual.remaining}</div>
-          <div className="text-xs text-slate-500 mt-1">يوم من {leaveBalance.annual.total}</div>
+          <div className="text-3xl font-semibold tracking-tight">
+            {safeLeave.annual?.remaining ?? 30}
+          </div>
+          <div className="text-xs text-slate-500 mt-1">
+            يوم من {safeLeave.annual?.total ?? 30}
+          </div>
         </CardContent>
       </Card>
 
@@ -40,8 +51,12 @@ export function KpiCards({ attendance, leaveBalance, payroll, requests }: Props)
           <div className="flex items-center gap-2 text-sm text-slate-500 mb-1">
             <FileText className="h-4 w-4" /> الطلبات المعلقة
           </div>
-          <div className="text-3xl font-semibold tracking-tight">{requests.pending}</div>
-          <div className="text-xs text-slate-500 mt-1">{requests.approved} معتمدة</div>
+          <div className="text-3xl font-semibold tracking-tight">
+            {safeRequests.pending ?? 0}
+          </div>
+          <div className="text-xs text-slate-500 mt-1">
+            {safeRequests.approved ?? 0} معتمدة
+          </div>
         </CardContent>
       </Card>
 
@@ -51,9 +66,11 @@ export function KpiCards({ attendance, leaveBalance, payroll, requests }: Props)
             <DollarSign className="h-4 w-4" /> الراتب
           </div>
           <div className="text-3xl font-semibold tracking-tight">
-            {payroll.baseSalary.toLocaleString()}
+            {(safePayroll.baseSalary || 0).toLocaleString()}
           </div>
-          <div className="text-xs text-slate-500 mt-1">{payroll.currency}</div>
+          <div className="text-xs text-slate-500 mt-1">
+            {safePayroll.currency || 'SAR'}
+          </div>
         </CardContent>
       </Card>
     </div>

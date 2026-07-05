@@ -76,8 +76,12 @@ export function EmployeeTopBar({ user, employee }: Props) {
 
           <Link href="/employee/profile" className="flex items-center gap-2 pl-2 ml-1 border-l border-slate-200 dark:border-slate-700">
             <div className="hidden sm:block text-right text-xs leading-tight">
-              <div className="font-medium truncate max-w-[110px]">{user?.name || employee?.firstName}</div>
-              <div className="text-slate-500 text-[10px]">{employee?.employeeNumber}</div>
+              <div className="font-medium truncate max-w-[110px]">
+                {user?.name || employee?.firstName || 'موظف'}
+              </div>
+              <div className="text-slate-500 text-[10px]">
+                {employee?.employeeNumber || '---'}
+              </div>
             </div>
             {avatarUrl ? (
               <img src={avatarUrl} alt="Avatar" className="h-8 w-8 rounded-full object-cover border border-slate-200 dark:border-slate-700" />

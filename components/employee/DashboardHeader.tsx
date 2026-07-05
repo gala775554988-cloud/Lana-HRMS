@@ -10,10 +10,19 @@ interface Props {
 }
 
 export function DashboardHeader({ employee, attendanceStatus = 'present' }: Props) {
-  const fullName = `${employee.firstName} ${employee.lastName}`;
+  if (!employee) {
+    return (
+      <div className="flex items-center justify-center p-8 text-slate-500">
+        جاري تحميل بيانات الموظف...
+      </div>
+    );
+  }
+
+  const firstName = employee.firstName || '';
+  const lastName = employee.lastName || '';
+  const fullName = `${firstName} ${lastName}`.trim() || 'موظف';
   const now = new Date();
   const time = now.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
-  const date = now.toLocaleDateString('ar-SA', { weekday: 'long', month: 'long', day: 'numeric' });
 
   const statusLabel = 
     attendanceStatus === 'present' ? 'حاضر' :
@@ -34,7 +43,7 @@ export function DashboardHeader({ employee, attendanceStatus = 'present' }: Prop
           />
         ) : (
           <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-2xl font-semibold border border-white/20 shadow-sm">
-            {employee.firstName[0]}{employee.lastName[0]}
+            {(employee.firstName?.[0] || '?')}{(employee.lastName?.[0] || '?')}
           </div>
         )}
 
@@ -42,7 +51,7 @@ export function DashboardHeader({ employee, attendanceStatus = 'present' }: Prop
           <div className="text-sm text-slate-500">مرحباً</div>
           <div className="text-2xl font-semibold tracking-tight">{fullName}</div>
           <div className="text-sm text-slate-600 mt-0.5">
-            {employee.position?.title} • {employee.department?.name}
+            {employee.position?.title || 'موظف'} • {employee.department?.name || 'غير محدد'}
           </div>
         </div>
       </div>
