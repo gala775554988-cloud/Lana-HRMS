@@ -12,7 +12,7 @@ export default async function LogoutPage() {
       <form action={logoutAction} className="space-y-4">
         <Button type="submit" className="w-full">{dictionary.common.signOut}</Button>
         <Button asChild variant="outline" className="w-full">
-          <Link href="/dashboard">Stay signed in</Link>
+          <Link href="/">Stay signed in</Link>
         </Button>
       </form>
     </AuthCard>

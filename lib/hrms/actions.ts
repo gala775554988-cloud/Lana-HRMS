@@ -237,7 +237,7 @@ export async function createModuleRecord(input: MutationInput) {
       });
 
       revalidatePath("/" + resource.key);
-      revalidatePath("/dashboard");
+      revalidatePath("/");
 
       return {
         success: true,
@@ -260,7 +260,7 @@ export async function createModuleRecord(input: MutationInput) {
     const record = await delegateFor(resource.model).create({ data });
     await writeAuditLog({ actorUserId: session.user.id, action: "create", entity: resource.model, entityId: String(record.id), metadata: data });
     revalidatePath("/" + resource.key);
-    revalidatePath("/dashboard");
+    revalidatePath("/");
     return { success: true, message: resource.title + " record created.", id: String(record.id) };
   } catch (error: any) {
     if (error?.code === "P2002") {

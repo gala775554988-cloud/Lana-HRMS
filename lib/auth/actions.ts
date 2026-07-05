@@ -34,7 +34,7 @@ export async function loginAction(input: unknown): Promise<ActionState> {
     await signIn("credentials", {
       identifier: parsed.data.identifier,
       password: parsed.data.password,
-      redirectTo: "/dashboard"
+      redirectTo: "/"
     });
 
     return {

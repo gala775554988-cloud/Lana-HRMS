@@ -27,7 +27,7 @@ export async function AppShell({ children, companyLogo }: { children: ReactNode;
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,hsl(var(--primary)/0.08),transparent_34rem),linear-gradient(180deg,hsl(var(--background)),hsl(var(--muted)/0.35))] text-foreground">
       <header className="sticky top-0 z-20 border-b bg-background/85 backdrop-blur-xl">
         <div className="flex min-h-16 items-center justify-between gap-4 px-4 lg:px-8">
-          <Link href="/dashboard" className="flex items-center gap-3 font-semibold" aria-label="HRMS dashboard">
+          <Link href="/" className="flex items-center gap-3 font-semibold" aria-label="HRMS dashboard">
             {companyLogo ? (
               <img 
                 src={companyLogo} 
@@ -64,7 +64,7 @@ export async function AppShell({ children, companyLogo }: { children: ReactNode;
             </div>
           </div>
           <nav className="flex gap-2 overflow-x-auto p-4 lg:block lg:space-y-1" aria-label="Primary HRMS navigation">
-            <Link href="/dashboard" className="flex whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium hover:bg-accent"><LayoutDashboard className="me-2 h-4 w-4" />{dictionary.common.dashboard}</Link>
+            <Link href="/" className="flex whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium hover:bg-accent"><LayoutDashboard className="me-2 h-4 w-4" />{dictionary.common.dashboard}</Link>
             {visibleNavigation.map((item) => (
               <Link key={item.href} href={item.href} className="block whitespace-nowrap rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">{item.key in navLabels ? navLabels[item.key as keyof typeof navLabels] : item.label}</Link>
             ))}
