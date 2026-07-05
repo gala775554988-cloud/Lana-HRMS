@@ -9,7 +9,7 @@ export default async function HomePage() {
   if (session?.user) {
     const roles = (session.user.roles as string[]) || [];
     
-    // If user has any admin-level role, send to HRMS dashboard
+    // Admin roles (Superhero login)
     const isAdmin = roles.some(role => 
       ["SUPER_ADMIN", "HR_MANAGER", "PAYROLL_MANAGER", "RECRUITER", "MANAGER"].includes(role)
     );
@@ -22,30 +22,40 @@ export default async function HomePage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
-      <section className="w-full max-w-3xl space-y-6 text-center">
-        <p className="text-sm font-medium uppercase text-muted-foreground">HRMS Foundation</p>
-        <h1 className="text-4xl font-semibold">Human Resource Management System</h1>
-        <p className="text-lg text-muted-foreground">
-          Authentication, authorization, JWT sessions, and RBAC are ready for protected HR workflows.
-        </p>
-        
-        <div className="pt-4">
-          <Button asChild size="lg">
-            <Link href="/login">تسجيل الدخول</Link>
-          </Button>
+    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-6">
+      <div className="w-full max-w-md space-y-8 text-center">
+        <div>
+          <h1 className="text-4xl font-bold tracking-tight">Lana HRMS</h1>
+          <p className="mt-3 text-lg text-slate-600">نظام إدارة الموارد البشرية</p>
         </div>
 
-        {/* Small link for Admin */}
-        <div className="pt-6">
-          <Link 
-            href="/login" 
-            className="text-sm text-muted-foreground hover:text-foreground underline"
-          >
-            تسجيل الدخول كمسؤول (لوحة التحكم)
-          </Link>
+        <div className="space-y-4">
+          {/* Employee Login */}
+          <div className="rounded-2xl border bg-white p-6 shadow-sm">
+            <div className="mb-4">
+              <div className="text-2xl mb-1">👤</div>
+              <h3 className="font-semibold">تسجيل دخول الموظف</h3>
+              <p className="text-sm text-slate-500 mt-1">استخدم رقم الهوية الوطنية</p>
+            </div>
+            <Button asChild className="w-full" size="lg">
+              <Link href="/login">دخول الموظف</Link>
+            </Button>
+          </div>
+
+          {/* Admin / Superhero Login */}
+          <div className="rounded-2xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-indigo-50 p-6 shadow-sm">
+            <div className="mb-4">
+              <div className="text-2xl mb-1">👑</div>
+              <h3 className="font-semibold text-purple-700">دخول المسؤول (بطل خارق)</h3>
+              <p className="text-sm text-purple-600 mt-1">لوحة التحكم الكاملة + صلاحيات عالية</p>
+            </div>
+            <Button asChild variant="default" className="w-full bg-purple-600 hover:bg-purple-700" size="lg">
+              <Link href="/login">دخول المسؤول</Link>
+            </Button>
+            <p className="mt-2 text-[10px] text-purple-500">البريد الإلكتروني + كلمة المرور</p>
+          </div>
         </div>
-      </section>
+      </div>
     </main>
   );
 }
