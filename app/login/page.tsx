@@ -10,7 +10,7 @@ export default async function LoginPage() {
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
       <div className="w-full max-w-md">
         
-        {/* Clean Simple Login Card */}
+        {/* Clean & Simple Login Card */}
         <div className="bg-white rounded-3xl shadow-xl border p-8">
           <div className="flex items-center gap-3 mb-6">
             <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white font-bold text-xl">L</div>
