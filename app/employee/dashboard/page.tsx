@@ -21,93 +21,141 @@ export default async function EmployeeDashboard() {
   });
 
   if (!employee) {
-    return <div className="p-8 text-center">لم يتم العثور على بيانات الموظف.</div>;
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="text-center">
+          <p className="text-lg text-slate-600">لم يتم العثور على بيانات الموظف</p>
+          <p className="mt-2 text-sm text-slate-400">يرجى التواصل مع الموارد البشرية</p>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-8">
       <DashboardHeader employee={employee as any} />
       <Suspense fallback={<DashboardContentSkeleton />}>
-        <DashboardContent employeeId={employee.id} />
+        <DashboardContent employeeId={employee.id} userId={session.user.id} />
       </Suspense>
     </div>
   );
 }
 
-async function DashboardContent({ employeeId }: { employeeId: string }) {
-  let data: any = null;
+async function DashboardContent({ employeeId, userId }: { employeeId: string; userId: string }) {
+  // Default safe data
+  const defaultAttendance = { todayStatus: "absent" as const, hoursToday: 0, totalThisMonth: 0 };
+  const defaultLeaveBalance = { annual: { used: 0, remaining: 30, total: 30 }, sick: { used: 0, remaining: 15, total: 15 } };
+  const defaultPayroll = { baseSalary: 12500, currency: "SAR" };
+  const defaultRequests = { pending: 0, approved: 0, rejected: 0 };
+
+  let attendance = defaultAttendance;
+  let leaveBalance = defaultLeaveBalance;
+  let payroll = defaultPayroll;
+  let requests = defaultRequests;
+  let recentRequests: any[] = [];
+  let notifications: any[] = [];
+  let hasError = false;
 
   try {
-    const emp = await prisma.employee.findUnique({ where: { id: employeeId }, select: { userId: true } });
-    const userId = emp?.userId;
-
     const [
       attendanceToday,
       attendanceMonth,
-      approvedLeaves,
-      latestPayroll,
       pendingCount,
       approvedCount,
       rejectedCount,
       recentLeaves,
-      recentOvertimes,
       auditLogs,
       notifs,
     ] = await prisma.$transaction([
-      prisma.attendanceRecord.findFirst({ where: { employeeId, workDate: { gte: new Date(new Date().setHours(0,0,0,0)) } } }),
-      prisma.attendanceRecord.findMany({ where: { employeeId, workDate: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) } } }),
-      prisma.leaveRequest.findMany({ where: { employeeId, status: "APPROVED" }, include: { leaveType: true } }),
-      prisma.payrollItem.findFirst({ where: { employeeId }, orderBy: { createdAt: "desc" } }),
+      prisma.attendanceRecord.findFirst({
+        where: { employeeId, workDate: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } },
+      }),
+      prisma.attendanceRecord.findMany({
+        where: { employeeId, workDate: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) } },
+      }),
       prisma.leaveRequest.count({ where: { employeeId, status: "PENDING" } }),
       prisma.leaveRequest.count({ where: { employeeId, status: "APPROVED" } }),
       prisma.leaveRequest.count({ where: { employeeId, status: "REJECTED" } }),
       prisma.leaveRequest.findMany({ where: { employeeId }, orderBy: { createdAt: "desc" }, take: 5 }),
-      prisma.overtimeRequest.findMany({ where: { employeeId }, orderBy: { createdAt: "desc" }, take: 2 }),
-      prisma.auditLog.findMany({ where: { entity: { in: ["leave","loan","overtime","expense"] }, metadata: { path: ["employeeId"], equals: employeeId } }, orderBy: { createdAt: "desc" }, take: 6 }),
-      prisma.notification.findMany({ where: { userId: userId ?? undefined }, orderBy: { createdAt: "desc" }, take: 5 }),
+      prisma.auditLog.findMany({
+        where: { entity: { in: ["leave", "loan", "overtime", "expense"] }, metadata: { path: ["employeeId"], equals: employeeId } },
+        orderBy: { createdAt: "desc" },
+        take: 6,
+      }),
+      prisma.notification.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      }),
     ]);
 
+    // Calculate attendance hours
     let totalHours = 0;
     (attendanceMonth || []).forEach((r: any) => {
-      if (r.checkIn && r.checkOut) totalHours += Math.max(0, (new Date(r.checkOut).getTime() - new Date(r.checkIn).getTime()) / (1000 * 60 * 60));
+      if (r.checkIn && r.checkOut) {
+        const diff = (new Date(r.checkOut).getTime() - new Date(r.checkIn).getTime()) / (1000 * 60 * 60);
+        totalHours += Math.max(0, diff);
+      }
     });
 
-    data = {
-      attendance: {
-        todayStatus: attendanceToday?.status === "PRESENT" ? "present" : attendanceToday?.checkOut ? "checked-out" : "absent",
-        hoursToday: attendanceToday?.checkIn && attendanceToday?.checkOut ? Math.max(0, (new Date(attendanceToday.checkOut).getTime() - new Date(attendanceToday.checkIn).getTime()) / (1000 * 60 * 60)) : 0,
-        totalThisMonth: Math.round(totalHours),
-      },
-      leaveBalance: { annual: { used: 0, remaining: 30, total: 30 }, sick: { used: 0, remaining: 15, total: 15 } },
-      payroll: { baseSalary: latestPayroll ? Number(latestPayroll.baseSalary) : 12500, currency: latestPayroll?.currency || "SAR" },
-      requests: { pending: pendingCount || 0, approved: approvedCount || 0, rejected: rejectedCount || 0 },
-      recentRequests: (recentLeaves || []).map((l: any) => ({ id: l.id, kind: "إجازة", status: l.status, createdAt: l.createdAt })),
-      notifications: [
-        ...(auditLogs || []).map((log: any) => ({ id: log.id, title: `تم ${log.action === "create" ? "تقديم" : "تحديث"} ${log.entity}`, createdAt: log.createdAt.toISOString() })),
-        ...(notifs || []).map((n: any) => ({ id: n.id, title: n.title, createdAt: n.createdAt.toISOString() })),
-      ].slice(0, 5),
+    attendance = {
+      todayStatus: attendanceToday?.status === "PRESENT" ? "present" : attendanceToday?.checkOut ? "checked-out" : "absent",
+      hoursToday: attendanceToday?.checkIn && attendanceToday?.checkOut
+        ? Math.max(0, (new Date(attendanceToday.checkOut).getTime() - new Date(attendanceToday.checkIn).getTime()) / (1000 * 60 * 60))
+        : 0,
+      totalThisMonth: Math.round(totalHours),
     };
-  } catch (e) {
-    console.error("[Dashboard] Error:", e);
-    data = null;
-  }
 
-  const attendance = data?.attendance ?? { todayStatus: "absent" as const, hoursToday: 0, totalThisMonth: 0 };
-  const leaveBalance = data?.leaveBalance ?? { annual: { used: 0, remaining: 30, total: 30 }, sick: { used: 0, remaining: 15, total: 15 } };
-  const payroll = data?.payroll ?? { baseSalary: 12500, currency: "SAR" };
-  const requests = data?.requests ?? { pending: 0, approved: 0, rejected: 0 };
-  const notifications = Array.isArray(data?.notifications) ? data.notifications : [];
-  const recentRequests = Array.isArray(data?.recentRequests) ? data.recentRequests : [];
+    requests = {
+      pending: pendingCount || 0,
+      approved: approvedCount || 0,
+      rejected: rejectedCount || 0,
+    };
+
+    recentRequests = (recentLeaves || []).map((l: any) => ({
+      id: l.id,
+      kind: "إجازة",
+      status: l.status,
+      createdAt: l.createdAt,
+    }));
+
+    notifications = [
+      ...(auditLogs || []).map((log: any) => ({
+        id: log.id,
+        title: `تم ${log.action === "create" ? "تقديم" : "تحديث"} ${log.entity}`,
+        createdAt: log.createdAt.toISOString(),
+      })),
+      ...(notifs || []).map((n: any) => ({
+        id: n.id,
+        title: n.title,
+        createdAt: n.createdAt.toISOString(),
+      })),
+    ].slice(0, 5);
+
+  } catch (error) {
+    console.error("[Employee Dashboard] Error loading data:", error);
+    hasError = true;
+  }
 
   return (
     <>
-      <KpiCards attendance={attendance} leaveBalance={leaveBalance} payroll={payroll} requests={requests} />
+      <KpiCards
+        attendance={attendance}
+        leaveBalance={leaveBalance}
+        payroll={payroll}
+        requests={requests}
+      />
       <QuickActions />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <LatestNotifications notifications={notifications} />
         <RecentRequests requests={recentRequests} />
       </div>
-      {!data && <div className="text-xs px-4 py-3 rounded-2xl bg-amber-50 text-amber-700 border border-amber-200">تم عرض بيانات احتياطية.</div>}
+
+      {hasError && (
+        <div className="text-xs px-4 py-3 rounded-2xl bg-amber-50 text-amber-700 border border-amber-200">
+          تم عرض بيانات احتياطية بسبب مشكلة مؤقتة في الاتصال.
+        </div>
+      )}
     </>
   );
 }

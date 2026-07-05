@@ -14,8 +14,7 @@ interface Props {
   requests?: RecentRequest[];
 }
 
-export function RecentRequests({ requests }: Props) {
-  // Pure props component. No Prisma calls.
+export function RecentRequests({ requests = [] }: Props) {
   const displayRequests: RecentRequest[] = Array.isArray(requests) ? requests : [];
 
   return (
@@ -29,19 +28,25 @@ export function RecentRequests({ requests }: Props) {
         ) : (
           <div className="divide-y">
             {displayRequests.map((req, i) => {
-              const date = typeof req.createdAt === 'string' ? new Date(req.createdAt) : req.createdAt;
+              const date = req.createdAt 
+                ? (typeof req.createdAt === 'string' ? new Date(req.createdAt) : req.createdAt)
+                : new Date();
+              
               return (
-                <div key={i} className="py-3 flex justify-between items-center text-sm">
+                <div key={req.id || i} className="py-3 flex justify-between items-center text-sm">
                   <div>
                     {req.kind || "طلب"} 
-                    <span className="text-slate-500 ml-2 text-xs">{date.toLocaleDateString('ar-SA')}</span>
+                    <span className="text-slate-500 ml-2 text-xs">
+                      {date.toLocaleDateString('ar-SA')}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge className={
                       req.status === "APPROVED" ? "bg-emerald-100 text-emerald-700" : 
-                      req.status === "PENDING" ? "bg-amber-100 text-amber-700" : "bg-rose-100 text-rose-700"
+                      req.status === "PENDING" ? "bg-amber-100 text-amber-700" : 
+                      "bg-rose-100 text-rose-700"
                     }>
-                      {req.status}
+                      {req.status || "غير معروف"}
                     </Badge>
                     <Link href="/employee/requests/tracker" className="text-xs text-indigo-600 hover:underline">عرض</Link>
                   </div>
