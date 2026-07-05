@@ -15,12 +15,31 @@ export default async function HrmsDashboard() {
     redirect("/login");
   }
 
-  // Redirect employees to their own dashboard
   const roles = (session.user.roles as string[]) || [];
-  const isEmployee = roles.includes("EMPLOYEE") || roles.length === 0;
   
-  if (isEmployee) {
-    redirect("/employee/dashboard");
+  // Only allow admin/HR roles
+  const isAdmin = roles.some((role: string) => 
+    ["SUPER_ADMIN", "HR_MANAGER", "PAYROLL_MANAGER", "RECRUITER", "MANAGER"].includes(role)
+  );
+
+  if (!isAdmin) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="text-center max-w-md">
+          <div className="text-6xl mb-4">🔒</div>
+          <h1 className="text-2xl font-semibold mb-2">Access Denied</h1>
+          <p className="text-slate-600 mb-6">
+            You do not have permission to access the HRMS Dashboard.
+          </p>
+          <a 
+            href="/employee/dashboard" 
+            className="inline-block px-6 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700"
+          >
+            Go to Employee Portal
+          </a>
+        </div>
+      </div>
+    );
   }
 
   return (

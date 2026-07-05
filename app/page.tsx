@@ -9,8 +9,8 @@ export default async function HomePage() {
   if (session?.user) {
     const roles = (session.user.roles as string[]) || [];
     
-    // Admin roles (Superhero login)
-    const isAdmin = roles.some(role => 
+    // Check if user has admin privileges
+    const isAdmin = roles.some((role: string) => 
       ["SUPER_ADMIN", "HR_MANAGER", "PAYROLL_MANAGER", "RECRUITER", "MANAGER"].includes(role)
     );
 
@@ -42,7 +42,7 @@ export default async function HomePage() {
             </Button>
           </div>
 
-          {/* Admin / Superhero Login */}
+          {/* Admin Login - "بطل خارق" */}
           <div className="rounded-2xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-indigo-50 p-6 shadow-sm">
             <div className="mb-4">
               <div className="text-2xl mb-1">👑</div>
