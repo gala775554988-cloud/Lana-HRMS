@@ -58,6 +58,11 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
+  // Prevent redirect loops on /dashboard (role-based redirect page)
+  if (normalizedPath === "/dashboard") {
+    return NextResponse.next({ request: { headers: requestHeaders } });
+  }
+
   if (isAuthRoute && isLoggedIn) {
     const response = NextResponse.redirect(new URL(pathLocale ? withLocale(DEFAULT_LOGIN_REDIRECT, activeLocale) : DEFAULT_LOGIN_REDIRECT, nextUrl));
     response.cookies.set("lana-locale", activeLocale, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
