@@ -16,6 +16,16 @@ export default async function LoginPage() {
       <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
         <strong>ملاحظة للموظفين:</strong> استخدم <span className="font-mono font-bold">رقم الهوية الوطنية</span> (مثال: 1000000001) كاسم مستخدم.
       </div>
+
+      {/* Admin login hint */}
+      <div className="mt-3 text-center">
+        <a 
+          href="/login" 
+          className="text-xs text-muted-foreground hover:text-foreground underline"
+        >
+          هل أنت مسؤول؟ استخدم البريد الإلكتروني + كلمة المرور
+        </a>
+      </div>
     </AuthCard>
   );
 }

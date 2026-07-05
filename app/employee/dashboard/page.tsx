@@ -12,47 +12,67 @@ import { DashboardContentSkeleton } from "@/components/employee/skeletons";
 export const dynamic = 'force-dynamic';
 
 export default async function EmployeeDashboard() {
-  const session = await auth();
-  if (!session?.user) redirect("/login");
-
-  let employee = null;
-
   try {
-    employee = await prisma.employee.findFirst({
-      where: { userId: session.user.id },
-      include: { department: true, position: true, branch: true },
-    });
+    const session = await auth();
+    if (!session?.user) redirect("/login");
+
+    let employee = null;
+
+    try {
+      employee = await prisma.employee.findFirst({
+        where: { userId: session.user.id },
+        include: { department: true, position: true, branch: true },
+      });
+    } catch (error) {
+      console.error("[EmployeeDashboard] Prisma error:", error);
+      return (
+        <div className="flex min-h-[60vh] items-center justify-center p-8">
+          <div className="text-center max-w-md">
+            <div className="text-6xl mb-4">👤</div>
+            <h2 className="text-2xl font-semibold mb-2">مرحباً بك</h2>
+            <p className="text-slate-600 mb-6">حدث خطأ مؤقت. يرجى المحاولة لاحقاً.</p>
+            <a href="/login" className="inline-block px-6 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700">
+              تسجيل الدخول
+            </a>
+          </div>
+        </div>
+      );
+    }
+
+    if (!employee) {
+      return (
+        <div className="flex min-h-[60vh] items-center justify-center p-8">
+          <div className="text-center max-w-md">
+            <div className="text-6xl mb-4">👤</div>
+            <h2 className="text-2xl font-semibold mb-2">مرحباً بك</h2>
+            <p className="text-slate-600 mb-6">لم يتم ربط حسابك ببيانات موظف. يرجى التواصل مع الموارد البشرية.</p>
+            <a href="/login" className="inline-block px-6 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700">
+              تسجيل الدخول
+            </a>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-8">
+        <DashboardHeader employee={employee as any} />
+        <Suspense fallback={<DashboardContentSkeleton />}>
+          <DashboardContent employeeId={employee.id} userId={session.user.id} />
+        </Suspense>
+      </div>
+    );
   } catch (error) {
-    console.error("[EmployeeDashboard] Failed to fetch employee:", error);
+    console.error("[EmployeeDashboard] Critical error:", error);
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="text-center max-w-md">
-          <p className="text-lg text-slate-600">حدث خطأ في تحميل بيانات الموظف</p>
-          <p className="mt-2 text-sm text-slate-400">يرجى التواصل مع الموارد البشرية أو المحاولة لاحقاً</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!employee) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="flex min-h-[60vh] items-center justify-center p-8">
         <div className="text-center">
-          <p className="text-lg text-slate-600">لم يتم العثور على بيانات الموظف</p>
-          <p className="mt-2 text-sm text-slate-400">يرجى التواصل مع الموارد البشرية</p>
+          <p className="text-lg text-slate-600">حدث خطأ غير متوقع</p>
+          <a href="/login" className="text-indigo-600 hover:underline mt-4 block">العودة لتسجيل الدخول</a>
         </div>
       </div>
     );
   }
-
-  return (
-    <div className="space-y-8">
-      <DashboardHeader employee={employee as any} />
-      <Suspense fallback={<DashboardContentSkeleton />}>
-        <DashboardContent employeeId={employee.id} userId={session.user.id} />
-      </Suspense>
-    </div>
-  );
 }
 
 async function DashboardContent({ employeeId, userId }: { employeeId: string; userId: string }) {
@@ -176,25 +196,36 @@ async function DashboardContent({ employeeId, userId }: { employeeId: string; us
     hasError = true;
   }
 
-  return (
-    <>
-      <KpiCards
-        attendance={attendance}
-        leaveBalance={leaveBalance}
-        payroll={payroll}
-        requests={requests}
-      />
-      <QuickActions />
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <LatestNotifications notifications={notifications} />
-        <RecentRequests requests={recentRequests} />
-      </div>
-
-      {hasError && (
-        <div className="text-xs px-4 py-3 rounded-2xl bg-amber-50 text-amber-700 border border-amber-200">
-          تم عرض بيانات احتياطية بسبب مشكلة مؤقتة في الاتصال.
+  // Extremely safe rendering - never throw
+  try {
+    return (
+      <>
+        <KpiCards
+          attendance={attendance}
+          leaveBalance={leaveBalance}
+          payroll={payroll}
+          requests={requests}
+        />
+        <QuickActions />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <LatestNotifications notifications={notifications} />
+          <RecentRequests requests={recentRequests} />
         </div>
-      )}
-    </>
-  );
+
+        {hasError && (
+          <div className="text-xs px-4 py-3 rounded-2xl bg-amber-50 text-amber-700 border border-amber-200">
+            تم عرض بيانات احتياطية بسبب مشكلة مؤقتة في الاتصال.
+          </div>
+        )}
+      </>
+    );
+  } catch (renderError) {
+    console.error("[Dashboard Render Error]", renderError);
+    return (
+      <div className="p-8 text-center">
+        <p className="text-slate-600">حدث خطأ في عرض الصفحة</p>
+        <a href="/employee/dashboard" className="text-indigo-600 hover:underline">إعادة تحميل</a>
+      </div>
+    );
+  }
 }

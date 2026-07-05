@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Search, Bell, Globe, Sun, Moon, LogOut, User } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useSession } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react';
 
 interface Props {
   user: any;
@@ -12,7 +12,7 @@ interface Props {
 }
 
 export function EmployeeTopBar({ user, employee }: Props) {
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
   const [isDark, setIsDark] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const router = useRouter();
@@ -28,8 +28,10 @@ export function EmployeeTopBar({ user, employee }: Props) {
   };
 
   const handleLogout = async () => {
-    await fetch('/api/auth/signout', { method: 'POST' });
-    router.push('/login');
+    await signOut({ 
+      redirect: true, 
+      callbackUrl: "/login" 
+    });
   };
 
   return (

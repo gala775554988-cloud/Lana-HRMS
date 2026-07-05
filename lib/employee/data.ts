@@ -11,35 +11,40 @@ import type {
 } from "@/types/employee";
 
 export async function getCurrentEmployee() {
-  const session = await auth();
-  if (!session?.user?.id) return null;
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return null;
 
-  const employee = await prisma.employee.findFirst({
-    where: { userId: session.user.id },
-    include: {
-      department: true,
-      position: true,
-      branch: true,
-    },
-  });
+    const employee = await prisma.employee.findFirst({
+      where: { userId: session.user.id },
+      include: {
+        department: true,
+        position: true,
+        branch: true,
+      },
+    }).catch(() => null);
 
-  if (!employee) return null;
+    if (!employee) return null;
 
-  return {
-    id: employee.id,
-    employeeNumber: employee.employeeNumber,
-    nationalId: employee.nationalId,
-    firstName: employee.firstName,
-    lastName: employee.lastName,
-    email: employee.email,
-    phone: employee.phone,
-    profilePhotoUrl: employee.profilePhotoUrl,
-    department: employee.department ? { name: employee.department.name, code: employee.department.code } : null,
-    position: employee.position ? { title: employee.position.title } : null,
-    branch: employee.branch ? { name: employee.branch.name } : null,
-    hireDate: employee.hireDate,
-    status: employee.status,
-  } as EmployeeProfile;
+    return {
+      id: employee.id,
+      employeeNumber: employee.employeeNumber,
+      nationalId: employee.nationalId,
+      firstName: employee.firstName,
+      lastName: employee.lastName,
+      email: employee.email,
+      phone: employee.phone,
+      profilePhotoUrl: employee.profilePhotoUrl,
+      department: employee.department ? { name: employee.department.name, code: employee.department.code } : null,
+      position: employee.position ? { title: employee.position.title } : null,
+      branch: employee.branch ? { name: employee.branch.name } : null,
+      hireDate: employee.hireDate,
+      status: employee.status,
+    } as EmployeeProfile;
+  } catch (error) {
+    console.error("[getCurrentEmployee] Error:", error);
+    return null;
+  }
 }
 
 export async function getAttendanceSummary(employeeId: string): Promise<AttendanceSummary> {
