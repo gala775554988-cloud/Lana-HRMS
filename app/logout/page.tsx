@@ -1,43 +1,20 @@
-'use client';
-
-import { signOut } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { AuthCard } from "@/components/auth/auth-card";
+import { getRequestDictionary } from "@/lib/i18n-server";
+import { LogoutActions } from "./logout-actions";
 
-export default function LogoutPage() {
-  const router = useRouter();
-
-  const handleLogout = async () => {
-    await signOut({ 
-      redirect: true,
-      callbackUrl: "/login" 
-    });
-  };
+export default async function LogoutPage() {
+  const { locale, dictionary } = await getRequestDictionary();
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50">
       <div className="w-full max-w-md">
-        <AuthCard 
-          title="تسجيل الخروج" 
+        <AuthCard
+          title="تسجيل الخروج"
           description="هل أنت متأكد من تسجيل الخروج من الحساب؟"
+          locale={locale}
+          dictionary={dictionary}
         >
-          <div className="space-y-4">
-            <Button 
-              onClick={handleLogout} 
-              className="w-full"
-            >
-              نعم، سجل خروجي
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              className="w-full"
-              onClick={() => router.back()}
-            >
-              إلغاء
-            </Button>
-          </div>
+          <LogoutActions />
         </AuthCard>
       </div>
     </div>

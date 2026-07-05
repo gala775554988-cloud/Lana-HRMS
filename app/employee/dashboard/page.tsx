@@ -77,7 +77,7 @@ export default async function EmployeeDashboard() {
 
 async function DashboardContent({ employeeId, userId }: { employeeId: string; userId: string }) {
   // Default safe data
-  const defaultAttendance = { todayStatus: "absent" as const, hoursToday: 0, totalThisMonth: 0 };
+  const defaultAttendance = { todayStatus: "absent" as "absent" | "present" | "checked-out", hoursToday: 0, totalThisMonth: 0 };
   const defaultLeaveBalance = { annual: { used: 0, remaining: 30, total: 30 }, sick: { used: 0, remaining: 15, total: 15 } };
   const defaultPayroll = { baseSalary: 12500, currency: "SAR" };
   const defaultRequests = { pending: 0, approved: 0, rejected: 0 };

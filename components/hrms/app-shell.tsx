@@ -20,7 +20,7 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
   const router = useRouter();
   const [session, setSession] = useState<any>(null);
   const [dictionary, setDictionary] = useState<any>(null);
-  const [locale, setLocale] = useState("en");
+  const [locale, setLocale] = useState<"en" | "ar">("en");
 
   // Fetch session on client
   useEffect(() => {
