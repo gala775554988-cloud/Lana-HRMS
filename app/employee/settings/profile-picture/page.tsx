@@ -20,55 +20,57 @@ export default function ProfilePicturePage() {
       alert('الرجاء اختيار صورة فقط');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      alert('حجم الصورة يجب أن يكون أقل من 5 ميجابايت');
+    if (file.size > 2 * 1024 * 1024) {
+      alert('حجم الصورة يجب أن يكون أقل من 2 ميجابايت');
       return;
     }
 
     setUploading(true);
 
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
-      const uploadRes = await fetch('/api/uploads', { 
-        method: 'POST', 
-        body: formData 
-      });
+      // Convert image to base64 (works on Vercel)
+      const reader = new FileReader();
+      
+      reader.onload = async (event) => {
+        const base64 = event.target?.result as string;
 
-      if (!uploadRes.ok) {
-        const errorData = await uploadRes.json().catch(() => ({}));
-        throw new Error(errorData.message || 'فشل في رفع الملف');
-      }
+        try {
+          // Update employee profile with base64 image
+          const res = await fetch('/api/employee/profile', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ profilePhotoUrl: base64 }),
+          });
 
-      const uploadData = await uploadRes.json();
+          if (!res.ok) {
+            throw new Error('فشل في حفظ الصورة');
+          }
 
-      if (uploadData.url) {
-        // Update employee record
-        const profileRes = await fetch('/api/employee/profile', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ profilePhotoUrl: uploadData.url }),
-        });
+          // Update session immediately
+          await update({ image: base64 });
 
-        if (!profileRes.ok) {
-          throw new Error('فشل في تحديث بيانات الموظف');
+          // Update UI
+          setPhotoUrl(base64);
+
+          alert('تم تحديث الصورة الشخصية بنجاح');
+        } catch (err: any) {
+          console.error(err);
+          alert('فشل في حفظ الصورة. حاول مرة أخرى.');
+        } finally {
+          setUploading(false);
         }
+      };
 
-        // Update session
-        await update({ image: uploadData.url });
+      reader.onerror = () => {
+        alert('فشل في قراءة الصورة');
+        setUploading(false);
+      };
 
-        // Update local state
-        setPhotoUrl(uploadData.url);
+      reader.readAsDataURL(file);
 
-        alert('تم تحديث الصورة الشخصية بنجاح');
-      } else {
-        throw new Error('لم يتم إرجاع رابط الصورة');
-      }
     } catch (err: any) {
       console.error('Upload error:', err);
-      alert(err.message || 'فشل في رفع الصورة. يرجى المحاولة مرة أخرى.');
-    } finally {
+      alert('حدث خطأ أثناء رفع الصورة');
       setUploading(false);
     }
   };
