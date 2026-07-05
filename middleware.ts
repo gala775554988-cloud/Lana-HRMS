@@ -48,18 +48,15 @@ export async function middleware(request: NextRequest) {
     (route) => route === normalizedPath || normalizedPath.startsWith(route + "/")
   );
 
-  // Root path: redirect to dashboard if logged in, otherwise to login
+  // Root path: redirect to login only if NOT logged in (no redirect loop for logged-in users)
   if (normalizedPath === "/") {
-    const targetPath = isLoggedIn
-      ? (pathLocale ? withLocale(DEFAULT_LOGIN_REDIRECT, activeLocale) : DEFAULT_LOGIN_REDIRECT)
-      : (pathLocale ? withLocale("/login", activeLocale) : "/login");
-    const response = NextResponse.redirect(new URL(targetPath, nextUrl));
-    response.cookies.set("lana-locale", activeLocale, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
-    return response;
-  }
-
-  // Prevent redirect loops on /dashboard (role-based redirect page)
-  if (normalizedPath === "/dashboard") {
+    if (!isLoggedIn) {
+      const loginPath = pathLocale ? withLocale("/login", activeLocale) : "/login";
+      const response = NextResponse.redirect(new URL(loginPath, nextUrl));
+      response.cookies.set("lana-locale", activeLocale, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
+      return response;
+    }
+    // If logged in on root, let the page handle role-based redirect
     return NextResponse.next({ request: { headers: requestHeaders } });
   }
 
