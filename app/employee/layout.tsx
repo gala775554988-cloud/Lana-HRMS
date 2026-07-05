@@ -8,34 +8,33 @@ import { EmployeeMobileBottomNav } from "@/components/employee/EmployeeMobileBot
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 export default async function EmployeeLayout({ children }: { children: ReactNode }) {
+  const session = await auth();
+  if (!session?.user) {
+    redirect("/login");
+  }
+
+  let employee = null;
   try {
-    const session = await auth();
-    if (!session?.user) {
-      redirect("/login");
-    }
+    employee = await getCurrentEmployee();
+  } catch (error) {
+    console.error("[EmployeeLayout] getCurrentEmployee error:", error);
+    employee = null;
+  }
 
-    let employee = null;
-    try {
-      employee = await getCurrentEmployee();
-    } catch (error) {
-      console.error("[EmployeeLayout] getCurrentEmployee error:", error);
-      employee = null;
-    }
-
-    if (!employee) {
-      return (
-        <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
-          <div className="text-center max-w-md">
-            <div className="text-6xl mb-4">👤</div>
-            <p className="text-lg text-slate-600 mb-2">لم يتم العثور على بيانات الموظف</p>
-            <p className="text-sm text-slate-400 mb-6">يرجى التواصل مع الموارد البشرية لربط حسابك</p>
-            <a href="/login" className="inline-block px-6 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700">
-              تسجيل الدخول
-            </a>
-          </div>
+  if (!employee) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <div className="text-center max-w-md">
+          <div className="text-6xl mb-4">👤</div>
+          <p className="text-lg text-slate-600 mb-2">لم يتم العثور على بيانات الموظف</p>
+          <p className="text-sm text-slate-400 mb-6">يرجى التواصل مع الموارد البشرية لربط حسابك</p>
+          <a href="/login" className="inline-block px-6 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700">
+            تسجيل الدخول
+          </a>
         </div>
-      );
-    }
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100" dir="rtl">
