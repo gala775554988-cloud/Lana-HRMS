@@ -16,17 +16,22 @@ export default async function LoginPage({
   return (
     <div className="min-h-screen bg-slate-50/90 flex items-center justify-center p-6">
       <div className="w-full max-w-md">
+        <div className="mb-7 flex flex-col items-center text-center">
+          <BrandLogo
+            href="/"
+            size="hero"
+            showText={false}
+            logoClassName="border-slate-300 shadow-2xl shadow-indigo-950/20 ring-4 ring-white/80"
+            imageClassName="p-2"
+          />
+          <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">Lana HRMS</h1>
+          <p className="mt-2 text-sm font-medium text-slate-600">
+            {isAdminMode ? "دخول المسؤولين - لوحة التحكم الكاملة" : "نظام إدارة الموارد البشرية"}
+          </p>
+        </div>
         
         {/* Clean & Simple Login Card */}
         <div className="bg-white/95 rounded-3xl shadow-xl border p-8 backdrop-blur">
-          <div className="mb-6">
-            <BrandLogo
-              href="/"
-              size="md"
-              subtitle={isAdminMode ? "دخول المسؤولين - لوحة التحكم الكاملة" : "نظام إدارة الموارد البشرية"}
-              subtitleClassName="text-slate-500"
-            />
-          </div>
 
           <Suspense>
             <LoginForm dictionary={dictionary} isAdminMode={isAdminMode} />

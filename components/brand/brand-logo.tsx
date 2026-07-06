@@ -3,14 +3,15 @@ import { cn } from "@/lib/utils";
 
 export const BRAND_LOGO_SRC = "/brand/lana-logo.png";
 
-type BrandLogoSize = "xs" | "sm" | "md" | "lg" | "xl";
+type BrandLogoSize = "xs" | "sm" | "md" | "lg" | "xl" | "hero";
 
 const logoSizes: Record<BrandLogoSize, string> = {
   xs: "h-8 w-8 rounded-xl",
   sm: "h-10 w-10 rounded-2xl",
   md: "h-12 w-12 rounded-2xl",
   lg: "h-16 w-16 rounded-3xl",
-  xl: "h-24 w-24 rounded-[2rem]"
+  xl: "h-24 w-24 rounded-[2rem]",
+  hero: "h-36 w-36 rounded-[2.5rem] sm:h-44 sm:w-44"
 };
 
 const titleSizes: Record<BrandLogoSize, string> = {
@@ -18,7 +19,8 @@ const titleSizes: Record<BrandLogoSize, string> = {
   sm: "text-base",
   md: "text-lg",
   lg: "text-2xl",
-  xl: "text-4xl"
+  xl: "text-4xl",
+  hero: "text-4xl sm:text-5xl"
 };
 
 const subtitleSizes: Record<BrandLogoSize, string> = {
@@ -26,7 +28,8 @@ const subtitleSizes: Record<BrandLogoSize, string> = {
   sm: "text-[10px]",
   md: "text-xs",
   lg: "text-sm",
-  xl: "text-base"
+  xl: "text-base",
+  hero: "text-base sm:text-lg"
 };
 
 interface BrandLogoProps {

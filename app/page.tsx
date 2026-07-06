@@ -26,7 +26,15 @@ export default async function HomePage() {
     <main className="flex min-h-screen items-center justify-center bg-slate-50/90 px-6">
       <div className="w-full max-w-md space-y-8 text-center">
         <div className="flex justify-center">
-          <BrandLogo href={null} size="xl" textClassName="text-right" subtitleClassName="text-slate-600" />
+          <BrandLogo
+            href={null}
+            size="hero"
+            className="flex-col text-center"
+            textClassName="text-center"
+            logoClassName="border-slate-300 shadow-2xl shadow-indigo-950/20 ring-4 ring-white/80"
+            imageClassName="p-2"
+            subtitleClassName="mt-2 text-slate-600"
+          />
         </div>
 
         <div className="space-y-4">
