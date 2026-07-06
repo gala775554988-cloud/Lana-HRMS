@@ -45,6 +45,14 @@ export async function getHierarchyStore(): Promise<HierarchyStore> {
   return normalizeStore(setting?.value);
 }
 
+export async function saveHierarchyStore(store: HierarchyStore) {
+  return prisma.appSetting.upsert({
+    where: { key: STORE_KEY },
+    update: { value: store },
+    create: { key: STORE_KEY, value: store, description: "Enterprise organization hierarchy mappings" }
+  });
+}
+
 export async function getAccessProfile(userId: string, roles: string[] = []): Promise<AccessProfile> {
   const [employee, store] = await Promise.all([
     prisma.employee.findFirst({ where: { userId }, select: { id: true, userId: true, departmentId: true, branchId: true } }),

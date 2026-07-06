@@ -9,6 +9,7 @@ import { applyScopedWhere, canAccessEmployeeId, getAccessProfile } from "@/lib/e
 import { writeAuditLog } from "@/lib/audit";
 import { buildModuleSchema } from "@/lib/validations/hrms";
 import { hashPassword } from "@/lib/password";
+import { notifyRole } from "@/lib/enterprise/notifications";
 
 type QueryInput = {
   resourceKey: string;
@@ -337,6 +338,7 @@ export async function createModuleRecord(input: MutationInput) {
 
       revalidatePath("/" + resource.key);
       revalidatePath("/");
+      await notifyRole(["SUPER_ADMIN", "HR_MANAGER"], "إضافة موظف", `Employee ${fullName} was added.`, "SUCCESS").catch(() => null);
 
       return {
         success: true,
@@ -401,6 +403,7 @@ export async function updateModuleRecord(input: MutationInput) {
     }
 
     await writeAuditLog({ actorUserId: session.user.id, action: "update", entity: resource.model, entityId: input.id, metadata: { ...data, passwordChanged: Boolean(inputPassword) } });
+    await notifyRole(["SUPER_ADMIN", "HR_MANAGER"], "تعديل موظف", `Employee record ${input.id} was updated.`, "INFO").catch(() => null);
     revalidatePath("/" + resource.key);
     revalidatePath("/" + resource.key + "/" + input.id);
     return { success: true, message: resource.title + " record updated." + (inputPassword ? " Password updated." : ""), id: String(record.id) };

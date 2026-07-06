@@ -6,14 +6,15 @@ import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import type { ReactNode } from "react";
 import {
-  Bell, LayoutDashboard, LogOut, ChevronLeft, ChevronRight, Search,
+  LayoutDashboard, LogOut, ChevronLeft, ChevronRight, Search,
   Users, Building2, MapPin, Briefcase, FileText, Clock, Calendar,
   DollarSign, GraduationCap, Package, Megaphone, BarChart3, Settings,
-  Shield, KeyRound
+  Shield, KeyRound, Network, Inbox, Send, BellRing, GitPullRequest, UserRoundCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { ClientLanguageToggle } from "@/components/i18n/client-language-toggle";
+import { NotificationBell } from "@/components/enterprise/notification-bell";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/hrms/theme-toggle";
 import { useThemeStore } from "@/store/theme";
@@ -26,6 +27,20 @@ interface AppShellProps {
 
 const navItems = [
   { href: "/", label: "لوحة التحكم", icon: LayoutDashboard, group: "main" },
+  { href: "/my-team", label: "فريقي", icon: UserRoundCheck, group: "main", roles: ["SUPERVISOR", "BRANCH_MANAGER", "DEPARTMENT_MANAGER", "PROJECT_MANAGER", "HR_MANAGER", "SUPER_ADMIN"] },
+  { href: "/request-center", label: "مركز الطلبات", icon: GitPullRequest, group: "main", permissions: ["read:requests", "manage:requests", "read:leave", "manage:leave"] },
+  { href: "/approvals-inbox", label: "صندوق الوارد", icon: Inbox, group: "main", roles: ["SUPERVISOR", "BRANCH_MANAGER", "DEPARTMENT_MANAGER", "PROJECT_MANAGER", "HR_MANAGER", "SUPER_ADMIN"] },
+  { href: "/approvals-outbox", label: "الصادر", icon: Send, group: "main", roles: ["SUPERVISOR", "BRANCH_MANAGER", "DEPARTMENT_MANAGER", "PROJECT_MANAGER", "HR_MANAGER", "SUPER_ADMIN"] },
+  { href: "/notification-center", label: "مركز الإشعارات", icon: BellRing, group: "main" },
+  { href: "/enterprise-dashboards/supervisor", label: "Supervisor Dashboard", icon: LayoutDashboard, group: "main", roles: ["SUPERVISOR", "SUPER_ADMIN"] },
+  { href: "/enterprise-dashboards/branch", label: "Branch Manager Dashboard", icon: LayoutDashboard, group: "main", roles: ["BRANCH_MANAGER", "SUPER_ADMIN"] },
+  { href: "/enterprise-dashboards/department", label: "Department Manager Dashboard", icon: LayoutDashboard, group: "main", roles: ["DEPARTMENT_MANAGER", "SUPER_ADMIN"] },
+  { href: "/enterprise-dashboards/hr", label: "HR Dashboard", icon: LayoutDashboard, group: "main", roles: ["HR_MANAGER", "SUPER_ADMIN"] },
+  { href: "/enterprise-dashboards/payroll", label: "Payroll Dashboard", icon: DollarSign, group: "main", permissions: ["read:payroll", "manage:payroll"] },
+  { href: "/enterprise-dashboards/insurance", label: "Insurance Dashboard", icon: Shield, group: "main", permissions: ["read:insurance", "manage:insurance"] },
+  { href: "/enterprise-dashboards/residency", label: "Residency Dashboard", icon: FileText, group: "main", permissions: ["read:residency", "manage:residency"] },
+  { href: "/enterprise-dashboards/project", label: "Project Manager Dashboard", icon: Briefcase, group: "main", roles: ["PROJECT_MANAGER", "SUPER_ADMIN"] },
+  { href: "/enterprise-dashboards/warehouse", label: "Warehouse Dashboard", icon: Package, group: "main", permissions: ["read:warehouse", "manage:warehouse"] },
   { href: "/employees", label: "الموظفون", icon: Users, group: "people" },
   { href: "/departments", label: "الإدارات", icon: Building2, group: "people" },
   { href: "/branches", label: "الفروع", icon: MapPin, group: "people" },
@@ -40,7 +55,8 @@ const navItems = [
   { href: "/announcements", label: "الإعلانات", icon: Megaphone, group: "admin" },
   { href: "/reports", label: "التقارير", icon: BarChart3, group: "admin" },
   { href: "/audit-logs", label: "سجل التدقيق", icon: Shield, group: "admin" },
-  { href: "/permissions-management", label: "إدارة الصلاحيات", icon: KeyRound, group: "admin" },
+  { href: "/organization-hierarchy", label: "الهيكل الإداري", icon: Network, group: "admin", roles: ["SUPER_ADMIN"] },
+  { href: "/permissions-management", label: "إدارة الصلاحيات", icon: KeyRound, group: "admin", roles: ["SUPER_ADMIN"] },
   { href: "/settings", label: "الإعدادات", icon: Settings, group: "admin" },
 ];
 
@@ -51,6 +67,8 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
   const pathname = usePathname();
   const { data: session, status } = useSession();
   const { sidebarCollapsed, toggleSidebar, _hasHydrated } = useThemeStore();
+  const userRoles = useMemo(() => (session?.user?.roles as string[]) || [], [session?.user?.roles]);
+  const userPermissions = useMemo(() => (session?.user?.permissions as string[]) || [], [session?.user?.permissions]);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -69,9 +87,15 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
 
   const groupedNav = useMemo(() => {
     const result: Record<string, typeof navItems> = {};
-    navItems.forEach((item) => { if (!result[item.group]) result[item.group] = []; result[item.group].push(item); });
+    navItems
+      .filter((item) => {
+        const roleAllowed = !("roles" in item) || item.roles?.some((role) => userRoles.includes(role));
+        const permissionAllowed = !("permissions" in item) || item.permissions?.some((permission) => userPermissions.includes(permission));
+        return roleAllowed && permissionAllowed;
+      })
+      .forEach((item) => { if (!result[item.group]) result[item.group] = []; result[item.group].push(item); });
     return result;
-  }, []);
+  }, [userPermissions, userRoles]);
 
   // Show loading while session is loading OR store hasn't hydrated
   if (status === "loading" || !_hasHydrated) {
@@ -88,8 +112,6 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
   if (!session?.user) {
     return null;
   }
-
-  const userRoles = (session.user.roles as string[]) || [];
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -117,10 +139,7 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
             </button>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="relative" aria-label="الإشعارات">
-              <Bell className="h-4 w-4" />
-              <span className="absolute -top-0.5 -left-0.5 h-4 w-4 rounded-full bg-destructive text-destructive-foreground text-[10px] flex items-center justify-center font-bold">3</span>
-            </Button>
+            <NotificationBell />
             <ClientLanguageToggle variant="ghost" className="hidden sm:inline-flex" />
             <ThemeToggle />
             <div className="hidden sm:block h-6 w-px bg-border" />

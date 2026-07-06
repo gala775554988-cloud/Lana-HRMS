@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, Bell, Sun, Moon, User } from 'lucide-react';
+import { Search, Sun, Moon, User } from 'lucide-react';
 import Link from 'next/link';
 import { BrandLogo } from '@/components/brand/brand-logo';
 import { ClientLanguageToggle } from '@/components/i18n/client-language-toggle';
+import { NotificationBell } from '@/components/enterprise/notification-bell';
 
 interface Props {
   user: any;
@@ -50,10 +51,7 @@ export function EmployeeHeader({ user, employee }: Props) {
 
         {/* Right side */}
         <div className="flex items-center gap-1">
-          <button className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 relative">
-            <Bell className="h-4 w-4" />
-            <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 bg-red-500 rounded-full" />
-          </button>
+          <NotificationBell />
 
           <button onClick={toggleTheme} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
             {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}

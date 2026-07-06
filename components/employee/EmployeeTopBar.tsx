@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, Bell, Sun, Moon, LogOut, User } from 'lucide-react';
+import { Search, Sun, Moon, LogOut, User } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { BrandLogo } from '@/components/brand/brand-logo';
 import { ClientLanguageToggle } from '@/components/i18n/client-language-toggle';
+import { NotificationBell } from '@/components/enterprise/notification-bell';
 
 interface Props {
   user: any;
@@ -66,10 +67,7 @@ export function EmployeeTopBar({ user, employee }: Props) {
 
         {/* Right controls */}
         <div className="flex items-center gap-1 sm:gap-2">
-          <button className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 relative">
-            <Bell className="h-4 w-4" />
-            <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-500 rounded-full" />
-          </button>
+          <NotificationBell />
 
           <button onClick={toggleTheme} className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800">
             {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}

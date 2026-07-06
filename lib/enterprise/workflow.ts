@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
 import { resolveApprovalChain } from "@/lib/enterprise/hierarchy";
+import { createEnterpriseNotification, notifyUsers } from "@/lib/enterprise/notifications";
 
 export async function createEnterpriseWorkflow(employeeId: string, type: string, entityId: string) {
   const approverUserIds = await resolveApprovalChain(employeeId);
@@ -22,6 +23,17 @@ export async function createEnterpriseWorkflow(employeeId: string, type: string,
         approverUserId,
         status: index === 0 ? "PENDING" : "WAITING"
       }))
+    });
+    await notifyUsers([approverUserIds[0]], "وصول طلب جديد", `New ${type} request is waiting for your approval.`, "INFO");
+  }
+
+  const employee = await prisma.employee.findUnique({ where: { id: employeeId }, select: { userId: true } });
+  if (employee?.userId) {
+    await createEnterpriseNotification({
+      userId: employee.userId,
+      title: approverUserIds.length ? "تم إرسال الطلب" : "تم اعتماد الطلب",
+      body: approverUserIds.length ? `Your ${type} request has been submitted.` : `Your ${type} request was approved automatically.`,
+      type: approverUserIds.length ? "INFO" : "SUCCESS"
     });
   }
 
@@ -86,6 +98,20 @@ export async function decideWorkflowStep({
     entityId: workflowInstanceId,
     metadata: { decision, comments, ip, entityId: instance.entityId, type: instance.type, employeeId: instance.employeeId }
   });
+
+  const employee = await prisma.employee.findUnique({ where: { id: instance.employeeId }, select: { userId: true } });
+  if (employee?.userId) {
+    await createEnterpriseNotification({
+      userId: employee.userId,
+      title: decision === "APPROVE" ? "اعتماد طلب" : decision === "REJECT" ? "رفض طلب" : "إرجاع طلب",
+      body: `Your ${instance.type} request status is now ${workflowStatus}.`,
+      type: decision === "APPROVE" ? "SUCCESS" : decision === "REJECT" ? "ERROR" : "WARNING"
+    });
+  }
+  const nextPendingStep = await prisma.workflowStep.findFirst({ where: { workflowInstanceId, status: "PENDING" }, select: { approverUserId: true } });
+  if (nextPendingStep?.approverUserId) {
+    await createEnterpriseNotification({ userId: nextPendingStep.approverUserId, title: "وصول طلب جديد", body: `A ${instance.type} request is waiting for your approval.`, type: "INFO" });
+  }
 
   return updated;
 }
