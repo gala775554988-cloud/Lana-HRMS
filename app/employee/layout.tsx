@@ -1,11 +1,13 @@
 import type { ReactNode } from "react";
 import { auth } from "@/auth";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentEmployee } from "@/lib/employee/data";
 import { EmployeeTopBar } from "@/components/employee/EmployeeTopBar";
 import { EmployeeDesktopSidebar } from "@/components/employee/EmployeeDesktopSidebar";
 import { EmployeeMobileBottomNav } from "@/components/employee/EmployeeMobileBottomNav";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { isPasswordChangeRequired } from "@/lib/auth/password-change-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +23,12 @@ export default async function EmployeeLayout({ children }: { children: ReactNode
   } catch (error) {
     console.error("[EmployeeLayout] getCurrentEmployee error:", error);
     employee = null;
+  }
+
+  const requestHeaders = await headers();
+  const pathname = requestHeaders.get("x-lana-pathname") ?? "";
+  if (await isPasswordChangeRequired(session.user.id) && pathname !== "/employee/settings/password") {
+    redirect("/employee/settings/password");
   }
 
   if (!employee) {

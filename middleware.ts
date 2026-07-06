@@ -13,6 +13,7 @@ export async function middleware(request: NextRequest) {
   const normalizedPath = stripLocaleFromPath(nextUrl.pathname);
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-lana-locale", activeLocale);
+  requestHeaders.set("x-lana-pathname", normalizedPath);
 
   // Auth.js v5 JWT handling - try both secure and non-secure cookie names
   let token: JWT | null = null;

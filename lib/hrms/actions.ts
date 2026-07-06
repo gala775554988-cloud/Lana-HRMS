@@ -11,6 +11,7 @@ import { buildModuleSchema } from "@/lib/validations/hrms";
 import { hashPassword } from "@/lib/password";
 import { notifyRole } from "@/lib/enterprise/notifications";
 import { extractSalaryProfile, saveEmployeeSalaryProfile } from "@/lib/employee/salary-profile";
+import { requirePasswordChange } from "@/lib/auth/password-change-policy";
 
 type QueryInput = {
   resourceKey: string;
@@ -356,6 +357,7 @@ export async function createModuleRecord(input: MutationInput) {
       });
 
       await saveEmployeeSalaryProfile(String(result.employee.id), salaryProfile);
+      await requirePasswordChange(String(result.user.id));
       revalidatePath("/" + resource.key);
       revalidatePath("/");
       await notifyRole(["SUPER_ADMIN", "HR_MANAGER"], "إضافة موظف", `Employee ${fullName} was added.`, "SUCCESS").catch(() => null);
