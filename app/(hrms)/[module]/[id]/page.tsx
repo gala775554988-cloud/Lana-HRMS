@@ -97,10 +97,14 @@ export default async function RecordPage({ params }: { params: Promise<{ module:
         <CardDescription>{rec.detailsDesc}</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3 sm:grid-cols-2">
-        {resource.key === "employees" && typeof record.profilePhotoUrl === "string" && record.profilePhotoUrl ? (
+        {resource.key === "employees" ? (
           <div className="rounded-md border p-3 sm:col-span-2">
             <p className="mb-2 text-xs uppercase text-muted-foreground">{(dictionary.fields as any)?.profilePhotoUrl ?? "الصورة الشخصية"}</p>
-            <img src={record.profilePhotoUrl} alt="Employee photo" className="h-32 w-32 rounded-2xl object-cover" />
+            {typeof record.profilePhotoUrl === "string" && record.profilePhotoUrl ? (
+              <img src={record.profilePhotoUrl} alt="Employee photo" className="h-32 w-32 rounded-2xl object-cover" />
+            ) : (
+              <div className="flex h-32 w-32 items-center justify-center rounded-2xl bg-muted text-3xl text-muted-foreground">👤</div>
+            )}
           </div>
         ) : null}
         {resource.key === "employees" ? (
@@ -109,7 +113,7 @@ export default async function RecordPage({ params }: { params: Promise<{ module:
             <p className="break-words text-sm">{`${String(record.firstName ?? "")} ${String(record.lastName ?? "")}`.trim() || "-"}</p>
           </div>
         ) : null}
-        {Object.entries(record).filter(([key]) => key !== "id" && key !== "emergencyContact" && key !== "firstName" && key !== "lastName" && key !== "salaryCosts" && key !== "salaryDeductInsurance" && !(salaryProfileFields as readonly string[]).includes(key)).map(([key, value]) => {
+        {Object.entries(record).filter(([key]) => key !== "id" && key !== "profilePhotoUrl" && key !== "emergencyContact" && key !== "firstName" && key !== "lastName" && key !== "salaryCosts" && key !== "salaryDeductInsurance" && !(salaryProfileFields as readonly string[]).includes(key)).map(([key, value]) => {
           const fieldLabel = (dictionary.fields as any)?.[key] ?? key;
           return (
             <div key={key} className="rounded-md border p-3">
