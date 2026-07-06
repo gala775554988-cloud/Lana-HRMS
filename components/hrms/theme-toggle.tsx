@@ -1,25 +1,26 @@
-'use client';
+"use client";
 
-import { Moon, Sun } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Moon, Sun, Monitor } from "lucide-react";
+import { useThemeStore } from "@/store/theme";
 import { Button } from "@/components/ui/button";
+import type { ThemeMode } from "@/lib/design-system/tokens";
 
 export function ThemeToggle() {
-  const [dark, setDark] = useState(false);
+  const { mode, setMode } = useThemeStore();
 
-  useEffect(() => {
-    const stored = window.localStorage.getItem("theme");
-    const enabled = stored === "dark" || (!stored && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    setDark(enabled);
-    document.documentElement.classList.toggle("dark", enabled);
-  }, []);
+  const cycleMode = () => {
+    const modes: ThemeMode[] = ["light", "dark", "system"];
+    const currentIndex = modes.indexOf(mode);
+    setMode(modes[(currentIndex + 1) % modes.length]);
+  };
 
-  function toggle() {
-    const next = !dark;
-    setDark(next);
-    document.documentElement.classList.toggle("dark", next);
-    window.localStorage.setItem("theme", next ? "dark" : "light");
-  }
+  const iconMap: Record<ThemeMode, typeof Sun> = { light: Sun, dark: Moon, system: Monitor };
+  const labelMap: Record<ThemeMode, string> = { light: "Light mode", dark: "Dark mode", system: "System mode" };
+  const Icon = iconMap[mode];
 
-  return <Button type="button" variant="outline" size="icon" onClick={toggle} aria-label="Toggle dark mode">{dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</Button>;
+  return (
+    <Button variant="ghost" size="icon" onClick={cycleMode} aria-label={labelMap[mode]} title={labelMap[mode]}>
+      <Icon className="h-4 w-4" />
+    </Button>
+  );
 }

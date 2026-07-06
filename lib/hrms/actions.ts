@@ -108,6 +108,48 @@ export async function listModuleRecords(input: QueryInput) {
   const page = Math.max(Number(input.page ?? 1), 1);
   const pageSize = Math.min(Math.max(Number(input.pageSize ?? 10), 5), 100);
   const where = buildWhere(resource, input.search, input.filters);
+
+  // Special handling for employees: include relations for card view
+  if (resource.key === "employees") {
+    const [records, total] = await Promise.all([
+      prisma.employee.findMany({
+        where,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        orderBy: { createdAt: "desc" },
+        include: {
+          department: { select: { name: true, code: true } },
+          position: { select: { title: true } },
+          branch: { select: { name: true } },
+          employmentType: { select: { name: true } },
+          user: { select: { lastLoginAt: true } },
+        },
+      }),
+      prisma.employee.count({ where }),
+    ]);
+
+    const serializedRecords = records.map((r: any) => ({
+      id: r.id,
+      employeeNumber: r.employeeNumber,
+      nationalId: r.nationalId,
+      firstName: r.firstName,
+      lastName: r.lastName,
+      email: r.email,
+      phone: r.phone,
+      profilePhotoUrl: r.profilePhotoUrl,
+      status: r.status,
+      hireDate: r.hireDate ? new Date(r.hireDate).toISOString().slice(0, 10) : null,
+      department: r.department,
+      position: r.position,
+      branch: r.branch,
+      employmentType: r.employmentType,
+      lastLoginAt: r.user?.lastLoginAt ? new Date(r.user.lastLoginAt).toLocaleString("ar-SA") : null,
+      createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : null,
+    }));
+
+    return { records: serializedRecords as Record<string, unknown>[], total, page, pageSize, pageCount: Math.max(Math.ceil(total / pageSize), 1) };
+  }
+
   const delegate = delegateFor(resource.model);
   const [records, total] = await Promise.all([
     delegate.findMany({ where, skip: (page - 1) * pageSize, take: pageSize, orderBy: { createdAt: "desc" } }),

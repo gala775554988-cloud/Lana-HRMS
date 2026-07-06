@@ -15,7 +15,7 @@ export default async function HomePage() {
     );
 
     if (isAdmin) {
-      redirect("/(hrms)/dashboard");
+      redirect("/dashboard");
     } else {
       redirect("/employee/dashboard");
     }

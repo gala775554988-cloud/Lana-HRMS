@@ -1,15 +1,16 @@
-import Link from "next/link";
-import { Filter, Plus, Search } from "lucide-react";
 import { notFound } from "next/navigation";
 import { getHrmsModule } from "@/config/hrms";
 import { listModuleRecords } from "@/lib/hrms/actions";
 import { getRequestDictionary } from "@/lib/i18n-server";
 import { ModuleForm } from "@/components/hrms/module-form";
 import { ModuleTable } from "@/components/hrms/module-table";
+import { EmployeeList } from "@/components/hrms/employee-list";
 import { FileUpload } from "@/components/hrms/file-upload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Filter, Plus, Search } from "lucide-react";
+import Link from "next/link";
 
 export default async function ResourcePage({ params, searchParams }: { params: Promise<{ module: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { module: resourceKey } = await params;
@@ -28,8 +29,22 @@ export default async function ResourcePage({ params, searchParams }: { params: P
 
   const t = dictionary.module;
   const f = dictionary.fields as Record<string, string>;
-
   const getFieldLabel = (fieldName: string) => f[fieldName] ?? fieldName;
+
+  if (resourceKey === "employees") {
+    return (
+      <EmployeeList
+        resource={resource}
+        records={data.records as any[]}
+        totalCount={data.total}
+        page={data.page}
+        pageCount={data.pageCount}
+        search={search}
+        dictionary={dictionary}
+        locale={locale}
+      />
+    );
+  }
 
   return (
     <section className="space-y-6" dir={locale === "ar" ? "rtl" : "ltr"}>
