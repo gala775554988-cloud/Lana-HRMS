@@ -46,6 +46,12 @@ const nationalities = [
   { name: "United Kingdom", code: "GB" }
 ];
 
+const leaveTypes = [
+  { name: "إجازة سنوية", code: "ANNUAL", description: "Annual leave - 30 days per year", annualLimit: 30, isPaid: true, isActive: true },
+  { name: "إجازة مرضية", code: "SICK", description: "Sick leave - 15 days per year", annualLimit: 15, isPaid: true, isActive: true },
+  { name: "إجازة طارئة", code: "EMERGENCY", description: "Emergency leave - 5 days per year", annualLimit: 5, isPaid: true, isActive: true }
+];
+
 type Delegate = { upsert(args: unknown): Promise<Record<string, unknown>>; findUnique(args: unknown): Promise<Record<string, unknown> | null>; createMany(args: unknown): Promise<unknown> };
 
 async function main() {
@@ -100,6 +106,7 @@ async function main() {
   for (const branch of branches) await client.branch.upsert({ where: { code: branch.code }, update: branch, create: branch });
   for (const employmentType of employmentTypes) await client.employmentType.upsert({ where: { code: employmentType.code }, update: employmentType, create: employmentType });
   for (const nationality of nationalities) await client.nationality.upsert({ where: { code: nationality.code }, update: nationality, create: nationality });
+  for (const leaveType of leaveTypes) await (client as any).leaveType.upsert({ where: { code: leaveType.code }, update: leaveType, create: leaveType });
   const hrDepartment = await client.department.findUnique({ where: { code: "HR" } });
   const headOffice = await client.branch.findUnique({ where: { code: "HQ" } });
   const fullTime = await client.employmentType.findUnique({ where: { code: "FULL_TIME" } });
