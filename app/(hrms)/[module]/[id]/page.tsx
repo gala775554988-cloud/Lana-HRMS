@@ -12,7 +12,13 @@ import { AlertTriangle } from "lucide-react";
 
 function display(value: unknown) {
   if (value === null || value === undefined || value === "") return "-";
-  if (typeof value === "object") return JSON.stringify(value);
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value, (_key, item) => typeof item === "bigint" ? item.toString() : item);
+    } catch {
+      return "-";
+    }
+  }
   return String(value);
 }
 
@@ -98,7 +104,7 @@ export default async function RecordPage({ params }: { params: Promise<{ module:
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
-        <Card>
+        <Card className={resource.key === "employees" ? "xl:order-2" : undefined}>
           <CardHeader>
             <CardTitle>{rec.details}</CardTitle>
             <CardDescription>{rec.detailsDesc}</CardDescription>
@@ -110,7 +116,13 @@ export default async function RecordPage({ params }: { params: Promise<{ module:
                 <img src={record.profilePhotoUrl} alt="Employee photo" className="h-32 w-32 rounded-2xl object-cover" />
               </div>
             ) : null}
-            {Object.entries(record).filter(([key]) => key !== "emergencyContact" && !(salaryProfileFields as readonly string[]).includes(key)).map(([key, value]) => {
+            {resource.key === "employees" ? (
+              <div className="rounded-md border p-3">
+                <p className="text-xs uppercase text-muted-foreground">{(dictionary.fields as any)?.fullName ?? "الاسم الكامل"}</p>
+                <p className="break-words text-sm">{`${String(record.firstName ?? "")} ${String(record.lastName ?? "")}`.trim() || "-"}</p>
+              </div>
+            ) : null}
+            {Object.entries(record).filter(([key]) => key !== "id" && key !== "emergencyContact" && key !== "firstName" && key !== "lastName" && key !== "salaryCosts" && key !== "salaryDeductInsurance" && !(salaryProfileFields as readonly string[]).includes(key)).map(([key, value]) => {
               const fieldLabel = (dictionary.fields as any)?.[key] ?? key;
               return (
                 <div key={key} className="rounded-md border p-3">
@@ -122,7 +134,7 @@ export default async function RecordPage({ params }: { params: Promise<{ module:
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={resource.key === "employees" ? "xl:order-1" : undefined}>
           <CardHeader>
             <CardTitle>{rec.edit}</CardTitle>
             <CardDescription>{rec.editDesc}</CardDescription>
@@ -140,6 +152,16 @@ export default async function RecordPage({ params }: { params: Promise<{ module:
             <CardDescription>الراتب الأساسي والبدلات والخصومات وصافي الراتب.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <div className="rounded-md border p-3">
+              <p className="text-xs uppercase text-muted-foreground">خصم التأمينات</p>
+              <p className="text-lg font-semibold">{salaryProfile?.salaryDeductInsurance ? "مفعل" : "غير مفعل"}</p>
+            </div>
+            {(salaryProfile?.salaryCosts ?? []).map((cost, index) => (
+              <div key={`cost-${index}`} className="rounded-md border p-3">
+                <p className="text-xs uppercase text-muted-foreground">{index === 0 ? "التكلفة" : `التكلفة ${index + 1}`}</p>
+                <p className="text-lg font-semibold">{display(cost)}</p>
+              </div>
+            ))}
             {salaryProfileFields.map((field) => (
               <div key={field} className="rounded-md border p-3">
                 <p className="text-xs uppercase text-muted-foreground">{salaryProfileLabels[field]}</p>

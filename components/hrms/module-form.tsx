@@ -15,18 +15,27 @@ import { Label } from "@/components/ui/label";
 import type { Dictionary } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
 import { EmployeePhotoUpload } from "./employee-photo-upload";
-import { calculateNetSalary, salaryProfileFields, salaryProfileLabels } from "@/lib/employee/salary-profile";
+import { calculateInsuranceDeduction, calculateTotalSalary, salaryProfileFields, salaryProfileLabels } from "@/lib/employee/salary-profile";
 
 export function ModuleForm({ resource, dictionary, initialValues, recordId, locale = "en" }: { resource: HrmsModule; dictionary: Dictionary; initialValues?: Record<string, unknown>; recordId?: string; locale?: Locale }) {
   const router = useRouter();
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [isPending, startTransition] = useTransition();
   const isEmployeeForm = resource.key === "employees";
+  const initialFullName = `${String(initialValues?.firstName ?? "")} ${String(initialValues?.lastName ?? "")}`.trim();
+  const [fullName, setFullName] = useState(initialFullName);
   const initialSalaryValues = useMemo(
-    () => Object.fromEntries(salaryProfileFields.map((field) => [field, initialValues?.[field] ?? ""])),
+    () => ({
+      ...Object.fromEntries(salaryProfileFields.map((field) => [field, initialValues?.[field] ?? ""])),
+      salaryDeductInsurance: initialValues?.salaryDeductInsurance === true
+    }),
     [initialValues]
   );
   const [salaryValues, setSalaryValues] = useState<Record<string, unknown>>(initialSalaryValues);
+  const [costValues, setCostValues] = useState<string[]>(() => {
+    const costs = initialValues?.salaryCosts;
+    return Array.isArray(costs) ? costs.map((cost) => String(cost)) : [""];
+  });
   const [customPositionOptions, setCustomPositionOptions] = useState<string[]>(() => {
     const current = typeof initialValues?.positionId === "string" ? initialValues.positionId : "";
     const field = resource.fields.find((item) => item.name === "positionId");
@@ -38,7 +47,16 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
     setMessage(null);
     startTransition(async () => {
       try {
-        const submitValues = isEmployeeForm ? { ...values, ...salaryValues } : values;
+        const nameParts = fullName.trim().split(/\s+/).filter(Boolean);
+        const submitValues = isEmployeeForm
+          ? {
+              ...values,
+              firstName: nameParts[0] ?? "",
+              lastName: nameParts.slice(1).join(" ") || nameParts[0] || "",
+              ...salaryValues,
+              salaryCosts: costValues.filter((cost) => cost !== "")
+            }
+          : values;
         const result = recordId ? await updateModuleRecord({ resourceKey: resource.key, id: recordId, values: submitValues }) : await createModuleRecord({ resourceKey: resource.key, values: submitValues });
         if (result.success) {
           setMessage({ text: result.message, type: 'success' });
@@ -52,11 +70,16 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
         setMessage({ text: error?.message || "حدث خطأ غير متوقع", type: 'error' });
       }
     });
-  }, [isEmployeeForm, recordId, resource.key, router, salaryValues]);
+  }, [costValues, fullName, isEmployeeForm, recordId, resource.key, router, salaryValues]);
 
   const fieldsDict = dictionary.fields as Record<string, string>;
   const getFieldLabel = (name: string, fallback: string) => fieldsDict[name] ?? fallback;
-  const derivedNetSalary = calculateNetSalary(Object.fromEntries(salaryProfileFields.map((field) => [field, Number(salaryValues[field] || 0)])) as any);
+  const salaryCalculationInput = {
+    ...Object.fromEntries(salaryProfileFields.map((field) => [field, Number(salaryValues[field] || 0)])),
+    salaryDeductInsurance: Boolean(salaryValues.salaryDeductInsurance)
+  };
+  const insuranceDeduction = calculateInsuranceDeduction(salaryCalculationInput as any);
+  const totalSalary = calculateTotalSalary(salaryCalculationInput as any);
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" dir={locale === "ar" ? "rtl" : "ltr"}>
@@ -83,8 +106,23 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
         </div>
       ) : null}
 
+      {isEmployeeForm ? (
+        <div className="space-y-2">
+          <Label htmlFor="fullName">{locale === "ar" ? "الاسم الكامل" : "Full Name"}<span className="text-destructive mr-1">*</span></Label>
+          <Input id="fullName" value={fullName} onChange={(event) => {
+            const value = event.target.value;
+            setFullName(value);
+            const parts = value.trim().split(/\s+/).filter(Boolean);
+            form.setValue("firstName", parts[0] ?? "", { shouldDirty: true });
+            form.setValue("lastName", parts.slice(1).join(" ") || parts[0] || "", { shouldDirty: true });
+          }} required />
+          <input type="hidden" {...form.register("firstName")} />
+          <input type="hidden" {...form.register("lastName")} />
+        </div>
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-2">
-        {resource.fields.filter((field) => !(isEmployeeForm && field.name === "profilePhotoUrl")).map((field) => {
+        {resource.fields.filter((field) => !(isEmployeeForm && ["profilePhotoUrl", "firstName", "lastName"].includes(field.name))).map((field) => {
           const error = form.formState.errors[field.name]?.message as string | undefined;
           const label = getFieldLabel(field.name, field.label);
           return (
@@ -129,19 +167,54 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
             <p className="text-sm text-muted-foreground">تفاصيل راتب الموظف وبدلاته بدون التأثير على أي بيانات قائمة.</p>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            {salaryProfileFields.map((field) => (
+            {salaryProfileFields.filter((field) => !["salaryInsuranceDeduction", "salaryTotal"].includes(field)).map((field) => (
               <div key={field} className="space-y-2">
                 <Label htmlFor={field}>{salaryProfileLabels[field]}</Label>
                 <Input
                   id={field}
                   type="number"
                   step="0.01"
-                  value={String(field === "salaryNet" ? (salaryValues[field] ?? derivedNetSalary) : (salaryValues[field] ?? ""))}
+                  value={String(salaryValues[field] ?? "")}
                   onChange={(event) => setSalaryValues((current) => ({ ...current, [field]: event.target.value }))}
-                  readOnly={field === "salaryNet"}
                 />
               </div>
             ))}
+            <label className="flex items-center gap-3 rounded-xl border bg-background p-3 md:col-span-2">
+              <input
+                type="checkbox"
+                checked={Boolean(salaryValues.salaryDeductInsurance)}
+                onChange={(event) => setSalaryValues((current) => ({ ...current, salaryDeductInsurance: event.target.checked }))}
+                className="h-4 w-4"
+              />
+              <span>خصم التأمينات</span>
+            </label>
+            <div className="space-y-2">
+              <Label htmlFor="salaryInsuranceDeduction">{salaryProfileLabels.salaryInsuranceDeduction}</Label>
+              <Input id="salaryInsuranceDeduction" type="number" value={insuranceDeduction.toFixed(2)} readOnly />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="salaryTotal">{salaryProfileLabels.salaryTotal}</Label>
+              <Input id="salaryTotal" type="number" value={totalSalary.toFixed(2)} readOnly />
+            </div>
+          </div>
+
+          <div className="space-y-3 rounded-xl border bg-background p-3">
+            <div className="flex items-center justify-between gap-3">
+              <Label>التكلفة</Label>
+              <Button type="button" variant="outline" size="sm" onClick={() => setCostValues((current) => [...current, ""])}>إضافة تكلفة جديدة</Button>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              {costValues.map((cost, index) => (
+                <Input
+                  key={index}
+                  type="number"
+                  step="0.01"
+                  value={cost}
+                  placeholder={index === 0 ? "Cost" : `Cost ${index + 1}`}
+                  onChange={(event) => setCostValues((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))}
+                />
+              ))}
+            </div>
           </div>
         </section>
       ) : null}
