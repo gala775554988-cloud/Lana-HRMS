@@ -11,30 +11,37 @@ import { Textarea } from '@/components/ui/textarea';
 export default function NewLeaveRequest() {
   const router = useRouter();
   const [loading, setLoading] = React.useState(false);
+  const [message, setMessage] = React.useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
+    setMessage(null);
 
     const formData = new FormData(e.currentTarget);
 
-    const res = await fetch('/api/hr/my-requests', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'leave',
-        ...Object.fromEntries(formData),
-      }),
-    });
+    try {
+      const res = await fetch('/api/hr/my-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'leave',
+          ...Object.fromEntries(formData),
+        }),
+      });
 
-    const data = await res.json();
-    setLoading(false);
+      const data = await res.json();
+      setLoading(false);
 
-    if (data.success) {
-      alert('تم تقديم طلب الإجازة. تم إنشاء سير العمل تلقائياً.');
-      router.push('/employee/requests');
-    } else {
-      alert(data.message || 'فشل تقديم الطلب');
+      if (data.success) {
+        setMessage({ text: 'تم إرسال الطلب بنجاح', type: 'success' });
+        setTimeout(() => router.push('/employee/requests'), 1500);
+      } else {
+        setMessage({ text: data.message || 'فشل تقديم الطلب', type: 'error' });
+      }
+    } catch {
+      setLoading(false);
+      setMessage({ text: 'فشل إرسال الطلب. يرجى المحاولة لاحقاً.', type: 'error' });
     }
   }
 
@@ -45,6 +52,12 @@ export default function NewLeaveRequest() {
           <CardTitle>طلب إجازة جديد</CardTitle>
         </CardHeader>
         <CardContent>
+          {message && (
+            <div className={`rounded-lg p-3 text-sm mb-4 ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+              {message.text}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <input type="hidden" name="type" value="leave" />
 
@@ -79,7 +92,7 @@ export default function NewLeaveRequest() {
             </div>
 
             <Button type="submit" disabled={loading} className="w-full">
-              {loading ? 'جاري التقديم...' : 'تقديم الطلب (سيتم إنشاء سير العمل)'}
+              {loading ? 'جاري التقديم...' : 'تقديم الطلب'}
             </Button>
           </form>
         </CardContent>

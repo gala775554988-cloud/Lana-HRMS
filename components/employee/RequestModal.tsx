@@ -27,6 +27,7 @@ const typeLabels: Record<string, string> = {
 
 export function RequestModal({ isOpen, type, onClose }: Props) {
   const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [formData, setFormData] = useState<any>({});
   const router = useRouter();
 
@@ -37,6 +38,7 @@ export function RequestModal({ isOpen, type, onClose }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
+    setMessage(null);
 
     try {
       const res = await fetch('/api/hr/my-requests', {
@@ -50,14 +52,16 @@ export function RequestModal({ isOpen, type, onClose }: Props) {
 
       const data = await res.json();
       if (data.success) {
-        alert('تم تقديم الطلب بنجاح!');
-        onClose();
-        router.refresh();
+        setMessage({ text: 'تم إرسال الطلب بنجاح', type: 'success' });
+        setTimeout(() => {
+          onClose();
+          router.refresh();
+        }, 1500);
       } else {
-        alert(data.message || 'حدث خطأ');
+        setMessage({ text: data.message || 'فشل تقديم الطلب', type: 'error' });
       }
-    } catch (err) {
-      alert('فشل إرسال الطلب');
+    } catch {
+      setMessage({ text: 'فشل إرسال الطلب. يرجى المحاولة لاحقاً.', type: 'error' });
     } finally {
       setSubmitting(false);
     }
@@ -69,6 +73,12 @@ export function RequestModal({ isOpen, type, onClose }: Props) {
         <DialogHeader>
           <DialogTitle>{label}</DialogTitle>
         </DialogHeader>
+
+        {message && (
+          <div className={`rounded-lg p-3 text-sm ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+            {message.text}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {type === 'leave' && (

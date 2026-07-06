@@ -19,18 +19,27 @@ export function RequestsCenter({ employeeId }: { employeeId: string }) {
   const [activeType, setActiveType] = useState('leave');
   const [form, setForm] = useState<any>({});
   const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
+    setMessage(null);
     try {
-      await fetch('/api/hr/my-requests', {
+      const res = await fetch('/api/hr/my-requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: activeType, employeeId, ...form }),
+        body: JSON.stringify({ type: activeType, ...form }),
       });
-      alert('تم تقديم الطلب بنجاح');
-      setForm({});
+      const data = await res.json();
+      if (data.success) {
+        setMessage({ text: 'تم إرسال الطلب بنجاح', type: 'success' });
+        setForm({});
+      } else {
+        setMessage({ text: data.message || 'فشل تقديم الطلب', type: 'error' });
+      }
+    } catch {
+      setMessage({ text: 'فشل إرسال الطلب. يرجى المحاولة لاحقاً.', type: 'error' });
     } finally {
       setSubmitting(false);
     }
@@ -45,7 +54,7 @@ export function RequestsCenter({ employeeId }: { employeeId: string }) {
           {requestTypes.map((t) => (
             <button
               key={t.key}
-              onClick={() => setActiveType(t.key)}
+              onClick={() => { setActiveType(t.key); setMessage(null); }}
               className={`w-full text-left px-3 py-2.5 rounded-xl mb-1 text-sm transition ${activeType === t.key ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100'}`}
             >
               {t.label}
@@ -57,6 +66,11 @@ export function RequestsCenter({ employeeId }: { employeeId: string }) {
       {/* Form */}
       <Card className="lg:col-span-2 border-slate-200 dark:border-slate-800">
         <CardContent className="p-6">
+          {message && (
+            <div className={`rounded-lg p-3 text-sm mb-4 ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+              {message.text}
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             {activeType === 'leave' && (
               <>
