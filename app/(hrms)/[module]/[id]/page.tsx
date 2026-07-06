@@ -4,6 +4,7 @@ import { getHrmsModule } from "@/config/hrms";
 import { getModuleRecord } from "@/lib/hrms/actions";
 import { getRequestDictionary } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
+import { getEmployeeSalaryProfile, salaryProfileFields, salaryProfileLabels } from "@/lib/employee/salary-profile";
 import { ModuleForm } from "@/components/hrms/module-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,9 +61,12 @@ export default async function RecordPage({ params }: { params: Promise<{ module:
   const resourceTitle = resource.key in dictionary.nav ? dictionary.nav[resource.key as keyof typeof dictionary.nav] : resource.title;
 
   let related = null;
+  let salaryProfile = null as Awaited<ReturnType<typeof getEmployeeSalaryProfile>> | null;
   if (resource.key === "employees") {
     try {
       related = await getEmployeeRelated(id);
+      salaryProfile = await getEmployeeSalaryProfile(id);
+      record = { ...record, ...salaryProfile };
     } catch (error) {
       console.error(`[RecordPage] getEmployeeRelated failed:`, error);
     }
@@ -100,7 +104,13 @@ export default async function RecordPage({ params }: { params: Promise<{ module:
             <CardDescription>{rec.detailsDesc}</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
-            {Object.entries(record).map(([key, value]) => {
+            {resource.key === "employees" && typeof record.profilePhotoUrl === "string" && record.profilePhotoUrl ? (
+              <div className="rounded-md border p-3 sm:col-span-2">
+                <p className="mb-2 text-xs uppercase text-muted-foreground">{(dictionary.fields as any)?.profilePhotoUrl ?? "الصورة الشخصية"}</p>
+                <img src={record.profilePhotoUrl} alt="Employee photo" className="h-32 w-32 rounded-2xl object-cover" />
+              </div>
+            ) : null}
+            {Object.entries(record).filter(([key]) => key !== "emergencyContact" && !(salaryProfileFields as readonly string[]).includes(key)).map(([key, value]) => {
               const fieldLabel = (dictionary.fields as any)?.[key] ?? key;
               return (
                 <div key={key} className="rounded-md border p-3">
@@ -122,6 +132,23 @@ export default async function RecordPage({ params }: { params: Promise<{ module:
           </CardContent>
         </Card>
       </div>
+
+      {resource.key === "employees" ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>تفاصيل الراتب</CardTitle>
+            <CardDescription>الراتب الأساسي والبدلات والخصومات وصافي الراتب.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            {salaryProfileFields.map((field) => (
+              <div key={field} className="rounded-md border p-3">
+                <p className="text-xs uppercase text-muted-foreground">{salaryProfileLabels[field]}</p>
+                <p className="text-lg font-semibold">{display(salaryProfile?.[field])}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {related ? (
         <Card>

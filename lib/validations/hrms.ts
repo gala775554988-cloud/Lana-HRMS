@@ -16,7 +16,8 @@ export function buildModuleSchema(resource: HrmsModule) {
     else if (field.type === "boolean") schema = z.coerce.boolean().default(false);
     else if (field.type === "email") schema = z.string().email("Enter a valid email address.");
     else if (field.type === "date") schema = z.string().min(1, field.label + " is required.");
-    else if (field.type === "select" && field.options?.length) schema = z.enum(field.options as [string, ...string[]]);
+    else if (field.type === "select" && field.options?.length && field.name !== "positionId") schema = z.enum(field.options as [string, ...string[]]);
+    else if (field.type === "select") schema = z.string();
     else schema = z.string();
 
     if (!field.required && field.type !== "boolean") {

@@ -10,6 +10,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { buildModuleSchema } from "@/lib/validations/hrms";
 import { hashPassword } from "@/lib/password";
 import { notifyRole } from "@/lib/enterprise/notifications";
+import { extractSalaryProfile, saveEmployeeSalaryProfile } from "@/lib/employee/salary-profile";
 
 type QueryInput = {
   resourceKey: string;
@@ -57,7 +58,7 @@ function serialize(value: unknown): unknown {
 }
 
 function normalizeValue(field: ModuleField, value: unknown) {
-  if (value === "" || value === undefined) return undefined;
+  if (value === "" || value === undefined) return field.name === "profilePhotoUrl" ? null : undefined;
   if (field.type === "boolean") return Boolean(value);
   if (field.type === "number") return Number(value);
   if (field.type === "date") return new Date(String(value));
@@ -79,6 +80,28 @@ function normalizeValues(resource: HrmsModule, values: Record<string, unknown>) 
       .map((field) => [field.name, normalizeValue(field, values[field.name])] as const)
       .filter(([, value]) => value !== undefined)
   );
+}
+
+function defaultEmployeePasswordFromNationalId(nationalId: string) {
+  return nationalId.slice(-4).padStart(4, "0");
+}
+
+function positionCodeFromTitle(title: string) {
+  return "POS-" + title.trim().toUpperCase().replace(/[^A-Z0-9\u0600-\u06FF]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
+}
+
+async function resolveEmployeePositionId(value: unknown) {
+  const title = typeof value === "string" ? value.trim() : "";
+  if (!title) return undefined;
+  const existing = await prisma.position.findUnique({ where: { id: title } }).catch(() => null);
+  if (existing) return existing.id;
+  const code = positionCodeFromTitle(title);
+  const record = await prisma.position.upsert({
+    where: { code },
+    update: { title },
+    create: { title, code, isActive: true }
+  });
+  return record.id;
 }
 
 async function requireModulePermission(resource: HrmsModule, action: "read" | "manage") {
@@ -238,6 +261,7 @@ export async function createModuleRecord(input: MutationInput) {
   const resource = getHrmsModule(input.resourceKey);
   if (!resource) return { success: false, message: "Unknown module." };
   const session = await requireModulePermission(resource, "manage");
+  const salaryProfile = resource.key === "employees" ? extractSalaryProfile(input.values) : {};
   const parsed = buildModuleSchema(resource).safeParse(input.values);
   if (!parsed.success) return { success: false, message: parsed.error.errors[0]?.message ?? "Invalid input." };
   const data = normalizeValues(resource, parsed.data) as Record<string, unknown>;
@@ -254,12 +278,7 @@ export async function createModuleRecord(input: MutationInput) {
       const lastName = String(data.lastName ?? "");
       const emailInput = data.email ? String(data.email) : "";
       const fullName = `${firstName} ${lastName}`.trim() || "Employee";
-      const inputPassword = typeof data.password === "string" && data.password.length >= 6 ? data.password : "";
-      const inputPasswordConfirm = typeof (data as any).passwordConfirm === "string" ? (data as any).passwordConfirm : "";
-      if (inputPassword && inputPassword !== inputPasswordConfirm) {
-        return { success: false, message: "Password confirmation does not match." };
-      }
-      const { password, passwordConfirm, ...employeeData } = data as any;
+      const employeeData = { ...data } as Record<string, unknown>;
 
       if (!nationalId) {
         return { success: false, message: "National ID is required to create login account." };
@@ -279,9 +298,9 @@ export async function createModuleRecord(input: MutationInput) {
 
       const emailUser = await prisma.user.findUnique({ where: { email: userEmail } }).catch(() => null);
 
-      const last4 = nationalId.slice(-4).padStart(4, "0");
-      const defaultPassword = inputPassword || `Emp@${last4}` || "Employee@123456";
+      const defaultPassword = defaultEmployeePasswordFromNationalId(nationalId);
       const passwordHash = await hashPassword(defaultPassword);
+      employeeData.positionId = await resolveEmployeePositionId(employeeData.positionId);
 
       const employeeRole = await prisma.role.findUnique({ where: { name: "EMPLOYEE" } });
 
@@ -302,7 +321,7 @@ export async function createModuleRecord(input: MutationInput) {
             where: { id: user.id },
             data: {
               name: fullName || user.name,
-              passwordHash: inputPassword ? passwordHash : (user.passwordHash ?? passwordHash),
+              passwordHash: user.passwordHash ?? passwordHash,
               isActive: true,
             }
           });
@@ -336,6 +355,7 @@ export async function createModuleRecord(input: MutationInput) {
         metadata: { ...employeeData, autoUserCreated: true, userId: result.user.id }
       });
 
+      await saveEmployeeSalaryProfile(String(result.employee.id), salaryProfile);
       revalidatePath("/" + resource.key);
       revalidatePath("/");
       await notifyRole(["SUPER_ADMIN", "HR_MANAGER"], "إضافة موظف", `Employee ${fullName} was added.`, "SUCCESS").catch(() => null);
@@ -374,39 +394,21 @@ export async function updateModuleRecord(input: MutationInput) {
   const session = await requireModulePermission(resource, "manage");
   const existingRecord = await delegateFor(resource.model).findUnique({ where: { id: input.id } });
   await assertRecordVisible(resource, existingRecord, session);
+  const salaryProfile = resource.key === "employees" ? extractSalaryProfile(input.values) : {};
   const parsed = buildModuleSchema(resource).safeParse(input.values);
   if (!parsed.success) return { success: false, message: parsed.error.errors[0]?.message ?? "Invalid input." };
   const data = normalizeValues(resource, parsed.data) as Record<string, unknown>;
 
   if (resource.key === "employees" && resource.model === "employee") {
-    const inputPassword = typeof data.password === "string" ? data.password : "";
-    const inputPasswordConfirm = typeof (data as any).passwordConfirm === "string" ? (data as any).passwordConfirm : "";
-    if (inputPassword || inputPasswordConfirm) {
-      if (inputPassword.length < 6) {
-        return { success: false, message: "Password must be at least 6 characters." };
-      }
-      if (inputPassword !== inputPasswordConfirm) {
-        return { success: false, message: "Password confirmation does not match." };
-      }
-    }
-    delete (data as any).password;
-    delete (data as any).passwordConfirm;
-
+    data.positionId = await resolveEmployeePositionId(data.positionId);
     const record = await delegateFor(resource.model).update({ where: { id: input.id }, data });
+    await saveEmployeeSalaryProfile(input.id, salaryProfile);
 
-    if (inputPassword) {
-      const employee = await prisma.employee.findUnique({ where: { id: input.id }, select: { userId: true } });
-      if (employee?.userId) {
-        const passwordHash = await hashPassword(inputPassword);
-        await prisma.user.update({ where: { id: employee.userId }, data: { passwordHash } });
-      }
-    }
-
-    await writeAuditLog({ actorUserId: session.user.id, action: "update", entity: resource.model, entityId: input.id, metadata: { ...data, passwordChanged: Boolean(inputPassword) } });
+    await writeAuditLog({ actorUserId: session.user.id, action: "update", entity: resource.model, entityId: input.id, metadata: { ...data, salaryProfileUpdated: true } });
     await notifyRole(["SUPER_ADMIN", "HR_MANAGER"], "تعديل موظف", `Employee record ${input.id} was updated.`, "INFO").catch(() => null);
     revalidatePath("/" + resource.key);
     revalidatePath("/" + resource.key + "/" + input.id);
-    return { success: true, message: resource.title + " record updated." + (inputPassword ? " Password updated." : ""), id: String(record.id) };
+    return { success: true, message: resource.title + " record updated.", id: String(record.id) };
   }
 
   const dataClean = data;

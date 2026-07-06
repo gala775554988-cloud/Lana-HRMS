@@ -1,4 +1,4 @@
-export type FieldType = "text" | "email" | "textarea" | "date" | "number" | "boolean" | "select" | "password";
+export type FieldType = "text" | "email" | "textarea" | "date" | "number" | "boolean" | "select";
 
 export type ModuleField = {
   name: string;
@@ -42,8 +42,6 @@ export const hrmsModules = [
       { name: "firstName", label: "First name", type: "text", required: true },
       { name: "lastName", label: "Last name", type: "text", required: true },
       { name: "email", label: "Email (optional)", type: "email" },
-      { name: "password", label: "Password", type: "password" },
-      { name: "passwordConfirm", label: "Confirm password", type: "password" },
       { name: "profilePhotoUrl", label: "Profile photo URL", type: "text" },
       { name: "phone", label: "Phone", type: "text" },
       { name: "gender", label: "Gender", type: "select", options: ["Female", "Male", "Not specified"] },
@@ -51,12 +49,11 @@ export const hrmsModules = [
       { name: "hireDate", label: "Hire date", type: "date", required: true },
       { name: "status", label: "Status", type: "select", required: true, options: ["ACTIVE", "ON_LEAVE", "TERMINATED", "INACTIVE"] },
       { name: "departmentId", label: "Department ID", type: "text" },
-      { name: "positionId", label: "Position ID", type: "text" },
+      { name: "positionId", label: "المنصب", type: "select", options: ["موظف", "مشرف", "مدير فرع", "مدير إدارة", "مدير مشاريع", "مدير الموارد البشرية", "مسؤول الرواتب", "مسؤول التأمين", "مسؤول الإقامة", "مسؤول الطلبات", "مسؤول المستلزمات", "مسؤول الأصول", "مسؤول التدريب", "مسؤول الأداء"] },
       { name: "branchId", label: "Branch ID", type: "text" },
       { name: "employmentTypeId", label: "Employment type ID", type: "text" },
       { name: "nationalityId", label: "Nationality ID", type: "text" },
       { name: "address", label: "Address", type: "textarea" },
-      { name: "emergencyContact", label: "Emergency contact", type: "text" }
     ]
   },
   {
