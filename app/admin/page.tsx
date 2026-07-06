@@ -31,7 +31,7 @@ export default async function AdminDashboard() {
               textClassName="text-white"
               titleClassName="text-xl"
               subtitleClassName="text-purple-400"
-              logoClassName="border-slate-700 shadow-lg shadow-purple-950/30"
+              logoClassName="h-12 w-12 border-slate-700 shadow-lg shadow-purple-950/30"
             />
           </div>
 

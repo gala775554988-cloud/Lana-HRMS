@@ -9,7 +9,7 @@ import {
   Bell, LayoutDashboard, LogOut, ChevronLeft, ChevronRight, Search,
   Users, Building2, MapPin, Briefcase, FileText, Clock, Calendar,
   DollarSign, GraduationCap, Package, Megaphone, BarChart3, Settings,
-  Shield, UserCheck
+  Shield
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/brand/brand-logo";
@@ -104,6 +104,7 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
               showText={!sidebarCollapsed}
               subtitle=""
               className="font-semibold"
+              logoClassName="h-12 w-12"
               titleClassName="text-base"
             />
           </div>
@@ -149,11 +150,7 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
               </div>
             ))}
           </div>
-          <div className="border-t p-3">
-            <Link href="/my" className={cn("sidebar-link", sidebarCollapsed ? "justify-center px-2" : "")} title={sidebarCollapsed ? "بوابتي الشخصية" : undefined}>
-              <UserCheck className="h-4.5 w-4.5 shrink-0" />{!sidebarCollapsed && <span>بوابتي الشخصية</span>}
-            </Link>
-          </div>
+
         </aside>
         <main className="flex-1 min-w-0 p-4 lg:p-6">{children}</main>
       </div>

@@ -5,7 +5,6 @@ import { getDirection, normalizeLocale } from "@/lib/i18n";
 import "./globals.css";
 import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from "@/components/hrms/theme-provider";
-import { BrandBackground } from "@/components/brand/brand-background";
 import { PWAInstallPrompt } from "@/components/pwa/pwa-install-prompt";
 import { PWARegister } from "@/components/pwa/pwa-register";
 
@@ -63,7 +62,6 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         <SessionProvider>
           <ThemeProvider>
             <PWARegister />
-            <BrandBackground />
             {children}
             <PWAInstallPrompt />
           </ThemeProvider>

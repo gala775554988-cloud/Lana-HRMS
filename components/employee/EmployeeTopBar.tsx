@@ -44,6 +44,7 @@ export function EmployeeTopBar({ user, employee }: Props) {
           size="sm"
           subtitle="Employee Portal"
           className="gap-3"
+          logoClassName="h-12 w-12"
           textClassName="hidden sm:block"
           subtitleClassName="text-slate-500 dark:text-slate-400"
         />

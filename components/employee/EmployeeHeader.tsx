@@ -31,6 +31,7 @@ export function EmployeeHeader({ user, employee }: Props) {
           href="/employee/dashboard"
           size="sm"
           subtitle="Employee Portal"
+          logoClassName="h-12 w-12"
           subtitleClassName="text-slate-500 dark:text-slate-400"
         />
 
