@@ -8,7 +8,6 @@ import { getEmployeeSalaryProfile, salaryProfileFields, salaryProfileLabels } fr
 import { ModuleForm } from "@/components/hrms/module-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle } from "lucide-react";
 
 function display(value: unknown) {
   if (value === null || value === undefined || value === "") return "-";
@@ -91,6 +90,50 @@ export default async function RecordPage({ params }: { params: Promise<{ module:
     noData: "No data"
   };
 
+  const detailsCard = (
+    <Card>
+      <CardHeader>
+        <CardTitle>{rec.details}</CardTitle>
+        <CardDescription>{rec.detailsDesc}</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-3 sm:grid-cols-2">
+        {resource.key === "employees" && typeof record.profilePhotoUrl === "string" && record.profilePhotoUrl ? (
+          <div className="rounded-md border p-3 sm:col-span-2">
+            <p className="mb-2 text-xs uppercase text-muted-foreground">{(dictionary.fields as any)?.profilePhotoUrl ?? "الصورة الشخصية"}</p>
+            <img src={record.profilePhotoUrl} alt="Employee photo" className="h-32 w-32 rounded-2xl object-cover" />
+          </div>
+        ) : null}
+        {resource.key === "employees" ? (
+          <div className="rounded-md border p-3">
+            <p className="text-xs uppercase text-muted-foreground">{(dictionary.fields as any)?.fullName ?? "الاسم الكامل"}</p>
+            <p className="break-words text-sm">{`${String(record.firstName ?? "")} ${String(record.lastName ?? "")}`.trim() || "-"}</p>
+          </div>
+        ) : null}
+        {Object.entries(record).filter(([key]) => key !== "id" && key !== "emergencyContact" && key !== "firstName" && key !== "lastName" && key !== "salaryCosts" && key !== "salaryDeductInsurance" && !(salaryProfileFields as readonly string[]).includes(key)).map(([key, value]) => {
+          const fieldLabel = (dictionary.fields as any)?.[key] ?? key;
+          return (
+            <div key={key} className="rounded-md border p-3">
+              <p className="text-xs uppercase text-muted-foreground">{fieldLabel}</p>
+              <p className="break-words text-sm">{display(value)}</p>
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+
+  const editCard = (
+    <Card>
+      <CardHeader>
+        <CardTitle>{rec.edit}</CardTitle>
+        <CardDescription>{rec.editDesc}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ModuleForm resource={resource} dictionary={dictionary} initialValues={record} recordId={id} />
+      </CardContent>
+    </Card>
+  );
+
   return (
     <section className="space-y-6">
       <div className="flex items-center justify-between gap-4">
@@ -104,45 +147,8 @@ export default async function RecordPage({ params }: { params: Promise<{ module:
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
-        <Card className={resource.key === "employees" ? "xl:order-2" : undefined}>
-          <CardHeader>
-            <CardTitle>{rec.details}</CardTitle>
-            <CardDescription>{rec.detailsDesc}</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-2">
-            {resource.key === "employees" && typeof record.profilePhotoUrl === "string" && record.profilePhotoUrl ? (
-              <div className="rounded-md border p-3 sm:col-span-2">
-                <p className="mb-2 text-xs uppercase text-muted-foreground">{(dictionary.fields as any)?.profilePhotoUrl ?? "الصورة الشخصية"}</p>
-                <img src={record.profilePhotoUrl} alt="Employee photo" className="h-32 w-32 rounded-2xl object-cover" />
-              </div>
-            ) : null}
-            {resource.key === "employees" ? (
-              <div className="rounded-md border p-3">
-                <p className="text-xs uppercase text-muted-foreground">{(dictionary.fields as any)?.fullName ?? "الاسم الكامل"}</p>
-                <p className="break-words text-sm">{`${String(record.firstName ?? "")} ${String(record.lastName ?? "")}`.trim() || "-"}</p>
-              </div>
-            ) : null}
-            {Object.entries(record).filter(([key]) => key !== "id" && key !== "emergencyContact" && key !== "firstName" && key !== "lastName" && key !== "salaryCosts" && key !== "salaryDeductInsurance" && !(salaryProfileFields as readonly string[]).includes(key)).map(([key, value]) => {
-              const fieldLabel = (dictionary.fields as any)?.[key] ?? key;
-              return (
-                <div key={key} className="rounded-md border p-3">
-                  <p className="text-xs uppercase text-muted-foreground">{fieldLabel}</p>
-                  <p className="break-words text-sm">{display(value)}</p>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-
-        <Card className={resource.key === "employees" ? "xl:order-1" : undefined}>
-          <CardHeader>
-            <CardTitle>{rec.edit}</CardTitle>
-            <CardDescription>{rec.editDesc}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ModuleForm resource={resource} dictionary={dictionary} initialValues={record} recordId={id} />
-          </CardContent>
-        </Card>
+        {resource.key === "employees" ? editCard : detailsCard}
+        {resource.key === "employees" ? detailsCard : editCard}
       </div>
 
       {resource.key === "employees" ? (

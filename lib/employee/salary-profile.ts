@@ -12,6 +12,7 @@ export const salaryProfileFields = [
   "salaryBonuses",
   "salaryDeductions",
   "salaryOvertime",
+  "salaryNet",
   "salaryInsuranceDeduction",
   "salaryTotal"
 ] as const;
@@ -32,6 +33,7 @@ export const salaryProfileLabels: Record<SalaryProfileField, string> = {
   salaryBonuses: "مكافآت",
   salaryDeductions: "خصومات",
   salaryOvertime: "إضافي",
+  salaryNet: "صافي الراتب",
   salaryInsuranceDeduction: "خصم التأمينات",
   salaryTotal: "إجمالي الراتب"
 };
@@ -59,13 +61,16 @@ export function calculateInsuranceDeduction(salary: SalaryProfile) {
   return (salary.salaryBase ?? 0) * SOCIAL_INSURANCE_RATE;
 }
 
-export function calculateTotalSalary(salary: SalaryProfile) {
+export function calculateNetSalary(salary: SalaryProfile) {
   const base = salary.salaryBase ?? 0;
   const allowances = (salary.salaryHousingAllowance ?? 0) + (salary.salaryTransportAllowance ?? 0) + (salary.salaryFoodAllowance ?? 0) + (salary.salaryCommunicationAllowance ?? 0) + (salary.salaryOtherAllowances ?? 0);
   const additions = (salary.salaryBonuses ?? 0) + (salary.salaryOvertime ?? 0);
   const deductions = salary.salaryDeductions ?? 0;
-  const insurance = calculateInsuranceDeduction(salary);
-  return base + allowances + additions - deductions - insurance;
+  return base + allowances + additions - deductions;
+}
+
+export function calculateTotalSalary(salary: SalaryProfile) {
+  return calculateNetSalary(salary) - calculateInsuranceDeduction(salary);
 }
 
 export function hasSalaryProfile(salary: SalaryProfile) {
@@ -87,6 +92,7 @@ export async function saveEmployeeSalaryProfile(employeeId: string, salary: Sala
   const insuranceDeduction = calculateInsuranceDeduction(salary);
   const withTotals: SalaryProfile = {
     ...salary,
+    salaryNet: salary.salaryNet ?? calculateNetSalary(salary),
     salaryInsuranceDeduction: insuranceDeduction,
     salaryTotal: calculateTotalSalary({ ...salary, salaryInsuranceDeduction: insuranceDeduction })
   };

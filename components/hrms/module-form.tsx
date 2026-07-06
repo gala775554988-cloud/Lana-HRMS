@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import type { Dictionary } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
 import { EmployeePhotoUpload } from "./employee-photo-upload";
-import { calculateInsuranceDeduction, calculateTotalSalary, salaryProfileFields, salaryProfileLabels } from "@/lib/employee/salary-profile";
+import { calculateInsuranceDeduction, calculateNetSalary, calculateTotalSalary, salaryProfileFields, salaryProfileLabels } from "@/lib/employee/salary-profile";
 
 export function ModuleForm({ resource, dictionary, initialValues, recordId, locale = "en" }: { resource: HrmsModule; dictionary: Dictionary; initialValues?: Record<string, unknown>; recordId?: string; locale?: Locale }) {
   const router = useRouter();
@@ -34,7 +34,7 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
   const [salaryValues, setSalaryValues] = useState<Record<string, unknown>>(initialSalaryValues);
   const [costValues, setCostValues] = useState<string[]>(() => {
     const costs = initialValues?.salaryCosts;
-    return Array.isArray(costs) ? costs.map((cost) => String(cost)) : [""];
+    return Array.isArray(costs) && costs.length ? costs.map((cost) => String(cost)) : [""];
   });
   const [customPositionOptions, setCustomPositionOptions] = useState<string[]>(() => {
     const current = typeof initialValues?.positionId === "string" ? initialValues.positionId : "";
@@ -48,21 +48,18 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
     startTransition(async () => {
       try {
         const nameParts = fullName.trim().split(/\s+/).filter(Boolean);
-        const submitValues = isEmployeeForm
-          ? {
-              ...values,
-              firstName: nameParts[0] ?? "",
-              lastName: nameParts.slice(1).join(" ") || nameParts[0] || "",
-              ...salaryValues,
-              salaryCosts: costValues.filter((cost) => cost !== "")
-            }
-          : values;
+        const submitValues = isEmployeeForm ? {
+          ...values,
+          firstName: nameParts[0] ?? "",
+          lastName: nameParts.slice(1).join(" ") || nameParts[0] || "",
+          ...salaryValues,
+          salaryCosts: costValues.filter((cost) => cost !== "")
+        } : values;
         const result = recordId ? await updateModuleRecord({ resourceKey: resource.key, id: recordId, values: submitValues }) : await createModuleRecord({ resourceKey: resource.key, values: submitValues });
         if (result.success) {
           setMessage({ text: result.message, type: 'success' });
           router.refresh();
         } else {
-          // Check if result has structured error info
           const errorMsg = result.message || (result as any).error?.message || "فشل في حفظ البيانات";
           setMessage({ text: errorMsg, type: 'error' });
         }
@@ -78,6 +75,7 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
     ...Object.fromEntries(salaryProfileFields.map((field) => [field, Number(salaryValues[field] || 0)])),
     salaryDeductInsurance: Boolean(salaryValues.salaryDeductInsurance)
   };
+  const derivedNetSalary = calculateNetSalary(salaryCalculationInput as any);
   const insuranceDeduction = calculateInsuranceDeduction(salaryCalculationInput as any);
   const totalSalary = calculateTotalSalary(salaryCalculationInput as any);
 
@@ -174,8 +172,9 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
                   id={field}
                   type="number"
                   step="0.01"
-                  value={String(salaryValues[field] ?? "")}
+                  value={String(field === "salaryNet" ? (salaryValues[field] ?? derivedNetSalary) : (salaryValues[field] ?? ""))}
                   onChange={(event) => setSalaryValues((current) => ({ ...current, [field]: event.target.value }))}
+                  readOnly={field === "salaryNet"}
                 />
               </div>
             ))}
