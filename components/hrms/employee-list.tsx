@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Search, LayoutGrid, List, Plus, SlidersHorizontal } from "lucide-react";
+import { Search, LayoutGrid, List, Plus, SlidersHorizontal, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatCard } from "@/components/ui/stat-card";
@@ -10,6 +10,7 @@ import { EmployeeCard, type EmployeeCardData } from "@/components/hrms/employee-
 import { EmployeeDrawer } from "@/components/hrms/employee-drawer";
 import { ModuleTable } from "@/components/hrms/module-table";
 import { ModuleForm } from "@/components/hrms/module-form";
+import { EmployeeBulkImportDialog } from "@/components/hrms/employee-bulk-import-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Users, UserCheck, Clock, UserPlus, FileWarning } from "lucide-react";
 import type { HrmsModule } from "@/config/hrms";
@@ -38,6 +39,7 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeCardData | null>(null);
   const [addEmployeeOpen, setAddEmployeeOpen] = useState(false);
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
 
   const stats = useMemo(() => {
     const active = records.filter((r) => r.status === "ACTIVE").length;
@@ -120,6 +122,7 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
               <Button variant={viewMode === "card" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("card")} className="rounded-none gap-1.5"><LayoutGrid className="h-4 w-4" />{isAr ? "بطاقات" : "Cards"}</Button>
               <Button variant={viewMode === "table" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("table")} className="rounded-none gap-1.5"><List className="h-4 w-4" />{isAr ? "جدول" : "Table"}</Button>
             </div>
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setBulkImportOpen(true)}><Upload className="h-4 w-4" />{isAr ? "استيراد الموظفين" : "Bulk Import"}</Button>
             <Button size="sm" className="gap-1.5" onClick={() => setAddEmployeeOpen(true)}><Plus className="h-4 w-4" />{isAr ? "إضافة موظف" : "Add Employee"}</Button>
           </div>
         </div>
@@ -162,6 +165,7 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
         </DialogContent>
       </Dialog>
 
+      <EmployeeBulkImportDialog open={bulkImportOpen} onOpenChange={setBulkImportOpen} locale={locale} />
       <EmployeeDrawer employee={selectedEmployee} open={drawerOpen} onClose={handleCloseDrawer} locale={locale} onEdit={handleEdit} />
     </section>
   );
