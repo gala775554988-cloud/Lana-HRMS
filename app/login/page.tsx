@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { getRequestDictionary } from "@/lib/i18n-server";
 import { BrandLogo } from "@/components/brand/brand-logo";
+import { ClientLanguageToggle } from "@/components/i18n/client-language-toggle";
 import { LoginForm } from "./login-form";
 import Link from "next/link";
 
@@ -15,6 +16,9 @@ export default async function LoginPage({
 
   return (
     <div className="min-h-screen bg-slate-50/90 flex items-center justify-center p-6">
+      <div className="absolute end-4 top-4">
+        <ClientLanguageToggle variant="outline" />
+      </div>
       <div className="w-full max-w-md">
         <div className="mb-7 flex flex-col items-center text-center">
           <BrandLogo

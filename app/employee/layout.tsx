@@ -39,7 +39,7 @@ export default async function EmployeeLayout({ children }: { children: ReactNode
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100" dir="rtl">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
       {/* Premium Top Bar */}
       <EmployeeTopBar user={session.user} employee={employee} />
 

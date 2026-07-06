@@ -79,7 +79,7 @@ export function PWAInstallPrompt() {
   if (!isVisible || isStandaloneDisplayMode()) return null;
 
   return (
-    <div className="fixed inset-x-3 bottom-3 z-[60] mx-auto max-w-md rounded-2xl border border-slate-200 bg-white/95 p-4 text-slate-900 shadow-2xl backdrop-blur dark:border-slate-700 dark:bg-slate-950/95 dark:text-slate-50" dir="rtl">
+    <div className="fixed inset-x-3 bottom-3 z-[60] mx-auto max-w-md rounded-2xl border border-slate-200 bg-white/95 p-4 text-slate-900 shadow-2xl backdrop-blur dark:border-slate-700 dark:bg-slate-950/95 dark:text-slate-50">
       <div className="flex items-start gap-3">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg shadow-indigo-500/15">
           <img src="/brand/lana-logo.png" alt="شعار Lana HRMS" className="h-full w-full object-contain p-1" />

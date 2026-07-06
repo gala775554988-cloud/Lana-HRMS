@@ -43,7 +43,7 @@ export default function EmployeeError({ error, reset }: { error: Error & { diges
   };
 
   return (
-    <div className="flex min-h-[60vh] items-center justify-center p-8 bg-slate-50 dark:bg-slate-950" dir="rtl">
+    <div className="flex min-h-[60vh] items-center justify-center p-8 bg-slate-50 dark:bg-slate-950">
       <div className="max-w-lg w-full bg-white dark:bg-slate-900 p-8 rounded-2xl shadow border border-slate-200 dark:border-slate-800">
         {/* Header */}
         <div className="flex items-start gap-4 mb-5">

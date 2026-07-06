@@ -43,7 +43,7 @@ export default function ModuleError({ error, reset }: { error: Error & { digest?
   };
 
   return (
-    <section className="flex min-h-[60vh] items-center justify-center p-4" dir="rtl">
+    <section className="flex min-h-[60vh] items-center justify-center p-4">
       <div className="max-w-lg w-full rounded-xl border bg-background p-6 shadow-sm">
         <div className="flex items-start gap-4 mb-5">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive">

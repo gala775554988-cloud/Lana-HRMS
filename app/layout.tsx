@@ -5,6 +5,7 @@ import { getDirection, normalizeLocale } from "@/lib/i18n";
 import "./globals.css";
 import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from "@/components/hrms/theme-provider";
+import { I18nRuntime } from "@/components/i18n/i18n-runtime";
 import { PWAInstallPrompt } from "@/components/pwa/pwa-install-prompt";
 import { PWARegister } from "@/components/pwa/pwa-register";
 
@@ -62,6 +63,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         <SessionProvider>
           <ThemeProvider>
             <PWARegister />
+            <I18nRuntime initialLocale={locale} />
             {children}
             <PWAInstallPrompt />
           </ThemeProvider>

@@ -50,7 +50,7 @@ export function ErrorDisplay({ error, onRetry, compact = false }: ErrorDisplayPr
 
   if (compact) {
     return (
-      <div className={`rounded-lg border p-4 ${config.bg} ${config.border}`} dir="rtl">
+      <div className={`rounded-lg border p-4 ${config.bg} ${config.border}`}>
         <div className="flex items-start gap-3">
           <Icon className={`h-5 w-5 shrink-0 mt-0.5 ${config.color}`} />
           <div className="flex-1 min-w-0">
@@ -64,7 +64,7 @@ export function ErrorDisplay({ error, onRetry, compact = false }: ErrorDisplayPr
   }
 
   return (
-    <div className={`rounded-xl border p-6 ${config.bg} ${config.border} max-w-lg w-full`} dir="rtl">
+    <div className={`rounded-xl border p-6 ${config.bg} ${config.border} max-w-lg w-full`}>
       {/* Header */}
       <div className="flex items-start gap-4 mb-4">
         <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${config.bg} ${config.border} border`}>

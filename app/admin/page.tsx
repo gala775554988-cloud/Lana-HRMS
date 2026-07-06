@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { BrandLogo } from "@/components/brand/brand-logo";
+import { ClientLanguageToggle } from "@/components/i18n/client-language-toggle";
 
 export default async function AdminDashboard() {
   const session = await auth();
@@ -36,6 +37,7 @@ export default async function AdminDashboard() {
           </div>
 
           <div className="flex items-center gap-4">
+            <ClientLanguageToggle variant="ghost" className="text-white hover:bg-slate-800" />
             <div className="px-4 py-1.5 bg-slate-800 rounded-full text-sm flex items-center gap-2">
               <div className="h-2 w-2 bg-emerald-400 rounded-full animate-pulse"></div>
               <span>Super Admin</span>

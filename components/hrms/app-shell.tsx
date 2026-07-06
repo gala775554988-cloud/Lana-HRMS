@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/brand/brand-logo";
+import { ClientLanguageToggle } from "@/components/i18n/client-language-toggle";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/hrms/theme-toggle";
 import { useThemeStore } from "@/store/theme";
@@ -90,7 +91,7 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
   const userRoles = (session.user.roles as string[]) || [];
 
   return (
-    <div className="min-h-screen bg-background text-foreground" dir="rtl">
+    <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur-md">
         <div className="flex h-16 items-center justify-between gap-4 px-4 lg:px-6">
           <div className="flex items-center gap-3">
@@ -119,6 +120,7 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
               <Bell className="h-4 w-4" />
               <span className="absolute -top-0.5 -left-0.5 h-4 w-4 rounded-full bg-destructive text-destructive-foreground text-[10px] flex items-center justify-center font-bold">3</span>
             </Button>
+            <ClientLanguageToggle variant="ghost" className="hidden sm:inline-flex" />
             <ThemeToggle />
             <div className="hidden sm:block h-6 w-px bg-border" />
             <div className="hidden sm:flex items-center gap-2">

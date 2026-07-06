@@ -71,7 +71,7 @@ export default function NewLeaveRequest() {
   }, [router]);
 
   return (
-    <div className="max-w-lg" dir="rtl">
+    <div className="max-w-lg">
       <Card>
         <CardHeader>
           <CardTitle>طلب إجازة جديد</CardTitle>

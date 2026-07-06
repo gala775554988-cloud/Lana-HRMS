@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { BrandLogo } from "@/components/brand/brand-logo";
+import { ClientLanguageToggle } from "@/components/i18n/client-language-toggle";
 import { Button } from "@/components/ui/button";
 import { redirect } from "next/navigation";
 
@@ -24,6 +25,9 @@ export default async function HomePage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-50/90 px-6">
+      <div className="absolute end-4 top-4">
+        <ClientLanguageToggle variant="outline" />
+      </div>
       <div className="w-full max-w-md space-y-8 text-center">
         <div className="flex justify-center">
           <BrandLogo

@@ -50,7 +50,7 @@ export default async function ResourcePage({ params, searchParams }: { params: P
             <p className="max-w-2xl text-muted-foreground">{resourceDescription}</p>
           </div>
         </div>
-        <div className="flex min-h-[40vh] items-center justify-center rounded-xl border bg-card p-8" dir="rtl">
+        <div className="flex min-h-[40vh] items-center justify-center rounded-xl border bg-card p-8">
           <div className="text-center max-w-md">
             <div className="flex justify-center mb-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400">

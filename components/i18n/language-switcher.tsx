@@ -25,6 +25,7 @@ export function LanguageSwitcher({
     window.localStorage.setItem("lana.hrms.locale", nextLocale);
     document.documentElement.lang = nextLocale;
     document.documentElement.dir = nextLocale === "ar" ? "rtl" : "ltr";
+    window.dispatchEvent(new CustomEvent("lana-locale-change", { detail: { locale: nextLocale } }));
     router.replace(nextPath || (nextLocale === defaultLocale ? "/" : `/${nextLocale}`));
     router.refresh();
   }

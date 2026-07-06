@@ -182,7 +182,7 @@ export function EmployeePortal({ employee, salaryInfo, userName }: Props) {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0A0A12] text-white pb-20 overflow-x-hidden" dir="rtl">
+    <div className="min-h-screen bg-[#0A0A12] text-white pb-20 overflow-x-hidden">
       {/* === HEADER: Purple gradient exactly like the image === */}
       <div className="bg-gradient-to-br from-violet-700 via-violet-600 to-indigo-700 px-5 pt-8 pb-6 rounded-b-[2.75rem] shadow-xl">
         <div className="flex items-center justify-between mb-5">

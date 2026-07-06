@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, Bell, Globe, Sun, Moon, User } from 'lucide-react';
+import { Search, Bell, Sun, Moon, User } from 'lucide-react';
 import Link from 'next/link';
 import { BrandLogo } from '@/components/brand/brand-logo';
+import { ClientLanguageToggle } from '@/components/i18n/client-language-toggle';
 
 interface Props {
   user: any;
@@ -58,9 +59,7 @@ export function EmployeeHeader({ user, employee }: Props) {
             {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
 
-          <button className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
-            <Globe className="h-4 w-4" />
-          </button>
+          <ClientLanguageToggle variant="ghost" icon="globe" className="rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800" />
 
           <Link href="/employee/profile" className="flex items-center gap-2 ml-2 pl-3 border-l border-[#E5E7EB]">
             <div className="hidden md:block text-right text-xs leading-tight">
