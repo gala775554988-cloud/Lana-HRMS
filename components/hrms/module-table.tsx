@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useTransition, useCallback } from "react";
-import { FileSearch } from "lucide-react";
+import { Check, FileSearch, RotateCcw, X } from "lucide-react";
 import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import type { HrmsModule } from "@/config/hrms";
 import { deleteModuleRecord } from "@/lib/hrms/actions";
@@ -41,15 +41,37 @@ export function ModuleTable({ resource, records, dictionary, locale = "en" }: { 
     });
   }, [resource.key, router]);
 
+  const handleDecision = useCallback((workflowId: string, decision: "APPROVE" | "REJECT" | "RETURN") => {
+    startTransition(async () => {
+      await fetch(`/api/enterprise/workflows/${workflowId}/decision`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision })
+      });
+      router.refresh();
+    });
+  }, [router]);
+
   const columns = useMemo(() => [
     ...resource.tableFields.map((field) => helper.accessor((row) => row[field], { id: field, header: formatHeader(field, fieldsDict), cell: (info) => display(info.getValue(), yesLabel, noLabel) })),
-    helper.display({ id: "actions", header: dictionary.table.actions, cell: ({ row }) => (
-      <div className="flex justify-end gap-2">
-        <Button asChild size="sm" variant="outline"><Link href={"/" + resource.key + "/" + row.original.id}>{dictionary.table.open}</Link></Button>
-        <Button size="sm" variant="destructive" disabled={isPending} onClick={() => handleDelete(row.original.id)}>{dictionary.table.delete}</Button>
-      </div>
-    )})
-  ], [dictionary, fieldsDict, helper, isPending, noLabel, resource, yesLabel, handleDelete]);
+    helper.display({ id: "actions", header: dictionary.table.actions, cell: ({ row }) => {
+      const workflowId = typeof row.original._workflowId === "string" ? row.original._workflowId : "";
+      const canAct = Boolean(row.original._canAct && workflowId);
+      return (
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button asChild size="sm" variant="outline"><Link href={"/" + resource.key + "/" + row.original.id}>{dictionary.table.open}</Link></Button>
+          {canAct ? (
+            <>
+              <Button size="sm" disabled={isPending} onClick={() => handleDecision(workflowId, "APPROVE")}><Check className="me-1 h-3.5 w-3.5" />Approve</Button>
+              <Button size="sm" variant="destructive" disabled={isPending} onClick={() => handleDecision(workflowId, "REJECT")}><X className="me-1 h-3.5 w-3.5" />Reject</Button>
+              <Button size="sm" variant="outline" disabled={isPending} onClick={() => handleDecision(workflowId, "RETURN")}><RotateCcw className="me-1 h-3.5 w-3.5" />Return</Button>
+            </>
+          ) : null}
+          <Button size="sm" variant="destructive" disabled={isPending} onClick={() => handleDelete(row.original.id)}>{dictionary.table.delete}</Button>
+        </div>
+      );
+    }})
+  ], [dictionary, fieldsDict, helper, isPending, noLabel, resource, yesLabel, handleDelete, handleDecision]);
 
   const table = useReactTable({ data: records, columns, getCoreRowModel: getCoreRowModel() });
 

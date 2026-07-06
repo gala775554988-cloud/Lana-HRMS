@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { ClientLanguageToggle } from "@/components/i18n/client-language-toggle";
 import { NotificationBell } from "@/components/enterprise/notification-bell";
+import { isEnterpriseResourceAllowed } from "@/lib/enterprise/resource-access";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/hrms/theme-toggle";
 import { useThemeStore } from "@/store/theme";
@@ -26,22 +27,22 @@ interface AppShellProps {
 }
 
 const navItems = [
-  { href: "/", label: "لوحة التحكم", icon: LayoutDashboard, group: "main" },
-  { href: "/employees", label: "الموظفون", icon: Users, group: "people" },
-  { href: "/departments", label: "الإدارات", icon: Building2, group: "people" },
-  { href: "/branches", label: "الفروع", icon: MapPin, group: "people" },
-  { href: "/positions", label: "المناصب", icon: Briefcase, group: "people" },
-  { href: "/contracts", label: "العقود", icon: FileText, group: "people" },
-  { href: "/attendance", label: "الحضور", icon: Clock, group: "ops" },
-  { href: "/leave-requests", label: "الإجازات", icon: Calendar, group: "ops" },
-  { href: "/payroll-runs", label: "الرواتب", icon: DollarSign, group: "ops" },
-  { href: "/performance", label: "الأداء", icon: GraduationCap, group: "ops" },
-  { href: "/training", label: "التدريب", icon: GraduationCap, group: "ops" },
-  { href: "/assets", label: "الأصول", icon: Package, group: "ops" },
-  { href: "/announcements", label: "الإعلانات", icon: Megaphone, group: "admin" },
-  { href: "/reports", label: "التقارير", icon: BarChart3, group: "admin" },
-  { href: "/audit-logs", label: "سجل التدقيق", icon: Shield, group: "admin" },
-  { href: "/settings", label: "الإعدادات", icon: Settings, group: "admin" },
+  { href: "/", label: "لوحة التحكم", icon: LayoutDashboard, group: "main", resource: "dashboard" },
+  { href: "/employees", label: "الموظفون", icon: Users, group: "people", resource: "employees" },
+  { href: "/departments", label: "الإدارات", icon: Building2, group: "people", resource: "departments" },
+  { href: "/branches", label: "الفروع", icon: MapPin, group: "people", resource: "branches" },
+  { href: "/positions", label: "المناصب", icon: Briefcase, group: "people", resource: "positions" },
+  { href: "/contracts", label: "العقود", icon: FileText, group: "people", resource: "contracts" },
+  { href: "/attendance", label: "الحضور", icon: Clock, group: "ops", resource: "attendance" },
+  { href: "/leave-requests", label: "الإجازات", icon: Calendar, group: "ops", resource: "leave" },
+  { href: "/payroll-runs", label: "الرواتب", icon: DollarSign, group: "ops", resource: "payroll" },
+  { href: "/performance", label: "الأداء", icon: GraduationCap, group: "ops", resource: "performance" },
+  { href: "/training", label: "التدريب", icon: GraduationCap, group: "ops", resource: "training" },
+  { href: "/assets", label: "الأصول", icon: Package, group: "ops", resource: "assets" },
+  { href: "/announcements", label: "الإعلانات", icon: Megaphone, group: "admin", resource: "announcements" },
+  { href: "/reports", label: "التقارير", icon: BarChart3, group: "admin", resource: "reports" },
+  { href: "/audit-logs", label: "سجل التدقيق", icon: Shield, group: "admin", resource: "audit-logs" },
+  { href: "/settings", label: "الإعدادات", icon: Settings, group: "admin", resource: "settings" },
 ];
 
 const groups: Record<string, string> = { main: "الرئيسية", people: "الأفراد", ops: "العمليات", admin: "الإدارة" };
@@ -52,6 +53,7 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
   const { data: session, status } = useSession();
   const { sidebarCollapsed, toggleSidebar, _hasHydrated } = useThemeStore();
   const userRoles = useMemo(() => (session?.user?.roles as string[]) || [], [session?.user?.roles]);
+  const userPermissions = useMemo(() => (session?.user?.permissions as string[]) || [], [session?.user?.permissions]);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -70,9 +72,11 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
 
   const groupedNav = useMemo(() => {
     const result: Record<string, typeof navItems> = {};
-    navItems.forEach((item) => { if (!result[item.group]) result[item.group] = []; result[item.group].push(item); });
+    navItems
+      .filter((item) => userPermissions.includes(`read:${item.resource}`) && isEnterpriseResourceAllowed(userRoles, item.resource))
+      .forEach((item) => { if (!result[item.group]) result[item.group] = []; result[item.group].push(item); });
     return result;
-  }, []);
+  }, [userPermissions, userRoles]);
 
   // Show loading while session is loading OR store hasn't hydrated
   if (status === "loading" || !_hasHydrated) {

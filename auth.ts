@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations/auth";
 import { verifyPassword } from "@/lib/password";
 import { mergeEffectivePermissions } from "@/lib/enterprise/permissions";
+import { inferEnterpriseRolesFromPosition } from "@/lib/enterprise/role-inference";
 
 async function getAuthorization(userId: string) {
   const assignments: any = await prisma.userRole.findMany({
@@ -22,7 +23,9 @@ async function getAuthorization(userId: string) {
     }
   });
 
-  const roles = assignments.map((assignment: any) => assignment.role.name);
+  const roleNames = assignments.map((assignment: any) => assignment.role.name);
+  const employee = await prisma.employee.findFirst({ where: { userId }, include: { position: true } }).catch(() => null);
+  const roles = Array.from(new Set([...roleNames, ...inferEnterpriseRolesFromPosition(employee?.position?.title)]));
   const rolePermissions = assignments.flatMap((assignment: any) =>
     assignment.role.permissions.map(
       ({ permission }: any) => `${permission.action}:${permission.resource}`
@@ -31,7 +34,7 @@ async function getAuthorization(userId: string) {
   const permissions = await mergeEffectivePermissions(Array.from(new Set(rolePermissions)), userId).catch(() => Array.from(new Set(rolePermissions)));
 
   return {
-    roles: Array.from(new Set(roles)),
+    roles,
     permissions
   };
 }

@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { inferEnterpriseRolesFromPosition } from "@/lib/enterprise/role-inference";
 
 export type HierarchyStore = {
   version: 1;
@@ -18,6 +19,7 @@ export type AccessProfile = {
     userId: string | null;
     departmentId: string | null;
     branchId: string | null;
+    position?: { title: string } | null;
   } | null;
   store: HierarchyStore;
   isSuperAdmin: boolean;
@@ -55,16 +57,17 @@ export async function saveHierarchyStore(store: HierarchyStore) {
 
 export async function getAccessProfile(userId: string, roles: string[] = []): Promise<AccessProfile> {
   const [employee, store] = await Promise.all([
-    prisma.employee.findFirst({ where: { userId }, select: { id: true, userId: true, departmentId: true, branchId: true } }),
+    prisma.employee.findFirst({ where: { userId }, select: { id: true, userId: true, departmentId: true, branchId: true, position: { select: { title: true } } } }),
     getHierarchyStore()
   ]);
+  const effectiveRoles = Array.from(new Set([...roles, ...inferEnterpriseRolesFromPosition(employee?.position?.title)]));
   return {
     userId,
-    roles,
+    roles: effectiveRoles,
     employee,
     store,
-    isSuperAdmin: roles.includes("SUPER_ADMIN"),
-    isHrManager: roles.includes("HR_MANAGER")
+    isSuperAdmin: effectiveRoles.includes("SUPER_ADMIN"),
+    isHrManager: effectiveRoles.includes("HR_MANAGER")
   };
 }
 

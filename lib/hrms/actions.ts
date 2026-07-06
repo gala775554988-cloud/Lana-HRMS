@@ -12,6 +12,7 @@ import { hashPassword } from "@/lib/password";
 import { notifyRole } from "@/lib/enterprise/notifications";
 import { extractSalaryProfile, saveEmployeeSalaryProfile } from "@/lib/employee/salary-profile";
 import { requirePasswordChange } from "@/lib/auth/password-change-policy";
+import { isEnterpriseResourceAllowed } from "@/lib/enterprise/resource-access";
 
 type QueryInput = {
   resourceKey: string;
@@ -109,6 +110,9 @@ async function requireModulePermission(resource: HrmsModule, action: "read" | "m
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
   if (!hasPermission(session.user.permissions, { action, resource: resource.permissionResource })) {
+    throw new Error("Forbidden");
+  }
+  if (!isEnterpriseResourceAllowed(session.user.roles as string[] | undefined, resource.permissionResource)) {
     throw new Error("Forbidden");
   }
   return session;
@@ -229,6 +233,27 @@ export async function listModuleRecords(input: QueryInput) {
       delegate.findMany({ where, skip: (page - 1) * pageSize, take: pageSize, orderBy: { createdAt: "desc" } }),
       delegate.count({ where })
     ]);
+
+    const requestModules = new Set(["leave-requests", "overtime", "loans", "expenses", "letter-requests"]);
+    if (requestModules.has(resource.key) && records.length > 0) {
+      const ids = records.map((record) => String(record.id));
+      const workflows = await prisma.workflowInstance.findMany({
+        where: { entityId: { in: ids } },
+        include: { steps: { orderBy: { step: "asc" } } }
+      }).catch(() => []);
+      const workflowByEntity = new Map(workflows.map((workflow) => [workflow.entityId, workflow]));
+      const enriched = records.map((record) => {
+        const workflow = workflowByEntity.get(String(record.id));
+        const currentStep = workflow?.steps.find((step) => step.step === workflow.currentStep);
+        return {
+          ...record,
+          _workflowId: workflow?.id,
+          _workflowStatus: workflow?.status,
+          _canAct: Boolean(currentStep?.approverUserId === session.user.id && currentStep.status === "PENDING")
+        };
+      });
+      return { records: serialize(enriched) as Record<string, unknown>[], total, page, pageSize, pageCount: Math.max(Math.ceil(total / pageSize), 1) };
+    }
 
     return { records: serialize(records) as Record<string, unknown>[], total, page, pageSize, pageCount: Math.max(Math.ceil(total / pageSize), 1) };
   } catch (error: any) {
