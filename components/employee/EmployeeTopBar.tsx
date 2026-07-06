@@ -5,6 +5,7 @@ import { Search, Bell, Globe, Sun, Moon, LogOut, User } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
+import { BrandLogo } from '@/components/brand/brand-logo';
 
 interface Props {
   user: any;
@@ -38,15 +39,14 @@ export function EmployeeTopBar({ user, employee }: Props) {
     <header className="sticky top-0 z-50 border-b bg-white/95 dark:bg-slate-900/95 backdrop-blur-md">
       <div className="max-w-[1280px] mx-auto h-16 px-4 sm:px-6 flex items-center justify-between gap-4">
         {/* Logo */}
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white font-semibold text-lg shadow-sm">
-            L
-          </div>
-          <div className="hidden sm:block">
-            <div className="font-semibold tracking-tight text-lg">Lana HRMS</div>
-            <div className="text-[10px] text-slate-500 -mt-1">Employee Portal</div>
-          </div>
-        </div>
+        <BrandLogo
+          href="/employee/dashboard"
+          size="sm"
+          subtitle="Employee Portal"
+          className="gap-3"
+          textClassName="hidden sm:block"
+          subtitleClassName="text-slate-500 dark:text-slate-400"
+        />
 
         {/* Search */}
         <div className="hidden md:flex flex-1 max-w-md">

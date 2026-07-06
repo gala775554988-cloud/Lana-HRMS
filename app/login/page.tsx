@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { getRequestDictionary } from "@/lib/i18n-server";
+import { BrandLogo } from "@/components/brand/brand-logo";
 import { LoginForm } from "./login-form";
 import Link from "next/link";
 
@@ -13,21 +14,18 @@ export default async function LoginPage({
   const isAdminMode = params.admin === "true";
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+    <div className="min-h-screen bg-slate-50/90 flex items-center justify-center p-6">
       <div className="w-full max-w-md">
         
         {/* Clean & Simple Login Card */}
-        <div className="bg-white rounded-3xl shadow-xl border p-8">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white font-bold text-xl">L</div>
-            <div>
-              <div className="font-bold text-2xl">
-                {isAdminMode ? "دخول المسؤولين" : "Lana HRMS"}
-              </div>
-              <div className="text-xs text-slate-500 -mt-0.5">
-                {isAdminMode ? "لوحة التحكم الكاملة" : "نظام إدارة الموارد البشرية"}
-              </div>
-            </div>
+        <div className="bg-white/95 rounded-3xl shadow-xl border p-8 backdrop-blur">
+          <div className="mb-6">
+            <BrandLogo
+              href="/"
+              size="md"
+              subtitle={isAdminMode ? "دخول المسؤولين - لوحة التحكم الكاملة" : "نظام إدارة الموارد البشرية"}
+              subtitleClassName="text-slate-500"
+            />
           </div>
 
           <Suspense>

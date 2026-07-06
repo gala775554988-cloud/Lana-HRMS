@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Search, Bell, Globe, Sun, Moon, User } from 'lucide-react';
 import Link from 'next/link';
+import { BrandLogo } from '@/components/brand/brand-logo';
 
 interface Props {
   user: any;
@@ -26,12 +27,12 @@ export function EmployeeHeader({ user, employee }: Props) {
     <header className="h-[72px] sticky top-0 z-50 border-b bg-white dark:bg-slate-900">
       <div className="max-w-[1280px] mx-auto h-full px-6 flex items-center justify-between">
         {/* Logo */}
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-lg bg-slate-900 dark:bg-white flex items-center justify-center">
-            <span className="text-white dark:text-slate-900 font-bold text-lg">L</span>
-          </div>
-          <div className="font-semibold text-lg tracking-tight">Lana HRMS</div>
-        </div>
+        <BrandLogo
+          href="/employee/dashboard"
+          size="sm"
+          subtitle="Employee Portal"
+          subtitleClassName="text-slate-500 dark:text-slate-400"
+        />
 
         {/* Search */}
         <div className="hidden md:block flex-1 max-w-md mx-8">

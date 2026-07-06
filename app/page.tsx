@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { auth } from "@/auth";
+import { BrandLogo } from "@/components/brand/brand-logo";
 import { Button } from "@/components/ui/button";
 import { redirect } from "next/navigation";
 
@@ -22,11 +23,10 @@ export default async function HomePage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-6">
+    <main className="flex min-h-screen items-center justify-center bg-slate-50/90 px-6">
       <div className="w-full max-w-md space-y-8 text-center">
-        <div>
-          <h1 className="text-4xl font-bold tracking-tight">Lana HRMS</h1>
-          <p className="mt-3 text-lg text-slate-600">نظام إدارة الموارد البشرية</p>
+        <div className="flex justify-center">
+          <BrandLogo href={null} size="xl" textClassName="text-right" subtitleClassName="text-slate-600" />
         </div>
 
         <div className="space-y-4">

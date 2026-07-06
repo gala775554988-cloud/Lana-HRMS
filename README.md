@@ -21,6 +21,34 @@ A production-oriented Human Resource Management System built with Next.js 15, Re
 7. Run npm run prisma:seed.
 8. Run npm run dev.
 
+## PWA / Mobile App Setup
+
+This project is configured as a Progressive Web App (PWA), so it can be installed on Android, iPhone/iPad, Windows, macOS, and Linux from a browser.
+
+Arabic deployment/install guides are included:
+
+- `VERCEL_SUPABASE_DEPLOY_AR.md` — نشر النظام على Vercel + Supabase.
+- `MOBILE_INSTALL_GUIDE.md` — طريقة تثبيت التطبيق على Android و iPhone.
+
+Included PWA files:
+
+- `app/manifest.ts` for install metadata, icons, display mode, and app shortcuts.
+- `public/sw.js` service worker for static asset caching and a safe offline fallback.
+- `public/offline.html` offline page.
+- `public/icons/*` mobile and maskable icons.
+- `components/pwa/*` browser-side service-worker registration and install prompt.
+
+Deployment notes:
+
+1. Use HTTPS in production. PWA installation and service workers require HTTPS except on localhost.
+2. Set `APP_URL` and `NEXTAUTH_URL` to the real public URL, for example `https://hrms.example.com`.
+3. Use Supabase/PostgreSQL values for `DATABASE_URL` and `DIRECT_URL`.
+4. Run `npx prisma migrate deploy` on production before starting the app.
+5. Build and run with `npm run build` then `npm run start`.
+6. On iPhone/iPad, open the site in Safari, tap Share, then Add to Home Screen. On Android/desktop, use the install prompt.
+
+Security note: the service worker does not cache authenticated HTML pages or API responses by default, to avoid storing HR data offline on shared devices.
+
 ## Required Environment Variables
 
 DATABASE_URL, DIRECT_URL, AUTH_SECRET, NEXTAUTH_URL, NEXTAUTH_SECRET, APP_URL, SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY.

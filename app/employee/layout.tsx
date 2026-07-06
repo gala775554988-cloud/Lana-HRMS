@@ -7,6 +7,8 @@ import { EmployeeDesktopSidebar } from "@/components/employee/EmployeeDesktopSid
 import { EmployeeMobileBottomNav } from "@/components/employee/EmployeeMobileBottomNav";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
+export const dynamic = "force-dynamic";
+
 export default async function EmployeeLayout({ children }: { children: ReactNode }) {
   const session = await auth();
   if (!session?.user) {

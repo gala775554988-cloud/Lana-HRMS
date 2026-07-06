@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { BrandLogo } from "@/components/brand/brand-logo";
 
 export default async function AdminDashboard() {
   const session = await auth();
@@ -23,15 +24,15 @@ export default async function AdminDashboard() {
       <div className="border-b border-slate-800 bg-slate-900">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
-                <span className="text-xl">👑</span>
-              </div>
-              <div>
-                <div className="font-bold text-xl">Lana HRMS</div>
-                <div className="text-[10px] text-purple-400 -mt-1">Admin Console</div>
-              </div>
-            </div>
+            <BrandLogo
+              href="/admin"
+              size="sm"
+              subtitle="Admin Console"
+              textClassName="text-white"
+              titleClassName="text-xl"
+              subtitleClassName="text-purple-400"
+              logoClassName="border-slate-700 shadow-lg shadow-purple-950/30"
+            />
           </div>
 
           <div className="flex items-center gap-4">

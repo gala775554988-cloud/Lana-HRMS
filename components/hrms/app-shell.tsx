@@ -9,9 +9,10 @@ import {
   Bell, LayoutDashboard, LogOut, ChevronLeft, ChevronRight, Search,
   Users, Building2, MapPin, Briefcase, FileText, Clock, Calendar,
   DollarSign, GraduationCap, Package, Megaphone, BarChart3, Settings,
-  Shield, UserCheck, Sparkles
+  Shield, UserCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BrandLogo } from "@/components/brand/brand-logo";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/hrms/theme-toggle";
 import { useThemeStore } from "@/store/theme";
@@ -96,14 +97,15 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
             <button onClick={toggleSidebar} className="hidden lg:flex h-8 w-8 items-center justify-center rounded-lg hover:bg-muted transition-colors" aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}>
               {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
             </button>
-            <Link href="/" className="flex items-center gap-2.5 font-semibold" aria-label="Lana HRMS">
-              {companyLogo ? (
-                <img src={companyLogo} alt="Logo" className="h-8 w-auto rounded-lg object-contain max-w-[120px]" />
-              ) : (
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm"><Sparkles className="h-4 w-4" /></div>
-              )}
-              {!sidebarCollapsed && <span className="text-base">Lana HRMS</span>}
-            </Link>
+            <BrandLogo
+              href="/"
+              src={companyLogo}
+              size="sm"
+              showText={!sidebarCollapsed}
+              subtitle=""
+              className="font-semibold"
+              titleClassName="text-base"
+            />
           </div>
           <div className="hidden md:flex flex-1 max-w-md items-center mx-auto">
             <button className="flex w-full items-center gap-2 rounded-lg border bg-muted/50 px-4 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors">

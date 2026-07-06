@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowUpRight, BadgeCheck, BriefcaseBusiness, CalendarClock, Fingerprint, ShieldCheck, UsersRound } from "lucide-react";
 import { AuthPreferences } from "@/components/auth/auth-preferences";
+import { BrandLogo } from "@/components/brand/brand-logo";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Dictionary, Locale } from "@/lib/i18n";
@@ -34,15 +35,14 @@ export function AuthCard({
       <section className="relative grid min-h-screen lg:grid-cols-[minmax(0,1fr)_520px]">
         <div className="flex min-h-[48vh] flex-col justify-between p-6 lg:min-h-screen lg:p-10 xl:p-12">
           <div className="flex items-center justify-between gap-4">
-            <Link href="/" className="group flex items-center gap-3" aria-label="Lana HRMS home">
-              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-slate-950 shadow-2xl shadow-blue-950/30 transition-transform group-hover:scale-105">
-                <span className="text-xl font-black tracking-tight">L</span>
-              </span>
-              <span>
-                <span className="block text-base font-semibold tracking-tight">Lana HRMS</span>
-                <span className="block text-xs text-white/60">Enterprise people cloud</span>
-              </span>
-            </Link>
+            <BrandLogo
+              href="/"
+              size="md"
+              subtitle="نظام إدارة الموارد البشرية"
+              textClassName="text-white"
+              subtitleClassName="text-white/60"
+              logoClassName="shadow-2xl shadow-blue-950/30"
+            />
             <AuthPreferences locale={locale} />
           </div>
 
@@ -106,9 +106,12 @@ export function AuthCard({
           <Card className="w-full max-w-md border-white/20 bg-white/80 shadow-2xl shadow-slate-950/30 backdrop-blur-2xl dark:bg-slate-950/70 dark:text-white animate-in fade-in zoom-in-95 duration-500">
             <CardHeader className="space-y-3">
               <div className="flex items-center justify-between gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white shadow-lg dark:bg-white dark:text-slate-950">
-                  <ShieldCheck className="h-6 w-6" aria-hidden="true" />
-                </div>
+                <BrandLogo
+                  href={null}
+                  size="md"
+                  showText={false}
+                  logoClassName="shadow-lg"
+                />
                 <Link href="/" className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground">
                   {dictionary.common.home} <ArrowUpRight className="h-3.5 w-3.5" />
                 </Link>
