@@ -1,71 +1,30 @@
 import { prisma } from "@/lib/prisma";
+import { createEnterpriseWorkflow, decideWorkflowStep } from "@/lib/enterprise/workflow";
 
 export async function createWorkflow(employeeId: string, type: string, entityId: string) {
-  // Create workflow instance
-  const instance = await prisma.workflowInstance.create({
-    data: {
-      employeeId,
-      type,
-      entityId,
-      status: "PENDING",
-      currentStep: 1,
-    }
-  });
-
-  // Standard approval chain (can be made configurable later)
-  const steps = [
-    { step: 1, role: "MANAGER" },
-    { step: 2, role: "HR" },
-    { step: 3, role: "FINANCE" },
-  ];
-
-  await prisma.workflowStep.createMany({
-    data: steps.map(s => ({
-      workflowInstanceId: instance.id,
-      step: s.step,
-      status: "PENDING",
-    }))
-  });
-
-  return instance;
+  return createEnterpriseWorkflow(employeeId, type, entityId);
 }
 
 export async function approveStep(workflowInstanceId: string, approverUserId: string, comments?: string) {
-  const instance = await prisma.workflowInstance.findUnique({
-    where: { id: workflowInstanceId },
-    include: { steps: true }
+  return decideWorkflowStep({ workflowInstanceId, actorUserId: approverUserId, decision: "APPROVE", comments });
+}
+
+export async function rejectStep(workflowInstanceId: string, approverUserId: string, comments?: string) {
+  return decideWorkflowStep({ workflowInstanceId, actorUserId: approverUserId, decision: "REJECT", comments });
+}
+
+export async function returnStep(workflowInstanceId: string, approverUserId: string, comments?: string) {
+  return decideWorkflowStep({ workflowInstanceId, actorUserId: approverUserId, decision: "RETURN", comments });
+}
+
+export async function getPendingApprovalsForUser(userId: string) {
+  return prisma.workflowInstance.findMany({
+    where: { steps: { some: { approverUserId: userId, status: "PENDING" } } },
+    include: {
+      employee: { select: { id: true, employeeNumber: true, firstName: true, lastName: true, departmentId: true, branchId: true } },
+      steps: { orderBy: { step: "asc" } }
+    },
+    orderBy: { createdAt: "desc" },
+    take: 100
   });
-
-  if (!instance) return null;
-
-  const currentStep = instance.steps.find(s => s.step === instance.currentStep);
-  if (!currentStep) return null;
-
-  // Approve current step
-  await prisma.workflowStep.update({
-    where: { id: currentStep.id },
-    data: {
-      status: "APPROVED",
-      approverUserId,
-      approvedAt: new Date(),
-      comments,
-    }
-  });
-
-  const nextStep = instance.currentStep + 1;
-
-  if (nextStep > 3) {
-    // Complete workflow
-    await prisma.workflowInstance.update({
-      where: { id: workflowInstanceId },
-      data: { status: "COMPLETED", currentStep: nextStep }
-    });
-  } else {
-    await prisma.workflowInstance.update({
-      where: { id: workflowInstanceId },
-      data: { currentStep: nextStep }
-    });
-  }
-
-  return true;
 }

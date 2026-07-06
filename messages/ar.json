@@ -754,6 +754,21 @@
     "١٦٠ ساعة": "١٦٠ ساعة",
     "١٨,٠٠٠": "١٨,٠٠٠",
     "💡 Suggested solution": "💡 الحل المقترح",
-    "💡 الحل المقترح": "💡 الحل المقترح"
+    "💡 الحل المقترح": "💡 الحل المقترح",
+    "إدارة الصلاحيات": "إدارة الصلاحيات",
+    "Permissions Management": "إدارة الصلاحيات",
+    "Manage direct user permissions independently from roles, apply templates, and audit every change.": "إدارة صلاحيات المستخدمين المباشرة بشكل مستقل عن الأدوار، مع تطبيق القوالب وتسجيل كل تغيير.",
+    "Role and direct permissions are managed separately. Only Super Admin can change direct grants.": "تتم إدارة الأدوار والصلاحيات المباشرة بشكل منفصل. يستطيع المدير العام فقط تغيير الصلاحيات المباشرة.",
+    "Selected direct grants:": "الصلاحيات المباشرة المحددة:",
+    "Grant All": "منح الكل",
+    "Remove All": "إزالة الكل",
+    "Copy Permissions": "نسخ الصلاحيات",
+    "Reset Default": "إعادة الافتراضي",
+    "Apply Template": "تطبيق القالب",
+    "Loading permissions...": "جاري تحميل الصلاحيات...",
+    "اختيار الموظف / Select employee": "اختيار الموظف",
+    "No department": "لا توجد إدارة",
+    "No branch": "لا يوجد فرع",
+    "NO_ROLE": "بدون دور"
   }
 }

@@ -4,6 +4,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations/auth";
 import { verifyPassword } from "@/lib/password";
+import { mergeEffectivePermissions } from "@/lib/enterprise/permissions";
 
 async function getAuthorization(userId: string) {
   const assignments: any = await prisma.userRole.findMany({
@@ -22,15 +23,16 @@ async function getAuthorization(userId: string) {
   });
 
   const roles = assignments.map((assignment: any) => assignment.role.name);
-  const permissions = assignments.flatMap((assignment: any) =>
+  const rolePermissions = assignments.flatMap((assignment: any) =>
     assignment.role.permissions.map(
       ({ permission }: any) => `${permission.action}:${permission.resource}`
     )
   );
+  const permissions = await mergeEffectivePermissions(Array.from(new Set(rolePermissions)), userId).catch(() => Array.from(new Set(rolePermissions)));
 
   return {
     roles: Array.from(new Set(roles)),
-    permissions: Array.from(new Set(permissions))
+    permissions
   };
 }
 

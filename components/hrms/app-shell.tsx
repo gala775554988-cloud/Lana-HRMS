@@ -9,7 +9,7 @@ import {
   Bell, LayoutDashboard, LogOut, ChevronLeft, ChevronRight, Search,
   Users, Building2, MapPin, Briefcase, FileText, Clock, Calendar,
   DollarSign, GraduationCap, Package, Megaphone, BarChart3, Settings,
-  Shield
+  Shield, KeyRound
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/brand/brand-logo";
@@ -40,6 +40,7 @@ const navItems = [
   { href: "/announcements", label: "الإعلانات", icon: Megaphone, group: "admin" },
   { href: "/reports", label: "التقارير", icon: BarChart3, group: "admin" },
   { href: "/audit-logs", label: "سجل التدقيق", icon: Shield, group: "admin" },
+  { href: "/permissions-management", label: "إدارة الصلاحيات", icon: KeyRound, group: "admin" },
   { href: "/settings", label: "الإعدادات", icon: Settings, group: "admin" },
 ];
 

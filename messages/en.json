@@ -754,6 +754,21 @@
     "١٦٠ ساعة": "160 hours",
     "١٨,٠٠٠": "18,000",
     "💡 Suggested solution": "💡 Suggested solution",
-    "💡 الحل المقترح": "💡 Suggested solution"
+    "💡 الحل المقترح": "💡 Suggested solution",
+    "إدارة الصلاحيات": "Permissions Management",
+    "Permissions Management": "Permissions Management",
+    "Manage direct user permissions independently from roles, apply templates, and audit every change.": "Manage direct user permissions independently from roles, apply templates, and audit every change.",
+    "Role and direct permissions are managed separately. Only Super Admin can change direct grants.": "Role and direct permissions are managed separately. Only Super Admin can change direct grants.",
+    "Selected direct grants:": "Selected direct grants:",
+    "Grant All": "Grant All",
+    "Remove All": "Remove All",
+    "Copy Permissions": "Copy Permissions",
+    "Reset Default": "Reset Default",
+    "Apply Template": "Apply Template",
+    "Loading permissions...": "Loading permissions...",
+    "اختيار الموظف / Select employee": "Select employee",
+    "No department": "No department",
+    "No branch": "No branch",
+    "NO_ROLE": "NO_ROLE"
   }
 }

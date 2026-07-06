@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { getHrmsModule, type HrmsModule, type ModuleField } from "@/config/hrms";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/rbac";
+import { applyScopedWhere, canAccessEmployeeId, getAccessProfile } from "@/lib/enterprise/hierarchy";
 import { writeAuditLog } from "@/lib/audit";
 import { buildModuleSchema } from "@/lib/validations/hrms";
 import { hashPassword } from "@/lib/password";
@@ -100,6 +101,15 @@ function buildWhere(resource: HrmsModule, search?: string, filters?: Record<stri
   return where;
 }
 
+async function assertRecordVisible(resource: HrmsModule, record: Record<string, unknown> | null, session: any) {
+  if (!record) return;
+  const roles = (session.user.roles as string[]) ?? [];
+  if (roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER")) return;
+  const profile = await getAccessProfile(session.user.id, roles);
+  const employeeId = resource.key === "employees" ? String(record.id) : typeof record.employeeId === "string" ? record.employeeId : typeof record.assignedEmployeeId === "string" ? record.assignedEmployeeId : null;
+  if (employeeId && !(await canAccessEmployeeId(employeeId, profile))) throw new Error("Forbidden");
+}
+
 export async function listModuleRecords(input: QueryInput) {
   const resource = getHrmsModule(input.resourceKey);
   if (!resource) throw new Error("Unknown module");
@@ -125,7 +135,9 @@ export async function listModuleRecords(input: QueryInput) {
 
   const page = Math.max(Number(input.page ?? 1), 1);
   const pageSize = Math.min(Math.max(Number(input.pageSize ?? 10), 5), 100);
-  const where = buildWhere(resource, input.search, input.filters);
+  const baseWhere = buildWhere(resource, input.search, input.filters);
+  const accessProfile = await getAccessProfile(session.user.id, (session.user.roles as string[]) ?? []);
+  const where = await applyScopedWhere(resource.key, baseWhere, accessProfile);
 
   // Special handling for employees: include relations for card view
   if (resource.key === "employees") {
@@ -210,9 +222,10 @@ export async function listModuleRecords(input: QueryInput) {
 export async function getModuleRecord(resourceKey: string, id: string) {
   const resource = getHrmsModule(resourceKey);
   if (!resource) throw new Error("Unknown module");
-  await requireModulePermission(resource, "read");
+  const session = await requireModulePermission(resource, "read");
   try {
     const record = await delegateFor(resource.model).findUnique({ where: { id } });
+    await assertRecordVisible(resource, record, session);
     return serialize(record) as Record<string, unknown> | null;
   } catch (error: any) {
     console.error(`[getModuleRecord] Query failed for ${resourceKey}/${id}:`, error);
@@ -227,6 +240,10 @@ export async function createModuleRecord(input: MutationInput) {
   const parsed = buildModuleSchema(resource).safeParse(input.values);
   if (!parsed.success) return { success: false, message: parsed.error.errors[0]?.message ?? "Invalid input." };
   const data = normalizeValues(resource, parsed.data) as Record<string, unknown>;
+  const accessProfile = await getAccessProfile(session.user.id, (session.user.roles as string[]) ?? []);
+  if (!accessProfile.isSuperAdmin && !accessProfile.isHrManager && typeof data.employeeId === "string" && !(await canAccessEmployeeId(data.employeeId, accessProfile))) {
+    return { success: false, message: "Forbidden" };
+  }
 
   // Auto-create User account for new employees
   if (resource.key === "employees" && resource.model === "employee") {
@@ -353,6 +370,8 @@ export async function updateModuleRecord(input: MutationInput) {
   const resource = getHrmsModule(input.resourceKey);
   if (!resource || !input.id) return { success: false, message: "Unknown record." };
   const session = await requireModulePermission(resource, "manage");
+  const existingRecord = await delegateFor(resource.model).findUnique({ where: { id: input.id } });
+  await assertRecordVisible(resource, existingRecord, session);
   const parsed = buildModuleSchema(resource).safeParse(input.values);
   if (!parsed.success) return { success: false, message: parsed.error.errors[0]?.message ?? "Invalid input." };
   const data = normalizeValues(resource, parsed.data) as Record<string, unknown>;
@@ -399,6 +418,8 @@ export async function deleteModuleRecord(resourceKey: string, id: string) {
   const resource = getHrmsModule(resourceKey);
   if (!resource) return { success: false, message: "Unknown module." };
   const session = await requireModulePermission(resource, "manage");
+  const existingRecord = await delegateFor(resource.model).findUnique({ where: { id } });
+  await assertRecordVisible(resource, existingRecord, session);
   await delegateFor(resource.model).delete({ where: { id } });
   await writeAuditLog({ actorUserId: session.user.id, action: "delete", entity: resource.model, entityId: id });
   revalidatePath("/" + resource.key);
@@ -428,11 +449,15 @@ export async function getDashboardMetrics() {
     }
   };
 
+  const accessProfile = await getAccessProfile(session.user.id, (session.user.roles as string[]) ?? []);
+  const employeeWhere = await applyScopedWhere("employees", {}, accessProfile);
+  const leaveWhere = await applyScopedWhere("leave-requests", { status: "PENDING" }, accessProfile);
+
   const [employees, departments, openJobs, pendingLeave, unreadNotifications, auditLogs] = await Promise.all([
-    safeCount(() => client.employee.count()),
+    safeCount(() => client.employee.count({ where: employeeWhere })),
     safeCount(() => client.department.count()),
     safeCount(() => client.jobOpening?.count?.({ where: { status: "OPEN" } }) ?? Promise.resolve(0)),
-    safeCount(() => client.leaveRequest?.count?.({ where: { status: "PENDING" } }) ?? Promise.resolve(0)),
+    safeCount(() => client.leaveRequest?.count?.({ where: leaveWhere }) ?? Promise.resolve(0)),
     safeCount(() => client.notification?.count?.({ where: { OR: [{ userId: session.user.id }, { userId: null }], readAt: null } }) ?? Promise.resolve(0)),
     safeFindMany(() => client.auditLog?.findMany?.({ take: 8, orderBy: { createdAt: "desc" } }) ?? Promise.resolve([]))
   ]);
