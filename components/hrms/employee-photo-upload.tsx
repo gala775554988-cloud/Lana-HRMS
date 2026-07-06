@@ -134,7 +134,6 @@ export function EmployeePhotoUpload({
             ) : null}
           </div>
           {message ? <p className="text-xs text-muted-foreground">{message}</p> : null}
-          {url ? <p className="truncate text-[10px] text-muted-foreground">{url}</p> : null}
         </div>
       </div>
     </div>
