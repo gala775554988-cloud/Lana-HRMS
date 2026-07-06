@@ -103,7 +103,25 @@ function buildWhere(resource: HrmsModule, search?: string, filters?: Record<stri
 export async function listModuleRecords(input: QueryInput) {
   const resource = getHrmsModule(input.resourceKey);
   if (!resource) throw new Error("Unknown module");
-  await requireModulePermission(resource, "read");
+
+  // Check auth and permissions — but catch and return empty instead of throwing
+  let session;
+  try {
+    session = await requireModulePermission(resource, "read");
+  } catch (error: any) {
+    // If unauthorized/forbidden, return empty result set instead of crashing the page
+    if (error?.message === "Unauthorized" || error?.message === "Forbidden") {
+      return {
+        records: [] as Record<string, unknown>[],
+        total: 0,
+        page: Math.max(Number(input.page ?? 1), 1),
+        pageSize: Math.min(Math.max(Number(input.pageSize ?? 10), 5), 100),
+        pageCount: 1,
+        error: error.message,
+      };
+    }
+    throw error;
+  }
 
   const page = Math.max(Number(input.page ?? 1), 1);
   const pageSize = Math.min(Math.max(Number(input.pageSize ?? 10), 5), 100);
@@ -111,60 +129,95 @@ export async function listModuleRecords(input: QueryInput) {
 
   // Special handling for employees: include relations for card view
   if (resource.key === "employees") {
-    const [records, total] = await Promise.all([
-      prisma.employee.findMany({
-        where,
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-        orderBy: { createdAt: "desc" },
-        include: {
-          department: { select: { name: true, code: true } },
-          position: { select: { title: true } },
-          branch: { select: { name: true } },
-          employmentType: { select: { name: true } },
-          user: { select: { lastLoginAt: true } },
-        },
-      }),
-      prisma.employee.count({ where }),
-    ]);
+    try {
+      const [records, total] = await Promise.all([
+        prisma.employee.findMany({
+          where,
+          skip: (page - 1) * pageSize,
+          take: pageSize,
+          orderBy: { createdAt: "desc" },
+          include: {
+            department: { select: { name: true, code: true } },
+            position: { select: { title: true } },
+            branch: { select: { name: true } },
+            employmentType: { select: { name: true } },
+            user: { select: { lastLoginAt: true } },
+          },
+        }),
+        prisma.employee.count({ where }),
+      ]);
 
-    const serializedRecords = records.map((r: any) => ({
-      id: r.id,
-      employeeNumber: r.employeeNumber,
-      nationalId: r.nationalId,
-      firstName: r.firstName,
-      lastName: r.lastName,
-      email: r.email,
-      phone: r.phone,
-      profilePhotoUrl: r.profilePhotoUrl,
-      status: r.status,
-      hireDate: r.hireDate ? new Date(r.hireDate).toISOString().slice(0, 10) : null,
-      department: r.department,
-      position: r.position,
-      branch: r.branch,
-      employmentType: r.employmentType,
-      lastLoginAt: r.user?.lastLoginAt ? new Date(r.user.lastLoginAt).toLocaleString("ar-SA") : null,
-      createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : null,
-    }));
+      const serializedRecords = records.map((r: any) => ({
+        id: r.id,
+        employeeNumber: r.employeeNumber,
+        nationalId: r.nationalId,
+        firstName: r.firstName,
+        lastName: r.lastName,
+        email: r.email,
+        phone: r.phone,
+        profilePhotoUrl: r.profilePhotoUrl,
+        status: r.status,
+        hireDate: r.hireDate ? new Date(r.hireDate).toISOString().slice(0, 10) : null,
+        department: r.department,
+        position: r.position,
+        branch: r.branch,
+        employmentType: r.employmentType,
+        lastLoginAt: r.user?.lastLoginAt ? new Date(r.user.lastLoginAt).toLocaleString("ar-SA") : null,
+        createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : null,
+      }));
 
-    return { records: serializedRecords as Record<string, unknown>[], total, page, pageSize, pageCount: Math.max(Math.ceil(total / pageSize), 1) };
+      return { records: serializedRecords as Record<string, unknown>[], total, page, pageSize, pageCount: Math.max(Math.ceil(total / pageSize), 1) };
+    } catch (error: any) {
+      console.error(`[listModuleRecords] Prisma error for employees:`, error);
+      return {
+        records: [] as Record<string, unknown>[],
+        total: 0,
+        page,
+        pageSize,
+        pageCount: 1,
+        error: error?.code === "P2021" ? "TABLE_NOT_FOUND" : "QUERY_FAILED",
+      };
+    }
   }
 
-  const delegate = delegateFor(resource.model);
-  const [records, total] = await Promise.all([
-    delegate.findMany({ where, skip: (page - 1) * pageSize, take: pageSize, orderBy: { createdAt: "desc" } }),
-    delegate.count({ where })
-  ]);
+  // Generic module query with delegate
+  try {
+    const delegate = delegateFor(resource.model);
+    if (!delegate) {
+      console.error(`[listModuleRecords] No Prisma delegate for model: ${resource.model}`);
+      return { records: [] as Record<string, unknown>[], total: 0, page, pageSize, pageCount: 1, error: "MODEL_NOT_FOUND" };
+    }
 
-  return { records: serialize(records) as Record<string, unknown>[], total, page, pageSize, pageCount: Math.max(Math.ceil(total / pageSize), 1) };
+    const [records, total] = await Promise.all([
+      delegate.findMany({ where, skip: (page - 1) * pageSize, take: pageSize, orderBy: { createdAt: "desc" } }),
+      delegate.count({ where })
+    ]);
+
+    return { records: serialize(records) as Record<string, unknown>[], total, page, pageSize, pageCount: Math.max(Math.ceil(total / pageSize), 1) };
+  } catch (error: any) {
+    console.error(`[listModuleRecords] Query failed for ${resource.key}:`, error);
+    return {
+      records: [] as Record<string, unknown>[],
+      total: 0,
+      page,
+      pageSize,
+      pageCount: 1,
+      error: error?.code === "P2021" ? "TABLE_NOT_FOUND" : "QUERY_FAILED",
+    };
+  }
 }
 
 export async function getModuleRecord(resourceKey: string, id: string) {
   const resource = getHrmsModule(resourceKey);
   if (!resource) throw new Error("Unknown module");
   await requireModulePermission(resource, "read");
-  const record = await delegateFor(resource.model).findUnique({ where: { id } });
-  return serialize(record) as Record<string, unknown> | null;
+  try {
+    const record = await delegateFor(resource.model).findUnique({ where: { id } });
+    return serialize(record) as Record<string, unknown> | null;
+  } catch (error: any) {
+    console.error(`[getModuleRecord] Query failed for ${resourceKey}/${id}:`, error);
+    return null;
+  }
 }
 
 export async function createModuleRecord(input: MutationInput) {
@@ -183,20 +236,17 @@ export async function createModuleRecord(input: MutationInput) {
       const lastName = String(data.lastName ?? "");
       const emailInput = data.email ? String(data.email) : "";
       const fullName = `${firstName} ${lastName}`.trim() || "Employee";
-      // password handling
       const inputPassword = typeof data.password === "string" && data.password.length >= 6 ? data.password : "";
       const inputPasswordConfirm = typeof (data as any).passwordConfirm === "string" ? (data as any).passwordConfirm : "";
       if (inputPassword && inputPassword !== inputPasswordConfirm) {
         return { success: false, message: "Password confirmation does not match." };
       }
-      // strip password fields from employee data
       const { password, passwordConfirm, ...employeeData } = data as any;
 
       if (!nationalId) {
         return { success: false, message: "National ID is required to create login account." };
       }
 
-      // Check if employee with this nationalId already has a user
       const existingEmployee = await prisma.employee.findUnique({
         where: { nationalId },
         include: { user: true }
@@ -205,25 +255,19 @@ export async function createModuleRecord(input: MutationInput) {
         return { success: false, message: "An account already exists for this National ID." };
       }
 
-      // Check if user with this email already exists
       const userEmail = emailInput && emailInput.includes("@")
         ? emailInput.toLowerCase()
         : `employee.${nationalId}@lana.local`;
 
-      // Actually check email uniquely
       const emailUser = await prisma.user.findUnique({ where: { email: userEmail } }).catch(() => null);
 
-      // Default employee password: Emp@ + last 4 of nationalId, fallback Employee@123456
       const last4 = nationalId.slice(-4).padStart(4, "0");
       const defaultPassword = inputPassword || `Emp@${last4}` || "Employee@123456";
       const passwordHash = await hashPassword(defaultPassword);
 
-      // Find EMPLOYEE role
       const employeeRole = await prisma.role.findUnique({ where: { name: "EMPLOYEE" } });
 
-      // Create user + employee in transaction
       const result = await prisma.$transaction(async (tx: any) => {
-        // Create or reuse user
         let user = emailUser;
         if (!user) {
           user = await tx.user.create({
@@ -236,7 +280,6 @@ export async function createModuleRecord(input: MutationInput) {
             }
           });
         } else {
-          // Update existing user to ensure active + password set
           user = await tx.user.update({
             where: { id: user.id },
             data: {
@@ -247,7 +290,6 @@ export async function createModuleRecord(input: MutationInput) {
           });
         }
 
-        // Assign EMPLOYEE role
         if (employeeRole && user) {
           await tx.userRole.upsert({
             where: { userId_roleId: { userId: user.id, roleId: employeeRole.id } },
@@ -258,7 +300,6 @@ export async function createModuleRecord(input: MutationInput) {
 
         if (!user) throw new Error("User creation failed");
 
-        // Create employee linked to user
         const employee = await tx.employee.create({
           data: {
             ...employeeData,
@@ -286,17 +327,14 @@ export async function createModuleRecord(input: MutationInput) {
         id: String(result.employee.id)
       };
     } catch (error: any) {
-      // Fallback to standard create if auto-user fails
-      // Check for unique constraint errors
       if (error?.code === "P2002") {
         return { success: false, message: "Employee with this National ID or Employee Number already exists, or user email already taken." };
       }
-      // Continue to standard flow below if specific handling fails
       console.error("Employee auto-user creation failed:", error);
     }
   }
 
-  // Standard create for all other modules (and employee fallback)
+  // Standard create for all other modules
   try {
     const record = await delegateFor(resource.model).create({ data });
     await writeAuditLog({ actorUserId: session.user.id, action: "create", entity: resource.model, entityId: String(record.id), metadata: data });
@@ -319,7 +357,6 @@ export async function updateModuleRecord(input: MutationInput) {
   if (!parsed.success) return { success: false, message: parsed.error.errors[0]?.message ?? "Invalid input." };
   const data = normalizeValues(resource, parsed.data) as Record<string, unknown>;
 
-  // Handle employee password update
   if (resource.key === "employees" && resource.model === "employee") {
     const inputPassword = typeof data.password === "string" ? data.password : "";
     const inputPasswordConfirm = typeof (data as any).passwordConfirm === "string" ? (data as any).passwordConfirm : "";
@@ -331,14 +368,11 @@ export async function updateModuleRecord(input: MutationInput) {
         return { success: false, message: "Password confirmation does not match." };
       }
     }
-    // strip password fields
     delete (data as any).password;
     delete (data as any).passwordConfirm;
 
-    // update employee record first
     const record = await delegateFor(resource.model).update({ where: { id: input.id }, data });
 
-    // if password provided, update linked user
     if (inputPassword) {
       const employee = await prisma.employee.findUnique({ where: { id: input.id }, select: { userId: true } });
       if (employee?.userId) {

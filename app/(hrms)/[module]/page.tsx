@@ -9,7 +9,7 @@ import { FileUpload } from "@/components/hrms/file-upload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Filter, Plus, Search } from "lucide-react";
+import { Filter, Plus, Search, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 
 export default async function ResourcePage({ params, searchParams }: { params: Promise<{ module: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -30,6 +30,43 @@ export default async function ResourcePage({ params, searchParams }: { params: P
   const t = dictionary.module;
   const f = dictionary.fields as Record<string, string>;
   const getFieldLabel = (fieldName: string) => f[fieldName] ?? fieldName;
+
+  // If listModuleRecords returned an error, show a graceful message instead of crashing
+  if ("error" in data && data.error) {
+    const errorMessage = data.error === "Forbidden"
+      ? "ليس لديك صلاحية لعرض هذه الوحدة"
+      : data.error === "Unauthorized"
+      ? "يرجى تسجيل الدخول أولاً"
+      : data.error === "TABLE_NOT_FOUND"
+      ? "جدول البيانات غير موجود. يرجى تشغيل migration: npx prisma migrate deploy"
+      : "حدث خطأ أثناء تحميل البيانات. يرجى المحاولة لاحقاً";
+
+    return (
+      <section className="space-y-6" dir={locale === "ar" ? "rtl" : "ltr"}>
+        <div className="flex flex-col gap-4 rounded-2xl border bg-background p-6 shadow-sm lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-2">
+            <Badge variant="outline">{t.moduleTag}</Badge>
+            <h1 className="text-3xl font-semibold tracking-tight">{resourceTitle}</h1>
+            <p className="max-w-2xl text-muted-foreground">{resourceDescription}</p>
+          </div>
+        </div>
+        <div className="flex min-h-[40vh] items-center justify-center rounded-xl border bg-card p-8" dir="rtl">
+          <div className="text-center max-w-md">
+            <div className="flex justify-center mb-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400">
+                <AlertTriangle className="h-6 w-6" />
+              </div>
+            </div>
+            <h3 className="text-lg font-semibold text-foreground mb-2">{errorMessage}</h3>
+            <p className="text-sm text-muted-foreground mb-4">الوحدة: {resourceTitle}</p>
+            <Button variant="outline" onClick={() => typeof window !== "undefined" && window.location.reload()}>
+              إعادة المحاولة
+            </Button>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   if (resourceKey === "employees") {
     return (

@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { ModuleForm } from "@/components/hrms/module-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AlertTriangle } from "lucide-react";
 
 function display(value: unknown) {
   if (value === null || value === undefined || value === "") return "-";
@@ -44,13 +45,29 @@ export default async function RecordPage({ params }: { params: Promise<{ module:
   const { module: resourceKey, id } = await params;
   const resource = getHrmsModule(resourceKey);
   if (!resource) notFound();
-  const record = await getModuleRecord(resourceKey, id);
+
+  let record;
+  try {
+    record = await getModuleRecord(resourceKey, id);
+  } catch (error) {
+    console.error(`[RecordPage] getModuleRecord failed for ${resourceKey}/${id}:`, error);
+    record = null;
+  }
+
   if (!record) notFound();
+
   const { dictionary } = await getRequestDictionary();
   const resourceTitle = resource.key in dictionary.nav ? dictionary.nav[resource.key as keyof typeof dictionary.nav] : resource.title;
-  const related = resource.key === "employees" ? await getEmployeeRelated(id) : null;
 
-  // Full bilingual support for detail page
+  let related = null;
+  if (resource.key === "employees") {
+    try {
+      related = await getEmployeeRelated(id);
+    } catch (error) {
+      console.error(`[RecordPage] getEmployeeRelated failed:`, error);
+    }
+  }
+
   const rec = (dictionary as any).record || {
     title: "Record profile",
     details: "Details",
