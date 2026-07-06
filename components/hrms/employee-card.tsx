@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,7 @@ interface EmployeeCardProps {
   onMore?: (id: string) => void;
 }
 
-function InfoRow({ icon: Icon, value }: { icon: LucideIcon; value?: string | null }) {
+const InfoRow = memo(function InfoRow({ icon: Icon, value }: { icon: LucideIcon; value?: string | null }) {
   if (!value) return null;
   return (
     <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -41,9 +42,9 @@ function InfoRow({ icon: Icon, value }: { icon: LucideIcon; value?: string | nul
       <span className="truncate">{value}</span>
     </div>
   );
-}
+});
 
-export function EmployeeCard({ employee, locale = "ar", onView, onEdit, onDocuments, onMore }: EmployeeCardProps) {
+export const EmployeeCard = memo(function EmployeeCard({ employee, locale = "ar", onView, onEdit, onDocuments, onMore }: EmployeeCardProps) {
   const fullName = `${employee.firstName} ${employee.lastName}`;
   const initials = `${employee.firstName.charAt(0)}${employee.lastName.charAt(0)}`.toUpperCase();
 
@@ -97,4 +98,4 @@ export function EmployeeCard({ employee, locale = "ar", onView, onEdit, onDocume
       </div>
     </div>
   );
-}
+});

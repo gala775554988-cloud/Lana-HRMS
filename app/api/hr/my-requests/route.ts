@@ -2,32 +2,58 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { createWorkflow } from "@/lib/employee/workflow";
+import { formatApiError } from "@/lib/errors";
 
 export async function POST(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ success: false, message: "غير مصرح" }, { status: 401 });
-  }
-
-  const body = await request.json();
-  const { type, employeeId: _clientEmployeeId, ...data } = body;
-
-  // Always resolve employee from session — never trust client-sent employeeId
-  const employee = await prisma.employee.findFirst({
-    where: { userId: session.user.id },
-  });
-
-  if (!employee) {
-    return NextResponse.json(
-      { success: false, message: "لم يتم العثور على بيانات الموظف المرتبطة بحسابك" },
-      { status: 403 }
-    );
-  }
-
-  const employeeId = employee.id;
-  let result: any;
-
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            id: `AUTH-${Date.now().toString(36)}`,
+            category: "auth",
+            name: "Authentication Required",
+            message: "غير مصرح - يرجى تسجيل الدخول",
+            cause: "لم يتم تقديم بيانات مصادقة صالحة",
+            suggestion: "سجل الدخول مرة أخرى",
+            statusCode: 401,
+          },
+        },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json();
+    const { type, employeeId: _clientEmployeeId, ...data } = body;
+
+    // Always resolve employee from session — never trust client-sent employeeId
+    const employee = await prisma.employee.findFirst({
+      where: { userId: session.user.id },
+    });
+
+    if (!employee) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            id: `AUTH-${Date.now().toString(36)}`,
+            category: "auth",
+            name: "Employee Not Found",
+            message: "لم يتم العثور على بيانات الموظف المرتبطة بحسابك",
+            cause: "حساب المستخدم غير مرتبط بسجل موظف",
+            suggestion: "تواصل مع الموارد البشرية لربط حسابك بملف الموظف",
+            statusCode: 403,
+          },
+        },
+        { status: 403 }
+      );
+    }
+
+    const employeeId = employee.id;
+    let result: any;
+
     switch (type) {
       case "leave": {
         // Resolve leaveTypeId from the code/name sent by the form
@@ -79,7 +105,39 @@ export async function POST(request: Request) {
 
         if (!leaveType) {
           return NextResponse.json(
-            { success: false, message: "لا توجد أنواع إجازات مُعرّفة في النظام. يرجى التواصل مع الإدارة." },
+            {
+              success: false,
+              error: {
+                id: `VAL-${Date.now().toString(36)}`,
+                category: "validation",
+                name: "Leave Type Not Found",
+                message: "لا توجد أنواع إجازات مُعرّفة في النظام",
+                cause: "لم يتم العثور على نوع الإجازة المطلوب ولا أنواع إجازات افتراضية",
+                suggestion: "تواصل مع الإدارة لإعداد أنواع الإجازات في النظام",
+              },
+            },
+            { status: 400 }
+          );
+        }
+
+        // Validate required fields
+        if (!data.startDate || !data.endDate) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                id: `VAL-${Date.now().toString(36)}`,
+                category: "validation",
+                name: "Missing Required Fields",
+                message: "يرجى تحديد تاريخ البداية والنهاية للإجازة",
+                cause: "حقول تاريخ البداية والنهاية مطلوبة",
+                suggestion: "أدخل تواريخ الإجازة وحاول مرة أخرى",
+                fields: [
+                  ...(data.startDate ? [] : [{ field: "startDate", message: "تاريخ البداية مطلوب" }]),
+                  ...(data.endDate ? [] : [{ field: "endDate", message: "تاريخ النهاية مطلوب" }]),
+                ],
+              },
+            },
             { status: 400 }
           );
         }
@@ -98,7 +156,23 @@ export async function POST(request: Request) {
         break;
       }
 
-      case "expense":
+      case "expense": {
+        if (!data.amount || Number(data.amount) <= 0) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                id: `VAL-${Date.now().toString(36)}`,
+                category: "validation",
+                name: "Invalid Amount",
+                message: "يرجى إدخال مبلغ صالح للطلب",
+                fields: [{ field: "amount", message: "المبلغ مطلوب ويجب أن يكون أكبر من صفر" }],
+                suggestion: "أدخل مبلغ صحيح وحاول مرة أخرى",
+              },
+            },
+            { status: 400 }
+          );
+        }
         result = await prisma.expenseRequest.create({
           data: {
             employeeId,
@@ -109,8 +183,25 @@ export async function POST(request: Request) {
           },
         });
         break;
+      }
 
-      case "loan":
+      case "loan": {
+        if (!data.amount || Number(data.amount) <= 0) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                id: `VAL-${Date.now().toString(36)}`,
+                category: "validation",
+                name: "Invalid Amount",
+                message: "يرجى إدخال مبلغ صالح للسلفة",
+                fields: [{ field: "amount", message: "المبلغ مطلوب ويجب أن يكون أكبر من صفر" }],
+                suggestion: "أدخل مبلغ صحيح وحاول مرة أخرى",
+              },
+            },
+            { status: 400 }
+          );
+        }
         result = await prisma.loan.create({
           data: {
             employeeId,
@@ -125,6 +216,7 @@ export async function POST(request: Request) {
           },
         });
         break;
+      }
 
       case "letter":
         result = await prisma.letterRequest.create({
@@ -139,7 +231,18 @@ export async function POST(request: Request) {
 
       default:
         return NextResponse.json(
-          { success: false, message: "نوع طلب غير معروف" },
+          {
+            success: false,
+            error: {
+              id: `VAL-${Date.now().toString(36)}`,
+              category: "validation",
+              name: "Unknown Request Type",
+              message: `نوع طلب غير معروف: "${type}"`,
+              cause: `النوع "${type}" غير مدعوم`,
+              suggestion: "الأنواع المدعومة: leave, expense, loan, letter",
+              statusCode: 400,
+            },
+          },
           { status: 400 }
         );
     }
@@ -169,9 +272,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, message: "تم إرسال الطلب بنجاح" });
   } catch (error: any) {
     console.error("Request creation failed:", error);
-    return NextResponse.json(
-      { success: false, message: "فشل إنشاء الطلب. يرجى المحاولة لاحقاً." },
-      { status: 500 }
-    );
+    const apiError = formatApiError(error, { location: "api/hr/my-requests", operation: "POST" });
+    return NextResponse.json(apiError, { status: error?.statusCode || 500 });
   }
 }

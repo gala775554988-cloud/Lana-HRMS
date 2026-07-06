@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { cn } from "@/lib/utils";
 import type { EmployeeStatus } from "@/lib/design-system/tokens";
 import { employeeStatusConfig } from "@/lib/design-system/tokens";
@@ -22,7 +23,7 @@ const colorMap: Record<EmployeeStatus, { bg: string; text: string; dot: string; 
   TERMINATED: { bg: "bg-red-50 dark:bg-red-950/40", text: "text-red-700 dark:text-red-400", dot: "bg-red-500", border: "border-red-200 dark:border-red-800" },
 };
 
-export function StatusBadge({ status, locale = "ar", size = "md", dotOnly = false, className }: StatusBadgeProps) {
+export const StatusBadge = memo(function StatusBadge({ status, locale = "ar", size = "md", dotOnly = false, className }: StatusBadgeProps) {
   const config = employeeStatusConfig[status];
   const colors = colorMap[status];
   const label = config.label[locale];
@@ -37,4 +38,4 @@ export function StatusBadge({ status, locale = "ar", size = "md", dotOnly = fals
       {label}
     </span>
   );
-}
+});

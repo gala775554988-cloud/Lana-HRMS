@@ -1,24 +1,39 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export default function NewLeaveRequest() {
   const router = useRouter();
-  const [loading, setLoading] = React.useState(false);
-  const [message, setMessage] = React.useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error'; details?: string } | null>(null);
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setMessage(null);
 
     const formData = new FormData(e.currentTarget);
+    const data = Object.fromEntries(formData);
+
+    // Client-side validation
+    if (!data.startDate || !data.endDate) {
+      setLoading(false);
+      setMessage({ text: 'يرجى تحديد تاريخ البداية والنهاية', type: 'error' });
+      return;
+    }
+
+    if (new Date(data.endDate as string) < new Date(data.startDate as string)) {
+      setLoading(false);
+      setMessage({ text: 'تاريخ النهاية يجب أن يكون بعد تاريخ البداية', type: 'error' });
+      return;
+    }
 
     try {
       const res = await fetch('/api/hr/my-requests', {
@@ -26,35 +41,51 @@ export default function NewLeaveRequest() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'leave',
-          ...Object.fromEntries(formData),
+          ...data,
         }),
       });
 
-      const data = await res.json();
+      const result = await res.json();
       setLoading(false);
 
-      if (data.success) {
+      if (result.success) {
         setMessage({ text: 'تم إرسال الطلب بنجاح', type: 'success' });
         setTimeout(() => router.push('/employee/requests'), 1500);
       } else {
-        setMessage({ text: data.message || 'فشل تقديم الطلب', type: 'error' });
+        const errorInfo = result.error;
+        let errorText = result.message || 'فشل تقديم الطلب';
+        let errorDetails: string | undefined;
+        if (errorInfo) {
+          errorText = errorInfo.message || errorText;
+          errorDetails = errorInfo.suggestion;
+          if (errorInfo.fields?.length) {
+            errorText += ' - الحقول: ' + errorInfo.fields.map((f: { field: string; message: string }) => f.field).join(', ');
+          }
+        }
+        setMessage({ text: errorText, type: 'error', details: errorDetails });
       }
     } catch {
       setLoading(false);
-      setMessage({ text: 'فشل إرسال الطلب. يرجى المحاولة لاحقاً.', type: 'error' });
+      setMessage({ text: 'فشل إرسال الطلب. يرجى التحقق من اتصالك والمحاولة لاحقاً.', type: 'error' });
     }
-  }
+  }, [router]);
 
   return (
-    <div className="max-w-lg">
+    <div className="max-w-lg" dir="rtl">
       <Card>
         <CardHeader>
           <CardTitle>طلب إجازة جديد</CardTitle>
         </CardHeader>
         <CardContent>
           {message && (
-            <div className={`rounded-lg p-3 text-sm mb-4 ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-              {message.text}
+            <div className={`rounded-lg p-3 text-sm mb-4 ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800' : 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800'}`}>
+              <div className="flex items-start gap-2">
+                {message.type === 'success' ? <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" /> : <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />}
+                <div>
+                  <p>{message.text}</p>
+                  {message.details && <p className="text-xs mt-1 opacity-80">{message.details}</p>}
+                </div>
+              </div>
             </div>
           )}
 
@@ -63,7 +94,8 @@ export default function NewLeaveRequest() {
 
             <div>
               <Label>نوع الإجازة</Label>
-              <select name="leaveType" className="w-full border rounded-xl p-2.5 text-sm" required>
+              <select name="leaveType" className="w-full border rounded-xl p-2.5 text-sm bg-background" required defaultValue="">
+                <option value="">اختر نوع الإجازة</option>
                 <option value="annual">إجازة سنوية</option>
                 <option value="sick">إجازة مرضية</option>
                 <option value="emergency">إجازة طارئة</option>
@@ -83,7 +115,7 @@ export default function NewLeaveRequest() {
 
             <div>
               <Label>عدد الأيام (تقريبي)</Label>
-              <Input type="number" name="days" defaultValue="1" required />
+              <Input type="number" name="days" defaultValue="1" min="1" required />
             </div>
 
             <div>

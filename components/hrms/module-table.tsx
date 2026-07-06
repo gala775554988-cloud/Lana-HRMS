@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useTransition } from "react";
+import { useMemo, useTransition, useCallback } from "react";
 import { FileSearch } from "lucide-react";
 import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import type { HrmsModule } from "@/config/hrms";
@@ -23,7 +23,6 @@ function display(value: unknown, yesLabel: string, noLabel: string) {
 
 function formatHeader(field: string, fieldsDict: Record<string, string>) {
   if (fieldsDict[field]) return fieldsDict[field];
-  // fallback: split camelCase
   return field.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
 }
 
@@ -35,15 +34,23 @@ export function ModuleTable({ resource, records, dictionary, locale = "en" }: { 
   const yesLabel = dictionary.common?.yes ?? dictionary.module.yes ?? "Yes";
   const noLabel = dictionary.common?.no ?? dictionary.module.no ?? "No";
 
+  const handleDelete = useCallback((id: string) => {
+    startTransition(async () => {
+      await deleteModuleRecord(resource.key, id);
+      router.refresh();
+    });
+  }, [resource.key, router]);
+
   const columns = useMemo(() => [
     ...resource.tableFields.map((field) => helper.accessor((row) => row[field], { id: field, header: formatHeader(field, fieldsDict), cell: (info) => display(info.getValue(), yesLabel, noLabel) })),
     helper.display({ id: "actions", header: dictionary.table.actions, cell: ({ row }) => (
       <div className="flex justify-end gap-2">
         <Button asChild size="sm" variant="outline"><Link href={"/" + resource.key + "/" + row.original.id}>{dictionary.table.open}</Link></Button>
-        <Button size="sm" variant="destructive" disabled={isPending} onClick={() => startTransition(async () => { await deleteModuleRecord(resource.key, row.original.id); router.refresh(); })}>{dictionary.table.delete}</Button>
+        <Button size="sm" variant="destructive" disabled={isPending} onClick={() => handleDelete(row.original.id)}>{dictionary.table.delete}</Button>
       </div>
     )})
-  ], [dictionary, fieldsDict, helper, isPending, noLabel, resource, router, yesLabel]);
+  ], [dictionary, fieldsDict, helper, isPending, noLabel, resource, yesLabel, handleDelete]);
+
   const table = useReactTable({ data: records, columns, getCoreRowModel: getCoreRowModel() });
 
   if (!records.length) {

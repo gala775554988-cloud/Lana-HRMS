@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useThemeStore } from '@/store/theme';
 import type { ThemeMode } from '@/lib/design-system/tokens';
 
@@ -15,18 +15,28 @@ function resolveTheme(mode: ThemeMode): 'light' | 'dark' {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const { mode } = useThemeStore();
-  const resolved = useMemo(() => resolveTheme(mode), [mode]);
+  const { mode, _hasHydrated } = useThemeStore();
+  const [mounted, setMounted] = useState(false);
+
+  // Wait for both mount and Zustand hydration before applying theme
+  const isReady = mounted && _hasHydrated;
+
+  const resolved = useMemo(() => isReady ? resolveTheme(mode) : 'light', [mode, isReady]);
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isReady) return;
     const root = document.documentElement;
     root.classList.remove('light', 'dark');
     root.classList.add(resolved);
     root.style.colorScheme = resolved;
-  }, [resolved]);
+  }, [resolved, isReady]);
 
   useEffect(() => {
-    if (mode !== 'system') return;
+    if (!isReady || mode !== 'system') return;
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     const handler = () => {
       const root = document.documentElement;
@@ -36,7 +46,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     };
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
-  }, [mode]);
+  }, [mode, isReady]);
 
+  // Always render children - theme is applied via class on html element
   return <>{children}</>;
 }

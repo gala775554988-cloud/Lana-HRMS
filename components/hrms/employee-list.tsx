@@ -50,7 +50,7 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
   }, [records]);
 
   const filteredRecords = useMemo(() => {
-    let result = [...records];
+    let result = records;
     if (statusFilter) result = result.filter((r) => r.status === statusFilter);
     if (departmentFilter) result = result.filter((r) => r.department?.name === departmentFilter);
     if (branchFilter) result = result.filter((r) => r.branch?.name === branchFilter);
@@ -68,13 +68,16 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
   const handleEdit = useCallback((id: string) => { router.push(`/employees/${id}`); }, [router]);
   const handleDocuments = useCallback((id: string) => { router.push(`/documents?employeeId=${id}`); }, [router]);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     const params = new URLSearchParams();
     if (search) params.set("search", search);
     if (statusFilter) params.set("status", statusFilter);
     router.push(`/employees?${params.toString()}`);
-  };
+  }, [search, statusFilter, router]);
+
+  const handleCloseDrawer = useCallback(() => { setDrawerOpen(false); }, []);
+  const handleCloseAddEmployee = useCallback((open: boolean) => { setAddEmployeeOpen(open); }, []);
 
   const isAr = locale === "ar";
 
@@ -149,7 +152,7 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
         </div>
       </div>
 
-      <Dialog open={addEmployeeOpen} onOpenChange={setAddEmployeeOpen}>
+      <Dialog open={addEmployeeOpen} onOpenChange={handleCloseAddEmployee}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>{isAr ? "إضافة موظف جديد" : "Add New Employee"}</DialogTitle>
@@ -159,7 +162,7 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
         </DialogContent>
       </Dialog>
 
-      <EmployeeDrawer employee={selectedEmployee} open={drawerOpen} onClose={() => setDrawerOpen(false)} locale={locale} onEdit={handleEdit} />
+      <EmployeeDrawer employee={selectedEmployee} open={drawerOpen} onClose={handleCloseDrawer} locale={locale} onEdit={handleEdit} />
     </section>
   );
 }

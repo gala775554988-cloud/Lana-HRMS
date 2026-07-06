@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
 
@@ -12,7 +13,7 @@ interface StatCardProps {
   className?: string;
 }
 
-export function StatCard({ title, value, description, icon: Icon, trend, className }: StatCardProps) {
+export const StatCard = memo(function StatCard({ title, value, description, icon: Icon, trend, className }: StatCardProps) {
   return (
     <div className={cn("stat-card", className)}>
       <div className="flex items-start justify-between gap-3">
@@ -35,4 +36,4 @@ export function StatCard({ title, value, description, icon: Icon, trend, classNa
       )}
     </div>
   );
-}
+});

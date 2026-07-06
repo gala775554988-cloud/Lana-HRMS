@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, memo } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -22,16 +22,16 @@ const tabs = [
 
 type TabId = typeof tabs[number]["id"];
 
-function InfoBlock({ label, value, children }: { label: string; value?: string | null; children?: React.ReactNode }) {
+const InfoBlock = memo(function InfoBlock({ label, value, children }: { label: string; value?: string | null; children?: React.ReactNode }) {
   return (
     <div className="space-y-1">
       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
       {children || <p className="text-sm font-medium text-foreground">{value || "-"}</p>}
     </div>
   );
-}
+});
 
-function OverviewTab({ employee, locale }: { employee: EmployeeCardData; locale: "en" | "ar" }) {
+const OverviewTab = memo(function OverviewTab({ employee, locale }: { employee: EmployeeCardData; locale: "en" | "ar" }) {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="grid grid-cols-2 gap-4">
@@ -44,9 +44,9 @@ function OverviewTab({ employee, locale }: { employee: EmployeeCardData; locale:
       </div>
     </div>
   );
-}
+});
 
-function PersonalTab({ employee, locale }: { employee: EmployeeCardData; locale: "en" | "ar" }) {
+const PersonalTab = memo(function PersonalTab({ employee, locale }: { employee: EmployeeCardData; locale: "en" | "ar" }) {
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="grid grid-cols-2 gap-4">
@@ -57,9 +57,9 @@ function PersonalTab({ employee, locale }: { employee: EmployeeCardData; locale:
       </div>
     </div>
   );
-}
+});
 
-function JobTab({ employee, locale }: { employee: EmployeeCardData; locale: "en" | "ar" }) {
+const JobTab = memo(function JobTab({ employee, locale }: { employee: EmployeeCardData; locale: "en" | "ar" }) {
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="grid grid-cols-2 gap-4">
@@ -72,9 +72,9 @@ function JobTab({ employee, locale }: { employee: EmployeeCardData; locale: "en"
       </div>
     </div>
   );
-}
+});
 
-function PlaceholderTab({ tabId, locale }: { tabId: string; locale: "en" | "ar" }) {
+const PlaceholderTab = memo(function PlaceholderTab({ tabId, locale }: { tabId: string; locale: "en" | "ar" }) {
   const labels: Record<string, { en: string; ar: string }> = {
     salary: { en: "Salary Information", ar: "معلومات الراتب" },
     attendance: { en: "Attendance Records", ar: "سجلات الحضور" },
@@ -92,7 +92,7 @@ function PlaceholderTab({ tabId, locale }: { tabId: string; locale: "en" | "ar" 
       <p className="text-xs mt-1">{locale === "ar" ? "سيتم تحميل البيانات عند الحاجة" : "Data will load on demand"}</p>
     </div>
   );
-}
+});
 
 interface EmployeeDrawerProps {
   employee: EmployeeCardData | null;
@@ -105,17 +105,24 @@ interface EmployeeDrawerProps {
 export function EmployeeDrawer({ employee, open, onClose, locale = "ar", onEdit }: EmployeeDrawerProps) {
   const [activeTab, setActiveTab] = useState<TabId>("overview");
 
-  useEffect(() => { if (employee) setActiveTab("overview"); // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [employee?.id]);
+  useEffect(() => {
+    if (employee) setActiveTab("overview");
+  }, [employee]);
+
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [open, onClose]);
+
+  // Only manage body overflow if drawer is open (don't conflict with Dialog)
   useEffect(() => {
-    if (open) document.body.style.overflow = "hidden";
-    else document.body.style.overflow = "";
+    if (open) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
     return () => { document.body.style.overflow = ""; };
   }, [open]);
 

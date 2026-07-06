@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import type { ReactNode } from "react";
 import {
   Bell, LayoutDashboard, LogOut, ChevronLeft, ChevronRight, Search,
@@ -46,22 +46,18 @@ const groups: Record<string, string> = { main: "الرئيسية", people: "ال
 export function AppShell({ children, companyLogo }: AppShellProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const [session, setSession] = useState<any>(null);
-  const { sidebarCollapsed, toggleSidebar } = useThemeStore();
+  const { data: session, status } = useSession();
+  const { sidebarCollapsed, toggleSidebar, _hasHydrated } = useThemeStore();
 
   useEffect(() => {
-    const fetchSession = async () => {
-      try {
-        const res = await fetch("/api/auth/session");
-        const data = await res.json();
-        if (data?.user) setSession(data);
-        else router.push("/login");
-      } catch { router.push("/login"); }
-    };
-    fetchSession();
-  }, [router]);
+    if (status === "unauthenticated") {
+      router.push("/login");
+    }
+  }, [status, router]);
 
-  const handleLogout = async () => { await signOut({ redirect: true, callbackUrl: "/login" }); };
+  const handleLogout = useCallback(async () => {
+    await signOut({ redirect: true, callbackUrl: "/login" });
+  }, []);
 
   const isActive = useCallback((href: string) => {
     if (href === "/") return pathname === "/" || pathname === "/dashboard";
@@ -74,7 +70,8 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
     return result;
   }, []);
 
-  if (!session) {
+  // Show loading while session is loading OR store hasn't hydrated
+  if (status === "loading" || !_hasHydrated) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
@@ -85,7 +82,11 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
     );
   }
 
-  const userRoles = (session.user?.roles as string[]) || [];
+  if (!session?.user) {
+    return null;
+  }
+
+  const userRoles = (session.user.roles as string[]) || [];
 
   return (
     <div className="min-h-screen bg-background text-foreground" dir="rtl">
