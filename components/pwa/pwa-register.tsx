@@ -2,6 +2,23 @@
 
 import { useEffect } from "react";
 
+const SW_CACHE_VERSION = "v4";
+const SW_CACHE_STORAGE_KEY = "lana.hrms.sw-cache-version";
+
+async function clearLegacyPwaCaches() {
+  if (!("caches" in window)) return;
+  const currentVersion = window.localStorage.getItem(SW_CACHE_STORAGE_KEY);
+  if (currentVersion === SW_CACHE_VERSION) return;
+
+  const cacheNames = await caches.keys();
+  await Promise.all(
+    cacheNames
+      .filter((name) => name.startsWith("lana-hrms-"))
+      .map((name) => caches.delete(name))
+  );
+  window.localStorage.setItem(SW_CACHE_STORAGE_KEY, SW_CACHE_VERSION);
+}
+
 export function PWARegister() {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
@@ -9,7 +26,12 @@ export function PWARegister() {
 
     const registerServiceWorker = async () => {
       try {
-        const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+        await clearLegacyPwaCaches();
+        const registration = await navigator.serviceWorker.register("/sw.js", {
+          scope: "/",
+          updateViaCache: "none"
+        });
+        await registration.update();
 
         registration.addEventListener("updatefound", () => {
           const installingWorker = registration.installing;

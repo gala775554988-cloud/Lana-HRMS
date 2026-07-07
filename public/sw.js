@@ -4,7 +4,7 @@
  * - Never cache API responses or authenticated HTML pages by default.
  * - Show a safe offline page when navigation fails.
  */
-const CACHE_VERSION = "v3";
+const CACHE_VERSION = "v4";
 const STATIC_CACHE = `lana-hrms-static-${CACHE_VERSION}`;
 const OFFLINE_URL = "/offline.html";
 
