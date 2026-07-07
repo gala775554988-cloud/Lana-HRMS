@@ -47,8 +47,8 @@ const navItems = [
   { href: "/reports", label: "التقارير", icon: BarChart3, group: "admin", resource: "reports" },
   { href: "/lana-ai", label: "Lana AI", icon: Sparkles, group: "admin", resource: "reports" },
   { href: "/audit-logs", label: "سجل التدقيق", icon: Shield, group: "admin", resource: "audit-logs" },
-  { href: "/settings/employees", label: "إعدادات النظام", icon: Settings, group: "admin", resource: "settings" },
-  { href: "/administration", label: "الصلاحيات والإدارة", icon: Shield, group: "admin", resource: "settings" },
+  { href: "/system-settings", label: "إعدادات النظام", icon: Settings, group: "admin", resource: "dashboard" },
+  { href: "/administration", label: "الصلاحيات والإدارة", icon: Shield, group: "admin", resource: "dashboard" },
 ];
 
 const groups: Record<string, string> = { main: "الرئيسية", people: "الأفراد", ops: "العمليات", admin: "الإدارة" };

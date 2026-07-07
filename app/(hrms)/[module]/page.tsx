@@ -15,6 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { getEmployeeExtraSettings } from "@/lib/enterprise/hospitals";
 import { Filter, Plus, Search, AlertTriangle } from "lucide-react";
 import Link from "next/link";
+import { ModuleTabs } from "@/components/hrms/module-tabs";
 
 async function getBranchOptions(query: Record<string, string | string[] | undefined>) {
   const search = typeof query.search === "string" ? query.search : "";
@@ -101,6 +102,7 @@ export default async function ResourcePage({ params, searchParams }: { params: P
 
     return (
       <section className="space-y-6" dir={locale === "ar" ? "rtl" : "ltr"}>
+      <ModuleTabs module={resourceKey} />
         <div className={polishedResource ? "flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white/95 p-6 shadow-sm shadow-slate-200/60 lg:flex-row lg:items-start lg:justify-between dark:border-slate-800 dark:bg-slate-900/85 dark:shadow-slate-950/30" : "flex flex-col gap-4 rounded-2xl border bg-background p-6 shadow-sm lg:flex-row lg:items-start lg:justify-between"}>
           <div className="space-y-2">
             <Badge variant="outline">{t.moduleTag}</Badge>
@@ -128,7 +130,9 @@ export default async function ResourcePage({ params, searchParams }: { params: P
 
   if (resourceKey === "employees") {
     return (
-      <EmployeeList
+      <div className="space-y-6">
+        <ModuleTabs module={resourceKey} />
+        <EmployeeList
         resource={resource}
         records={data.records as any[]}
         totalCount={data.total}
@@ -139,12 +143,14 @@ export default async function ResourcePage({ params, searchParams }: { params: P
         pageSize={pageSize}
         dictionary={dictionary}
         locale={locale}
-      />
+        />
+      </div>
     );
   }
 
   return (
     <section className="space-y-6" dir={locale === "ar" ? "rtl" : "ltr"}>
+      <ModuleTabs module={resourceKey} />
       <div className={polishedResource ? "flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white/95 p-6 shadow-sm shadow-slate-200/60 lg:flex-row lg:items-start lg:justify-between dark:border-slate-800 dark:bg-slate-900/85 dark:shadow-slate-950/30" : "flex flex-col gap-4 rounded-2xl border bg-background p-6 shadow-sm lg:flex-row lg:items-start lg:justify-between"}>
         <div className="space-y-2">
           <Badge variant="outline">{t.moduleTag}</Badge>
