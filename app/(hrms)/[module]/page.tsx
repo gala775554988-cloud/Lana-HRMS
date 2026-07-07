@@ -23,7 +23,7 @@ export default async function ResourcePage({ params, searchParams }: { params: P
 
   const filters = Object.fromEntries(resource.filterFields.map((field) => [field, typeof query[field] === "string" ? query[field] as string : undefined]));
   const page = Number(query.page ?? 1);
-  const pageSize = Number(query.pageSize ?? 10);
+  const pageSize = Number(query.pageSize ?? (resourceKey === "employees" ? 30 : 10));
   const search = typeof query.search === "string" ? query.search : "";
   const data = await listModuleRecords({ resourceKey, page, pageSize, search, filters });
 
@@ -77,6 +77,8 @@ export default async function ResourcePage({ params, searchParams }: { params: P
         page={data.page}
         pageCount={data.pageCount}
         search={search}
+        filters={filters}
+        pageSize={pageSize}
         dictionary={dictionary}
         locale={locale}
       />

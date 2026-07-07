@@ -9,7 +9,7 @@ import {
   LayoutDashboard, LogOut, ChevronLeft, ChevronRight, Search,
   Users, Building2, MapPin, Briefcase, FileText, Clock, Calendar,
   DollarSign, GraduationCap, Package, Megaphone, BarChart3, Settings,
-  Shield
+  Shield, GitPullRequest
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/brand/brand-logo";
@@ -28,6 +28,7 @@ interface AppShellProps {
 
 const navItems = [
   { href: "/", label: "لوحة التحكم", icon: LayoutDashboard, group: "main", resource: "dashboard" },
+  { href: "/request-center", label: "استقبال الطلبات", icon: GitPullRequest, group: "main", resource: "leave" },
   { href: "/employees", label: "الموظفون", icon: Users, group: "people", resource: "employees" },
   { href: "/departments", label: "الإدارات", icon: Building2, group: "people", resource: "departments" },
   { href: "/branches", label: "الفروع", icon: MapPin, group: "people", resource: "branches" },

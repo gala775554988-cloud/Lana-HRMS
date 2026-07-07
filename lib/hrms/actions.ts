@@ -5,7 +5,7 @@ import { auth } from "@/auth";
 import { getHrmsModule, type HrmsModule, type ModuleField } from "@/config/hrms";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/rbac";
-import { applyScopedWhere, canAccessEmployeeId, getAccessProfile } from "@/lib/enterprise/hierarchy";
+import { applyScopedWhere, canAccessEmployeeId, getAccessProfile, getHierarchyStore } from "@/lib/enterprise/hierarchy";
 import { writeAuditLog } from "@/lib/audit";
 import { buildModuleSchema } from "@/lib/validations/hrms";
 import { hashPassword } from "@/lib/password";
@@ -154,7 +154,7 @@ export async function listModuleRecords(input: QueryInput) {
         records: [] as Record<string, unknown>[],
         total: 0,
         page: Math.max(Number(input.page ?? 1), 1),
-        pageSize: Math.min(Math.max(Number(input.pageSize ?? 10), 5), 100),
+        pageSize: Math.min(Math.max(Number(input.pageSize ?? 30), 5), 200),
         pageCount: 1,
         error: error.message,
       };
@@ -163,8 +163,56 @@ export async function listModuleRecords(input: QueryInput) {
   }
 
   const page = Math.max(Number(input.page ?? 1), 1);
-  const pageSize = Math.min(Math.max(Number(input.pageSize ?? 10), 5), 100);
-  const baseWhere = buildWhere(resource, input.search, input.filters);
+  const pageSize = Math.min(Math.max(Number(input.pageSize ?? 30), 5), 200);
+  let baseWhere = buildWhere(resource, input.search, input.filters);
+
+  if (resource.key === "employees") {
+    const filters = input.filters ?? {};
+    const employeeAnd: Record<string, unknown>[] = [];
+    const relationContains = (relation: string, field: string, value?: string) => {
+      if (value) employeeAnd.push({ [relation]: { [field]: { contains: value, mode: "insensitive" } } });
+    };
+    relationContains("department", "name", filters.department);
+    relationContains("branch", "name", filters.branch);
+    relationContains("position", "title", filters.position || filters.section);
+    relationContains("employmentType", "name", filters.employmentType);
+    relationContains("nationality", "name", filters.nationality);
+    if (filters.hireDate) {
+      const start = new Date(filters.hireDate);
+      if (!Number.isNaN(start.getTime())) {
+        const end = new Date(start);
+        end.setDate(end.getDate() + 1);
+        employeeAnd.push({ hireDate: { gte: start, lt: end } });
+      }
+    }
+    if (filters.manager) {
+      const store = await getHierarchyStore();
+      const manager = await prisma.employee.findFirst({
+        where: {
+          OR: [
+            { employeeNumber: { equals: filters.manager, mode: "insensitive" } },
+            { nationalId: { equals: filters.manager, mode: "insensitive" } },
+            { firstName: { contains: filters.manager, mode: "insensitive" } },
+            { lastName: { contains: filters.manager, mode: "insensitive" } }
+          ]
+        },
+        select: { id: true }
+      });
+      if (manager) {
+        const employeeIds = Object.entries(store.directManagers).filter(([, managerId]) => managerId === manager.id).map(([employeeId]) => employeeId);
+        employeeAnd.push({ id: { in: employeeIds.length ? employeeIds : ["__NO_MANAGER_MATCH__"] } });
+      }
+    }
+    if (filters.project) {
+      const store = await getHierarchyStore();
+      const employeeIds = Object.values(store.projects)
+        .filter((project) => project.name.toLowerCase().includes(String(filters.project).toLowerCase()))
+        .flatMap((project) => project.employeeIds);
+      employeeAnd.push({ id: { in: employeeIds.length ? employeeIds : ["__NO_PROJECT_MATCH__"] } });
+    }
+    if (employeeAnd.length) baseWhere = Object.keys(baseWhere).length ? { AND: [baseWhere, ...employeeAnd] } : { AND: employeeAnd };
+  }
+
   const accessProfile = await getAccessProfile(session.user.id, (session.user.roles as string[]) ?? []);
   const where = await applyScopedWhere(resource.key, baseWhere, accessProfile);
 
