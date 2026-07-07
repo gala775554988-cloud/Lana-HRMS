@@ -47,7 +47,8 @@ const navItems = [
   { href: "/reports", label: "التقارير", icon: BarChart3, group: "admin", resource: "reports" },
   { href: "/lana-ai", label: "Lana AI", icon: Sparkles, group: "admin", resource: "reports" },
   { href: "/audit-logs", label: "سجل التدقيق", icon: Shield, group: "admin", resource: "audit-logs" },
-  { href: "/settings", label: "الإعدادات", icon: Settings, group: "admin", resource: "settings" },
+  { href: "/settings/employees", label: "إعدادات النظام", icon: Settings, group: "admin", resource: "settings" },
+  { href: "/administration", label: "الصلاحيات والإدارة", icon: Shield, group: "admin", resource: "settings" },
 ];
 
 const groups: Record<string, string> = { main: "الرئيسية", people: "الأفراد", ops: "العمليات", admin: "الإدارة" };
@@ -92,8 +93,12 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
 
   const groupedNav = useMemo(() => {
     const result: Record<string, typeof navItems> = {};
+    const roleSet = new Set(userRoles);
+    const isSuperAdminOrHR = roleSet.has("SUPER_ADMIN") || roleSet.has("HR_MANAGER");
+
     navItems
       .filter((item) => {
+        if (isSuperAdminOrHR) return true; // Always allow Admin
         const hasResourceAccess = item.resource === "overtime"
           ? userPermissions.includes("manage:overtime")
           : (userPermissions.includes(`read:${item.resource}`) || userPermissions.includes(`manage:${item.resource}`));
