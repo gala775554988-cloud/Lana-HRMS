@@ -107,20 +107,47 @@ export async function listHospitals(filters?: { search?: string; departmentId?: 
     counts.set(name, (counts.get(name) ?? 0) + 1);
   }
 
+  const employees = await prisma.employee.findMany({
+    select: {
+      id: true,
+      employeeNumber: true,
+      nationalId: true,
+      firstName: true,
+      lastName: true,
+      department: { select: { id: true, name: true, code: true } },
+      branch: { select: { id: true, name: true, code: true } }
+    },
+    take: 10000
+  });
+  const employeeById = new Map(employees.map((employee) => [employee.id, employee]));
+
   const search = normalize(filters?.search);
   const isActive = filters?.isActive;
   const items = Array.from(byName.values())
-    .filter((hospital) => !search || normalize(hospital.name).includes(search) || normalize(hospital.code).includes(search))
+    .map((hospital) => {
+      const normalizedHospital = normalize(hospital.name);
+      const hospitalEmployees = extra
+        .filter((item) => normalize(String(item.value.hospital ?? "")) === normalizedHospital)
+        .map((item) => employeeById.get(item.employeeId))
+        .filter(Boolean) as typeof employees;
+      const department = departments.find((item) => item.id === hospital.departmentId) ?? null;
+      const branch = branches.find((item) => item.id === hospital.branchId) ?? null;
+      const smartSearchText = [
+        hospital.name,
+        hospital.code,
+        department?.name,
+        department?.code,
+        branch?.name,
+        branch?.code,
+        ...hospitalEmployees.flatMap((employee) => [employee.firstName, employee.lastName, `${employee.firstName} ${employee.lastName}`, employee.employeeNumber, employee.nationalId, employee.department?.name, employee.department?.code, employee.branch?.name, employee.branch?.code])
+      ].filter(Boolean).join(" ").toLowerCase();
+      return { ...hospital, employeeCount: counts.get(normalizedHospital) ?? 0, department, branch, smartSearchText };
+    })
+    .filter((hospital) => !search || hospital.smartSearchText.includes(search))
     .filter((hospital) => !filters?.departmentId || hospital.departmentId === filters.departmentId)
     .filter((hospital) => !filters?.branchId || hospital.branchId === filters.branchId)
     .filter((hospital) => isActive === undefined || isActive === "" || String(hospital.isActive) === isActive)
-    .sort((a, b) => a.name.localeCompare(b.name, "ar"))
-    .map((hospital) => ({
-      ...hospital,
-      employeeCount: counts.get(normalize(hospital.name)) ?? 0,
-      department: departments.find((department) => department.id === hospital.departmentId) ?? null,
-      branch: branches.find((branch) => branch.id === hospital.branchId) ?? null
-    }));
+    .sort((a, b) => a.name.localeCompare(b.name, "ar"));
 
   return { hospitals: items, departments, branches };
 }

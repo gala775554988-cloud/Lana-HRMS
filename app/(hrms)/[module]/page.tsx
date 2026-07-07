@@ -35,13 +35,24 @@ async function getBranchOptions(query: Record<string, string | string[] | undefi
   if (department) branchAnd.push({ employees: { some: { department: { name: { contains: department, mode: "insensitive" as const } } } } });
   if (hospitalEmployeeIds) branchAnd.push({ employees: { some: { id: { in: hospitalEmployeeIds.length ? hospitalEmployeeIds : ["__NO_HOSPITAL_MATCH__"] } } } });
 
+  const extra = await getEmployeeExtraSettings();
+  const hospitalByEmployeeId = new Map(extra.map((item) => [item.employeeId, String(item.value.hospital ?? "")]));
   const branches = await prisma.branch.findMany({
     where: branchAnd.length ? { AND: branchAnd } : {},
-    include: { employees: { select: { id: true } } },
+    include: { employees: { select: { id: true, employeeNumber: true, nationalId: true, firstName: true, lastName: true, department: { select: { name: true, code: true } } } } },
     orderBy: { name: "asc" }
   });
 
-  return branches.map((branch) => ({ id: branch.id, name: branch.name, code: branch.code, city: branch.city, country: branch.country, employeeCount: branch.employees.length }));
+  return branches.map((branch) => ({
+    id: branch.id,
+    name: branch.name,
+    code: branch.code,
+    city: branch.city,
+    country: branch.country,
+    isActive: branch.isActive,
+    employeeCount: branch.employees.length,
+    searchText: [branch.name, branch.code, branch.city, branch.country, ...branch.employees.flatMap((employee) => [employee.firstName, employee.lastName, `${employee.firstName} ${employee.lastName}`, employee.employeeNumber, employee.nationalId, employee.department?.name, employee.department?.code, hospitalByEmployeeId.get(employee.id)])].filter(Boolean).join(" ")
+  }));
 }
 
 export default async function ResourcePage({ params, searchParams }: { params: Promise<{ module: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -60,6 +71,9 @@ export default async function ResourcePage({ params, searchParams }: { params: P
   const data = await listModuleRecords({ resourceKey, page, pageSize, search, filters });
   const departmentOptions = resourceKey === "departments" || resourceKey === "branches"
     ? await prisma.department.findMany({ where: { isActive: true }, select: { id: true, name: true, code: true }, orderBy: { name: "asc" } })
+    : [];
+  const departmentEmployeeOptions = resourceKey === "departments"
+    ? await prisma.employee.findMany({ select: { id: true, employeeNumber: true, nationalId: true, firstName: true, lastName: true, departmentId: true }, take: 10000 })
     : [];
   const branchOptions = resourceKey === "branches"
     ? await getBranchOptions(query)
@@ -153,7 +167,7 @@ export default async function ResourcePage({ params, searchParams }: { params: P
             <CardDescription>اختر إدارة موجودة فعلياً لعرض موظفيها.</CardDescription>
           </CardHeader>
           <CardContent>
-            <DepartmentSelector departments={departmentOptions} />
+            <DepartmentSelector departments={departmentOptions} employees={departmentEmployeeOptions} />
           </CardContent>
         </Card>
       ) : null}

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,13 +84,6 @@ export function HospitalsClient() {
     });
   }
 
-  function softDelete(id: string) {
-    startTransition(async () => {
-      await fetch(`/api/enterprise/hospitals?id=${encodeURIComponent(id)}`, { method: "DELETE" });
-      load();
-    });
-  }
-
   return (
     <div className="space-y-6">
       <div className="rounded-xl border bg-card p-4 shadow-sm">
@@ -148,7 +142,7 @@ export function HospitalsClient() {
                 <td className="px-4 py-3">{hospital.branch?.name ?? "-"}</td>
                 <td className="px-4 py-3">{hospital.employeeCount}</td>
                 <td className="px-4 py-3">{hospital.isActive ? "نشط" : "غير نشط"}</td>
-                <td className="px-4 py-3"><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => startEdit(hospital)}>تعديل</Button><Button size="sm" variant="destructive" onClick={() => softDelete(hospital.id)}>حذف</Button></div></td>
+                <td className="px-4 py-3"><div className="flex gap-2"><Button asChild size="sm" variant="outline"><Link href={`/hospitals/${hospital.id}`}>عرض</Link></Button><Button size="sm" variant="outline" onClick={() => startEdit(hospital)}>تعديل</Button></div></td>
               </tr>
             ))}
             {hospitals.length === 0 ? <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">لا توجد مستشفيات</td></tr> : null}

@@ -59,7 +59,7 @@ export function ModuleTable({ resource, records, dictionary, locale = "en" }: { 
       const canAct = Boolean(row.original._canAct && workflowId);
       return (
         <div className="flex flex-wrap justify-end gap-2">
-          <Button asChild size="sm" variant="outline"><Link href={"/" + resource.key + "/" + row.original.id}>{dictionary.table.open}</Link></Button>
+          <Button asChild size="sm" variant="outline"><Link href={"/" + resource.key + "/" + row.original.id}>{resource.key === "departments" ? "عرض" : dictionary.table.open}</Link></Button>
           {canAct ? (
             <>
               <Button size="sm" disabled={isPending} onClick={() => handleDecision(workflowId, "APPROVE")}><Check className="me-1 h-3.5 w-3.5" />Approve</Button>
@@ -67,7 +67,7 @@ export function ModuleTable({ resource, records, dictionary, locale = "en" }: { 
               <Button size="sm" variant="outline" disabled={isPending} onClick={() => handleDecision(workflowId, "RETURN")}><RotateCcw className="me-1 h-3.5 w-3.5" />Return</Button>
             </>
           ) : null}
-          <Button size="sm" variant="destructive" disabled={isPending} onClick={() => handleDelete(row.original.id)}>{dictionary.table.delete}</Button>
+          {resource.key !== "departments" ? <Button size="sm" variant="destructive" disabled={isPending} onClick={() => handleDelete(row.original.id)}>{dictionary.table.delete}</Button> : null}
         </div>
       );
     }})
