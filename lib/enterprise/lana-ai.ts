@@ -70,16 +70,19 @@ export async function answerLanaAi({
     const where = canReadEmployees
       ? await applyScopedWhere("employees", {}, profile)
       : { userId };
+    const searchTerm = message
+      .replace(/ابحث|بحث|عن|الموظفين|الموظف|موظف|employees|employee|staff/gi, "")
+      .trim();
     const employees = await prisma.employee.findMany({
       where: {
         AND: [
           where as any,
-          lowered ? {
+          searchTerm ? {
             OR: [
-              { firstName: { contains: message, mode: "insensitive" } },
-              { lastName: { contains: message, mode: "insensitive" } },
-              { employeeNumber: { contains: message, mode: "insensitive" } },
-              { nationalId: { contains: message, mode: "insensitive" } }
+              { firstName: { contains: searchTerm, mode: "insensitive" } },
+              { lastName: { contains: searchTerm, mode: "insensitive" } },
+              { employeeNumber: { contains: searchTerm, mode: "insensitive" } },
+              { nationalId: { contains: searchTerm, mode: "insensitive" } }
             ]
           } : {}
         ]
