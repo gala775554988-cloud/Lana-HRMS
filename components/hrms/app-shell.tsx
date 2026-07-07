@@ -103,8 +103,8 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur-md">
+    <div className="min-h-screen bg-[#F5F7FB] text-[#111827] dark:bg-slate-950 dark:text-slate-100">
+      <header className="sticky top-0 z-30 border-b border-[#E5E7EB]/80 bg-white/90 shadow-sm shadow-slate-200/60 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/90 dark:shadow-slate-950/40">
         <div className="flex h-16 items-center justify-between gap-4 px-4 lg:px-6">
           <div className="flex items-center gap-3">
             <button onClick={toggleSidebar} className="hidden lg:flex h-8 w-8 items-center justify-center rounded-lg hover:bg-muted transition-colors" aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}>
@@ -122,9 +122,9 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
             />
           </div>
           <div className="hidden md:flex flex-1 max-w-md items-center mx-auto">
-            <button className="flex w-full items-center gap-2 rounded-lg border bg-muted/50 px-4 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors">
-              <Search className="h-4 w-4" /><span>بحث...</span>
-              <kbd className="mr-auto rounded border bg-background px-1.5 py-0.5 text-[10px] font-mono">⌘K</kbd>
+            <button className="flex w-full items-center gap-2 rounded-2xl border border-[#E5E7EB] bg-[#F5F7FB] px-4 py-2 text-sm text-[#6B7280] shadow-inner shadow-white/80 transition-all hover:border-[#6D6AF8]/50 hover:bg-white hover:text-[#2E2A8C] dark:border-slate-800 dark:bg-slate-900 dark:shadow-none dark:hover:border-[#6D6AF8]/40">
+              <Search className="h-4 w-4" /><span>البحث الذكي...</span>
+              <kbd className="mr-auto rounded-lg border border-[#E5E7EB] bg-white px-1.5 py-0.5 text-[10px] font-mono text-[#6B7280] dark:border-slate-700 dark:bg-slate-950">⌘K</kbd>
             </button>
           </div>
           <div className="flex items-center gap-2">

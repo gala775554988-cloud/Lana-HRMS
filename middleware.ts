@@ -49,16 +49,12 @@ export async function middleware(request: NextRequest) {
     (route) => route === normalizedPath || normalizedPath.startsWith(route + "/")
   );
 
-  // Root path: redirect to login only if NOT logged in (no redirect loop for logged-in users)
+  // Root path stays public for the Lana HRMS landing hero.
+  // If logged in, the page itself keeps the existing role-based redirect.
   if (normalizedPath === "/") {
-    if (!isLoggedIn) {
-      const loginPath = pathLocale ? withLocale("/login", activeLocale) : "/login";
-      const response = NextResponse.redirect(new URL(loginPath, nextUrl));
-      response.cookies.set("lana-locale", activeLocale, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
-      return response;
-    }
-    // If logged in on root, let the page handle role-based redirect
-    return NextResponse.next({ request: { headers: requestHeaders } });
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
+    response.cookies.set("lana-locale", activeLocale, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
+    return response;
   }
 
   if (isAuthRoute && isLoggedIn) {
