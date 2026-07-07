@@ -337,11 +337,6 @@ export async function analyzeEmployeeImport(rows: ParsedEmployeeRow[], options: 
     if (row.employmentType && !employmentTypeMap.has(normalizeLookup(row.employmentType))) missingReferences.employmentTypes.add(row.employmentType);
     if (row.nationality && !nationalityMap.has(normalizeLookup(row.nationality))) missingReferences.nationalities.add(row.nationality);
 
-    for (const [field, value] of [["Supervisor", row.supervisor], ["Branch Manager", row.branchManager], ["Department Manager", row.departmentManager], ["Project Manager", row.projectManager]] as const) {
-      if (value && !employeeMap.has(normalizeLookup(value)) && !fileEmployeeRefs.has(normalizeLookup(value))) {
-        errors.push({ row: row.rowNumber, field, message: `${field} غير موجود.` });
-      }
-    }
   }
 
   if (!options.autoCreateReferences) {
@@ -405,7 +400,9 @@ async function getPasswordHashes(rows: ParsedEmployeeRow[]) {
 export async function importEmployees(rows: ParsedEmployeeRow[], options: BulkImportOptions, actorUserId: string) {
   const duplicateStrategy = options.duplicateStrategy ?? "skip";
   const analysis = await analyzeEmployeeImport(rows, options);
-  if (analysis.errors.length) return { success: false, analysis, result: null };
+  const errorRows = new Set(analysis.errors.filter((error) => error.row > 0).map((error) => error.row));
+  rows = rows.filter((row) => !errorRows.has(row.rowNumber));
+  if (!rows.length) return { success: false, analysis, result: { added: 0, updated: 0, skipped: 0, errors: errorRows.size, total: 0 } };
 
   const references = await ensureReferences(rows, Boolean(options.autoCreateReferences));
   const departmentMap = indexRefs(references.departments);
@@ -416,6 +413,19 @@ export async function importEmployees(rows: ParsedEmployeeRow[], options: BulkIm
   const existingEmployeeByNationalId = new Map(references.employees.map((employee) => [normalizeLookup(employee.nationalId), employee]));
   const existingEmployeeByNumber = new Map(references.employees.map((employee) => [normalizeLookup(employee.employeeNumber), employee]));
   const passwordHashes = await getPasswordHashes(rows);
+  const employeeEmailCounts = new Map<string, number>();
+  const existingEmployeeEmails = new Set(references.employees.map((employee) => normalizeLookup(employee.email ?? "")).filter(Boolean));
+  for (const row of rows) {
+    const email = normalizeLookup(row.workEmail || row.personalEmail);
+    if (email) employeeEmailCounts.set(email, (employeeEmailCounts.get(email) ?? 0) + 1);
+  }
+  const safeEmployeeEmail = (row: ParsedEmployeeRow, currentEmail?: string | null) => {
+    const email = row.workEmail || row.personalEmail;
+    const key = normalizeLookup(email);
+    if (!key || employeeEmailCounts.get(key) !== 1) return currentEmail ?? null;
+    if (existingEmployeeEmails.has(key) && normalizeLookup(currentEmail) !== key) return currentEmail ?? null;
+    return email;
+  };
   const employeeRole = await prisma.role.findUnique({ where: { name: "EMPLOYEE" } });
 
   let added = 0;
@@ -426,7 +436,7 @@ export async function importEmployees(rows: ParsedEmployeeRow[], options: BulkIm
     const newRows = rows.filter((row) => !existingEmployeeByNationalId.has(normalizeLookup(row.nationalId)) && !existingEmployeeByNumber.has(normalizeLookup(row.employeeNumber)));
     const existingRows = rows.filter((row) => existingEmployeeByNationalId.has(normalizeLookup(row.nationalId)) || existingEmployeeByNumber.has(normalizeLookup(row.employeeNumber)));
 
-    const userEmails = newRows.map((row) => row.workEmail || row.personalEmail || `employee.${row.nationalId}@lana.local`);
+    const userEmails = newRows.map((row) => `employee.${row.nationalId}@lana.local`);
     await tx.user.createMany({
       data: newRows.map((row, index) => ({
         name: row.fullName,
@@ -446,7 +456,7 @@ export async function importEmployees(rows: ParsedEmployeeRow[], options: BulkIm
         nationalId: row.nationalId,
         firstName: row.firstName,
         lastName: row.lastName,
-        email: row.workEmail || row.personalEmail || null,
+        email: safeEmployeeEmail(row),
         phone: row.phone || null,
         gender: row.gender || null,
         dateOfBirth: row.dateOfBirth,
@@ -474,7 +484,7 @@ export async function importEmployees(rows: ParsedEmployeeRow[], options: BulkIm
           data: {
             firstName: row.firstName,
             lastName: row.lastName,
-            email: row.workEmail || row.personalEmail || existing.email,
+            email: safeEmployeeEmail(row, existing.email) ?? undefined,
             phone: row.phone || undefined,
             gender: row.gender || undefined,
             dateOfBirth: row.dateOfBirth,
@@ -568,5 +578,5 @@ export async function importEmployees(rows: ParsedEmployeeRow[], options: BulkIm
   }
   await writeAuditLog({ actorUserId, action: "bulk-import", entity: "employee", metadata: { added, updated, skipped, total: rows.length } }).catch(() => null);
 
-  return { success: true, analysis, result: { added, updated, skipped, errors: 0, total: rows.length } };
+  return { success: true, analysis, result: { added, updated, skipped, errors: errorRows.size, total: rows.length } };
 }
