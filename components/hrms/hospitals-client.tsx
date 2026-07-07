@@ -43,9 +43,12 @@ export function HospitalsClient() {
 
   const load = () => {
     fetch(`/api/enterprise/hospitals?${query}`, { cache: "no-store" })
-      .then((response) => response.json())
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({ success: false, message: "فشل قراءة رد المستشفيات" }));
+        if (!response.ok || !data.success) throw new Error(data.message || "فشل تحميل المستشفيات");
+        return data;
+      })
       .then((data) => {
-        if (!data.success) throw new Error(data.message || "فشل تحميل المستشفيات");
         setHospitals(data.hospitals ?? []);
         setDepartments(data.departments ?? []);
         setBranches(data.branches ?? []);
@@ -73,8 +76,8 @@ export function HospitalsClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: editing?.id, ...form })
       });
-      const data = await response.json();
-      if (!data.success) {
+      const data = await response.json().catch(() => ({ success: false, message: "فشل قراءة رد الحفظ" }));
+      if (!response.ok || !data.success) {
         setMessage(data.message || "فشل الحفظ");
         return;
       }

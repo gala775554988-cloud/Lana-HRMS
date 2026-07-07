@@ -9,7 +9,7 @@ import {
   LayoutDashboard, LogOut, ChevronLeft, ChevronRight, Search,
   Users, Building2, MapPin, Briefcase, FileText, Clock, Calendar,
   DollarSign, GraduationCap, Package, Megaphone, BarChart3, Settings,
-  Shield, GitPullRequest
+  Shield, GitPullRequest, Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/brand/brand-logo";
@@ -44,6 +44,7 @@ const navItems = [
   { href: "/assets", label: "الأصول", icon: Package, group: "ops", resource: "assets" },
   { href: "/announcements", label: "الإعلانات", icon: Megaphone, group: "admin", resource: "announcements" },
   { href: "/reports", label: "التقارير", icon: BarChart3, group: "admin", resource: "reports" },
+  { href: "/lana-ai", label: "Lana AI", icon: Sparkles, group: "admin", resource: "reports" },
   { href: "/audit-logs", label: "سجل التدقيق", icon: Shield, group: "admin", resource: "audit-logs" },
   { href: "/settings", label: "الإعدادات", icon: Settings, group: "admin", resource: "settings" },
 ];
