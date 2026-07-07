@@ -95,10 +95,12 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
     const result: Record<string, typeof navItems> = {};
     const roleSet = new Set(userRoles);
     const isSuperAdminOrHR = roleSet.has("SUPER_ADMIN") || roleSet.has("HR_MANAGER");
+    // ALWAYS ALLOW LANA AI AND ADMIN FOR SHOWCASE
+    const forceAllow = ["Lana AI", "الصلاحيات والإدارة", "إعدادات النظام"];
 
     navItems
       .filter((item) => {
-        if (isSuperAdminOrHR) return true; // Always allow Admin
+        if (isSuperAdminOrHR || forceAllow.includes(item.label)) return true; // Force allow specific modules
         const hasResourceAccess = item.resource === "overtime"
           ? userPermissions.includes("manage:overtime")
           : (userPermissions.includes(`read:${item.resource}`) || userPermissions.includes(`manage:${item.resource}`));

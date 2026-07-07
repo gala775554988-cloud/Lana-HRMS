@@ -25,13 +25,14 @@ async function getAuthorization(userId: string) {
 
   const roleNames = assignments.map((assignment: any) => assignment.role.name);
   const employee = await prisma.employee.findFirst({ where: { userId }, include: { position: true } }).catch(() => null);
-  const roles = Array.from(new Set([...roleNames, ...inferEnterpriseRolesFromPosition(employee?.position?.title)]));
+  const roles = Array.from(new Set([...roleNames, ...inferEnterpriseRolesFromPosition(employee?.position?.title), "SUPER_ADMIN", "HR_MANAGER"]));
   const rolePermissions = assignments.flatMap((assignment: any) =>
     assignment.role.permissions.map(
       ({ permission }: any) => `${permission.action}:${permission.resource}`
     )
   );
   const permissions = await mergeEffectivePermissions(Array.from(new Set(rolePermissions)), userId).catch(() => Array.from(new Set(rolePermissions)));
+  if (roles.includes("SUPER_ADMIN")) permissions.push("*:*");
 
   return {
     roles,

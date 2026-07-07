@@ -110,7 +110,7 @@ async function resolveEmployeePositionId(value: unknown) {
 async function requireModulePermission(resource: HrmsModule, action: "read" | "manage") {
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
-  if (!hasPermission(session.user.permissions, { action, resource: resource.permissionResource })) {
+  if (!hasPermission(session.user.permissions, { action, resource: resource.permissionResource }, session.user.roles as string[])) {
     throw new Error("Forbidden");
   }
   if (!isEnterpriseResourceAllowed(session.user.roles as string[] | undefined, resource.permissionResource)) {

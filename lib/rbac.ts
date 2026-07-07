@@ -15,8 +15,10 @@ export function hasRole(userRoles: string[] | undefined, role: string) {
 
 export function hasPermission(
   userPermissions: string[] | undefined,
-  permission: PermissionCheck
+  permission: PermissionCheck,
+  userRoles?: string[]
 ) {
+  if (userRoles?.includes("SUPER_ADMIN") || userPermissions?.includes("SUPER_ADMIN") || userPermissions?.includes("*:*")) return true;
   return Boolean(userPermissions?.includes(toPermissionKey(permission)));
 }
 
@@ -27,7 +29,7 @@ export async function requirePermission(permission: PermissionCheck) {
     throw new Error("Unauthorized");
   }
 
-  if (!hasPermission(session.user.permissions, permission)) {
+  if (!hasPermission(session.user.permissions, permission, session.user.roles as string[] | undefined)) {
     throw new Error("Forbidden");
   }
 

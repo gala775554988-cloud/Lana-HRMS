@@ -1,7 +1,9 @@
 import { ModuleTabs } from "@/components/hrms/module-tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getHrmsModule } from "@/config/hrms";
 import { notFound } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { FileText, Download, BarChart2 } from "lucide-react";
 
 export default async function ModuleReportsPage({ params }: { params: Promise<{ module: string }> }) {
   const { module } = await params;
@@ -13,11 +15,30 @@ export default async function ModuleReportsPage({ params }: { params: Promise<{ 
       <ModuleTabs module={module} />
       <div>
         <h1 className="text-3xl font-bold tracking-tight">تقارير {resource.title}</h1>
+        <p className="text-muted-foreground mt-2">تصدير وإنشاء تقارير مفصلة بصيغة Excel و PDF.</p>
       </div>
-      <Card>
-        <CardHeader><CardTitle>التقارير</CardTitle></CardHeader>
-        <CardContent><p className="text-muted-foreground">تصدير Excel و PDF.</p></CardContent>
-      </Card>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <Card className="hover:border-primary/50 transition-colors">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-indigo-500" /> تقرير القائمة الشامل</CardTitle>
+            <CardDescription>تصدير جميع بيانات {resource.title}</CardDescription>
+          </CardHeader>
+          <CardContent className="flex gap-2">
+            <Button variant="outline" size="sm" className="w-full gap-2"><Download className="h-4 w-4" /> Excel</Button>
+            <Button variant="outline" size="sm" className="w-full gap-2"><Download className="h-4 w-4" /> PDF</Button>
+          </CardContent>
+        </Card>
+        
+        <Card className="hover:border-primary/50 transition-colors">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><BarChart2 className="h-5 w-5 text-emerald-500" /> الإحصائيات التحليلية</CardTitle>
+            <CardDescription>مؤشرات الأداء للقسم</CardDescription>
+          </CardHeader>
+          <CardContent className="flex gap-2">
+            <Button variant="secondary" size="sm" className="w-full gap-2">عرض التقرير</Button>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
