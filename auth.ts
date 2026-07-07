@@ -43,16 +43,18 @@ async function findUserByIdentifier(identifier: string) {
   const normalized = identifier.trim();
   const lower = normalized.toLowerCase();
 
-  // 1. Admin by username
-  const byUsername = await prisma.user.findFirst({
+  // 1. Admin or User by username or email
+  const byUsernameOrEmail = await prisma.user.findFirst({
     where: {
       OR: [
         { username: normalized },
-        { username: { equals: lower, mode: "insensitive" } }
+        { username: { equals: lower, mode: "insensitive" } },
+        { email: { equals: lower, mode: "insensitive" } },
+        { email: { startsWith: `${lower}@`, mode: "insensitive" } }
       ]
     }
   });
-  if (byUsername) return byUsername;
+  if (byUsernameOrEmail) return byUsernameOrEmail;
 
   // 2. Employee by nationalId (primary for employees)
   let employee = await prisma.employee.findUnique({
