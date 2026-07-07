@@ -91,6 +91,13 @@ export async function decideWorkflowStep({
     data: { status: workflowStatus, currentStep: currentStepNumber }
   });
 
+  if (instance.type === "OVERTIME") {
+    const nextOvertimeStatus = workflowStatus === "COMPLETED" ? "APPROVED" : workflowStatus === "REJECTED" ? "REJECTED" : workflowStatus === "RETURNED" ? "PENDING" : undefined;
+    if (nextOvertimeStatus) {
+      await prisma.overtimeRequest.update({ where: { id: instance.entityId }, data: { status: nextOvertimeStatus as any } }).catch(() => null);
+    }
+  }
+
   await writeAuditLog({
     actorUserId,
     action: `workflow:${decision.toLowerCase()}`,

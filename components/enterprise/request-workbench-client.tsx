@@ -16,7 +16,7 @@ const typeLabels: Record<string, string> = {
   DOCUMENT: "طلبات الوثائق",
   EXPENSE: "طلبات المصروفات",
   LETTER: "طلبات الخطابات",
-  OVERTIME: "طلبات الإضافي"
+  OVERTIME: "طلبات الأوفر تايم"
 };
 
 const scopeOptions = [

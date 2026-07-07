@@ -37,6 +37,7 @@ const navItems = [
   { href: "/contracts", label: "العقود", icon: FileText, group: "people", resource: "contracts" },
   { href: "/attendance", label: "الحضور", icon: Clock, group: "ops", resource: "attendance" },
   { href: "/leave-requests", label: "الإجازات", icon: Calendar, group: "ops", resource: "leave" },
+  { href: "/overtime", label: "الأوفر تايم", icon: Clock, group: "ops", resource: "overtime" },
   { href: "/payroll-runs", label: "الرواتب", icon: DollarSign, group: "ops", resource: "payroll" },
   { href: "/performance", label: "الأداء", icon: GraduationCap, group: "ops", resource: "performance" },
   { href: "/training", label: "التدريب", icon: GraduationCap, group: "ops", resource: "training" },
@@ -75,7 +76,7 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
   const groupedNav = useMemo(() => {
     const result: Record<string, typeof navItems> = {};
     navItems
-      .filter((item) => userPermissions.includes(`read:${item.resource}`) && isEnterpriseResourceAllowed(userRoles, item.resource))
+      .filter((item) => (userPermissions.includes(`read:${item.resource}`) || userPermissions.includes(`manage:${item.resource}`)) && isEnterpriseResourceAllowed(userRoles, item.resource))
       .forEach((item) => { if (!result[item.group]) result[item.group] = []; result[item.group].push(item); });
     return result;
   }, [userPermissions, userRoles]);
