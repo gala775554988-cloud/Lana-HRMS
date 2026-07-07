@@ -229,22 +229,21 @@ export async function POST(request: Request) {
         });
         break;
 
+      case "residency":
+      case "delegation":
+      case "custody":
+      case "document":
+      case "documents":
       default:
-        return NextResponse.json(
-          {
-            success: false,
-            error: {
-              id: `VAL-${Date.now().toString(36)}`,
-              category: "validation",
-              name: "Unknown Request Type",
-              message: `نوع طلب غير معروف: "${type}"`,
-              cause: `النوع "${type}" غير مدعوم`,
-              suggestion: "الأنواع المدعومة: leave, expense, loan, letter",
-              statusCode: 400,
-            },
+        result = await prisma.letterRequest.create({
+          data: {
+            employeeId,
+            letterType: String(type || "general"),
+            purpose: data.purpose || data.reason || data.notes || data.details || "",
+            status: "PENDING",
           },
-          { status: 400 }
-        );
+        });
+        break;
     }
 
     // Create Workflow automatically (non-blocking)

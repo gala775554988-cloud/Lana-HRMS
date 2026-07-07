@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getHrmsModule } from "@/config/hrms";
-import { getModuleRecord } from "@/lib/hrms/actions";
+import { getModuleRecord, listModuleRecords } from "@/lib/hrms/actions";
 import { getRequestDictionary } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeSalaryProfile, salaryProfileFields, salaryProfileLabels } from "@/lib/employee/salary-profile";
 import { ModuleForm } from "@/components/hrms/module-form";
+import { EmployeeList } from "@/components/hrms/employee-list";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -47,8 +48,9 @@ async function getEmployeeRelated(id: string) {
   return { documents, contracts, attendance, leaveRequests, assets };
 }
 
-export default async function RecordPage({ params }: { params: Promise<{ module: string; id: string }> }) {
+export default async function RecordPage({ params, searchParams }: { params: Promise<{ module: string; id: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const { module: resourceKey, id } = await params;
+  const query = searchParams ? await searchParams : {};
   const resource = getHrmsModule(resourceKey);
   if (!resource) notFound();
 
@@ -62,10 +64,12 @@ export default async function RecordPage({ params }: { params: Promise<{ module:
 
   if (!record) notFound();
 
-  const { dictionary } = await getRequestDictionary();
+  const { dictionary, locale } = await getRequestDictionary();
   const resourceTitle = resource.key in dictionary.nav ? dictionary.nav[resource.key as keyof typeof dictionary.nav] : resource.title;
 
   let related = null;
+  let departmentEmployees = null as Awaited<ReturnType<typeof listModuleRecords>> | null;
+  const departmentEmployeeResource = resource.key === "departments" ? getHrmsModule("employees") : undefined;
   let salaryProfile = null as Awaited<ReturnType<typeof getEmployeeSalaryProfile>> | null;
   if (resource.key === "employees") {
     try {
@@ -74,6 +78,30 @@ export default async function RecordPage({ params }: { params: Promise<{ module:
       record = { ...record, ...salaryProfile };
     } catch (error) {
       console.error(`[RecordPage] getEmployeeRelated failed:`, error);
+    }
+  }
+
+  if (resource.key === "departments") {
+    if (departmentEmployeeResource) {
+      const employeeFilters = {
+        departmentId: id,
+        status: typeof query.status === "string" ? query.status : undefined,
+        branch: typeof query.branch === "string" ? query.branch : undefined,
+        project: typeof query.project === "string" ? query.project : undefined,
+        section: typeof query.section === "string" ? query.section : undefined,
+        position: typeof query.position === "string" ? query.position : undefined,
+        nationality: typeof query.nationality === "string" ? query.nationality : undefined,
+        employmentType: typeof query.employmentType === "string" ? query.employmentType : undefined,
+        manager: typeof query.manager === "string" ? query.manager : undefined,
+        hireDate: typeof query.hireDate === "string" ? query.hireDate : undefined
+      };
+      departmentEmployees = await listModuleRecords({
+        resourceKey: "employees",
+        page: Number(query.page ?? 1),
+        pageSize: Number(query.pageSize ?? 30),
+        search: typeof query.search === "string" ? query.search : "",
+        filters: employeeFilters
+      });
     }
   }
 
@@ -154,6 +182,32 @@ export default async function RecordPage({ params }: { params: Promise<{ module:
         {resource.key === "employees" ? editCard : detailsCard}
         {resource.key === "employees" ? detailsCard : editCard}
       </div>
+
+      {resource.key === "departments" && departmentEmployees && departmentEmployeeResource ? (
+        <EmployeeList
+          resource={departmentEmployeeResource}
+          records={departmentEmployees.records as any[]}
+          totalCount={departmentEmployees.total}
+          page={departmentEmployees.page}
+          pageCount={departmentEmployees.pageCount}
+          search={typeof query.search === "string" ? query.search : ""}
+          filters={{
+            departmentId: id,
+            status: typeof query.status === "string" ? query.status : undefined,
+            branch: typeof query.branch === "string" ? query.branch : undefined,
+            project: typeof query.project === "string" ? query.project : undefined,
+            section: typeof query.section === "string" ? query.section : undefined,
+            position: typeof query.position === "string" ? query.position : undefined,
+            nationality: typeof query.nationality === "string" ? query.nationality : undefined,
+            employmentType: typeof query.employmentType === "string" ? query.employmentType : undefined,
+            manager: typeof query.manager === "string" ? query.manager : undefined,
+            hireDate: typeof query.hireDate === "string" ? query.hireDate : undefined
+          }}
+          pageSize={departmentEmployees.pageSize}
+          dictionary={dictionary}
+          locale={locale}
+        />
+      ) : null}
 
       {resource.key === "employees" ? (
         <Card>

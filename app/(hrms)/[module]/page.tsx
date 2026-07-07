@@ -2,9 +2,11 @@ import { notFound } from "next/navigation";
 import { getHrmsModule } from "@/config/hrms";
 import { listModuleRecords } from "@/lib/hrms/actions";
 import { getRequestDictionary } from "@/lib/i18n-server";
+import { prisma } from "@/lib/prisma";
 import { ModuleForm } from "@/components/hrms/module-form";
 import { ModuleTable } from "@/components/hrms/module-table";
 import { EmployeeList } from "@/components/hrms/employee-list";
+import { DepartmentSelector } from "@/components/hrms/department-selector";
 import { FileUpload } from "@/components/hrms/file-upload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,6 +28,9 @@ export default async function ResourcePage({ params, searchParams }: { params: P
   const pageSize = Number(query.pageSize ?? (resourceKey === "employees" ? 30 : 10));
   const search = typeof query.search === "string" ? query.search : "";
   const data = await listModuleRecords({ resourceKey, page, pageSize, search, filters });
+  const departmentOptions = resourceKey === "departments"
+    ? await prisma.department.findMany({ where: { isActive: true }, select: { id: true, name: true, code: true }, orderBy: { name: "asc" } })
+    : [];
 
   const t = dictionary.module;
   const f = dictionary.fields as Record<string, string>;
@@ -108,6 +113,17 @@ export default async function ResourcePage({ params, searchParams }: { params: P
           </form>
         </CardContent>
       </Card>
+      {resource.key === "departments" ? (
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle>قائمة الإدارات</CardTitle>
+            <CardDescription>اختر إدارة موجودة فعلياً لعرض موظفيها.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DepartmentSelector departments={departmentOptions} />
+          </CardContent>
+        </Card>
+      ) : null}
       {resource.key === "documents" || resource.key === "candidates" ? <FileUpload /> : null}
       <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
         <div className="space-y-4">
