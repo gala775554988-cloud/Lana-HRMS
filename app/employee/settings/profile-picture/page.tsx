@@ -4,18 +4,20 @@ import React, { useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload, User } from 'lucide-react';
+import { ImagePlus, Save, Trash2, User } from 'lucide-react';
 
 export default function ProfilePicturePage() {
   const { data: session, update } = useSession();
-  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [photoUrl, setPhotoUrl] = useState((session?.user as any)?.image || null);
+  const [previewUrl, setPreviewUrl] = useState((session?.user as any)?.image || null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [removePhoto, setRemovePhoto] = useState(false);
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type and size
     if (!file.type.startsWith('image/')) {
       alert('الرجاء اختيار صورة فقط');
       return;
@@ -25,55 +27,56 @@ export default function ProfilePicturePage() {
       return;
     }
 
-    setUploading(true);
+    setSelectedFile(file);
+    setRemovePhoto(false);
+    setPreviewUrl(URL.createObjectURL(file));
+  };
 
+  const handleRemove = () => {
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    setRemovePhoto(true);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
     try {
-      // Convert image to base64 (works on Vercel)
-      const reader = new FileReader();
-      
-      reader.onload = async (event) => {
-        const base64 = event.target?.result as string;
+      let nextPhotoUrl: string | null = photoUrl;
 
-        try {
-          // Update employee profile with base64 image
-          const res = await fetch('/api/employee/profile', {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ profilePhotoUrl: base64 }),
-          });
+      if (selectedFile) {
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        const uploadResponse = await fetch('/api/uploads', { method: 'POST', body: formData });
+        const uploadData = await uploadResponse.json();
+        if (!uploadData.url) throw new Error(uploadData.message || 'فشل رفع الصورة');
+        nextPhotoUrl = uploadData.url;
+      }
 
-          if (!res.ok) {
-            throw new Error('فشل في حفظ الصورة');
-          }
+      if (removePhoto) nextPhotoUrl = null;
 
-          // Update session immediately
-          await update({ image: base64 });
+      const res = await fetch('/api/employee/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profilePhotoUrl: nextPhotoUrl ?? '' }),
+      });
 
-          // Update UI
-          setPhotoUrl(base64);
+      if (!res.ok) throw new Error('فشل في حفظ الصورة');
 
-          alert('تم تحديث الصورة الشخصية بنجاح');
-        } catch (err: any) {
-          console.error(err);
-          alert('فشل في حفظ الصورة. حاول مرة أخرى.');
-        } finally {
-          setUploading(false);
-        }
-      };
-
-      reader.onerror = () => {
-        alert('فشل في قراءة الصورة');
-        setUploading(false);
-      };
-
-      reader.readAsDataURL(file);
-
+      await update({ image: nextPhotoUrl });
+      setPhotoUrl(nextPhotoUrl);
+      setPreviewUrl(nextPhotoUrl);
+      setSelectedFile(null);
+      setRemovePhoto(false);
+      alert('تم حفظ التغييرات بنجاح');
     } catch (err: any) {
-      console.error('Upload error:', err);
-      alert('حدث خطأ أثناء رفع الصورة');
-      setUploading(false);
+      console.error(err);
+      alert('فشل في حفظ الصورة. حاول مرة أخرى.');
+    } finally {
+      setSaving(false);
     }
   };
+
+  const hasPendingChange = Boolean(selectedFile || removePhoto);
 
   return (
     <Card className="max-w-md">
@@ -82,8 +85,8 @@ export default function ProfilePicturePage() {
       </CardHeader>
       <CardContent className="space-y-6 text-center">
         <div className="flex justify-center">
-          {photoUrl ? (
-            <img src={photoUrl} alt="صورة شخصية" className="h-28 w-28 rounded-full object-cover border-4 border-white shadow" />
+          {previewUrl ? (
+            <img src={previewUrl} alt="صورة شخصية" className="h-28 w-28 rounded-full object-cover border-4 border-white shadow" />
           ) : (
             <div className="h-28 w-28 rounded-full bg-slate-200 flex items-center justify-center">
               <User className="h-10 w-10 text-slate-400" />
@@ -91,22 +94,29 @@ export default function ProfilePicturePage() {
           )}
         </div>
 
-        <label className="inline-block">
-          <div className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl cursor-pointer transition">
-            <Upload className="h-4 w-4" />
-            {uploading ? 'جاري الرفع...' : 'اختر صورة جديدة'}
-          </div>
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleUpload}
-            disabled={uploading}
-          />
-        </label>
+        <div className="flex flex-wrap justify-center gap-2">
+          <label className="inline-block">
+            <div className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl cursor-pointer transition">
+              <ImagePlus className="h-4 w-4" />
+              اختر صورة جديدة
+            </div>
+            <input type="file" accept="image/*" className="hidden" onChange={handleSelect} disabled={saving} />
+          </label>
+          {previewUrl ? (
+            <Button type="button" variant="destructive" onClick={handleRemove} disabled={saving} className="rounded-2xl gap-2">
+              <Trash2 className="h-4 w-4" />
+              حذف الصورة
+            </Button>
+          ) : null}
+        </div>
+
+        <Button type="button" onClick={handleSave} disabled={saving || !hasPendingChange} className="w-full rounded-2xl gap-2">
+          <Save className="h-4 w-4" />
+          {saving ? 'جاري الحفظ...' : 'حفظ التغييرات'}
+        </Button>
 
         <p className="text-xs text-slate-500">
-          الصورة تُحدث فوراً في الشريط العلوي بدون إعادة تحميل.
+          يتم رفع الصورة وحفظها فقط بعد الضغط على حفظ التغييرات.
         </p>
       </CardContent>
     </Card>

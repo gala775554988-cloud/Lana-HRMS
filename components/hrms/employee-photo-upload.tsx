@@ -9,8 +9,10 @@ interface EmployeePhotoUploadProps {
   currentPhoto?: string;
   onUploaded?: (url: string) => void;
   onRemoved?: () => void;
+  onFileSelected?: (file: File | null, previewUrl: string) => void;
   dictionary?: any;
   large?: boolean;
+  autoUpload?: boolean;
 }
 
 export function EmployeePhotoUpload({
@@ -18,8 +20,10 @@ export function EmployeePhotoUpload({
   currentPhoto,
   onUploaded,
   onRemoved,
+  onFileSelected,
   dictionary,
-  large = false
+  large = false,
+  autoUpload = true
 }: EmployeePhotoUploadProps) {
   const [url, setUrl] = useState(currentPhoto || "");
   const [preview, setPreview] = useState(currentPhoto || "");
@@ -46,9 +50,13 @@ export function EmployeePhotoUpload({
     const nextFile = event.target.files?.[0] ?? null;
     setMessage(null);
     setFile(nextFile);
-    if (!nextFile) return;
+    if (!nextFile) {
+      onFileSelected?.(null, url);
+      return;
+    }
     const objectUrl = URL.createObjectURL(nextFile);
     setPreview(objectUrl);
+    onFileSelected?.(nextFile, objectUrl);
   }
 
   async function persistEmployeePhoto(nextUrl: string | null) {
@@ -94,10 +102,13 @@ export function EmployeePhotoUpload({
     setFile(null);
     setMessage(null);
     if (inputRef.current) inputRef.current.value = "";
+    onFileSelected?.(null, "");
     onRemoved?.();
-    startTransition(async () => {
-      await persistEmployeePhoto(null).catch(() => null);
-    });
+    if (autoUpload) {
+      startTransition(async () => {
+        await persistEmployeePhoto(null).catch(() => null);
+      });
+    }
   }
 
   const imageClassName = large
@@ -122,10 +133,12 @@ export function EmployeePhotoUpload({
               <ImagePlus className="h-3.5 w-3.5" />
               {url || preview ? "تغيير الصورة" : t.selectFile}
             </Button>
-            <Button type="button" size="sm" disabled={isPending || !file} onClick={handleUpload} className="gap-1.5">
-              <Upload className="h-3.5 w-3.5" />
-              {isPending ? t.uploading : t.upload}
-            </Button>
+            {autoUpload ? (
+              <Button type="button" size="sm" disabled={isPending || !file} onClick={handleUpload} className="gap-1.5">
+                <Upload className="h-3.5 w-3.5" />
+                {isPending ? t.uploading : t.upload}
+              </Button>
+            ) : null}
             {(url || preview) ? (
               <Button type="button" variant="destructive" size="sm" disabled={isPending} onClick={handleRemove} className="gap-1.5">
                 <Trash2 className="h-3.5 w-3.5" />

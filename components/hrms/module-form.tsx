@@ -41,6 +41,8 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
     const field = resource.fields.find((item) => item.name === "positionId");
     return current && !field?.options?.includes(current) ? [current] : [];
   });
+  const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null);
+  const [photoRemoved, setPhotoRemoved] = useState(false);
   const form = useForm<Record<string, unknown>>({ resolver: zodResolver(buildModuleSchema(resource)), defaultValues: Object.fromEntries(resource.fields.map((field) => [field.name, initialValues?.[field.name] ?? (field.type === "boolean" ? false : "")])) });
 
   const onSubmit = useCallback((values: Record<string, unknown>) => {
@@ -55,8 +57,20 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
           ...salaryValues,
           salaryCosts: costValues.filter((cost) => cost !== "")
         } : values;
+        if (isEmployeeForm && selectedPhotoFile) {
+          const formData = new FormData();
+          formData.append("file", selectedPhotoFile);
+          const uploadResponse = await fetch("/api/uploads", { method: "POST", body: formData });
+          const uploadData = await uploadResponse.json();
+          if (!uploadData.url) throw new Error(uploadData.message || "فشل رفع الصورة");
+          submitValues.profilePhotoUrl = uploadData.url;
+        } else if (isEmployeeForm && photoRemoved) {
+          submitValues.profilePhotoUrl = "";
+        }
         const result = recordId ? await updateModuleRecord({ resourceKey: resource.key, id: recordId, values: submitValues }) : await createModuleRecord({ resourceKey: resource.key, values: submitValues });
         if (result.success) {
+          setSelectedPhotoFile(null);
+          setPhotoRemoved(false);
           setMessage({ text: result.message, type: 'success' });
           router.refresh();
         } else {
@@ -67,7 +81,7 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
         setMessage({ text: error?.message || "حدث خطأ غير متوقع", type: 'error' });
       }
     });
-  }, [costValues, fullName, isEmployeeForm, recordId, resource.key, router, salaryValues]);
+  }, [costValues, fullName, isEmployeeForm, photoRemoved, recordId, resource.key, router, salaryValues, selectedPhotoFile]);
 
   const fieldsDict = dictionary.fields as Record<string, string>;
   const getFieldLabel = (name: string, fallback: string) => fieldsDict[name] ?? fallback;
@@ -97,8 +111,9 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
             currentPhoto={String(form.watch("profilePhotoUrl") || "")}
             large
             dictionary={dictionary}
-            onUploaded={(url) => form.setValue("profilePhotoUrl", url, { shouldDirty: true })}
-            onRemoved={() => form.setValue("profilePhotoUrl", "", { shouldDirty: true })}
+            autoUpload={false}
+            onFileSelected={(file) => { setSelectedPhotoFile(file); setPhotoRemoved(false); }}
+            onRemoved={() => { setSelectedPhotoFile(null); setPhotoRemoved(true); form.setValue("profilePhotoUrl", "", { shouldDirty: true }); }}
           />
           <input type="hidden" {...form.register("profilePhotoUrl")} />
         </div>
