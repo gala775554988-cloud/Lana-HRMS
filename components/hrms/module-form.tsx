@@ -61,7 +61,8 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
           const formData = new FormData();
           formData.append("file", selectedPhotoFile);
           const uploadResponse = await fetch("/api/uploads", { method: "POST", body: formData });
-          const uploadData = await uploadResponse.json();
+          const uploadData = await uploadResponse.json().catch(() => ({ success: false, message: "فشل رفع الصورة" }));
+          if (!uploadResponse.ok) throw new Error(uploadData.message || "فشل رفع الصورة");
           if (!uploadData.url) throw new Error(uploadData.message || "فشل رفع الصورة");
           submitValues.profilePhotoUrl = uploadData.url;
         } else if (isEmployeeForm && photoRemoved) {

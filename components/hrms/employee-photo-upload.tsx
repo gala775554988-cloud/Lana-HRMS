@@ -79,7 +79,11 @@ export function EmployeePhotoUpload({
     startTransition(async () => {
       try {
         const res = await fetch("/api/uploads", { method: "POST", body: formData });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({ success: false, message: t.error }));
+        if (!res.ok) {
+          setMessage(data.message || t.error);
+          return;
+        }
         if (data.url) {
           setUrl(data.url);
           setPreview(data.url);

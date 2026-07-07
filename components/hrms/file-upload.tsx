@@ -17,14 +17,23 @@ export function FileUpload({ onUploaded, label = "Upload" }: FileUploadProps) {
   function upload(formData: FormData) {
     setMessage(null);
     startTransition(async () => {
-      const response = await fetch("/api/uploads", { method: "POST", body: formData });
-      const result = await response.json();
+      try {
+        const response = await fetch("/api/uploads", { method: "POST", body: formData });
+        const result = await response.json().catch(() => ({ success: false, message: "Upload failed" }));
 
-      if (result.url) {
-        setMessage("Uploaded: " + result.url);
-        onUploaded?.(result.url);
-      } else {
-        setMessage(result.message || "Upload failed");
+        if (!response.ok) {
+          setMessage(result.message || "Upload failed");
+          return;
+        }
+
+        if (result.url) {
+          setMessage("Uploaded: " + result.url);
+          onUploaded?.(result.url);
+        } else {
+          setMessage(result.message || "Upload failed");
+        }
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "Upload failed");
       }
     });
   }

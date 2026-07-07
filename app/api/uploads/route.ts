@@ -7,7 +7,13 @@ import { auth } from "@/auth";
 const allowedExtensions = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff", ".tif", ".svg", ".heic", ".heif", ".avif"]);
 const allowedMimePrefixes = ["image/"];
 
-async function optimizeImage(bytes: Buffer, fileName: string, mimeType: string) {
+type OptimizedImage = {
+  buffer: Buffer;
+  extension: string;
+  type: string;
+};
+
+async function optimizeImage(bytes: Buffer, fileName: string, mimeType: string): Promise<OptimizedImage> {
   const extension = path.extname(fileName).toLowerCase();
   const isSvg = extension === ".svg" || mimeType === "image/svg+xml";
   if (isSvg) return { buffer: bytes, extension: ".svg", type: "image/svg+xml" };
@@ -25,22 +31,67 @@ async function optimizeImage(bytes: Buffer, fileName: string, mimeType: string) 
   }
 }
 
+function dataUrlFromImage(image: OptimizedImage) {
+  return `data:${image.type};base64,${image.buffer.toString("base64")}`;
+}
+
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  const formData = await request.formData();
-  const file = formData.get("file");
-  if (!(file instanceof File)) return NextResponse.json({ message: "File is required" }, { status: 400 });
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+    }
 
-  const extension = path.extname(file.name).toLowerCase();
-  const looksLikeImage = allowedMimePrefixes.some((prefix) => file.type.startsWith(prefix)) || allowedExtensions.has(extension);
-  if (!looksLikeImage) return NextResponse.json({ message: "Unsupported image file" }, { status: 400 });
+    const formData = await request.formData();
+    const file = formData.get("file");
+    if (!(file instanceof File)) {
+      return NextResponse.json({ success: false, message: "File is required" }, { status: 400 });
+    }
 
-  const rawBytes = Buffer.from(await file.arrayBuffer());
-  const optimized = await optimizeImage(rawBytes, file.name, file.type);
-  const fileName = randomUUID() + optimized.extension;
-  const uploadDir = path.join(process.cwd(), "public", "uploads");
-  await mkdir(uploadDir, { recursive: true });
-  await writeFile(path.join(uploadDir, fileName), optimized.buffer);
-  return NextResponse.json({ url: "/uploads/" + fileName, fileName: file.name, size: optimized.buffer.length, originalSize: file.size, type: optimized.type });
+    const extension = path.extname(file.name).toLowerCase();
+    const looksLikeImage = allowedMimePrefixes.some((prefix) => file.type.startsWith(prefix)) || allowedExtensions.has(extension);
+    if (!looksLikeImage) {
+      return NextResponse.json({ success: false, message: "Unsupported image file" }, { status: 400 });
+    }
+
+    const rawBytes = Buffer.from(await file.arrayBuffer());
+    const optimized = await optimizeImage(rawBytes, file.name, file.type);
+    const fileName = randomUUID() + optimized.extension;
+    const uploadDir = path.join(process.cwd(), "public", "uploads");
+
+    try {
+      await mkdir(uploadDir, { recursive: true });
+      await writeFile(path.join(uploadDir, fileName), optimized.buffer);
+      return NextResponse.json({
+        success: true,
+        url: "/uploads/" + fileName,
+        fileName: file.name,
+        size: optimized.buffer.length,
+        originalSize: file.size,
+        type: optimized.type
+      });
+    } catch (fileSystemError) {
+      const url = dataUrlFromImage(optimized);
+      return NextResponse.json({
+        success: true,
+        url,
+        fileName: file.name,
+        size: optimized.buffer.length,
+        originalSize: file.size,
+        type: optimized.type,
+        storage: "inline-data-url"
+      });
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Upload failed";
+    return NextResponse.json(
+      {
+        success: false,
+        message
+      },
+      {
+        status: 500
+      }
+    );
+  }
 }
