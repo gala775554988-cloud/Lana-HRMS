@@ -164,7 +164,7 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
           {records.length === 0 && (
             <div className="col-span-full flex flex-col items-center justify-center py-16 text-muted-foreground">
               <Users className="h-12 w-12 mb-3 opacity-40" />
-              <p className="text-sm font-medium">{isAr ? "لا توجد نتائج" : "No results found"}</p>
+              <p className="text-sm font-medium">{filters.department ? "لا يوجد موظفون في هذه الإدارة." : filters.hospital ? "لا يوجد موظفون في هذه المستشفى." : isAr ? "لا توجد نتائج" : "No results found"}</p>
               <p className="text-xs mt-1">{isAr ? "حاول تعديل البحث أو التصفية" : "Try adjusting your search or filters"}</p>
             </div>
           )}

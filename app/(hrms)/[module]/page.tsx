@@ -65,6 +65,11 @@ export default async function ResourcePage({ params, searchParams }: { params: P
   const resourceDescription = (dictionary.moduleDescriptions as Record<string, string>)[resource.key] ?? resource.description;
 
   const filters = Object.fromEntries(resource.filterFields.map((field) => [field, typeof query[field] === "string" ? query[field] as string : undefined]));
+  if (resourceKey === "employees") {
+    ["department", "hospital", "branch", "project", "section", "position", "nationality", "employmentType", "manager", "hireDate"].forEach((field) => {
+      if (typeof query[field] === "string") filters[field] = query[field] as string;
+    });
+  }
   const page = Number(query.page ?? 1);
   const pageSize = Number(query.pageSize ?? (resourceKey === "employees" ? 30 : 10));
   const search = typeof query.search === "string" ? query.search : "";

@@ -142,7 +142,7 @@ export function HospitalsClient() {
                 <td className="px-4 py-3">{hospital.branch?.name ?? "-"}</td>
                 <td className="px-4 py-3">{hospital.employeeCount}</td>
                 <td className="px-4 py-3">{hospital.isActive ? "نشط" : "غير نشط"}</td>
-                <td className="px-4 py-3"><div className="flex gap-2"><Button asChild size="sm" variant="outline"><Link href={`/hospitals/${hospital.id}`}>عرض</Link></Button><Button size="sm" variant="outline" onClick={() => startEdit(hospital)}>تعديل</Button></div></td>
+                <td className="px-4 py-3"><div className="flex gap-2"><Button asChild size="sm" variant="outline"><Link href={`/employees?hospital=${encodeURIComponent(hospital.name)}`}>عرض</Link></Button><Button size="sm" variant="outline" onClick={() => startEdit(hospital)}>تعديل</Button></div></td>
               </tr>
             ))}
             {hospitals.length === 0 ? <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">لا توجد مستشفيات</td></tr> : null}
