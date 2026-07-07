@@ -4,7 +4,7 @@
  * - Never cache API responses or authenticated HTML pages by default.
  * - Show a safe offline page when navigation fails.
  */
-const CACHE_VERSION = "v2";
+const CACHE_VERSION = "v3";
 const STATIC_CACHE = `lana-hrms-static-${CACHE_VERSION}`;
 const OFFLINE_URL = "/offline.html";
 
@@ -50,7 +50,6 @@ function isApiOrAuthRequest(url) {
 
 function isStaticAsset(url) {
   return (
-    url.pathname.startsWith("/_next/static/") ||
     url.pathname.startsWith("/icons/") ||
     url.pathname === "/favicon.png" ||
     url.pathname === "/favicon.ico" ||
