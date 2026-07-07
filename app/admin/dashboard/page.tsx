@@ -1,10 +1,8 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import { BrandLogo } from "@/components/brand/brand-logo";
-import { ClientLanguageToggle } from "@/components/i18n/client-language-toggle";
 import { resolveRoleDashboard } from "@/config/auth";
 
-export default async function AdminDashboard() {
+export default async function AdminDashboardPage() {
   const session = await auth();
 
   if (!session?.user) {
@@ -12,75 +10,5 @@ export default async function AdminDashboard() {
   }
 
   const roles = (session.user.roles as string[]) || [];
-  if (!roles.includes("SUPER_ADMIN")) {
-    redirect(resolveRoleDashboard(roles));
-  }
-
-  return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      {/* Powerful Admin Header */}
-      <div className="border-b border-slate-800 bg-slate-900">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <BrandLogo
-              href="/admin"
-              size="sm"
-              subtitle="Admin Console"
-              textClassName="text-white"
-              titleClassName="text-xl"
-              subtitleClassName="text-purple-400"
-              logoClassName="h-12 w-12 border-slate-700 shadow-lg shadow-purple-950/30"
-            />
-          </div>
-
-          <div className="flex items-center gap-4">
-            <ClientLanguageToggle variant="ghost" className="text-white hover:bg-slate-800" />
-            <div className="px-4 py-1.5 bg-slate-800 rounded-full text-sm flex items-center gap-2">
-              <div className="h-2 w-2 bg-emerald-400 rounded-full animate-pulse"></div>
-              <span>Super Admin</span>
-            </div>
-            <a href="/logout" className="text-sm px-4 py-2 hover:bg-slate-800 rounded-xl transition">تسجيل الخروج</a>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-6 py-10">
-        <div className="mb-10">
-          <h1 className="text-4xl font-bold">لوحة تحكم المسؤولين</h1>
-          <p className="text-slate-400 mt-2">مرحباً بك في لوحة التحكم المتقدمة</p>
-        </div>
-
-        {/* Powerful Admin Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <a href="/(hrms)/employees" className="group block p-6 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-3xl transition">
-            <div className="text-4xl mb-4">👥</div>
-            <div className="font-semibold text-xl mb-1">إدارة الموظفين</div>
-            <div className="text-sm text-slate-400">عرض وتعديل جميع الموظفين</div>
-          </a>
-
-          <a href="/(hrms)/payroll-runs" className="group block p-6 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-3xl transition">
-            <div className="text-4xl mb-4">💰</div>
-            <div className="font-semibold text-xl mb-1">الرواتب والمدفوعات</div>
-            <div className="text-sm text-slate-400">إدارة كشوف الرواتب والحسابات</div>
-          </a>
-
-          <a href="/(hrms)/reports" className="group block p-6 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-3xl transition">
-            <div className="text-4xl mb-4">📊</div>
-            <div className="font-semibold text-xl mb-1">التقارير والتحليلات</div>
-            <div className="text-sm text-slate-400">تقارير متقدمة وإحصائيات</div>
-          </a>
-
-          <a href="/(hrms)/settings" className="group block p-6 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-3xl transition">
-            <div className="text-4xl mb-4">⚙️</div>
-            <div className="font-semibold text-xl mb-1">إعدادات النظام</div>
-            <div className="text-sm text-slate-400">إدارة الصلاحيات والإعدادات</div>
-          </a>
-        </div>
-
-        <div className="mt-10 text-center text-xs text-slate-500">
-          لوحة التحكم المتقدمة • صلاحيات كاملة • تصميم احترافي
-        </div>
-      </div>
-    </div>
-  );
+  redirect(resolveRoleDashboard(roles));
 }

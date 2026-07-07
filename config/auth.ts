@@ -8,14 +8,11 @@ export const DEFAULT_LOGIN_REDIRECT = "/employee/dashboard"; // Safe default (ro
 
 export function resolveRoleDashboard(userRoles?: string[] | null): string {
   if (!userRoles || !Array.isArray(userRoles)) return DEFAULT_LOGIN_REDIRECT;
-  if (userRoles.includes("SUPER_ADMIN")) {
-    return "/admin/dashboard";
-  }
-  if (userRoles.some((role) => ["HR_MANAGER", "PAYROLL_MANAGER", "RECRUITER", "HR"].includes(role))) {
-    return "/hr/dashboard";
-  }
-  if (userRoles.some((role) => ["MANAGER", "DEPARTMENT_MANAGER", "BRANCH_MANAGER", "SUPERVISOR", "PROJECT_MANAGER"].includes(role))) {
-    return "/manager/dashboard";
+  const isAdminOrManager = userRoles.some((role) =>
+    ["SUPER_ADMIN", "HR_MANAGER", "PAYROLL_MANAGER", "RECRUITER", "MANAGER", "HR", "DEPARTMENT_MANAGER", "BRANCH_MANAGER", "SUPERVISOR", "PROJECT_MANAGER"].includes(role)
+  );
+  if (isAdminOrManager) {
+    return "/dashboard";
   }
   return "/employee/dashboard";
 }

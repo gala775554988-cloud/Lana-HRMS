@@ -10,9 +10,5 @@ export default async function AdminPage() {
   }
 
   const roles = (session.user.roles as string[]) || [];
-  if (!roles.includes("SUPER_ADMIN")) {
-    redirect(resolveRoleDashboard(roles));
-  }
-
-  redirect("/admin/dashboard");
+  redirect(resolveRoleDashboard(roles));
 }

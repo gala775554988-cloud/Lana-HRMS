@@ -1,9 +1,6 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { resolveRoleDashboard } from "@/config/auth";
-import HrmsDashboard from "@/app/(hrms)/dashboard/page";
-
-export const dynamic = "force-dynamic";
 
 export default async function HrDashboardPage() {
   const session = await auth();
@@ -13,13 +10,5 @@ export default async function HrDashboardPage() {
   }
 
   const roles = (session.user.roles as string[]) || [];
-  const isHrOrAdmin = roles.some((role: string) =>
-    ["SUPER_ADMIN", "HR_MANAGER", "PAYROLL_MANAGER", "RECRUITER", "HR"].includes(role)
-  );
-
-  if (!isHrOrAdmin) {
-    redirect(resolveRoleDashboard(roles));
-  }
-
-  return <HrmsDashboard />;
+  redirect(resolveRoleDashboard(roles));
 }
