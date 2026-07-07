@@ -86,7 +86,7 @@ export function HospitalsClient() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border bg-card p-4 shadow-sm">
+      <div className="rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-sm shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900/85 dark:shadow-slate-950/30">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="البحث" />
           <select value={departmentId} onChange={(event) => setDepartmentId(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
@@ -106,7 +106,7 @@ export function HospitalsClient() {
         </div>
       </div>
 
-      <div className="rounded-xl border bg-card p-4 shadow-sm">
+      <div className="rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-sm shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900/85 dark:shadow-slate-950/30">
         <h2 className="mb-4 text-lg font-semibold">{editing ? "تعديل مستشفى" : "إضافة مستشفى"}</h2>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <Input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="اسم المستشفى" />
@@ -129,14 +129,14 @@ export function HospitalsClient() {
 
       {message ? <div className="rounded-xl border bg-background p-3 text-sm text-muted-foreground">{message}</div> : null}
 
-      <div className="overflow-hidden rounded-xl border bg-background shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900 dark:shadow-slate-950/30">
         <table className="w-full text-sm">
           <thead className="bg-muted/70 text-muted-foreground">
             <tr><th className="px-4 py-3 text-start">المستشفى</th><th className="px-4 py-3 text-start">الإدارة</th><th className="px-4 py-3 text-start">الفرع</th><th className="px-4 py-3 text-start">عدد الموظفين</th><th className="px-4 py-3 text-start">الحالة</th><th className="px-4 py-3 text-start">الإجراءات</th></tr>
           </thead>
           <tbody>
             {hospitals.map((hospital) => (
-              <tr key={hospital.id} className="border-t">
+              <tr key={hospital.id} className="border-t border-slate-100 transition-colors hover:bg-indigo-50/40 dark:border-slate-800 dark:hover:bg-indigo-950/20">
                 <td className="px-4 py-3">{hospital.name}<div className="text-xs text-muted-foreground">{hospital.code}</div></td>
                 <td className="px-4 py-3">{hospital.department?.name ?? "-"}</td>
                 <td className="px-4 py-3">{hospital.branch?.name ?? "-"}</td>

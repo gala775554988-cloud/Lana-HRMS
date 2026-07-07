@@ -36,7 +36,7 @@ export function DepartmentSelector({
   }, [departments, employees, normalizedSearch]);
 
   return (
-    <div className="grid max-w-2xl gap-3 text-sm">
+    <div className="grid max-w-2xl gap-3 rounded-2xl border border-slate-200/80 bg-white/95 p-4 text-sm shadow-sm shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900/85 dark:shadow-slate-950/30">
       <span className="font-medium text-muted-foreground">{label}</span>
       <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="بحث باسم الإدارة أو الرمز أو اسم الموظف أو الرقم الوظيفي أو رقم الهوية" />
       <select

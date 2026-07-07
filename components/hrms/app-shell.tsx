@@ -139,7 +139,7 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
         </div>
       </header>
       <div className="flex">
-        <aside className={cn("hidden lg:flex flex-col border-l bg-sidebar border-sidebar-border", "sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto overflow-x-hidden", "transition-all duration-300 ease-in-out", sidebarCollapsed ? "w-[72px]" : "w-[280px]")}>
+        <aside className={cn("hidden lg:flex flex-col border-l border-indigo-100/70 bg-white/95 shadow-sm shadow-indigo-100/40 backdrop-blur dark:border-indigo-950/40 dark:bg-slate-950/95 dark:shadow-slate-950", "sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto overflow-x-hidden", "transition-all duration-300 ease-in-out", sidebarCollapsed ? "w-[72px]" : "w-[280px]")}>
           <div className="flex-1 py-4">
             {Object.entries(groupedNav).map(([groupKey, items]) => (
               <div key={groupKey} className="mb-2">
@@ -148,7 +148,7 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
                   const Icon = item.icon;
                   const active = isActive(item.href);
                   return (
-                    <Link key={item.href} href={item.href} className={cn("sidebar-link mx-2", sidebarCollapsed ? "justify-center px-2" : "", active && "active")} title={sidebarCollapsed ? item.label : undefined}>
+                    <Link key={item.href} href={item.href} className={cn("sidebar-link mx-2 border border-transparent hover:border-indigo-100 hover:bg-indigo-50/80 hover:text-indigo-700 dark:hover:border-indigo-900/50 dark:hover:bg-indigo-950/30 dark:hover:text-indigo-300", sidebarCollapsed ? "justify-center px-2" : "", active && "active border-indigo-200 bg-indigo-50 text-indigo-700 shadow-sm shadow-indigo-100/60 dark:border-indigo-800/60 dark:bg-indigo-950/40 dark:text-indigo-300 dark:shadow-none")} title={sidebarCollapsed ? item.label : undefined}>
                       <Icon className="h-4.5 w-4.5 shrink-0" />{!sidebarCollapsed && <span>{item.label}</span>}
                     </Link>
                   );

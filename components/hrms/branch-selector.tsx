@@ -38,7 +38,7 @@ export function BranchSelector({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-sm shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900/85 dark:shadow-slate-950/30">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="البحث باسم الفرع أو الرمز أو الموظف" />
         <select value={department} onChange={(event) => setDepartment(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">

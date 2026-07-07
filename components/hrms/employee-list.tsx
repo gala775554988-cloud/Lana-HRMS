@@ -116,15 +116,15 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
         <StatCard title={isAr ? "عقود منتهية" : "Expiring Contracts"} value={0} icon={FileWarning} description={isAr ? "خلال 30 يوم" : "Within 30 days"} />
       </div>
 
-      <div className="rounded-xl border bg-card shadow-card p-4">
+      <div className="rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-sm shadow-slate-200/60 backdrop-blur transition-colors dark:border-slate-800 dark:bg-slate-900/85 dark:shadow-slate-950/30">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <form onSubmit={handleSearch} className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input type="text" placeholder={isAr ? "بحث بالاسم أو الرقم الوظيفي..." : "Search by name or ID..."} value={search} onChange={(e) => setSearch(e.target.value)} className="pr-9" />
             </div>
-            <Button type="submit" size="sm"><Search className="h-4 w-4 ml-1.5" />{isAr ? "بحث" : "Search"}</Button>
-            <Button type="button" size="sm" variant="outline" onClick={() => setFiltersOpen((value) => !value)}><SlidersHorizontal className="h-4 w-4 ml-1.5" />الفلاتر</Button>
+            <Button type="submit" size="sm" className="bg-indigo-600 text-white shadow-sm shadow-indigo-200 hover:bg-indigo-700 dark:shadow-indigo-950/30"><Search className="h-4 w-4 ml-1.5" />{isAr ? "بحث" : "Search"}</Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => setFiltersOpen((value) => !value)} className="border-indigo-100 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800 dark:border-indigo-900/50 dark:text-indigo-300 dark:hover:bg-indigo-950/30"><SlidersHorizontal className="h-4 w-4 ml-1.5" />الفلاتر</Button>
           </form>
           <div className="flex flex-wrap items-center gap-2">
             <select value={pageSize} onChange={(event) => router.push(`/employees?${buildQuery({ pageSize: event.target.value, page: 1 })}`)} className="h-9 rounded-md border bg-background px-3 text-sm">
@@ -139,7 +139,7 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
           </div>
         </div>
         {filtersOpen ? (
-          <form onSubmit={handleApplyFilters} className="mt-4 rounded-xl border bg-background p-4">
+          <form onSubmit={handleApplyFilters} className="mt-4 rounded-2xl border border-indigo-100/80 bg-indigo-50/30 p-4 shadow-inner shadow-white/60 dark:border-indigo-900/40 dark:bg-indigo-950/10">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
               {filterFields.map(([name, label]) => (
                 <label key={name} className="grid gap-1 text-sm">

@@ -79,6 +79,7 @@ export default async function ResourcePage({ params, searchParams }: { params: P
     ? await getBranchOptions(query)
     : [];
 
+  const polishedResource = resourceKey === "departments" || resourceKey === "branches";
   const t = dictionary.module;
   const f = dictionary.fields as Record<string, string>;
   const getFieldLabel = (fieldName: string) => f[fieldName] ?? fieldName;
@@ -95,7 +96,7 @@ export default async function ResourcePage({ params, searchParams }: { params: P
 
     return (
       <section className="space-y-6" dir={locale === "ar" ? "rtl" : "ltr"}>
-        <div className="flex flex-col gap-4 rounded-2xl border bg-background p-6 shadow-sm lg:flex-row lg:items-start lg:justify-between">
+        <div className={polishedResource ? "flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white/95 p-6 shadow-sm shadow-slate-200/60 lg:flex-row lg:items-start lg:justify-between dark:border-slate-800 dark:bg-slate-900/85 dark:shadow-slate-950/30" : "flex flex-col gap-4 rounded-2xl border bg-background p-6 shadow-sm lg:flex-row lg:items-start lg:justify-between"}>
           <div className="space-y-2">
             <Badge variant="outline">{t.moduleTag}</Badge>
             <h1 className="text-3xl font-semibold tracking-tight">{resourceTitle}</h1>
@@ -139,7 +140,7 @@ export default async function ResourcePage({ params, searchParams }: { params: P
 
   return (
     <section className="space-y-6" dir={locale === "ar" ? "rtl" : "ltr"}>
-      <div className="flex flex-col gap-4 rounded-2xl border bg-background p-6 shadow-sm lg:flex-row lg:items-start lg:justify-between">
+      <div className={polishedResource ? "flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white/95 p-6 shadow-sm shadow-slate-200/60 lg:flex-row lg:items-start lg:justify-between dark:border-slate-800 dark:bg-slate-900/85 dark:shadow-slate-950/30" : "flex flex-col gap-4 rounded-2xl border bg-background p-6 shadow-sm lg:flex-row lg:items-start lg:justify-between"}>
         <div className="space-y-2">
           <Badge variant="outline">{t.moduleTag}</Badge>
           <h1 className="text-3xl font-semibold tracking-tight">{resourceTitle}</h1>
