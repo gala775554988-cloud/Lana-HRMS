@@ -31,20 +31,11 @@ export default async function EmployeeLayout({ children }: { children: ReactNode
     redirect("/employee/settings/password");
   }
 
-  if (!employee) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
-        <div className="text-center max-w-md">
-          <div className="text-6xl mb-4">👤</div>
-          <p className="text-lg text-slate-600 mb-2">لم يتم العثور على بيانات الموظف</p>
-          <p className="text-sm text-slate-400 mb-6">يرجى التواصل مع الموارد البشرية لربط حسابك</p>
-          <a href="/login" className="inline-block px-6 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700">
-            تسجيل الدخول
-          </a>
-        </div>
-      </div>
-    );
-  }
+  const missingEmployeeNotice = !employee ? (
+    <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200" role="alert">
+      لا توجد بيانات موظف مرتبطة بحسابك حالياً. يرجى التواصل مع الموارد البشرية.
+    </div>
+  ) : null;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
@@ -60,6 +51,7 @@ export default async function EmployeeLayout({ children }: { children: ReactNode
         {/* Main Content */}
         <div className="flex-1 min-w-0">
           <main className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 lg:pb-8">
+            {missingEmployeeNotice}
             <ErrorBoundary>
               {children}
             </ErrorBoundary>

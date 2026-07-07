@@ -26,30 +26,16 @@ export default async function EmployeeDashboard() {
     } catch (error) {
       console.error("[EmployeeDashboard] Prisma error:", error);
       return (
-        <div className="flex min-h-[60vh] items-center justify-center p-8">
-          <div className="text-center max-w-md">
-            <div className="text-6xl mb-4">👤</div>
-            <h2 className="text-2xl font-semibold mb-2">مرحباً بك</h2>
-            <p className="text-slate-600 mb-6">حدث خطأ مؤقت. يرجى المحاولة لاحقاً.</p>
-            <a href="/login" className="inline-block px-6 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700">
-              تسجيل الدخول
-            </a>
-          </div>
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200" role="alert">
+          حدث خطأ مؤقت في تحميل بيانات الموظف. يرجى المحاولة لاحقاً.
         </div>
       );
     }
 
     if (!employee) {
       return (
-        <div className="flex min-h-[60vh] items-center justify-center p-8">
-          <div className="text-center max-w-md">
-            <div className="text-6xl mb-4">👤</div>
-            <h2 className="text-2xl font-semibold mb-2">مرحباً بك</h2>
-            <p className="text-slate-600 mb-6">لم يتم ربط حسابك ببيانات موظف. يرجى التواصل مع الموارد البشرية.</p>
-            <a href="/login" className="inline-block px-6 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700">
-              تسجيل الدخول
-            </a>
-          </div>
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200" role="alert">
+          لا توجد بيانات موظف مرتبطة بحسابك حالياً. يرجى التواصل مع الموارد البشرية.
         </div>
       );
     }
@@ -65,11 +51,8 @@ export default async function EmployeeDashboard() {
   } catch (error) {
     console.error("[EmployeeDashboard] Critical error:", error);
     return (
-      <div className="flex min-h-[60vh] items-center justify-center p-8">
-        <div className="text-center">
-          <p className="text-lg text-slate-600">حدث خطأ غير متوقع</p>
-          <a href="/login" className="text-indigo-600 hover:underline mt-4 block">العودة لتسجيل الدخول</a>
-        </div>
+      <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800 shadow-sm dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200" role="alert">
+        حدث خطأ غير متوقع في تحميل الصفحة.
       </div>
     );
   }
