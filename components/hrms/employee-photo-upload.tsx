@@ -127,7 +127,7 @@ export function EmployeePhotoUpload({
         )}
 
         <div className={large ? "w-full space-y-3" : "flex-1 space-y-2"}>
-          <input ref={inputRef} type="file" name="file" accept="image/*" onChange={handleSelect} className="hidden" />
+          <input ref={inputRef} type="file" name="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,.svg,.heic,.heif,.avif" onChange={handleSelect} className="hidden" />
           <div className="flex flex-wrap justify-center gap-2">
             <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()} className="gap-1.5">
               <ImagePlus className="h-3.5 w-3.5" />

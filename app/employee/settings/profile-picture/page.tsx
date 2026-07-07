@@ -100,7 +100,7 @@ export default function ProfilePicturePage() {
               <ImagePlus className="h-4 w-4" />
               اختر صورة جديدة
             </div>
-            <input type="file" accept="image/*" className="hidden" onChange={handleSelect} disabled={saving} />
+            <input type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,.svg,.heic,.heif,.avif" className="hidden" onChange={handleSelect} disabled={saving} />
           </label>
           {previewUrl ? (
             <Button type="button" variant="destructive" onClick={handleRemove} disabled={saving} className="rounded-2xl gap-2">

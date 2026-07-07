@@ -7,12 +7,42 @@ import { ModuleForm } from "@/components/hrms/module-form";
 import { ModuleTable } from "@/components/hrms/module-table";
 import { EmployeeList } from "@/components/hrms/employee-list";
 import { DepartmentSelector } from "@/components/hrms/department-selector";
+import { BranchSelector } from "@/components/hrms/branch-selector";
 import { FileUpload } from "@/components/hrms/file-upload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getEmployeeExtraSettings } from "@/lib/enterprise/hospitals";
 import { Filter, Plus, Search, AlertTriangle } from "lucide-react";
 import Link from "next/link";
+
+async function getBranchOptions(query: Record<string, string | string[] | undefined>) {
+  const search = typeof query.search === "string" ? query.search : "";
+  const department = typeof query.department === "string" ? query.department : "";
+  const hospital = typeof query.hospital === "string" ? query.hospital : "";
+  const isActive = typeof query.isActive === "string" ? query.isActive : "";
+  let hospitalEmployeeIds: string[] | undefined;
+  if (hospital) {
+    const extra = await getEmployeeExtraSettings();
+    hospitalEmployeeIds = extra
+      .filter((item) => String(item.value.hospital ?? "").toLowerCase().includes(hospital.toLowerCase()))
+      .map((item) => item.employeeId);
+  }
+
+  const branchAnd: Record<string, unknown>[] = [];
+  if (search) branchAnd.push({ OR: [{ name: { contains: search, mode: "insensitive" as const } }, { code: { contains: search, mode: "insensitive" as const } }, { city: { contains: search, mode: "insensitive" as const } }] });
+  if (isActive) branchAnd.push({ isActive: isActive === "true" });
+  if (department) branchAnd.push({ employees: { some: { department: { name: { contains: department, mode: "insensitive" as const } } } } });
+  if (hospitalEmployeeIds) branchAnd.push({ employees: { some: { id: { in: hospitalEmployeeIds.length ? hospitalEmployeeIds : ["__NO_HOSPITAL_MATCH__"] } } } });
+
+  const branches = await prisma.branch.findMany({
+    where: branchAnd.length ? { AND: branchAnd } : {},
+    include: { employees: { select: { id: true } } },
+    orderBy: { name: "asc" }
+  });
+
+  return branches.map((branch) => ({ id: branch.id, name: branch.name, code: branch.code, city: branch.city, country: branch.country, employeeCount: branch.employees.length }));
+}
 
 export default async function ResourcePage({ params, searchParams }: { params: Promise<{ module: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { module: resourceKey } = await params;
@@ -28,8 +58,11 @@ export default async function ResourcePage({ params, searchParams }: { params: P
   const pageSize = Number(query.pageSize ?? (resourceKey === "employees" ? 30 : 10));
   const search = typeof query.search === "string" ? query.search : "";
   const data = await listModuleRecords({ resourceKey, page, pageSize, search, filters });
-  const departmentOptions = resourceKey === "departments"
+  const departmentOptions = resourceKey === "departments" || resourceKey === "branches"
     ? await prisma.department.findMany({ where: { isActive: true }, select: { id: true, name: true, code: true }, orderBy: { name: "asc" } })
+    : [];
+  const branchOptions = resourceKey === "branches"
+    ? await getBranchOptions(query)
     : [];
 
   const t = dictionary.module;
@@ -121,6 +154,17 @@ export default async function ResourcePage({ params, searchParams }: { params: P
           </CardHeader>
           <CardContent>
             <DepartmentSelector departments={departmentOptions} />
+          </CardContent>
+        </Card>
+      ) : null}
+      {resource.key === "branches" ? (
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle>الفلاتر</CardTitle>
+            <CardDescription>اختر فرعاً أو صفِّ الفروع حسب الإدارة والمستشفى والحالة.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <BranchSelector branches={branchOptions} departments={departmentOptions} initialFilters={{ search, department: typeof query.department === "string" ? query.department : undefined, hospital: typeof query.hospital === "string" ? query.hospital : undefined, isActive: typeof query.isActive === "string" ? query.isActive : undefined }} />
           </CardContent>
         </Card>
       ) : null}

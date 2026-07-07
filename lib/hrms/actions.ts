@@ -13,6 +13,7 @@ import { notifyRole } from "@/lib/enterprise/notifications";
 import { extractSalaryProfile, saveEmployeeSalaryProfile } from "@/lib/employee/salary-profile";
 import { requirePasswordChange } from "@/lib/auth/password-change-policy";
 import { isEnterpriseResourceAllowed } from "@/lib/enterprise/resource-access";
+import { getEmployeeIdsByHospital } from "@/lib/enterprise/hospitals";
 
 type QueryInput = {
   resourceKey: string;
@@ -177,6 +178,10 @@ export async function listModuleRecords(input: QueryInput) {
     relationContains("position", "title", filters.position || filters.section);
     relationContains("employmentType", "name", filters.employmentType);
     relationContains("nationality", "name", filters.nationality);
+    if (filters.hospital) {
+      const employeeIds = await getEmployeeIdsByHospital(filters.hospital);
+      employeeAnd.push({ id: { in: employeeIds.length ? employeeIds : ["__NO_HOSPITAL_MATCH__"] } });
+    }
     if (filters.hireDate) {
       const start = new Date(filters.hireDate);
       if (!Number.isNaN(start.getTime())) {

@@ -55,6 +55,7 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
   const filterFields = useMemo(() => [
     ["department", isAr ? "الإدارة" : "Department"],
     ["branch", isAr ? "الفرع" : "Branch"],
+    ["hospital", isAr ? "المستشفى" : "Hospital"],
     ["project", isAr ? "المشروع" : "Project"],
     ["section", isAr ? "القسم" : "Section"],
     ["position", isAr ? "المنصب" : "Position"],

@@ -32,6 +32,7 @@ const navItems = [
   { href: "/employees", label: "الموظفون", icon: Users, group: "people", resource: "employees" },
   { href: "/departments", label: "الإدارات", icon: Building2, group: "people", resource: "departments" },
   { href: "/branches", label: "الفروع", icon: MapPin, group: "people", resource: "branches" },
+  { href: "/hospitals", label: "المستشفيات", icon: Building2, group: "people", resource: "employees" },
   { href: "/positions", label: "المناصب", icon: Briefcase, group: "people", resource: "positions" },
   { href: "/contracts", label: "العقود", icon: FileText, group: "people", resource: "contracts" },
   { href: "/attendance", label: "الحضور", icon: Clock, group: "ops", resource: "attendance" },

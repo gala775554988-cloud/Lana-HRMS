@@ -68,8 +68,8 @@ export default async function RecordPage({ params, searchParams }: { params: Pro
   const resourceTitle = resource.key in dictionary.nav ? dictionary.nav[resource.key as keyof typeof dictionary.nav] : resource.title;
 
   let related = null;
-  let departmentEmployees = null as Awaited<ReturnType<typeof listModuleRecords>> | null;
-  const departmentEmployeeResource = resource.key === "departments" ? getHrmsModule("employees") : undefined;
+  let scopedEmployees = null as Awaited<ReturnType<typeof listModuleRecords>> | null;
+  const scopedEmployeeResource = resource.key === "departments" || resource.key === "branches" ? getHrmsModule("employees") : undefined;
   let salaryProfile = null as Awaited<ReturnType<typeof getEmployeeSalaryProfile>> | null;
   if (resource.key === "employees") {
     try {
@@ -81,12 +81,14 @@ export default async function RecordPage({ params, searchParams }: { params: Pro
     }
   }
 
-  if (resource.key === "departments") {
-    if (departmentEmployeeResource) {
+  if (resource.key === "departments" || resource.key === "branches") {
+    if (scopedEmployeeResource) {
       const employeeFilters = {
-        departmentId: id,
+        departmentId: resource.key === "departments" ? id : undefined,
+        branchId: resource.key === "branches" ? id : undefined,
         status: typeof query.status === "string" ? query.status : undefined,
         branch: typeof query.branch === "string" ? query.branch : undefined,
+        hospital: typeof query.hospital === "string" ? query.hospital : undefined,
         project: typeof query.project === "string" ? query.project : undefined,
         section: typeof query.section === "string" ? query.section : undefined,
         position: typeof query.position === "string" ? query.position : undefined,
@@ -95,7 +97,7 @@ export default async function RecordPage({ params, searchParams }: { params: Pro
         manager: typeof query.manager === "string" ? query.manager : undefined,
         hireDate: typeof query.hireDate === "string" ? query.hireDate : undefined
       };
-      departmentEmployees = await listModuleRecords({
+      scopedEmployees = await listModuleRecords({
         resourceKey: "employees",
         page: Number(query.page ?? 1),
         pageSize: Number(query.pageSize ?? 30),
@@ -183,18 +185,20 @@ export default async function RecordPage({ params, searchParams }: { params: Pro
         {resource.key === "employees" ? detailsCard : editCard}
       </div>
 
-      {resource.key === "departments" && departmentEmployees && departmentEmployeeResource ? (
+      {(resource.key === "departments" || resource.key === "branches") && scopedEmployees && scopedEmployeeResource ? (
         <EmployeeList
-          resource={departmentEmployeeResource}
-          records={departmentEmployees.records as any[]}
-          totalCount={departmentEmployees.total}
-          page={departmentEmployees.page}
-          pageCount={departmentEmployees.pageCount}
+          resource={scopedEmployeeResource}
+          records={scopedEmployees.records as any[]}
+          totalCount={scopedEmployees.total}
+          page={scopedEmployees.page}
+          pageCount={scopedEmployees.pageCount}
           search={typeof query.search === "string" ? query.search : ""}
           filters={{
-            departmentId: id,
+            departmentId: resource.key === "departments" ? id : undefined,
+            branchId: resource.key === "branches" ? id : undefined,
             status: typeof query.status === "string" ? query.status : undefined,
             branch: typeof query.branch === "string" ? query.branch : undefined,
+            hospital: typeof query.hospital === "string" ? query.hospital : undefined,
             project: typeof query.project === "string" ? query.project : undefined,
             section: typeof query.section === "string" ? query.section : undefined,
             position: typeof query.position === "string" ? query.position : undefined,
@@ -203,7 +207,7 @@ export default async function RecordPage({ params, searchParams }: { params: Pro
             manager: typeof query.manager === "string" ? query.manager : undefined,
             hireDate: typeof query.hireDate === "string" ? query.hireDate : undefined
           }}
-          pageSize={departmentEmployees.pageSize}
+          pageSize={scopedEmployees.pageSize}
           dictionary={dictionary}
           locale={locale}
         />
