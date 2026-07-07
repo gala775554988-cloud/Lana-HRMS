@@ -76,7 +76,12 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
   const groupedNav = useMemo(() => {
     const result: Record<string, typeof navItems> = {};
     navItems
-      .filter((item) => (userPermissions.includes(`read:${item.resource}`) || userPermissions.includes(`manage:${item.resource}`)) && isEnterpriseResourceAllowed(userRoles, item.resource))
+      .filter((item) => {
+        const hasResourceAccess = item.resource === "overtime"
+          ? userPermissions.includes("manage:overtime")
+          : (userPermissions.includes(`read:${item.resource}`) || userPermissions.includes(`manage:${item.resource}`));
+        return hasResourceAccess && isEnterpriseResourceAllowed(userRoles, item.resource);
+      })
       .forEach((item) => { if (!result[item.group]) result[item.group] = []; result[item.group].push(item); });
     return result;
   }, [userPermissions, userRoles]);

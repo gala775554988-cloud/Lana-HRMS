@@ -35,7 +35,6 @@ export async function POST(request: NextRequest) {
   const extension = path.extname(file.name).toLowerCase();
   const looksLikeImage = allowedMimePrefixes.some((prefix) => file.type.startsWith(prefix)) || allowedExtensions.has(extension);
   if (!looksLikeImage) return NextResponse.json({ message: "Unsupported image file" }, { status: 400 });
-  if (file.size > 30 * 1024 * 1024) return NextResponse.json({ message: "File must be 30MB or smaller" }, { status: 400 });
 
   const rawBytes = Buffer.from(await file.arrayBuffer());
   const optimized = await optimizeImage(rawBytes, file.name, file.type);
