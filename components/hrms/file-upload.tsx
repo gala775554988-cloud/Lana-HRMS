@@ -19,13 +19,13 @@ export function FileUpload({ onUploaded, label = "Upload" }: FileUploadProps) {
     startTransition(async () => {
       try {
         const response = await fetch("/api/uploads", { method: "POST", body: formData });
-        const result = await response.json().catch(() => ({ success: false, message: "Upload failed" }));
-
         if (!response.ok) {
-          setMessage(result.message || "Upload failed");
+          const errorData = await response.json().catch(() => ({ message: "Upload failed" }));
+          setMessage(errorData.message || "Upload failed");
           return;
         }
 
+        const result = await response.json();
         if (result.url) {
           setMessage("Uploaded: " + result.url);
           onUploaded?.(result.url);

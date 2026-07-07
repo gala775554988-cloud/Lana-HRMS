@@ -47,8 +47,11 @@ export default function ProfilePicturePage() {
         const formData = new FormData();
         formData.append('file', selectedFile);
         const uploadResponse = await fetch('/api/uploads', { method: 'POST', body: formData });
-        const uploadData = await uploadResponse.json().catch(() => ({ success: false, message: 'فشل رفع الصورة' }));
-        if (!uploadResponse.ok) throw new Error(uploadData.message || 'فشل رفع الصورة');
+        if (!uploadResponse.ok) {
+          const errorData = await uploadResponse.json().catch(() => ({ message: 'فشل رفع الصورة' }));
+          throw new Error(errorData.message || 'فشل رفع الصورة');
+        }
+        const uploadData = await uploadResponse.json();
         if (!uploadData.url) throw new Error(uploadData.message || 'فشل رفع الصورة');
         nextPhotoUrl = uploadData.url;
       }
