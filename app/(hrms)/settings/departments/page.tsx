@@ -1,0 +1,23 @@
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
+export default function DepartmentsSettingsPage() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight capitalize">إعدادات departments</h1>
+        <p className="text-muted-foreground">إدارة وتخصيص إعدادات departments.</p>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">الإعدادات العامة</CardTitle>
+            <CardDescription>الخيارات الافتراضية</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">قريباً...</p>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}

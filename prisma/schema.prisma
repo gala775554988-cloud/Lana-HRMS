@@ -774,3 +774,45 @@ model WorkflowStep {
   createdAt          DateTime  @default(now())
   workflowInstance   WorkflowInstance @relation(fields: [workflowInstanceId], references: [id], onDelete: Cascade)
 }
+
+// ====================== ENTERPRISE UPGRADE MODELS ======================
+
+model Hospital {
+  id             String    @id @default(cuid())
+  name           String
+  code           String    @unique
+  logoUrl        String?
+  medicalDepts   String?
+  bedsCount      Int       @default(0)
+  capacity       Int       @default(0)
+  phone          String?
+  email          String?
+  address        String?
+  city           String?
+  branchId       String?
+  managerId      String?
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model DynamicField {
+  id             String    @id @default(cuid())
+  module         String    // e.g., "EMPLOYEE", "DEPARTMENT"
+  fieldName      String
+  fieldType      String    // e.g., "TEXT", "NUMBER", "DATE", "SELECT"
+  options        Json?
+  isRequired     Boolean   @default(false)
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model AILog {
+  id             String    @id @default(cuid())
+  action         String
+  prompt         String?   @db.Text
+  response       String?   @db.Text
+  userId         String?
+  createdAt      DateTime  @default(now())
+}
