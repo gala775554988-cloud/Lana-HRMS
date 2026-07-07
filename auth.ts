@@ -188,11 +188,15 @@ export const authConfig = {
           data: { lastLoginAt: new Date() }
         });
 
+        const authorization = await getAuthorization(user.id);
+
         return {
           id: user.id,
-          name: user.name,
-          email: user.email,
-          image: user.image
+          name: user.name ?? null,
+          email: user.email ?? null,
+          image: user.image ?? null,
+          roles: (authorization.roles || []) as string[],
+          permissions: (authorization.permissions || []) as string[]
         };
       }
     })
@@ -205,24 +209,28 @@ export const authConfig = {
         token.email = user.email ?? token.email;
         token.picture = user.image ?? token.picture;
 
-        try {
-          const authorization = await getAuthorization(user.id);
-          token.roles = authorization.roles as string[];
-          token.permissions = authorization.permissions as string[];
-        } catch {
-          // Edge runtime or DB unavailable (e.g., middleware): keep existing token claims
-          token.roles = (token.roles as string[]) ?? [];
-          token.permissions = (token.permissions as string[]) ?? [];
+        if (Array.isArray((user as any).roles)) {
+          token.roles = (user as any).roles;
+        }
+        if (Array.isArray((user as any).permissions)) {
+          token.permissions = (user as any).permissions;
+        }
+
+        if (!token.roles || (token.roles as string[]).length === 0) {
+          try {
+            const authorization = await getAuthorization(user.id);
+            token.roles = authorization.roles as string[];
+            token.permissions = authorization.permissions as string[];
+          } catch {
+            token.roles = (token.roles as string[]) ?? [];
+            token.permissions = (token.permissions as string[]) ?? [];
+          }
         }
       }
 
-      // Do NOT hit the database on every JWT invocation (middleware runs on Edge).
-      // Roles/permissions are established at sign-in and persist in the JWT.
-      // If roles are missing for any reason, default to empty arrays to avoid Edge DB access.
       if (!token.roles) token.roles = [];
       if (!token.permissions) token.permissions = [];
 
-      // Optional: allow explicit session update to refresh authorization server-side
       if (trigger === "update" && token.sub) {
         try {
           const authorization = await getAuthorization(token.sub);
@@ -238,8 +246,8 @@ export const authConfig = {
     async session({ session, token }) {
       if (session.user && token.sub) {
         session.user.id = token.sub;
-        session.user.roles = (token.roles as string[]) ?? [];
-        session.user.permissions = (token.permissions as string[]) ?? [];
+        session.user.roles = Array.isArray(token.roles) ? (token.roles as string[]) : [];
+        session.user.permissions = Array.isArray(token.permissions) ? (token.permissions as string[]) : [];
         session.user.name = token.name ?? session.user.name;
         session.user.email = token.email ?? session.user.email;
         session.user.image = (token.picture as string | null) ?? session.user.image;

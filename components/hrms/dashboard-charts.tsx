@@ -10,8 +10,8 @@ function cardClass(extra = "") {
 }
 
 export function DashboardCharts({ metrics }: { metrics: Record<string, unknown> }) {
-  const { theme } = useThemeStore();
-  const isDark = theme === "dark";
+  const { mode } = useThemeStore();
+  const isDark = mode === "dark";
 
   const employees = Number(metrics.employees ?? 0);
   const departments = Number(metrics.departments ?? 0);

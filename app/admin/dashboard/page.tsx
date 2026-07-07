@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { ClientLanguageToggle } from "@/components/i18n/client-language-toggle";
+import { resolveRoleDashboard } from "@/config/auth";
 
 export default async function AdminDashboard() {
   const session = await auth();
@@ -11,12 +12,8 @@ export default async function AdminDashboard() {
   }
 
   const roles = (session.user.roles as string[]) || [];
-  const isAdmin = roles.some((role: string) =>
-    ["SUPER_ADMIN", "HR_MANAGER", "PAYROLL_MANAGER", "RECRUITER", "MANAGER"].includes(role)
-  );
-
-  if (!isAdmin) {
-    redirect("/employee/dashboard");
+  if (!roles.includes("SUPER_ADMIN")) {
+    redirect(resolveRoleDashboard(roles));
   }
 
   return (

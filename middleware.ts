@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getToken, type JWT } from "@auth/core/jwt";
-import { authRoutes, DEFAULT_LOGIN_REDIRECT, publicRoutes } from "@/config/auth";
+import { authRoutes, DEFAULT_LOGIN_REDIRECT, publicRoutes, resolveRoleDashboard } from "@/config/auth";
 import { getLocaleFromPath, normalizeLocale, stripLocaleFromPath, withLocale } from "@/lib/i18n";
 
 const AUTH_SECRET = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? "";
@@ -61,7 +61,9 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isAuthRoute && isLoggedIn) {
-    const response = NextResponse.redirect(new URL(pathLocale ? withLocale(DEFAULT_LOGIN_REDIRECT, activeLocale) : DEFAULT_LOGIN_REDIRECT, nextUrl));
+    const roles = Array.isArray(token?.roles) ? (token.roles as string[]) : [];
+    const targetDashboard = roles.length > 0 ? resolveRoleDashboard(roles) : "/";
+    const response = NextResponse.redirect(new URL(pathLocale ? withLocale(targetDashboard, activeLocale) : targetDashboard, nextUrl));
     response.cookies.set("lana-locale", activeLocale, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
     return response;
   }

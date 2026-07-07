@@ -24,7 +24,7 @@ export default async function HrmsDashboard() {
 
   const roles = (session.user.roles as string[]) || [];
   const isAdmin = roles.some((role: string) =>
-    ["SUPER_ADMIN", "HR_MANAGER", "PAYROLL_MANAGER", "RECRUITER", "MANAGER"].includes(role)
+    ["SUPER_ADMIN", "HR_MANAGER", "PAYROLL_MANAGER", "RECRUITER", "MANAGER", "HR", "DEPARTMENT_MANAGER", "BRANCH_MANAGER", "SUPERVISOR", "PROJECT_MANAGER"].includes(role)
   );
 
   if (!isAdmin) {

@@ -6,6 +6,20 @@ export const authRoutes = ["/login", "/forgot-password", "/reset-password", "/ve
 export const publicRoutes = [...authRoutes];
 export const DEFAULT_LOGIN_REDIRECT = "/employee/dashboard"; // Safe default (root page overrides for role-based redirect)
 
+export function resolveRoleDashboard(userRoles?: string[] | null): string {
+  if (!userRoles || !Array.isArray(userRoles)) return DEFAULT_LOGIN_REDIRECT;
+  if (userRoles.includes("SUPER_ADMIN")) {
+    return "/admin/dashboard";
+  }
+  if (userRoles.some((role) => ["HR_MANAGER", "PAYROLL_MANAGER", "RECRUITER", "HR"].includes(role))) {
+    return "/hr/dashboard";
+  }
+  if (userRoles.some((role) => ["MANAGER", "DEPARTMENT_MANAGER", "BRANCH_MANAGER", "SUPERVISOR", "PROJECT_MANAGER"].includes(role))) {
+    return "/manager/dashboard";
+  }
+  return "/employee/dashboard";
+}
+
 export const permissions = Object.fromEntries(
   moduleResources.flatMap((resource) => [
     [resource + ":read", { action: "read", resource }],
