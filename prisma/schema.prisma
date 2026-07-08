@@ -1569,3 +1569,316 @@ model PlatformHealthMetric {
   @@index([status])
   @@index([capturedAt])
 }
+
+// ====================== PHASE 4 ENTERPRISE INFRASTRUCTURE ======================
+model EventStoreRecord {
+  id            String   @id @default(cuid())
+  tenantId      String?
+  stream        String
+  eventType     String
+  aggregateType String
+  aggregateId   String
+  version       Int      @default(1)
+  payload       Json
+  metadata      Json?
+  status        String   @default("PENDING")
+  attempts      Int      @default(0)
+  replayedAt    DateTime?
+  deadLetterAt  DateTime?
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([stream])
+  @@index([eventType])
+  @@index([aggregateType, aggregateId])
+  @@index([status])
+}
+
+model MessageQueueRecord {
+  id            String   @id @default(cuid())
+  tenantId      String?
+  provider      String
+  queueName     String
+  jobType       String
+  payload       Json
+  status        String   @default("PENDING")
+  priority      Int      @default(5)
+  attempts      Int      @default(0)
+  maxAttempts   Int      @default(5)
+  delayedUntil  DateTime?
+  lockedAt      DateTime?
+  processedAt   DateTime?
+  deadLetterAt  DateTime?
+  lastError     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([provider])
+  @@index([queueName])
+  @@index([status])
+  @@index([delayedUntil])
+}
+
+model SchedulerRecord {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  code        String   @unique
+  name        String
+  cron        String?
+  calendar    Json?
+  jobType     String
+  payload     Json
+  status      String   @default("ACTIVE")
+  lastRunAt   DateTime?
+  nextRunAt   DateTime?
+  lastError   String?
+  history     Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([nextRunAt])
+}
+
+model NotificationPipelineRecord {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  channel     String
+  queueName   String
+  recipient   String
+  template    String?
+  payload     Json
+  status      String   @default("PENDING")
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(5)
+  scheduledAt DateTime @default(now())
+  sentAt      DateTime?
+  failedAt    DateTime?
+  lastError   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([channel])
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+model AuditIntelligenceRecord {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  actorUserId String?
+  objectType  String
+  objectId    String?
+  action      String
+  before      Json?
+  after       Json?
+  fieldDiff   Json?
+  ipAddress   String?
+  deviceHash  String?
+  riskScore   Float    @default(0)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([actorUserId])
+  @@index([objectType, objectId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model InfrastructureConnector {
+  id            String   @id @default(cuid())
+  tenantId      String?
+  provider      String
+  name          String
+  baseUrl       String?
+  authType      String
+  config        Json
+  secretCipher  String?
+  status        String   @default("DISCONNECTED")
+  lastSyncAt    DateTime?
+  lastError     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([tenantId, provider, name])
+  @@index([provider])
+  @@index([status])
+}
+
+model AICopilotRecord {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  type        String
+  prompt      String
+  context     Json?
+  output      Json?
+  status      String   @default("READY")
+  model       String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([type])
+  @@index([status])
+}
+
+model DocumentAIRecord {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  type        String
+  fileUrl     String
+  language    String?
+  status      String   @default("PENDING")
+  extractedText String?
+  entities    Json?
+  confidence  Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([type])
+  @@index([status])
+}
+
+model BIEngineRecord {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  type        String
+  code        String
+  name        String
+  definition  Json
+  result      Json?
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, type, code])
+  @@index([type])
+  @@index([status])
+}
+
+model SecurityEnterpriseRecord {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  type        String
+  provider    String?
+  name        String
+  config      Json
+  status      String   @default("ACTIVE")
+  riskScore   Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([type])
+  @@index([provider])
+  @@index([status])
+}
+
+model DevOpsCenterRecord {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  type        String
+  name        String
+  environment String?
+  config      Json
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([type])
+  @@index([environment])
+}
+
+model MonitoringEnterpriseRecord {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  type        String
+  source      String
+  metric      String
+  value       Float
+  unit        String?
+  status      String   @default("OK")
+  traceId     String?
+  metadata    Json?
+  capturedAt  DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([type])
+  @@index([source])
+  @@index([status])
+}
+
+model DatabaseStudioRecord {
+  id          String   @id @default(cuid())
+  type        String
+  name        String
+  schemaName  String?
+  artifact    Json
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([type])
+  @@index([schemaName])
+  @@index([status])
+}
+
+model EnterpriseAdminRecord {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  type        String
+  name        String
+  plan        String?
+  usage       Json?
+  billing     Json?
+  config      Json
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([type])
+  @@index([status])
+}
+
+model WhiteLabelRecord {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  domain      String?  @unique
+  logoUrl     String?
+  theme       Json
+  fonts       Json?
+  colors      Json?
+  emailBranding Json?
+  loginBranding Json?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([isActive])
+}
+
+model MarketplacePlugin {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  version     String
+  description String?
+  manifest    Json
+  dependencies Json?
+  status      String   @default("AVAILABLE")
+  installedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([version])
+}
