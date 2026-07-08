@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { OdooEmployeesService } from "@/lib/integrations/odoo/services/employees";
 import { OdooSyncService, requireOdooIntegrationAccess } from "@/lib/integrations/odoo/sync";
+import type { SyncOptions } from "@/lib/integrations/odoo/types";
 
 function statusFor(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
@@ -10,10 +12,11 @@ function statusFor(error: unknown) {
 
 export async function GET(request: NextRequest) {
   try {
-    await requireOdooIntegrationAccess("manage");
+    await requireOdooIntegrationAccess("read");
     const connectionId = request.nextUrl.searchParams.get("connectionId") || undefined;
-    const service = await OdooSyncService.forConnection(connectionId);
-    return NextResponse.json(await service.testConnection());
+    const limit = Number(request.nextUrl.searchParams.get("limit") || 50);
+    const service = new OdooEmployeesService(await OdooSyncService.forConnection(connectionId));
+    return NextResponse.json({ success: true, data: await service.list(limit) });
   } catch (error) {
     return NextResponse.json({ success: false, message: error instanceof Error ? error.message : String(error) }, { status: statusFor(error) });
   }
@@ -23,8 +26,8 @@ export async function POST(request: NextRequest) {
   try {
     await requireOdooIntegrationAccess("manage");
     const body = await request.json().catch(() => ({}));
-    const service = await OdooSyncService.forConnection(body.connectionId);
-    return NextResponse.json(await service.testConnection());
+    const service = new OdooEmployeesService(await OdooSyncService.forConnection(body.connectionId));
+    return NextResponse.json({ success: true, result: await service.sync(body as SyncOptions) });
   } catch (error) {
     return NextResponse.json({ success: false, message: error instanceof Error ? error.message : String(error) }, { status: statusFor(error) });
   }
