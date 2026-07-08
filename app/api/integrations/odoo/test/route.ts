@@ -104,10 +104,11 @@ async function runRpcAuthDiagnostics() {
       cache: "no-store"
     });
     const raw = await response.text();
-    const uidMatch = raw.match(/<(?:int|i4|i8)>(\d+)<\/(?:int|i4|i8)>/);
+    const hasFault = raw.includes("<fault>");
+    const uidMatch = hasFault ? null : raw.match(/<(?:int|i4|i8)>(\d+)<\/(?:int|i4|i8)>/);
     const boolFalse = /<boolean>0<\/boolean>/.test(raw);
     const uid = uidMatch ? Number(uidMatch[1]) : null;
-    const success = response.ok && typeof uid === "number" && uid > 0;
+    const success = response.ok && !hasFault && typeof uid === "number" && uid > 0;
     attempts.push({
       protocol: "xml-rpc",
       endpoint: xmlEndpoint,
@@ -115,7 +116,7 @@ async function runRpcAuthDiagnostics() {
       httpStatus: response.status,
       responseHeaders: { contentType: response.headers.get("content-type") },
       rawResponse: raw,
-      parsedResult: { uid, booleanFalse: boolFalse, hasFault: raw.includes("<fault>") },
+      parsedResult: { uid, booleanFalse: boolFalse, hasFault },
       success,
       failureType: success ? null : classifyRpcFailure({ status: response.status, raw, uidFalse: boolFalse })
     });
