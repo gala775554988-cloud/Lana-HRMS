@@ -236,6 +236,17 @@ export function mapLanaCompanyToOdoo(branch: { name: string; city?: string | nul
   return stripEmpty({ name: branch.name, city: branch.city, phone: branch.phone, email: branch.email });
 }
 
+export function mapOdooCompanyToLana(record: OdooRecord): Record<string, unknown> {
+  return stripEmpty({
+    name: record.name || `Odoo Company ${record.id}`,
+    code: `ODOO-COMPANY-${record.id}`,
+    address: [record.street, record.street2].filter(Boolean).join(" ") || undefined,
+    city: record.city,
+    country: many2oneName(record.country_id),
+    isActive: true
+  });
+}
+
 export function mapLanaPayrollToOdoo(item: LanaPayrollItem, odooEmployeeId?: number): OdooWriteValues {
   const runName = item.payrollRun?.name || item.payrollRun?.period || "Lana Payroll";
   return stripEmpty({ name: runName, employee_id: odooEmployeeId, basic_wage: decimalNumber(item.baseSalary), net_wage: decimalNumber(item.netPay) });
