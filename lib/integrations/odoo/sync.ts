@@ -220,15 +220,25 @@ export class OdooSyncService {
         for (const row of rows) {
           const values = mapOdooEmployeeToLana(row);
           const employeeNumber = String(values.employeeNumber);
-          const existing = await delegate("employee").findFirst({ where: { employeeNumber } });
+          const uniqueOr = [
+            { employeeNumber },
+            values.nationalId ? { nationalId: String(values.nationalId) } : undefined,
+            values.email ? { email: String(values.email) } : undefined
+          ].filter(Boolean);
+          const existing = await delegate("employee").findFirst({ where: { OR: uniqueOr } });
           if (existing && this.hasWriteDateConflict(existing.updatedAt, row.write_date, existing, row, mapper.fieldMap)) {
             await this.conflict(options.mappingId, "employees", objectId(existing.id), String(row.id), existing, row, result);
             continue;
           }
-          if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.lanaModel, localId: objectId(existing?.id), externalId: row.id, values });
-          else if (existing) { await delegate("employee").update({ where: { id: existing.id }, data: values }); result.updated += 1; }
-          else { await delegate("employee").create({ data: values }); result.created += 1; }
-          result.pulled += 1;
+          try {
+            if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.lanaModel, localId: objectId(existing?.id), externalId: row.id, values });
+            else if (existing) { await delegate("employee").update({ where: { id: existing.id }, data: values }); result.updated += 1; }
+            else { await delegate("employee").create({ data: values }); result.created += 1; }
+            result.pulled += 1;
+          } catch (recordError) {
+            result.skipped += 1;
+            result.operations.push({ operation: "skip", model: mapper.lanaModel, externalId: row.id, values, reason: recordError instanceof Error ? recordError.message : String(recordError) });
+          }
         }
       }
 
