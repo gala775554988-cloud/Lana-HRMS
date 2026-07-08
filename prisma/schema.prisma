@@ -1477,3 +1477,95 @@ model LoginHistory {
   @@index([success])
   @@index([createdAt])
 }
+
+// ====================== ENTERPRISE ERP PLATFORM EXTENSIONS ======================
+model Tenant {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  domain      String?  @unique
+  databaseUrl String?
+  branding    Json?
+  settings    Json?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  records     EnterprisePlatformRecord[]
+
+  @@index([isActive])
+}
+
+model EnterprisePlatformRecord {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  suite       String
+  feature     String
+  code        String
+  name        String
+  status      String   @default("ACTIVE")
+  priority    String   @default("NORMAL")
+  payload     Json
+  workflow    Json?
+  approvals   Json?
+  metrics     Json?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, suite, feature, code])
+  @@index([suite])
+  @@index([feature])
+  @@index([status])
+  @@index([tenantId])
+}
+
+model OpenApiDocument {
+  id          String   @id @default(cuid())
+  version     String
+  title       String
+  spec        Json
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([version, title])
+  @@index([isActive])
+}
+
+model PlatformBackgroundJob {
+  id          String   @id @default(cuid())
+  queue       String
+  name        String
+  status      String   @default("PENDING")
+  payload     Json
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(5)
+  runAt       DateTime @default(now())
+  lockedAt    DateTime?
+  finishedAt  DateTime?
+  lastError   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([queue])
+  @@index([status])
+  @@index([runAt])
+}
+
+model PlatformHealthMetric {
+  id          String   @id @default(cuid())
+  service     String
+  metric      String
+  value       Float
+  unit        String?
+  status      String   @default("OK")
+  traceId     String?
+  metadata    Json?
+  capturedAt  DateTime @default(now())
+
+  @@index([service])
+  @@index([metric])
+  @@index([status])
+  @@index([capturedAt])
+}

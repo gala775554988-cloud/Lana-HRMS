@@ -1,0 +1,18 @@
+CREATE TABLE IF NOT EXISTS "Tenant" ("id" TEXT NOT NULL PRIMARY KEY,"code" TEXT NOT NULL UNIQUE,"name" TEXT NOT NULL,"domain" TEXT UNIQUE,"databaseUrl" TEXT,"branding" JSONB,"settings" JSONB,"isActive" BOOLEAN NOT NULL DEFAULT true,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS "EnterprisePlatformRecord" ("id" TEXT NOT NULL PRIMARY KEY,"tenantId" TEXT REFERENCES "Tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE,"suite" TEXT NOT NULL,"feature" TEXT NOT NULL,"code" TEXT NOT NULL,"name" TEXT NOT NULL,"status" TEXT NOT NULL DEFAULT 'ACTIVE',"priority" TEXT NOT NULL DEFAULT 'NORMAL',"payload" JSONB NOT NULL,"workflow" JSONB,"approvals" JSONB,"metrics" JSONB,"createdById" TEXT,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE("tenantId","suite","feature","code"));
+CREATE TABLE IF NOT EXISTS "OpenApiDocument" ("id" TEXT NOT NULL PRIMARY KEY,"version" TEXT NOT NULL,"title" TEXT NOT NULL,"spec" JSONB NOT NULL,"isActive" BOOLEAN NOT NULL DEFAULT true,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE("version","title"));
+CREATE TABLE IF NOT EXISTS "PlatformBackgroundJob" ("id" TEXT NOT NULL PRIMARY KEY,"queue" TEXT NOT NULL,"name" TEXT NOT NULL,"status" TEXT NOT NULL DEFAULT 'PENDING',"payload" JSONB NOT NULL,"attempts" INTEGER NOT NULL DEFAULT 0,"maxAttempts" INTEGER NOT NULL DEFAULT 5,"runAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"lockedAt" TIMESTAMP(3),"finishedAt" TIMESTAMP(3),"lastError" TEXT,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS "PlatformHealthMetric" ("id" TEXT NOT NULL PRIMARY KEY,"service" TEXT NOT NULL,"metric" TEXT NOT NULL,"value" DOUBLE PRECISION NOT NULL,"unit" TEXT,"status" TEXT NOT NULL DEFAULT 'OK',"traceId" TEXT,"metadata" JSONB,"capturedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE INDEX IF NOT EXISTS "Tenant_isActive_idx" ON "Tenant"("isActive");
+CREATE INDEX IF NOT EXISTS "EnterprisePlatformRecord_suite_idx" ON "EnterprisePlatformRecord"("suite");
+CREATE INDEX IF NOT EXISTS "EnterprisePlatformRecord_feature_idx" ON "EnterprisePlatformRecord"("feature");
+CREATE INDEX IF NOT EXISTS "EnterprisePlatformRecord_status_idx" ON "EnterprisePlatformRecord"("status");
+CREATE INDEX IF NOT EXISTS "EnterprisePlatformRecord_tenantId_idx" ON "EnterprisePlatformRecord"("tenantId");
+CREATE INDEX IF NOT EXISTS "OpenApiDocument_isActive_idx" ON "OpenApiDocument"("isActive");
+CREATE INDEX IF NOT EXISTS "PlatformBackgroundJob_queue_idx" ON "PlatformBackgroundJob"("queue");
+CREATE INDEX IF NOT EXISTS "PlatformBackgroundJob_status_idx" ON "PlatformBackgroundJob"("status");
+CREATE INDEX IF NOT EXISTS "PlatformBackgroundJob_runAt_idx" ON "PlatformBackgroundJob"("runAt");
+CREATE INDEX IF NOT EXISTS "PlatformHealthMetric_service_idx" ON "PlatformHealthMetric"("service");
+CREATE INDEX IF NOT EXISTS "PlatformHealthMetric_metric_idx" ON "PlatformHealthMetric"("metric");
+CREATE INDEX IF NOT EXISTS "PlatformHealthMetric_status_idx" ON "PlatformHealthMetric"("status");
+CREATE INDEX IF NOT EXISTS "PlatformHealthMetric_capturedAt_idx" ON "PlatformHealthMetric"("capturedAt");
