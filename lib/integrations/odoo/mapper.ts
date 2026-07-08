@@ -21,9 +21,9 @@ export const ODOO_MAPPERS: Record<string, MapperDefinition> = {
     lanaModel: "department",
     odooModel: "hr.department",
     keyField: "code",
-    externalKeyField: "code",
-    odooFields: ["id", "name", "code", "active", "note", "create_date", "write_date"],
-    fieldMap: { name: "name", code: "code", description: "note", isActive: "active" }
+    externalKeyField: "name",
+    odooFields: ["id", "name", "active", "create_date", "write_date"],
+    fieldMap: { name: "name", isActive: "active" }
   },
   attendance: {
     entity: "attendance",
@@ -95,10 +95,21 @@ export function getMapper(entity: SyncEntity | string) {
 }
 
 export function asDateString(value: unknown, dateOnly = false) {
-  if (!value) return undefined;
-  const date = value instanceof Date ? value : new Date(String(value));
-  if (Number.isNaN(date.getTime())) return undefined;
+  const date = asDate(value);
+  if (!date) return undefined;
   return dateOnly ? date.toISOString().slice(0, 10) : date.toISOString().replace("T", " ").slice(0, 19);
+}
+
+export function asDate(value: unknown) {
+  if (!value || value === false) return undefined;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? undefined : value;
+  const normalized = String(value).includes("T") ? String(value) : String(value).replace(" ", "T");
+  const date = new Date(normalized.length === 10 ? `${normalized}T00:00:00.000Z` : normalized.endsWith("Z") ? normalized : `${normalized}Z`);
+  return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
+function textValue(value: unknown) {
+  return typeof value === "string" && value.trim() ? value : undefined;
 }
 
 export function decimalNumber(value: unknown) {
@@ -146,10 +157,10 @@ export function mapOdooEmployeeToLana(record: OdooRecord): Record<string, unknow
     nationalId: String(record.identification_id || `ODOO-${record.id}`),
     firstName: names.firstName,
     lastName: names.lastName,
-    email: record.work_email || undefined,
-    phone: record.work_phone || record.mobile_phone || undefined,
+    email: textValue(record.work_email),
+    phone: textValue(record.work_phone) || textValue(record.mobile_phone),
     gender: normalizeGender(record.gender),
-    hireDate: asDateString(record.create_date, true) || new Date(),
+    hireDate: asDate(record.create_date) || new Date(),
     status: record.active === false ? "INACTIVE" : "ACTIVE"
   });
 }
@@ -159,7 +170,7 @@ export function mapLanaDepartmentToOdoo(department: LanaDepartment): OdooWriteVa
 }
 
 export function mapOdooDepartmentToLana(record: OdooRecord): Record<string, unknown> {
-  return stripEmpty({ name: record.name || `Odoo Department ${record.id}`, code: record.code || `ODOO-${record.id}`, description: record.note, isActive: record.active !== false });
+  return stripEmpty({ name: textValue(record.name) || `Odoo Department ${record.id}`, code: `ODOO-DEPT-${record.id}`, isActive: record.active !== false });
 }
 
 export function mapLanaAttendanceToOdoo(attendance: LanaAttendance, odooEmployeeId?: number): OdooWriteValues {
@@ -167,8 +178,8 @@ export function mapLanaAttendanceToOdoo(attendance: LanaAttendance, odooEmployee
 }
 
 export function mapOdooAttendanceToLana(record: OdooRecord, employeeId?: string): Record<string, unknown> {
-  const checkIn = asDateString(record.check_in) || new Date();
-  return stripEmpty({ employeeId, workDate: asDateString(checkIn, true), checkIn, checkOut: asDateString(record.check_out), status: "PRESENT" });
+  const checkIn = asDate(record.check_in) || new Date();
+  return stripEmpty({ employeeId, workDate: asDate(asDateString(checkIn, true)), checkIn, checkOut: asDate(record.check_out), status: "PRESENT" });
 }
 
 export function mapLanaLeaveToOdoo(leave: LanaLeave, odooEmployeeId?: number, leaveTypeId?: number): OdooWriteValues {
@@ -187,10 +198,10 @@ export function mapOdooLeaveToLana(record: OdooRecord, employeeId?: string, leav
   return stripEmpty({
     employeeId,
     leaveTypeId,
-    startDate: asDateString(record.request_date_from, true),
-    endDate: asDateString(record.request_date_to, true),
+    startDate: asDate(record.request_date_from),
+    endDate: asDate(record.request_date_to),
     days: decimalNumber(record.number_of_days) ?? 1,
-    reason: record.name,
+    reason: textValue(record.name),
     status: mapLeaveStateToLana(record.state)
   });
 }
@@ -224,7 +235,7 @@ export function mapLanaJobToOdoo(position: { title: string; code?: string; descr
 }
 
 export function mapOdooJobToLana(record: OdooRecord): Record<string, unknown> {
-  return stripEmpty({ title: record.name || `Odoo Job ${record.id}`, code: record.code || `ODOO-${record.id}`, description: record.description, isActive: true });
+  return stripEmpty({ title: textValue(record.name) || `Odoo Job ${record.id}`, code: `ODOO-JOB-${record.id}`, description: textValue(record.description), isActive: true });
 }
 
 export function mapLanaPartnerToOdoo(employee: LanaEmployee): OdooWriteValues {
@@ -238,10 +249,10 @@ export function mapLanaCompanyToOdoo(branch: { name: string; city?: string | nul
 
 export function mapOdooCompanyToLana(record: OdooRecord): Record<string, unknown> {
   return stripEmpty({
-    name: record.name || `Odoo Company ${record.id}`,
+    name: textValue(record.name) || `Odoo Company ${record.id}`,
     code: `ODOO-COMPANY-${record.id}`,
-    address: [record.street, record.street2].filter(Boolean).join(" ") || undefined,
-    city: record.city,
+    address: [textValue(record.street), textValue(record.street2)].filter(Boolean).join(" ") || undefined,
+    city: textValue(record.city),
     country: many2oneName(record.country_id),
     isActive: true
   });
