@@ -1156,3 +1156,324 @@ model EnterpriseWorkflowTemplate {
   @@index([suite, feature])
   @@index([isActive])
 }
+
+// ====================== PHASE 7 ENTERPRISE PRODUCTION ======================
+model ProductionAreaRecord {
+  id          String   @id @default(cuid())
+  area        String
+  feature     String
+  code        String
+  name        String
+  description String?
+  status      String   @default("ACTIVE")
+  config      Json
+  metrics     Json?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([area, feature, code])
+  @@index([area])
+  @@index([feature])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model DashboardDefinition {
+  id          String            @id @default(cuid())
+  code        String            @unique
+  name        String
+  audience    String
+  layout      Json
+  filters     Json?
+  isDefault   Boolean           @default(false)
+  isActive    Boolean           @default(true)
+  createdById String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  widgets     DashboardWidget[]
+
+  @@index([audience])
+  @@index([isActive])
+}
+
+model DashboardWidget {
+  id          String              @id @default(cuid())
+  dashboardId String
+  type        String
+  title       String
+  dataSource  String
+  config      Json
+  position    Json
+  filters     Json?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  dashboard   DashboardDefinition @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+
+  @@index([dashboardId])
+  @@index([type])
+}
+
+model WorkflowDefinition {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  entity      String
+  trigger     String
+  mode        String   @default("SEQUENTIAL")
+  steps       Json
+  conditions  Json?
+  slaHours    Int?
+  escalation  Json?
+  delegation  Json?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([entity])
+  @@index([mode])
+  @@index([isActive])
+}
+
+model ReportDesign {
+  id          String            @id @default(cuid())
+  code        String            @unique
+  name        String
+  module      String
+  definition  Json
+  outputTypes Json
+  filters     Json?
+  isActive    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  schedules   ScheduledReport[]
+
+  @@index([module])
+  @@index([isActive])
+}
+
+model ScheduledReport {
+  id          String       @id @default(cuid())
+  reportId    String
+  cron        String
+  recipients  Json
+  outputType  String
+  nextRunAt   DateTime?
+  lastRunAt   DateTime?
+  status      String       @default("ACTIVE")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  report      ReportDesign @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@index([status])
+  @@index([nextRunAt])
+}
+
+model NotificationTemplate {
+  id          String              @id @default(cuid())
+  code        String              @unique
+  channel     String
+  name        String
+  subject     String?
+  body        String
+  variables   Json?
+  isActive    Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  deliveries  NotificationQueue[]
+
+  @@index([channel])
+  @@index([isActive])
+}
+
+model NotificationQueue {
+  id          String                @id @default(cuid())
+  templateId  String?
+  channel     String
+  recipient   String
+  payload     Json
+  status      String                @default("PENDING")
+  attempts    Int                   @default(0)
+  maxAttempts Int                   @default(5)
+  scheduledAt DateTime              @default(now())
+  sentAt      DateTime?
+  lastError   String?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  template    NotificationTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([channel])
+  @@index([scheduledAt])
+}
+
+model EnterpriseSearchIndex {
+  id          String   @id @default(cuid())
+  entity      String
+  entityId    String
+  title       String
+  content     String
+  keywords    Json?
+  url         String?
+  permissions Json?
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@unique([entity, entityId])
+  @@index([entity])
+  @@index([updatedAt])
+}
+
+model FileCenterDocument {
+  id          String              @id @default(cuid())
+  code        String              @unique
+  name        String
+  category    String
+  ownerType   String?
+  ownerId     String?
+  currentUrl  String?
+  status      String              @default("ACTIVE")
+  expiresAt   DateTime?
+  ocrText     String?
+  metadata    Json?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  versions    FileCenterVersion[]
+
+  @@index([category])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model FileCenterVersion {
+  id          String             @id @default(cuid())
+  documentId  String
+  version     Int
+  fileUrl     String
+  fileName    String
+  mimeType    String?
+  sizeBytes   Int?
+  checksum    String?
+  approval    String             @default("PENDING")
+  createdById String?
+  createdAt   DateTime           @default(now())
+  document    FileCenterDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, version])
+  @@index([approval])
+}
+
+model BIInsight {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  metric      String
+  dimension   String?
+  value       Float
+  trend       Json?
+  forecast    Json?
+  heatmap     Json?
+  period      String
+  audience    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([metric])
+  @@index([audience])
+  @@index([period])
+}
+
+model AIPromptLibraryItem {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  category    String
+  prompt      String
+  variables   Json?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+  @@index([isActive])
+}
+
+model ApiGatewayEndpoint {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  version     String
+  method      String
+  path        String
+  scopes      Json
+  rateLimit   Int      @default(1000)
+  webhookUrl  String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([version])
+  @@index([path])
+  @@index([isActive])
+}
+
+model MonitoringMetric {
+  id          String   @id @default(cuid())
+  source      String
+  metric      String
+  value       Float
+  unit        String?
+  status      String   @default("OK")
+  metadata    Json?
+  capturedAt  DateTime @default(now())
+
+  @@index([source])
+  @@index([metric])
+  @@index([status])
+  @@index([capturedAt])
+}
+
+model SecurityPolicy {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  type        String
+  rules       Json
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([type])
+  @@index([isActive])
+}
+
+model UserDevice {
+  id          String   @id @default(cuid())
+  userId      String
+  deviceHash  String
+  name        String?
+  userAgent   String?
+  ipAddress   String?
+  trusted     Boolean  @default(false)
+  lastSeenAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, deviceHash])
+  @@index([userId])
+  @@index([trusted])
+}
+
+model LoginHistory {
+  id          String   @id @default(cuid())
+  userId      String?
+  identifier  String?
+  success     Boolean
+  ipAddress   String?
+  userAgent   String?
+  reason      String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([success])
+  @@index([createdAt])
+}

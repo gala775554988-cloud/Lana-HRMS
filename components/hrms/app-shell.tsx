@@ -47,6 +47,7 @@ const navItems = [
   { href: "/reports", label: "التقارير", icon: BarChart3, group: "admin", resource: "reports" },
   { href: "/integrations", label: "ERP Integrations", icon: PlugZap, group: "admin", resource: "settings" },
   { href: "/enterprise-suite", label: "Enterprise Suites", icon: Briefcase, group: "admin", resource: "settings" },
+  { href: "/enterprise-production", label: "Production Centers", icon: BarChart3, group: "admin", resource: "settings" },
   { href: "/lana-ai", label: "Lana AI", icon: Sparkles, group: "admin", resource: "reports" },
   { href: "/audit-logs", label: "سجل التدقيق", icon: Shield, group: "admin", resource: "audit-logs" },
   { href: "/system-settings", label: "إعدادات النظام", icon: Settings, group: "admin", resource: "settings" },
