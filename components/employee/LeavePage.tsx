@@ -27,9 +27,9 @@ export function LeavePage({ employee, balance }: any) {
         </Card>
       </div>
 
-      <Link href="/employee/requests">
-        <Button size="lg" className="bg-violet-600">تقديم طلب إجازة جديد</Button>
-      </Link>
+      <Button asChild size="lg" className="bg-violet-600">
+        <Link href="/employee/leave/new">تقديم طلب إجازة جديد</Link>
+      </Button>
     </div>
   );
 }

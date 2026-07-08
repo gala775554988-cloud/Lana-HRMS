@@ -74,22 +74,21 @@ const JobTab = memo(function JobTab({ employee, locale }: { employee: EmployeeCa
   );
 });
 
-const PlaceholderTab = memo(function PlaceholderTab({ tabId, locale }: { tabId: string; locale: "en" | "ar" }) {
-  const labels: Record<string, { en: string; ar: string }> = {
-    salary: { en: "Salary Information", ar: "معلومات الراتب" },
-    attendance: { en: "Attendance Records", ar: "سجلات الحضور" },
-    leave: { en: "Leave History", ar: "سجل الإجازات" },
-    documents: { en: "Employee Documents", ar: "مستندات الموظف" },
-    performance: { en: "Performance Reviews", ar: "تقييمات الأداء" },
-    assets: { en: "Assigned Assets", ar: "الأصول المخصصة" },
-    activity: { en: "Activity Timeline", ar: "الجدول الزمني للنشاط" },
+const RelatedDataTab = memo(function RelatedDataTab({ tabId, employee, locale }: { tabId: string; employee: EmployeeCardData; locale: "en" | "ar" }) {
+  const config: Record<string, { en: string; ar: string; href: string; description: { en: string; ar: string } }> = {
+    salary: { en: "Salary Information", ar: "معلومات الراتب", href: `/payroll-items?employeeId=${employee.id}`, description: { en: "Open payroll items filtered for this employee.", ar: "فتح بنود الرواتب المصفّاة لهذا الموظف." } },
+    attendance: { en: "Attendance Records", ar: "سجلات الحضور", href: `/attendance?employeeId=${employee.id}`, description: { en: "Open attendance records filtered for this employee.", ar: "فتح سجلات الحضور المصفّاة لهذا الموظف." } },
+    leave: { en: "Leave History", ar: "سجل الإجازات", href: `/leave-requests?employeeId=${employee.id}`, description: { en: "Open leave requests filtered for this employee.", ar: "فتح طلبات الإجازة المصفّاة لهذا الموظف." } },
+    documents: { en: "Employee Documents", ar: "مستندات الموظف", href: `/documents?employeeId=${employee.id}`, description: { en: "Open documents filtered for this employee.", ar: "فتح مستندات الموظف." } },
+    performance: { en: "Performance Reviews", ar: "تقييمات الأداء", href: `/performance?employeeId=${employee.id}`, description: { en: "Open performance reviews filtered for this employee.", ar: "فتح تقييمات الأداء المصفّاة لهذا الموظف." } },
+    assets: { en: "Assigned Assets", ar: "الأصول المخصصة", href: `/assets?assignedEmployeeId=${employee.id}`, description: { en: "Open assigned assets for this employee.", ar: "فتح الأصول المسندة لهذا الموظف." } },
+    activity: { en: "Activity Timeline", ar: "سجل النشاط", href: `/audit-logs?entityId=${employee.id}`, description: { en: "Open audit records related to this employee.", ar: "فتح سجلات التدقيق المرتبطة بهذا الموظف." } },
   };
-  const label = labels[tabId] || { en: tabId, ar: tabId };
+  const item = config[tabId] || config.activity;
   return (
-    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground animate-fade-in">
-      <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-3"><FileText className="h-6 w-6" /></div>
-      <p className="text-sm font-medium">{label[locale]}</p>
-      <p className="text-xs mt-1">{locale === "ar" ? "سيتم تحميل البيانات عند الحاجة" : "Data will load on demand"}</p>
+    <div className="space-y-4 animate-fade-in">
+      <InfoBlock label={item[locale]} value={item.description[locale]} />
+      <Button asChild variant="outline"><a href={item.href}>{locale === "ar" ? "فتح السجلات" : "Open records"}</a></Button>
     </div>
   );
 });
@@ -132,7 +131,7 @@ export function EmployeeDrawer({ employee, open, onClose, locale = "ar", onEdit 
       case "overview": return <OverviewTab employee={employee} locale={locale} />;
       case "personal": return <PersonalTab employee={employee} locale={locale} />;
       case "job": return <JobTab employee={employee} locale={locale} />;
-      default: return <PlaceholderTab tabId={activeTab} locale={locale} />;
+      default: return <RelatedDataTab tabId={activeTab} employee={employee} locale={locale} />;
     }
   }, [activeTab, employee, locale]);
 

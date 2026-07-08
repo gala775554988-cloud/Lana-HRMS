@@ -25,7 +25,9 @@ async function getAuthorization(userId: string) {
 
   const roleNames = assignments.map((assignment: any) => assignment.role.name);
   const employee = await prisma.employee.findFirst({ where: { userId }, include: { position: true } }).catch(() => null);
-  const roles = Array.from(new Set([...roleNames, ...inferEnterpriseRolesFromPosition(employee?.position?.title), "SUPER_ADMIN", "HR_MANAGER"]));
+  const inferredRoles = inferEnterpriseRolesFromPosition(employee?.position?.title);
+  const roles = Array.from(new Set([...roleNames, ...inferredRoles]));
+  if (roles.length === 0 && employee) roles.push("EMPLOYEE");
   const rolePermissions = assignments.flatMap((assignment: any) =>
     assignment.role.permissions.map(
       ({ permission }: any) => `${permission.action}:${permission.resource}`

@@ -25,8 +25,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = await request.json();
-    const { type, employeeId: _clientEmployeeId, ...data } = body;
+    const contentType = request.headers.get("content-type") ?? "";
+    const isJsonRequest = contentType.includes("application/json");
+    const body = isJsonRequest
+      ? await request.json()
+      : Object.fromEntries((await request.formData()).entries());
+    const { type, employeeId: _clientEmployeeId, ...data } = body as Record<string, any>;
 
     // Always resolve employee from session — never trust client-sent employeeId
     const employee = await prisma.employee.findFirst({
@@ -266,6 +270,10 @@ export async function POST(request: Request) {
       });
     } catch (auditError) {
       console.error("Audit log failed (non-blocking):", auditError);
+    }
+
+    if (!isJsonRequest) {
+      return NextResponse.redirect(new URL("/employee/requests?created=1", request.url), { status: 303 });
     }
 
     return NextResponse.json({ success: true, message: "تم إرسال الطلب بنجاح" });

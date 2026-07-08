@@ -11,12 +11,13 @@ export default async function ModuleDashboardPage({ params }: { params: Promise<
 
   let count = 0;
   let activeCount = 0;
+  const hasActiveFilter = resource.filterFields.some((field) => field === "isActive");
 
   try {
     const modelDelegate = (prisma as any)[resource.model];
     if (modelDelegate && modelDelegate.count) {
       count = await modelDelegate.count();
-      if (resource.filterFields.includes("isActive")) {
+      if (hasActiveFilter) {
         activeCount = await modelDelegate.count({ where: { isActive: true } }).catch(() => 0);
       }
     } else {
@@ -48,7 +49,7 @@ export default async function ModuleDashboardPage({ params }: { params: Promise<
             <p className="text-3xl font-bold">{count}</p>
           </CardContent>
         </Card>
-        {resource.filterFields.includes("isActive") && (
+        {hasActiveFilter && (
           <Card className="hover:shadow-md transition-all">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">النشط حالياً</CardTitle>

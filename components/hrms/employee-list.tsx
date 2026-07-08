@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Search, LayoutGrid, List, Plus, SlidersHorizontal, Upload } from "lucide-react";
+import { Search, LayoutGrid, List, Plus, SlidersHorizontal, Upload, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatCard } from "@/components/ui/stat-card";
@@ -12,7 +12,7 @@ import { ModuleTable } from "@/components/hrms/module-table";
 import { ModuleForm } from "@/components/hrms/module-form";
 import { EmployeeBulkImportDialog } from "@/components/hrms/employee-bulk-import-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
-import { Users, UserCheck, Clock, UserPlus, FileWarning } from "lucide-react";
+import { Users, UserCheck, Clock, UserPlus } from "lucide-react";
 import type { HrmsModule } from "@/config/hrms";
 import type { Dictionary, Locale } from "@/lib/i18n";
 
@@ -108,12 +108,11 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
 
   return (
     <section className="space-y-6" dir={isAr ? "rtl" : "ltr"}>
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
         <StatCard title={isAr ? "إجمالي الموظفين" : "Total Employees"} value={totalCount} icon={Users} description={isAr ? "جميع الموظفين" : "All employees"} />
-        <StatCard title={isAr ? "نشط" : "Active"} value={stats.active} icon={UserCheck} description={isAr ? "حالياً في العمل" : "Currently working"} />
-        <StatCard title={isAr ? "في إجازة" : "On Leave"} value={stats.onLeave} icon={Clock} description={isAr ? "في إجازة حالياً" : "Currently on leave"} />
-        <StatCard title={isAr ? "موظفون جدد" : "New Employees"} value={stats.newThisMonth} icon={UserPlus} description={isAr ? "هذا الشهر" : "This month"} />
-        <StatCard title={isAr ? "عقود منتهية" : "Expiring Contracts"} value={0} icon={FileWarning} description={isAr ? "خلال 30 يوم" : "Within 30 days"} />
+        <StatCard title={isAr ? "نشط في الصفحة" : "Active on page"} value={stats.active} icon={UserCheck} description={isAr ? "حسب نتائج الصفحة الحالية" : "Current page results"} />
+        <StatCard title={isAr ? "في إجازة في الصفحة" : "On Leave on page"} value={stats.onLeave} icon={Clock} description={isAr ? "حسب نتائج الصفحة الحالية" : "Current page results"} />
+        <StatCard title={isAr ? "موظفون جدد في الصفحة" : "New on page"} value={stats.newThisMonth} icon={UserPlus} description={isAr ? "حسب نتائج الصفحة الحالية" : "Current page results"} />
       </div>
 
       <div className="rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-sm shadow-slate-200/60 backdrop-blur transition-colors dark:border-slate-800 dark:bg-slate-900/85 dark:shadow-slate-950/30">
@@ -134,6 +133,8 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
               <Button variant={viewMode === "card" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("card")} className="rounded-none gap-1.5"><LayoutGrid className="h-4 w-4" />{isAr ? "بطاقات" : "Cards"}</Button>
               <Button variant={viewMode === "table" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("table")} className="rounded-none gap-1.5"><List className="h-4 w-4" />{isAr ? "جدول" : "Table"}</Button>
             </div>
+            <Button asChild size="sm" variant="outline" className="gap-1.5"><a href={`/api/hr/employees/export?format=xlsx&${buildQuery({})}`}><Download className="h-4 w-4" />Excel</a></Button>
+            <Button asChild size="sm" variant="outline" className="gap-1.5"><a href={`/api/hr/employees/export?format=pdf&${buildQuery({})}`}><Download className="h-4 w-4" />PDF</a></Button>
             <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setBulkImportOpen(true)}><Upload className="h-4 w-4" />{isAr ? "استيراد الموظفين" : "Bulk Import"}</Button>
             <Button size="sm" className="gap-1.5" onClick={() => setAddEmployeeOpen(true)}><Plus className="h-4 w-4" />{isAr ? "إضافة موظف" : "Add Employee"}</Button>
           </div>

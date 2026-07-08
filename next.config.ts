@@ -5,11 +5,15 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   output: "standalone",
   outputFileTracingRoot: process.cwd(),
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
+  webpack(config) {
+    config.ignoreWarnings = [
+      ...(config.ignoreWarnings ?? []),
+      {
+        module: /node_modules\/jose\/dist\/webapi\/lib\/deflate\.js/,
+        message: /A Node\.js API is used/,
+      },
+    ];
+    return config;
   },
   images: {
     remotePatterns: [

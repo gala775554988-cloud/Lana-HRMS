@@ -57,11 +57,11 @@ export function EmployeeInfoPanel({ employee }: Props) {
         <div className="flex items-center gap-2 text-sm"><Clock className="h-4 w-4 text-slate-400" /> ساعات العمل <span className="font-semibold ml-auto">١٦٠ ساعة</span></div>
       </div>
 
-      <Link href="/employee/profile">
-        <Button variant="outline" className="w-full gap-2 border-[#E5E7EB] text-sm">
+      <Button asChild variant="outline" className="w-full gap-2 border-[#E5E7EB] text-sm">
+        <Link href="/employee/profile">
           <Edit2 className="h-3.5 w-3.5" /> تعديل الملف الشخصي
-        </Button>
-      </Link>
+        </Link>
+      </Button>
     </div>
   );
 }

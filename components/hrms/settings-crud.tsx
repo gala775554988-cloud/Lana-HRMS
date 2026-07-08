@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Edit, Trash2, Search, Save, X, Loader2 } from "lucide-react";
@@ -15,17 +15,17 @@ export function SettingsCrud({ modelName, title }: { modelName: string, title: s
   const [editForm, setEditForm] = useState({ name: "", code: "", isActive: true });
   const [errorMsg, setErrorMsg] = useState("");
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     const result = await getSettingsData(modelName, search);
     setData(result);
     setLoading(false);
-  };
+  }, [modelName, search]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => { fetchData(); }, 300);
     return () => clearTimeout(delayDebounceFn);
-  }, [search, modelName]);
+  }, [fetchData]);
 
   const handleEdit = (record: any) => {
     setEditingId(record.id);

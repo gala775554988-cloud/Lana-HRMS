@@ -116,7 +116,7 @@ export async function getPayrollSummary(employeeId: string): Promise<PayrollSumm
   });
 
   return {
-    baseSalary: latest ? Number(latest.baseSalary) : 12500,
+    baseSalary: latest ? Number(latest.baseSalary) : 0,
     currency: latest?.currency || "SAR",
     netPay: latest ? Number(latest.netPay || latest.baseSalary) : undefined,
     lastPayDate: latest?.createdAt.toISOString().slice(0, 10),

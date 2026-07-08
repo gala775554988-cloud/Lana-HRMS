@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getEmployeeExtraSettings } from "@/lib/enterprise/hospitals";
-import { Filter, Plus, Search, AlertTriangle } from "lucide-react";
+import { Filter, Plus, Search, AlertTriangle, Download, Upload } from "lucide-react";
 import Link from "next/link";
 import { ModuleTabs } from "@/components/hrms/module-tabs";
 
@@ -157,7 +157,11 @@ export default async function ResourcePage({ params, searchParams }: { params: P
           <h1 className="text-3xl font-semibold tracking-tight">{resourceTitle}</h1>
           <p className="max-w-2xl text-muted-foreground">{resourceDescription}</p>
         </div>
-        <Button asChild variant="outline"><Link href="/reports">{t.openReports}</Link></Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline"><Link href={`/${resourceKey}/reports`}>{t.openReports}</Link></Button>
+          <Button asChild variant="outline"><Link href={`/api/hr/${resourceKey}/export?format=xlsx&search=${encodeURIComponent(search)}`}><Download className="me-2 h-4 w-4" />Excel</Link></Button>
+          <Button asChild variant="outline"><Link href={`/api/hr/${resourceKey}/export?format=pdf&search=${encodeURIComponent(search)}`}><Download className="me-2 h-4 w-4" />PDF</Link></Button>
+        </div>
       </div>
       <Card className="shadow-sm">
         <CardHeader><CardTitle className="flex items-center gap-2"><Filter className="h-5 w-5" /> {t.searchTitle}</CardTitle><CardDescription>{t.searchDescription}</CardDescription></CardHeader>
@@ -169,6 +173,18 @@ export default async function ResourcePage({ params, searchParams }: { params: P
             </label>
             {resource.filterFields.slice(0, 2).map((field) => <input key={field} name={field} defaultValue={String(filters[field] ?? "")} placeholder={getFieldLabel(field)} className="h-10 rounded-md border bg-background px-3 text-sm" />)}
             <Button type="submit">{t.apply}</Button>
+          </form>
+        </CardContent>
+      </Card>
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Upload className="h-5 w-5" /> استيراد البيانات</CardTitle>
+          <CardDescription>ارفع ملف Excel أو CSV يحتوي على أعمدة مطابقة لحقول الوحدة: {resource.fields.map((field) => field.name).join(", ")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form action={`/api/hr/${resourceKey}/import`} method="post" encType="multipart/form-data" className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <input name="file" type="file" accept=".xlsx,.xls,.csv" required className="h-10 flex-1 rounded-md border bg-background px-3 py-2 text-sm" />
+            <Button type="submit"><Upload className="me-2 h-4 w-4" />استيراد</Button>
           </form>
         </CardContent>
       </Card>
