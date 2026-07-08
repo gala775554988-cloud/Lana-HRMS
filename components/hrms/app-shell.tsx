@@ -52,6 +52,8 @@ const navItems = [
   { href: "/enterprise-erp", label: "Enterprise ERP", icon: Building2, group: "admin", resource: "settings" },
   { href: "/infra", label: "Infrastructure", icon: PlugZap, group: "admin", resource: "settings" },
   { href: "/saas-platform", label: "SaaS Platform", icon: DollarSign, group: "admin", resource: "settings" },
+  { href: "/intelligent", label: "Intelligent Platform", icon: Sparkles, group: "admin", resource: "settings" },
+  { href: "/digital-twin", label: "Digital Twin", icon: BarChart3, group: "admin", resource: "settings" },
   { href: "/lana-ai", label: "Lana AI", icon: Sparkles, group: "admin", resource: "reports" },
   { href: "/audit-logs", label: "سجل التدقيق", icon: Shield, group: "admin", resource: "audit-logs" },
   { href: "/system-settings", label: "إعدادات النظام", icon: Settings, group: "admin", resource: "settings" },

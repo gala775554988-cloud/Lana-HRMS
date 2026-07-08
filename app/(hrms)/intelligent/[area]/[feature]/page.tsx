@@ -1,0 +1,6 @@
+import { notFound } from "next/navigation";
+import { getIntelligentArea, titleFromSlug } from "@/lib/intelligent/catalog";
+import { listIntelligentRecords } from "@/lib/intelligent/actions";
+import { IntelligentFeatureNav, IntelligentForm, IntelligentHeader, IntelligentNav, IntelligentTable } from "@/components/intelligent/intelligent-ui";
+
+export default async function IntelligentFeaturePage({ params, searchParams }: { params: Promise<{ area:string; feature:string }>; searchParams: Promise<{ search?:string }> }) { const {area:areaKey,feature}=await params; const {search=""}=await searchParams; const area=getIntelligentArea(areaKey); if(!area||!area.features.includes(feature as never)) notFound(); const rows=await listIntelligentRecords(areaKey,feature,search); return <section className="space-y-6"><IntelligentHeader title={`${area.title} — ${titleFromSlug(feature)}`} description="Database-backed intelligent enterprise capability with RBAC, REST API, audit logging, tenant-ready data, and responsive UI."/><IntelligentNav/><IntelligentFeatureNav area={area}/><IntelligentForm area={areaKey} feature={feature}/><IntelligentTable rows={rows as Array<Record<string,unknown>&{id:string}>}/></section>; }

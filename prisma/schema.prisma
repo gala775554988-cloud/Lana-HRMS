@@ -2209,3 +2209,468 @@ model QualityRecord {
   @@index([testType])
   @@index([status])
 }
+
+// ====================== PHASE 6 INTELLIGENT ENTERPRISE PLATFORM ======================
+model DigitalTwinCompany {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  code        String
+  name        String
+  baseline    Json
+  assumptions Json?
+  metrics     Json?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  organizations DigitalTwinOrganization[]
+  employees     DigitalTwinEmployee[]
+  scenarios     DigitalTwinScenario[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+}
+
+model DigitalTwinOrganization {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  companyId   String
+  code        String
+  name        String
+  parentCode  String?
+  structure   Json
+  metrics     Json?
+  company     DigitalTwinCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([companyId, code])
+  @@index([tenantId])
+  @@index([parentCode])
+}
+
+model DigitalTwinEmployee {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  companyId   String
+  employeeId  String?
+  code        String
+  name        String
+  department  String?
+  position    String?
+  skills      Json?
+  cost        Decimal? @db.Decimal(14, 2)
+  capacity    Float    @default(1)
+  metrics     Json?
+  company     DigitalTwinCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([companyId, code])
+  @@index([tenantId])
+  @@index([employeeId])
+}
+
+model DigitalTwinScenario {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  companyId   String
+  type        String
+  name        String
+  input       Json
+  output      Json
+  riskScore   Float    @default(0)
+  confidence  Float    @default(0)
+  recommendation String?
+  status      String   @default("READY")
+  company     DigitalTwinCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([companyId])
+  @@index([type])
+  @@index([status])
+}
+
+model DecisionPolicy {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  code        String
+  name        String
+  entity      String
+  action      String
+  riskModel   Json?
+  fallback    String   @default("HUMAN_APPROVAL")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  rules       DecisionRule[]
+  executions  DecisionExecution[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([entity])
+  @@index([isActive])
+}
+
+model DecisionRule {
+  id          String   @id @default(cuid())
+  policyId    String
+  priority    Int      @default(100)
+  condition   Json
+  outcome     Json
+  isActive    Boolean  @default(true)
+  policy      DecisionPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([policyId])
+  @@index([priority])
+}
+
+model DecisionExecution {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  policyId    String
+  entityId    String?
+  input       Json
+  decision    String
+  riskScore   Float
+  confidence  Float
+  reason      String
+  fallbackRequired Boolean @default(false)
+  approvedById String?
+  policy      DecisionPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([policyId])
+  @@index([decision])
+}
+
+model KnowledgeCategory {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  code        String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  nodes       KnowledgeNode[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+}
+
+model KnowledgeNode {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  categoryId  String?
+  type        String
+  entityId    String?
+  label       String
+  content     String?
+  vector      Json?
+  metadata    Json?
+  category    KnowledgeCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  outgoing    KnowledgeRelation[] @relation("KnowledgeRelationFrom")
+  incoming    KnowledgeRelation[] @relation("KnowledgeRelationTo")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([type])
+  @@index([entityId])
+}
+
+model KnowledgeRelation {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  fromNodeId  String
+  toNodeId    String
+  type        String
+  weight      Float    @default(1)
+  metadata    Json?
+  fromNode    KnowledgeNode @relation("KnowledgeRelationFrom", fields: [fromNodeId], references: [id], onDelete: Cascade)
+  toNode      KnowledgeNode @relation("KnowledgeRelationTo", fields: [toNodeId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([type])
+  @@index([fromNodeId])
+  @@index([toNodeId])
+}
+
+model GlobalSearchDocument {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  entity      String
+  entityId    String
+  title       String
+  content     String
+  locale      String?
+  url         String?
+  vector      Json?
+  ocrText     String?
+  facets      Json?
+  permissions Json?
+  rank        Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, entity, entityId])
+  @@index([tenantId])
+  @@index([entity])
+  @@index([rank])
+}
+
+model AIAssistantConversation {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  userId      String?
+  title       String
+  context     Json?
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  messages    AIAssistantMessage[]
+  memories    AIAssistantMemory[]
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([status])
+}
+
+model AIAssistantMessage {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String
+  content        String
+  toolCalls      Json?
+  output         Json?
+  conversation   AIAssistantConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+
+  @@index([conversationId])
+  @@index([role])
+}
+
+model AIAssistantMemory {
+  id             String   @id @default(cuid())
+  conversationId String?
+  tenantId       String?
+  userId         String?
+  key            String
+  value          Json
+  expiresAt      DateTime?
+  conversation   AIAssistantConversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([key])
+}
+
+model LowCodeArtifact {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  type        String
+  code        String
+  name        String
+  schema      Json
+  version     Int      @default(1)
+  status      String   @default("ACTIVE")
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, type, code])
+  @@index([tenantId])
+  @@index([type])
+  @@index([status])
+}
+
+model ProcessMiningEvent {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  processKey  String
+  caseId      String
+  activity    String
+  actorId     String?
+  startedAt   DateTime
+  finishedAt  DateTime?
+  durationMs  Int?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([processKey])
+  @@index([caseId])
+  @@index([activity])
+}
+
+model ProcessMiningInsight {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  processKey  String
+  type        String
+  title       String
+  metrics     Json
+  recommendation String?
+  severity    String   @default("INFO")
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([processKey])
+  @@index([type])
+  @@index([severity])
+}
+
+model DataFabricAsset {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  domain      String
+  name        String
+  assetType   String
+  metadata    Json
+  lineage     Json?
+  quality     Json?
+  masterKey   String?
+  ownerId     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([domain])
+  @@index([assetType])
+  @@index([masterKey])
+}
+
+model PredictiveModel {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  type        String
+  code        String
+  name        String
+  features    Json
+  parameters  Json?
+  status      String   @default("READY")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  runs        PredictiveRun[]
+
+  @@unique([tenantId, type, code])
+  @@index([tenantId])
+  @@index([type])
+  @@index([status])
+}
+
+model PredictiveRun {
+  id          String   @id @default(cuid())
+  modelId     String
+  input       Json
+  output      Json
+  confidence  Float
+  model       PredictiveModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@index([modelId])
+}
+
+model GenerativeReport {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  type        String
+  title       String
+  prompt      String
+  format      String
+  content     Json
+  fileUrl     String?
+  status      String   @default("GENERATED")
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([type])
+  @@index([format])
+  @@index([status])
+}
+
+model ObservabilitySpan {
+  id          String   @id @default(cuid())
+  traceId     String
+  spanId      String
+  parentSpanId String?
+  service     String
+  operation   String
+  status      String   @default("OK")
+  durationMs  Int
+  attributes  Json?
+  startedAt   DateTime
+  endedAt     DateTime?
+
+  @@index([traceId])
+  @@index([service])
+  @@index([operation])
+  @@index([status])
+}
+
+model EdgeSyncRecord {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  deviceId    String
+  entity      String
+  entityId    String
+  operation   String
+  payload     Json
+  status      String   @default("PENDING")
+  conflict    Json?
+  syncedAt    DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([deviceId])
+  @@index([entity, entityId])
+  @@index([status])
+}
+
+model MultiRegionConfig {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  region      String
+  role        String
+  endpoint    String
+  geoRouting  Json?
+  replication Json?
+  drPolicy    Json?
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, region, role])
+  @@index([region])
+  @@index([status])
+}
+
+model ZeroTrustPolicy {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  code        String
+  name        String
+  policyType  String
+  conditions  Json
+  actions     Json
+  riskThreshold Float  @default(0.5)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([policyType])
+  @@index([isActive])
+}
