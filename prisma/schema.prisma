@@ -816,3 +816,304 @@ model AILog {
   userId         String?
   createdAt      DateTime  @default(now())
 }
+
+// ====================== ENTERPRISE ERP INTEGRATIONS ======================
+model IntegrationProvider {
+  id          String                  @id @default(cuid())
+  name        String
+  code        String                  @unique
+  type        String                  @default("ODOO")
+  baseUrl     String
+  authType    String                  @default("ODOO_JSON_RPC")
+  isActive    Boolean                 @default(true)
+  metadata    Json?
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  connections IntegrationConnection[]
+  mappings    IntegrationMapping[]
+  jobs        IntegrationJob[]
+  queues      IntegrationQueue[]
+  webhooks    IntegrationWebhook[]
+  apiKeys     IntegrationApiKey[]
+  oauthClients IntegrationOAuthClient[]
+  settings    IntegrationSetting[]
+  logs        IntegrationLog[]
+
+  @@index([type])
+  @@index([isActive])
+}
+
+model IntegrationConnection {
+  id             String                @id @default(cuid())
+  providerId     String
+  name           String
+  baseUrl        String
+  database       String?
+  username       String?
+  uid            Int?
+  sessionId      String?
+  secretCipher   String?
+  status         String                @default("DISCONNECTED")
+  lastTestAt     DateTime?
+  lastError      String?
+  version        Json?
+  metadata       Json?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  provider       IntegrationProvider   @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  mappings       IntegrationMapping[]
+  jobs           IntegrationJob[]
+  queues         IntegrationQueue[]
+  syncHistories  SyncHistory[]
+  conflicts      ConflictLog[]
+  logs           IntegrationLog[]
+
+  @@index([providerId])
+  @@index([status])
+}
+
+model IntegrationMapping {
+  id              String                @id @default(cuid())
+  providerId      String
+  connectionId    String?
+  name            String
+  hrmsModule      String
+  hrmsModel       String
+  externalModel   String
+  direction       String                @default("BIDIRECTIONAL")
+  keyField        String                @default("id")
+  externalKeyField String               @default("id")
+  fieldMap        Json
+  transformMap    Json?
+  isActive        Boolean               @default(true)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  provider        IntegrationProvider   @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  connection      IntegrationConnection? @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  jobs            IntegrationJob[]
+  queues          IntegrationQueue[]
+  syncHistories   SyncHistory[]
+  conflicts       ConflictLog[]
+
+  @@index([providerId])
+  @@index([connectionId])
+  @@index([hrmsModule])
+  @@index([externalModel])
+  @@index([isActive])
+}
+
+model IntegrationJob {
+  id             String                 @id @default(cuid())
+  providerId     String?
+  connectionId   String?
+  mappingId      String?
+  name           String
+  type           String
+  status         String                 @default("PENDING")
+  direction      String                 @default("BIDIRECTIONAL")
+  schedule       String?
+  payload        Json?
+  result         Json?
+  attempts       Int                    @default(0)
+  maxAttempts    Int                    @default(3)
+  runAt          DateTime?
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  lastError      String?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  provider       IntegrationProvider?   @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  connection     IntegrationConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  mapping        IntegrationMapping?    @relation(fields: [mappingId], references: [id], onDelete: SetNull)
+  queues         IntegrationQueue[]
+  logs           IntegrationLog[]
+
+  @@index([status])
+  @@index([type])
+  @@index([runAt])
+  @@index([connectionId])
+}
+
+model IntegrationQueue {
+  id            String                  @id @default(cuid())
+  providerId    String?
+  connectionId  String?
+  mappingId     String?
+  jobId         String?
+  queueName     String                  @default("default")
+  status        String                  @default("PENDING")
+  direction     String                  @default("BIDIRECTIONAL")
+  operation     String
+  entity        String
+  entityId      String?
+  externalId    String?
+  payload       Json
+  result        Json?
+  attempts      Int                     @default(0)
+  maxAttempts   Int                     @default(5)
+  availableAt   DateTime                @default(now())
+  lockedAt      DateTime?
+  processedAt   DateTime?
+  deadLetterAt  DateTime?
+  lastError     String?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+  provider      IntegrationProvider?    @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  connection    IntegrationConnection?  @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  mapping       IntegrationMapping?     @relation(fields: [mappingId], references: [id], onDelete: SetNull)
+  job           IntegrationJob?         @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  logs          IntegrationLog[]
+
+  @@index([status])
+  @@index([queueName])
+  @@index([availableAt])
+  @@index([connectionId])
+  @@index([entity, entityId])
+}
+
+model IntegrationWebhook {
+  id              String                @id @default(cuid())
+  providerId      String?
+  name            String
+  url             String
+  secretCipher    String?
+  events          Json
+  isActive        Boolean               @default(true)
+  lastDeliveryAt  DateTime?
+  lastStatus      String?
+  metadata        Json?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  provider        IntegrationProvider?  @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId])
+  @@index([isActive])
+}
+
+model IntegrationLog {
+  id            String                  @id @default(cuid())
+  providerId    String?
+  connectionId  String?
+  jobId         String?
+  queueId       String?
+  level         String                  @default("INFO")
+  action        String
+  message       String
+  request       Json?
+  response      Json?
+  metadata      Json?
+  createdAt     DateTime                @default(now())
+  provider      IntegrationProvider?    @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  connection    IntegrationConnection?  @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  job           IntegrationJob?         @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  queue         IntegrationQueue?       @relation(fields: [queueId], references: [id], onDelete: SetNull)
+
+  @@index([level])
+  @@index([action])
+  @@index([createdAt])
+  @@index([connectionId])
+}
+
+model IntegrationApiKey {
+  id              String                @id @default(cuid())
+  providerId      String?
+  name            String
+  keyHash         String                @unique
+  secretCipher    String?
+  scopes          Json
+  expiresAt       DateTime?
+  lastUsedAt      DateTime?
+  isActive        Boolean               @default(true)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  provider        IntegrationProvider?  @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId])
+  @@index([isActive])
+}
+
+model IntegrationOAuthClient {
+  id                 String               @id @default(cuid())
+  providerId         String?
+  name               String
+  clientId           String               @unique
+  clientSecretCipher String
+  redirectUris       Json
+  scopes             Json
+  grants             Json
+  isActive           Boolean              @default(true)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  provider           IntegrationProvider? @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId])
+  @@index([isActive])
+}
+
+model IntegrationSetting {
+  id          String               @id @default(cuid())
+  providerId  String?
+  key         String
+  value       Json
+  isSecret    Boolean              @default(false)
+  description String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  provider    IntegrationProvider? @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, key])
+  @@index([key])
+}
+
+model SyncHistory {
+  id            String                 @id @default(cuid())
+  connectionId  String
+  mappingId     String?
+  direction     String
+  entity        String
+  startedAt     DateTime               @default(now())
+  finishedAt    DateTime?
+  status        String                 @default("RUNNING")
+  pulled        Int                    @default(0)
+  pushed        Int                    @default(0)
+  createdCount  Int                    @default(0)
+  updatedCount  Int                    @default(0)
+  deletedCount  Int                    @default(0)
+  conflictCount Int                    @default(0)
+  cursor        String?
+  error         String?
+  metadata      Json?
+  connection    IntegrationConnection  @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  mapping       IntegrationMapping?    @relation(fields: [mappingId], references: [id], onDelete: SetNull)
+
+  @@index([connectionId])
+  @@index([mappingId])
+  @@index([status])
+  @@index([startedAt])
+}
+
+model ConflictLog {
+  id            String                 @id @default(cuid())
+  connectionId  String
+  mappingId     String?
+  entity        String
+  localId       String?
+  externalId    String?
+  field         String?
+  localValue    Json?
+  externalValue Json?
+  resolution    String                 @default("PENDING")
+  resolvedValue Json?
+  resolvedById  String?
+  resolvedAt    DateTime?
+  metadata      Json?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  connection    IntegrationConnection  @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  mapping       IntegrationMapping?    @relation(fields: [mappingId], references: [id], onDelete: SetNull)
+
+  @@index([connectionId])
+  @@index([mappingId])
+  @@index([resolution])
+  @@index([entity])
+}
