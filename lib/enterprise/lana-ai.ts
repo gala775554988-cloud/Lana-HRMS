@@ -44,6 +44,26 @@ function policyAnswer(message: string, ar: boolean) {
   return null;
 }
 
+async function answerWithOpenAi(message: string, ar: boolean): Promise<string | null> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return null;
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+      messages: [
+        { role: "system", content: ar ? "أنت مساعد موارد بشرية لنظام Lana HRMS. أجب بإيجاز وبشكل عملي." : "You are an HR assistant for Lana HRMS. Answer concisely and practically." },
+        { role: "user", content: message }
+      ],
+      temperature: 0.2
+    })
+  });
+  if (!response.ok) return null;
+  const data = await response.json().catch(() => null) as { choices?: Array<{ message?: { content?: string } }> } | null;
+  return data?.choices?.[0]?.message?.content?.trim() || null;
+}
+
 export async function answerLanaAi({
   userId,
   roles,
@@ -160,10 +180,11 @@ export async function answerLanaAi({
     };
   }
 
+  const openAiAnswer = await answerWithOpenAi(message, ar).catch(() => null);
   return {
-    answer: ar
+    answer: openAiAnswer || (ar
       ? "أنا Lana AI. أستطيع مساعدتك في سياسات الموارد البشرية، الطلبات، الرواتب، الإجازات، الأوفر تايم، والبحث داخل البيانات التي تملك صلاحية رؤيتها."
-      : "I am Lana AI. I can help with HR policies, requests, payroll, leave, overtime, and searching data you are allowed to access.",
+      : "I am Lana AI. I can help with HR policies, requests, payroll, leave, overtime, and searching data you are allowed to access."),
     suggestions
   };
 }

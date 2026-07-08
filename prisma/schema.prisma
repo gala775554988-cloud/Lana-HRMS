@@ -1117,3 +1117,42 @@ model ConflictLog {
   @@index([resolution])
   @@index([entity])
 }
+
+// ====================== ENTERPRISE PROCESS SUITES ======================
+model EnterpriseRecord {
+  id              String   @id @default(cuid())
+  suite           String
+  feature         String
+  code            String
+  title           String
+  status          String   @default("ACTIVE")
+  priority        String   @default("NORMAL")
+  ownerEmployeeId String?
+  effectiveFrom   DateTime?
+  effectiveTo     DateTime?
+  data            Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([suite, feature, code])
+  @@index([suite])
+  @@index([feature])
+  @@index([status])
+  @@index([ownerEmployeeId])
+}
+
+model EnterpriseWorkflowTemplate {
+  id          String   @id @default(cuid())
+  suite       String
+  feature     String
+  name        String
+  steps       Json
+  conditions  Json?
+  slaHours    Int?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([suite, feature])
+  @@index([isActive])
+}
