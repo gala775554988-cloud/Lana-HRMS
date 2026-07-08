@@ -105,6 +105,7 @@ export type SyncOptions = {
   incremental?: boolean;
   since?: Date | string;
   limit?: number;
+  tenantId?: string;
 };
 
 export type SyncOperation = "create" | "update" | "delete" | "skip" | "conflict";
@@ -141,6 +142,7 @@ export type SyncResult = {
   skipped: number;
   conflicts: number;
   cursor?: string;
+  tenantId?: string;
   operations: DryRunOperation[];
   errors: Array<{ id?: string; message: string; details?: unknown }>;
 };

@@ -15,12 +15,14 @@ import {
   mapLanaDepartmentToOdoo,
   mapLanaEmployeeToOdoo,
   mapLanaLeaveToOdoo,
+  mapLanaJobToOdoo,
   mapLanaPayrollToOdoo,
   mapOdooAttendanceToLana,
   mapOdooContractToLana,
   mapOdooDepartmentToLana,
   mapOdooEmployeeToLana,
   mapOdooLeaveToLana,
+  mapOdooJobToLana,
   many2oneId
 } from "./mapper";
 import type { LanaAttendance, LanaContract, LanaDepartment, LanaEmployee, LanaLeave, LanaPayrollItem, NormalizedSyncDirection, OdooDomain, OdooRecord, SyncDirection, SyncEntity, SyncOptions, SyncResult } from "./types";
@@ -55,11 +57,11 @@ function normalizeDirection(direction: SyncDirection = "BIDIRECTIONAL"): Normali
   return direction;
 }
 
-function emptyResult(entity: string, direction: NormalizedSyncDirection, dryRun: boolean): SyncResult {
-  return { success: true, entity, direction, dryRun, pulled: 0, pushed: 0, created: 0, updated: 0, deleted: 0, skipped: 0, conflicts: 0, operations: [], errors: [] };
+function emptyResult(entity: string, direction: NormalizedSyncDirection, dryRun: boolean, tenantId?: string): SyncResult {
+  return { success: true, entity, direction, dryRun, tenantId, pulled: 0, pushed: 0, created: 0, updated: 0, deleted: 0, skipped: 0, conflicts: 0, operations: [], errors: [] };
 }
 
-function mergeResults(entity: string, direction: NormalizedSyncDirection, dryRun: boolean, results: SyncResult[]): SyncResult {
+function mergeResults(entity: string, direction: NormalizedSyncDirection, dryRun: boolean, results: SyncResult[], tenantId?: string): SyncResult {
   return results.reduce((acc, item) => ({
     ...acc,
     pulled: acc.pulled + item.pulled,
@@ -73,7 +75,7 @@ function mergeResults(entity: string, direction: NormalizedSyncDirection, dryRun
     errors: [...acc.errors, ...item.errors],
     success: acc.success && item.success,
     cursor: item.cursor || acc.cursor
-  }), emptyResult(entity, direction, dryRun));
+  }), emptyResult(entity, direction, dryRun, tenantId));
 }
 
 function updatedWhere(since?: Date | string) {
@@ -157,6 +159,7 @@ export class OdooSyncService {
       });
       await this.log("ODOO_TEST", "Odoo connection authenticated", { uid: state.uid, protocol: state.protocol, version });
     }
+    await writeAuditLog({ action: "ODOO_TEST", entity: "odoo", entityId: this.connection?.id, metadata: { uid: state.uid, protocol: state.protocol, version } }).catch(() => undefined);
     return { success: true, uid: state.uid, protocol: state.protocol, sessionId: state.sessionId, version };
   }
 
@@ -165,10 +168,10 @@ export class OdooSyncService {
     const entity = options.entity ?? "all";
     if (entity === "all") {
       const results: SyncResult[] = [];
-      for (const current of ["departments", "employees", "attendance", "leave", "payroll"] as SyncEntity[]) {
+      for (const current of ["departments", "jobs", "employees", "attendance", "leave"] as SyncEntity[]) {
         results.push(await this.sync({ ...options, entity: current }));
       }
-      return mergeResults("all", direction, Boolean(options.dryRun), results);
+      return mergeResults("all", direction, Boolean(options.dryRun), results, options.tenantId);
     }
 
     switch (entity) {
@@ -176,6 +179,7 @@ export class OdooSyncService {
       case "departments": return this.syncDepartments(options);
       case "attendance": return this.syncAttendance(options);
       case "leave": return this.syncLeave(options);
+      case "jobs": return this.syncJobs(options);
       case "payroll": return this.syncPayroll(options);
       case "contracts": return this.syncContracts(options);
       default: throw new Error(`Unsupported Odoo sync entity: ${entity}`);
@@ -184,11 +188,11 @@ export class OdooSyncService {
 
   async syncEmployees(options: SyncOptions = {}) {
     const direction = normalizeDirection(options.direction);
-    const result = emptyResult("employees", direction, Boolean(options.dryRun));
+    const result = emptyResult("employees", direction, Boolean(options.dryRun), options.tenantId);
     const mapper = getMapper("employees");
     const since = await this.resolveSince("employees", options);
     const batchSize = options.batchSize ?? options.limit ?? 100;
-    const history = await this.startHistory(options.mappingId, direction, "employees", since);
+    const history = await this.startHistory(options.mappingId, direction, "employees", since, options.tenantId);
 
     try {
       if (direction === "LANA_TO_ODOO" || direction === "BIDIRECTIONAL") {
@@ -233,11 +237,11 @@ export class OdooSyncService {
 
   async syncDepartments(options: SyncOptions = {}) {
     const direction = normalizeDirection(options.direction);
-    const result = emptyResult("departments", direction, Boolean(options.dryRun));
+    const result = emptyResult("departments", direction, Boolean(options.dryRun), options.tenantId);
     const mapper = getMapper("departments");
     const since = await this.resolveSince("departments", options);
     const batchSize = options.batchSize ?? options.limit ?? 100;
-    const history = await this.startHistory(options.mappingId, direction, "departments", since);
+    const history = await this.startHistory(options.mappingId, direction, "departments", since, options.tenantId);
 
     try {
       if (direction === "LANA_TO_ODOO" || direction === "BIDIRECTIONAL") {
@@ -278,11 +282,11 @@ export class OdooSyncService {
 
   async syncAttendance(options: SyncOptions = {}) {
     const direction = normalizeDirection(options.direction);
-    const result = emptyResult("attendance", direction, Boolean(options.dryRun));
+    const result = emptyResult("attendance", direction, Boolean(options.dryRun), options.tenantId);
     const mapper = getMapper("attendance");
     const since = await this.resolveSince("attendance", options);
     const batchSize = options.batchSize ?? options.limit ?? 100;
-    const history = await this.startHistory(options.mappingId, direction, "attendance", since);
+    const history = await this.startHistory(options.mappingId, direction, "attendance", since, options.tenantId);
 
     try {
       if (direction === "LANA_TO_ODOO" || direction === "BIDIRECTIONAL") {
@@ -319,11 +323,11 @@ export class OdooSyncService {
 
   async syncLeave(options: SyncOptions = {}) {
     const direction = normalizeDirection(options.direction);
-    const result = emptyResult("leave", direction, Boolean(options.dryRun));
+    const result = emptyResult("leave", direction, Boolean(options.dryRun), options.tenantId);
     const mapper = getMapper("leave");
     const since = await this.resolveSince("leave", options);
     const batchSize = options.batchSize ?? options.limit ?? 100;
-    const history = await this.startHistory(options.mappingId, direction, "leave", since);
+    const history = await this.startHistory(options.mappingId, direction, "leave", since, options.tenantId);
 
     try {
       if (direction === "LANA_TO_ODOO" || direction === "BIDIRECTIONAL") {
@@ -333,7 +337,9 @@ export class OdooSyncService {
           const employeeId = await this.findOdooEmployeeId(record.employee);
           if (!employeeId || !defaultLeaveTypeId) { result.skipped += 1; result.operations.push({ operation: "skip", model: mapper.odooModel, localId: record.id, reason: "Missing Odoo employee or leave type" }); continue; }
           const values = mapLanaLeaveToOdoo(record, employeeId, defaultLeaveTypeId);
-          if (options.dryRun) result.operations.push({ operation: "create", model: mapper.odooModel, localId: record.id, values });
+          const existing = await this.findOdooLeave(employeeId, record.startDate, record.endDate);
+          if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.odooModel, localId: record.id, externalId: existing?.id, values });
+          else if (existing?.id) { await this.client.write(mapper.odooModel, [existing.id], values); result.updated += 1; }
           else { await this.client.create(mapper.odooModel, values); result.created += 1; }
           result.pushed += 1;
         }
@@ -347,8 +353,56 @@ export class OdooSyncService {
           const localEmployeeId = await this.findLocalEmployeeId(row.employee_id);
           if (!localEmployeeId) { result.skipped += 1; result.operations.push({ operation: "skip", model: mapper.lanaModel, externalId: row.id, reason: "Missing matching Lana employee" }); continue; }
           const values = mapOdooLeaveToLana(row, localEmployeeId, leaveTypeId);
-          if (options.dryRun) result.operations.push({ operation: "create", model: mapper.lanaModel, externalId: row.id, values });
+          const existing = await this.findLocalLeave(localEmployeeId, values.startDate, values.endDate);
+          if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.lanaModel, localId: objectId(existing?.id), externalId: row.id, values });
+          else if (existing) { await delegate("leaveRequest").update({ where: { id: existing.id }, data: values }); result.updated += 1; }
           else { await delegate("leaveRequest").create({ data: values }); result.created += 1; }
+          result.pulled += 1;
+        }
+      }
+      return this.finishHistory(history?.id, result);
+    } catch (error) { return this.failHistory(history?.id, result, error); }
+  }
+
+
+  async syncJobs(options: SyncOptions = {}) {
+    const direction = normalizeDirection(options.direction);
+    const result = emptyResult("jobs", direction, Boolean(options.dryRun), options.tenantId);
+    const mapper = getMapper("jobs");
+    const since = await this.resolveSince("jobs", options);
+    const batchSize = options.batchSize ?? options.limit ?? 100;
+    const history = await this.startHistory(options.mappingId, direction, "jobs", since, options.tenantId);
+
+    try {
+      if (direction === "LANA_TO_ODOO" || direction === "BIDIRECTIONAL") {
+        const records = await delegate("position").findMany({ where: updatedWhere(since), take: batchSize, orderBy: { updatedAt: "asc" } });
+        for (const record of records as Array<{ id?: string; title: string; code?: string; description?: string | null; updatedAt?: Date | string }>) {
+          const values = mapLanaJobToOdoo(record);
+          const existing = await this.findExternalBy(mapper.odooModel, "name", record.title, mapper.odooFields);
+          if (existing && this.hasWriteDateConflict(record.updatedAt, existing.write_date, record, existing, mapper.fieldMap)) {
+            await this.conflict(options.mappingId, "jobs", record.id, String(existing.id), record, existing, result);
+            continue;
+          }
+          if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.odooModel, localId: record.id, externalId: existing?.id, values });
+          else if (existing?.id) { await this.client.write(mapper.odooModel, [existing.id], values); result.updated += 1; }
+          else { await this.client.create(mapper.odooModel, values); result.created += 1; }
+          result.pushed += 1;
+        }
+      }
+
+      if (direction === "ODOO_TO_LANA" || direction === "BIDIRECTIONAL") {
+        const rows = await this.client.search_read(mapper.odooModel, odooIncrementalDomain(since), mapper.odooFields, { limit: batchSize, order: "write_date asc" });
+        result.cursor = maxCursor(rows, since);
+        for (const row of rows) {
+          const values = mapOdooJobToLana(row);
+          const existing = await delegate("position").findFirst({ where: { code: String(values.code) } });
+          if (existing && this.hasWriteDateConflict(existing.updatedAt, row.write_date, existing, row, mapper.fieldMap)) {
+            await this.conflict(options.mappingId, "jobs", objectId(existing.id), String(row.id), existing, row, result);
+            continue;
+          }
+          if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.lanaModel, localId: objectId(existing?.id), externalId: row.id, values });
+          else if (existing) { await delegate("position").update({ where: { id: existing.id }, data: values }); result.updated += 1; }
+          else { await delegate("position").create({ data: values }); result.created += 1; }
           result.pulled += 1;
         }
       }
@@ -358,11 +412,11 @@ export class OdooSyncService {
 
   async syncContracts(options: SyncOptions = {}) {
     const direction = normalizeDirection(options.direction);
-    const result = emptyResult("contracts", direction, Boolean(options.dryRun));
+    const result = emptyResult("contracts", direction, Boolean(options.dryRun), options.tenantId);
     const mapper = getMapper("contracts");
     const since = await this.resolveSince("contracts", options);
     const batchSize = options.batchSize ?? options.limit ?? 100;
-    const history = await this.startHistory(options.mappingId, direction, "contracts", since);
+    const history = await this.startHistory(options.mappingId, direction, "contracts", since, options.tenantId);
 
     try {
       if (direction === "LANA_TO_ODOO" || direction === "BIDIRECTIONAL") {
@@ -397,11 +451,11 @@ export class OdooSyncService {
 
   async syncPayroll(options: SyncOptions = {}) {
     const direction = normalizeDirection(options.direction);
-    const result = emptyResult("payroll", direction, Boolean(options.dryRun));
+    const result = emptyResult("payroll", direction, Boolean(options.dryRun), options.tenantId);
     const mapper = getMapper("payroll");
     const since = await this.resolveSince("payroll", options);
     const batchSize = options.batchSize ?? options.limit ?? 100;
-    const history = await this.startHistory(options.mappingId, direction, "payroll", since);
+    const history = await this.startHistory(options.mappingId, direction, "payroll", since, options.tenantId);
 
     try {
       if (direction === "LANA_TO_ODOO" || direction === "BIDIRECTIONAL") {
@@ -460,6 +514,20 @@ export class OdooSyncService {
     return rows[0];
   }
 
+  private async findOdooLeave(employeeId: number, startDate: Date | string, endDate: Date | string) {
+    const rows = await this.client.search_read("hr.leave", [
+      ["employee_id", "=", employeeId],
+      ["request_date_from", "=", asDateString(startDate, true)],
+      ["request_date_to", "=", asDateString(endDate, true)]
+    ], ["id", "employee_id", "request_date_from", "request_date_to", "write_date"], { limit: 1 });
+    return rows[0];
+  }
+
+  private async findLocalLeave(employeeId: string, startDate: unknown, endDate: unknown) {
+    if (!startDate || !endDate) return undefined;
+    return delegate("leaveRequest").findFirst({ where: { employeeId, startDate: new Date(String(startDate)), endDate: new Date(String(endDate)) } });
+  }
+
   private async findDefaultOdooLeaveTypeId() {
     try {
       const rows = await this.client.search_read("hr.leave.type", [], ["id", "name"], { limit: 1 });
@@ -503,9 +571,9 @@ export class OdooSyncService {
     return history?.cursor ?? undefined;
   }
 
-  private async startHistory(mappingId: string | undefined, direction: NormalizedSyncDirection, entity: string, since?: Date | string) {
+  private async startHistory(mappingId: string | undefined, direction: NormalizedSyncDirection, entity: string, since?: Date | string, tenantId?: string) {
     if (!this.connection?.id) return undefined;
-    return prisma.syncHistory.create({ data: { connectionId: this.connection.id, mappingId, direction, entity, status: "RUNNING", cursor: since ? asDateString(since) : undefined } });
+    return prisma.syncHistory.create({ data: { connectionId: this.connection.id, mappingId, direction, entity, status: "RUNNING", cursor: since ? asDateString(since) : undefined, metadata: tenantId ? { tenantId } as any : undefined } });
   }
 
   private async finishHistory(historyId: string | undefined, result: SyncResult) {
@@ -522,12 +590,12 @@ export class OdooSyncService {
           deletedCount: result.deleted,
           conflictCount: result.conflicts,
           cursor: result.cursor,
-          metadata: { dryRun: result.dryRun, skipped: result.skipped, operations: result.operations.slice(0, 50) } as any
+          metadata: { dryRun: result.dryRun, skipped: result.skipped, tenantId: result.tenantId, operations: result.operations.slice(0, 50) } as any
         }
       });
     }
     await this.log("ODOO_SYNC", `Odoo ${result.entity} sync completed`, result).catch(() => undefined);
-    await writeAuditLog({ action: "ODOO_SYNC", entity: result.entity, entityId: this.connection?.id, metadata: { result } }).catch(() => undefined);
+    await writeAuditLog({ action: "ODOO_SYNC", entity: result.entity, entityId: this.connection?.id, metadata: { tenantId: result.tenantId, result } }).catch(() => undefined);
     return result;
   }
 
@@ -536,7 +604,8 @@ export class OdooSyncService {
     result.success = false;
     result.errors.push({ message, details: error });
     if (historyId) await prisma.syncHistory.update({ where: { id: historyId }, data: { status: "FAILED", finishedAt: new Date(), error: message } });
-    await this.log("ODOO_SYNC_FAILED", `Odoo ${result.entity} sync failed`, { message }).catch(() => undefined);
+    await this.log("ODOO_SYNC_FAILED", `Odoo ${result.entity} sync failed`, { message, tenantId: result.tenantId }).catch(() => undefined);
+    await writeAuditLog({ action: "ODOO_SYNC_FAILED", entity: result.entity, entityId: this.connection?.id, metadata: { tenantId: result.tenantId, message } }).catch(() => undefined);
     throw error;
   }
 

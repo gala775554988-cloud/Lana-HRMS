@@ -57,9 +57,9 @@ export const ODOO_MAPPERS: Record<string, MapperDefinition> = {
     lanaModel: "position",
     odooModel: "hr.job",
     keyField: "code",
-    externalKeyField: "code",
-    odooFields: ["id", "name", "code", "description", "department_id", "create_date", "write_date"],
-    fieldMap: { title: "name", code: "code", description: "description" }
+    externalKeyField: "name",
+    odooFields: ["id", "name", "description", "department_id", "create_date", "write_date"],
+    fieldMap: { title: "name", description: "description" }
   },
   partners: {
     entity: "partners",
@@ -220,7 +220,7 @@ export function mapOdooContractToLana(record: OdooRecord, employeeId?: string): 
 }
 
 export function mapLanaJobToOdoo(position: { title: string; code?: string; description?: string | null }): OdooWriteValues {
-  return stripEmpty({ name: position.title, code: position.code, description: position.description });
+  return stripEmpty({ name: position.title, description: position.description });
 }
 
 export function mapOdooJobToLana(record: OdooRecord): Record<string, unknown> {
