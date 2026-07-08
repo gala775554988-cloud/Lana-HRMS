@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { OdooSyncService, requireOdooIntegrationAccess } from "@/lib/integrations/odoo/sync";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 function statusFor(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   if (message === "Unauthorized") return 401;

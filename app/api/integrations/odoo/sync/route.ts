@@ -3,6 +3,10 @@ import { enqueueSync } from "@/lib/integrations/service";
 import { OdooSyncService, requireOdooIntegrationAccess } from "@/lib/integrations/odoo/sync";
 import type { SyncOptions } from "@/lib/integrations/odoo/types";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 function statusFor(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   if (message === "Unauthorized") return 401;

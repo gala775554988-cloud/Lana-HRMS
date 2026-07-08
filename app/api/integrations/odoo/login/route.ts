@@ -3,6 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { getOdooClient, requireIntegrationAccess, testOdooConnection } from "@/lib/integrations/service";
 import { decryptSecret } from "@/lib/integrations/security";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function POST(request: NextRequest) {
   try {
     await requireIntegrationAccess("manage");
