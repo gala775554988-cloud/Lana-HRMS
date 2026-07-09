@@ -170,7 +170,7 @@ export class OdooSyncService {
     const entity = options.entity ?? "all";
     if (entity === "all") {
       const results: SyncResult[] = [];
-      for (const current of ["companies", "departments", "jobs", "employees", "attendance", "leave"] as SyncEntity[]) {
+      for (const current of ["companies", "departments", "jobs", "employees", "contracts", "attendance", "leave"] as SyncEntity[]) {
         results.push(await this.sync({ ...options, entity: current }));
       }
       return mergeResults("all", direction, Boolean(options.dryRun), results, options.tenantId);
@@ -199,9 +199,22 @@ export class OdooSyncService {
 
     try {
       if (direction === "LANA_TO_ODOO" || direction === "BIDIRECTIONAL") {
-        const records = await delegate("employee").findMany({ where: updatedWhere(since), take: batchSize, orderBy: { updatedAt: "asc" }, include: { department: true, position: true } });
-        for (const record of records as LanaEmployee[]) {
-          const values = mapLanaEmployeeToOdoo(record);
+        const records = await delegate("employee").findMany({ where: updatedWhere(since), take: batchSize, orderBy: { updatedAt: "asc" }, include: { department: true, position: true, branch: true } });
+        for (const record of records as any[]) {
+          const values: any = mapLanaEmployeeToOdoo(record);
+          // Resolve relations to Odoo IDs
+          if (record.department) {
+            const dept = await this.findExternalBy("hr.department", "name", record.department.name, ["id"]);
+            if (dept?.id) values.department_id = dept.id;
+          }
+          if (record.position) {
+            const job = await this.findExternalBy("hr.job", "name", record.position.title, ["id"]);
+            if (job?.id) values.job_id = job.id;
+          }
+          if (record.branch) {
+            const comp = await this.findExternalBy("res.company", "name", record.branch.name, ["id"]);
+            if (comp?.id) values.company_id = comp.id;
+          }
           const existing = await this.findExternalBy(mapper.odooModel, mapper.externalKeyField, record.employeeNumber, mapper.odooFields);
           if (existing && this.hasWriteDateConflict(record.updatedAt, existing.write_date, record, existing, mapper.fieldMap)) {
             await this.conflict(options.mappingId, "employees", record.id, String(existing.id), record, existing, result);
@@ -218,7 +231,27 @@ export class OdooSyncService {
         const rows = await this.client.search_read(mapper.odooModel, odooIncrementalDomain(since), mapper.odooFields, { limit: batchSize, order: "write_date asc" });
         result.cursor = maxCursor(rows, since);
         for (const row of rows) {
-          const values = mapOdooEmployeeToLana(row);
+          const rawValues: any = mapOdooEmployeeToLana(row);
+          // Resolve Odoo relations -> Lana IDs
+          const departmentId = rawValues.odooDepartmentId ? await this.resolveDepartmentId(rawValues.odooDepartmentId) : undefined;
+          const positionId = rawValues.odooJobId ? await this.resolvePositionId(rawValues.odooJobId) : undefined;
+          const branchId = rawValues.odooCompanyId ? await this.resolveBranchId(rawValues.odooCompanyId) : undefined;
+
+          // Clean meta fields
+          delete rawValues.odooDepartmentId;
+          delete rawValues.odooJobId;
+          delete rawValues.odooCompanyId;
+          delete rawValues.odooManagerId;
+          delete rawValues._odooId;
+          delete rawValues._odooName;
+
+          const values: any = {
+            ...rawValues,
+            ...(departmentId ? { departmentId } : {}),
+            ...(positionId ? { positionId } : {}),
+            ...(branchId ? { branchId } : {})
+          };
+
           const employeeNumber = String(values.employeeNumber);
           const uniqueOr = [
             { employeeNumber },
@@ -231,10 +264,30 @@ export class OdooSyncService {
             continue;
           }
           try {
-            if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.lanaModel, localId: objectId(existing?.id), externalId: row.id, values });
-            else if (existing) { await delegate("employee").update({ where: { id: existing.id }, data: values }); result.updated += 1; }
-            else { await delegate("employee").create({ data: values }); result.created += 1; }
+            let localEmployeeId: string | undefined;
+            if (options.dryRun) {
+              result.operations.push({ operation: existing ? "update" : "create", model: mapper.lanaModel, localId: objectId(existing?.id), externalId: row.id, values });
+              localEmployeeId = objectId(existing?.id);
+            } else if (existing) {
+              const updated = await delegate("employee").update({ where: { id: existing.id }, data: values });
+              result.updated += 1;
+              localEmployeeId = String((updated as any).id);
+            } else {
+              const created = await delegate("employee").create({ data: values });
+              result.created += 1;
+              localEmployeeId = String((created as any).id);
+            }
             result.pulled += 1;
+
+            // Import contract / salary if available
+            if (localEmployeeId && !options.dryRun) {
+              try {
+                await this.importEmployeeContractFromOdoo(Number(row.id), localEmployeeId, result);
+              } catch (contractErr) {
+                // Non-fatal – log but continue
+                result.operations.push({ operation: "skip", model: "employeeContract", localId: localEmployeeId, externalId: row.id, reason: contractErr instanceof Error ? contractErr.message : String(contractErr) });
+              }
+            }
           } catch (recordError) {
             result.skipped += 1;
             result.operations.push({ operation: "skip", model: mapper.lanaModel, externalId: row.id, values, reason: recordError instanceof Error ? recordError.message : String(recordError) });
@@ -656,6 +709,97 @@ export class OdooSyncService {
     await this.log("ODOO_SYNC", `Odoo ${result.entity} sync completed`, result).catch(() => undefined);
     await writeAuditLog({ action: "ODOO_SYNC", entity: result.entity, entityId: this.connection?.id, metadata: { tenantId: result.tenantId, result } }).catch(() => undefined);
     return result;
+  }
+
+  private async resolveDepartmentId(odooDepartmentId: number): Promise<string | undefined> {
+    if (!odooDepartmentId) return undefined;
+    // Try ODOO-DEPT-{id} code first
+    const code = `ODOO-DEPT-${odooDepartmentId}`;
+    const dept = await delegate("department").findFirst({ where: { code } });
+    if (dept?.id) return String(dept.id);
+    // Fallback: try to find by Odoo name
+    try {
+      const rows = await this.client.read<OdooRecord>("hr.department", [odooDepartmentId], ["id", "name"]);
+      const name = rows?.[0]?.name ? String(rows[0].name) : undefined;
+      if (name) {
+        const byName = await delegate("department").findFirst({ where: { name } });
+        if (byName?.id) return String(byName.id);
+      }
+    } catch {}
+    return undefined;
+  }
+
+  private async resolvePositionId(odooJobId: number): Promise<string | undefined> {
+    if (!odooJobId) return undefined;
+    const code = `ODOO-JOB-${odooJobId}`;
+    const pos = await delegate("position").findFirst({ where: { code } });
+    if (pos?.id) return String(pos.id);
+    try {
+      const rows = await this.client.read<OdooRecord>("hr.job", [odooJobId], ["id", "name"]);
+      const name = rows?.[0]?.name ? String(rows[0].name) : undefined;
+      if (name) {
+        const byTitle = await delegate("position").findFirst({ where: { title: name } });
+        if (byTitle?.id) return String(byTitle.id);
+      }
+    } catch {}
+    return undefined;
+  }
+
+  private async resolveBranchId(odooCompanyId: number): Promise<string | undefined> {
+    if (!odooCompanyId) return undefined;
+    const code = `ODOO-COMPANY-${odooCompanyId}`;
+    const branch = await delegate("branch").findFirst({ where: { code } });
+    if (branch?.id) return String(branch.id);
+    try {
+      const rows = await this.client.read<OdooRecord>("res.company", [odooCompanyId], ["id", "name"]);
+      const name = rows?.[0]?.name ? String(rows[0].name) : undefined;
+      if (name) {
+        const byName = await delegate("branch").findFirst({ where: { name } });
+        if (byName?.id) return String(byName.id);
+      }
+    } catch {}
+    return undefined;
+  }
+
+  private async importEmployeeContractFromOdoo(odooEmployeeId: number, localEmployeeId: string, result: SyncResult) {
+    try {
+      // Fetch latest open contract for employee
+      const contracts = await this.client.search_read(
+        "hr.contract",
+        [["employee_id", "=", odooEmployeeId]],
+        ["id", "name", "date_start", "date_end", "wage", "state", "job_id", "department_id", "write_date"],
+        { order: "date_start desc", limit: 5 }
+      );
+      if (!contracts || contracts.length === 0) return;
+      // Prefer open state, else first
+      const contract = contracts.find((c: any) => c.state === "open") || contracts[0];
+      const contractNumber = contract.name ? String(contract.name) : `ODOO-${contract.id}`;
+      const startDate = contract.date_start ? new Date(String(contract.date_start)) : new Date();
+      const endDate = contract.date_end ? new Date(String(contract.date_end)) : null;
+      const salaryAmount = Number(contract.wage) || 0;
+      const statusMap: Record<string, string> = { open: "ACTIVE", close: "EXPIRED", cancel: "TERMINATED", draft: "DRAFT" };
+      const status = statusMap[String(contract.state)] || "DRAFT";
+
+      const existing = await delegate("employeeContract").findFirst({ where: { contractNumber } });
+      const data = {
+        employeeId: localEmployeeId,
+        contractNumber,
+        title: contractNumber,
+        startDate,
+        endDate,
+        salaryAmount,
+        currency: "SAR",
+        status
+      };
+      if (existing) {
+        await delegate("employeeContract").update({ where: { id: existing.id }, data });
+      } else {
+        await delegate("employeeContract").create({ data });
+      }
+    } catch (e) {
+      // swallow – caller logs skip
+      throw e;
+    }
   }
 
   private async failHistory(historyId: string | undefined, result: SyncResult, error: unknown): Promise<SyncResult> {

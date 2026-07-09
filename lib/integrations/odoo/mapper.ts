@@ -7,13 +7,60 @@ export const ODOO_MAPPERS: Record<string, MapperDefinition> = {
     odooModel: "hr.employee",
     keyField: "employeeNumber",
     externalKeyField: "barcode",
-    odooFields: ["id", "name", "barcode", "identification_id", "work_email", "work_phone", "mobile_phone", "gender", "active", "department_id", "job_id", "create_date", "write_date"],
+    odooFields: [
+      "id",
+      "name",
+      "barcode",
+      "identification_id",
+      "work_email",
+      "work_phone",
+      "mobile_phone",
+      "gender",
+      "active",
+      "department_id",
+      "job_id",
+      "parent_id",
+      "company_id",
+      "image_1920",
+      "first_contract_date",
+      "birthday",
+      "country_id",
+      "address_home_id",
+      "private_email",
+      "private_phone",
+      "emergency_contact",
+      "emergency_phone",
+      "work_location_id",
+      "employee_type",
+      "marital",
+      "children",
+      "place_of_birth",
+      "country_of_birth",
+      "passport_id",
+      "permit_no",
+      "visa_no",
+      "visa_expire",
+      "departure_date",
+      "departure_description",
+      "create_date",
+      "write_date"
+    ],
     fieldMap: {
       employeeNumber: "barcode",
       nationalId: "identification_id",
       email: "work_email",
       phone: "work_phone",
-      gender: "gender"
+      gender: "gender",
+      hireDate: "first_contract_date",
+      dateOfBirth: "birthday",
+      profilePhotoUrl: "image_1920",
+      status: "active",
+      departmentId: "department_id",
+      positionId: "job_id",
+      branchId: "company_id",
+      emergencyContact: "emergency_contact",
+      terminationDate: "departure_date",
+      address: "address_home_id"
     }
   },
   departments: {
@@ -136,8 +183,14 @@ export function splitFullName(fullName: unknown) {
   return { firstName, lastName: rest.join(" ") || " " };
 }
 
-export function mapLanaEmployeeToOdoo(employee: LanaEmployee): OdooWriteValues {
+export function mapLanaEmployeeToOdoo(employee: any): OdooWriteValues {
   const name = [employee.firstName, employee.lastName].filter(Boolean).join(" ").trim();
+  // profilePhotoUrl may be data URI – extract base64
+  let image1920: string | undefined;
+  if (typeof employee.profilePhotoUrl === "string" && employee.profilePhotoUrl.length > 0) {
+    const match = employee.profilePhotoUrl.match(/^data:image\/[^;]+;base64,(.+)$/);
+    image1920 = match ? match[1] : employee.profilePhotoUrl;
+  }
   return stripEmpty({
     name: name || employee.employeeNumber,
     barcode: employee.employeeNumber,
@@ -146,22 +199,55 @@ export function mapLanaEmployeeToOdoo(employee: LanaEmployee): OdooWriteValues {
     work_phone: employee.phone,
     mobile_phone: employee.phone,
     gender: normalizeGender(employee.gender),
-    active: employee.status ? employee.status !== "TERMINATED" && employee.status !== "INACTIVE" : undefined
+    active: employee.status ? employee.status !== "TERMINATED" && employee.status !== "INACTIVE" : undefined,
+    birthday: asDateString(employee.dateOfBirth, true),
+    emergency_contact: employee.emergencyContact,
+    // Relations are resolved in sync service via IDs, not here
+    // department_id, job_id, company_id handled externally
+    image_1920: image1920
   });
 }
 
 export function mapOdooEmployeeToLana(record: OdooRecord): Record<string, unknown> {
   const names = splitFullName(record.name);
+  const workEmail = textValue(record.work_email) || textValue(record.private_email);
+  const workPhone = textValue(record.work_phone) || textValue(record.mobile_phone) || textValue(record.private_phone);
+  const imageRaw = textValue(record.image_1920);
+  const profilePhotoUrl = imageRaw ? (imageRaw.startsWith("data:") ? imageRaw : `data:image/jpeg;base64,${imageRaw}`) : undefined;
+  const hireDate = asDate(record.first_contract_date) || asDate(record.create_date) || new Date();
+  const dateOfBirth = asDate(record.birthday);
+  const terminationDate = asDate(record.departure_date);
+  const emergencyContact = [textValue(record.emergency_contact), textValue(record.emergency_phone)].filter(Boolean).join(" - ") || undefined;
+
+  // Extract many2one IDs for later resolution in sync service
+  const departmentOdooId = many2oneId(record.department_id);
+  const jobOdooId = many2oneId(record.job_id);
+  const companyOdooId = many2oneId(record.company_id);
+  const managerOdooId = many2oneId(record.parent_id);
+
   return stripEmpty({
     employeeNumber: String(record.barcode || record.id || `ODOO-${record.id}`),
     nationalId: String(record.identification_id || `ODOO-${record.id}`),
     firstName: names.firstName,
     lastName: names.lastName,
-    email: textValue(record.work_email),
-    phone: textValue(record.work_phone) || textValue(record.mobile_phone),
+    email: workEmail,
+    phone: workPhone,
     gender: normalizeGender(record.gender),
-    hireDate: asDate(record.create_date) || new Date(),
-    status: record.active === false ? "INACTIVE" : "ACTIVE"
+    hireDate,
+    dateOfBirth,
+    terminationDate,
+    emergencyContact,
+    profilePhotoUrl,
+    address: undefined, // address_home_id is m2o – could be resolved separately
+    status: record.active === false ? "INACTIVE" : "ACTIVE",
+    // Pass-through Odoo relation IDs for resolver
+    odooDepartmentId: departmentOdooId,
+    odooJobId: jobOdooId,
+    odooCompanyId: companyOdooId,
+    odooManagerId: managerOdooId,
+    // also keep raw for debugging
+    _odooId: record.id,
+    _odooName: record.name
   });
 }
 
