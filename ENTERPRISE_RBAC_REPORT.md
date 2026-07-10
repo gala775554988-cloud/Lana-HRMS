@@ -1,37 +1,99 @@
-# تقرير تنفيذ ونشر نظام الصلاحيات Enterprise RBAC
+# تقرير إصلاح متغيرات Vercel و Supabase + Enterprise RBAC
 
 التاريخ: 2026-07-11
 المشروع: Lana HRMS
 GitHub branch: main
-Commit: b2fdce0 - Rebuild enterprise RBAC custom permissions
 
-## حالة الرفع والنشر
+## حالة التنفيذ النهائية
 
-- تم رفع التعديلات إلى GitHub على الفرع `main`.
-- تم تنفيذ نشر Production على Vercel بنجاح.
-- رابط Production:
+تم إصلاح خطأ متغيرات قاعدة البيانات، إنشاء المتغيرات على Vercel، تطبيق Migrations على Supabase، إعادة Seed لصلاحيات Enterprise RBAC، ثم إعادة النشر على Vercel Production.
+
+## روابط النشر
+
+- Production:
   - https://lana-hrms.vercel.app
-- رابط Deployment المباشر:
-  - https://lana-hrms-iyiznl9bn-lanahr.vercel.app
-- رابط Inspect في Vercel:
-  - https://vercel.com/lanahr/lana-hrms/CYJVnR5Z7YzwSvrLExukDUQHhbG3
-- تم التحقق من الرابط ويعيد إلى `/login` بشكل صحيح عبر HTTP 307.
+- آخر Deployment مباشر:
+  - https://lana-hrms-9kmn8l9n9-lanahr.vercel.app
+- Vercel Inspect:
+  - https://vercel.com/lanahr/lana-hrms/qNYLdxZ3m5aGWMfd1RZrvebQ2gHv
+
+تم فحص رابط Production، وهو يعمل ويرجع إلى `/login` بشكل صحيح.
+
+## إصلاح المتغيرات
+
+تم إنشاء/تحديث المتغيرات التالية في Vercel لكل البيئات:
+
+- Production
+- Preview
+- Development
+
+المتغيرات:
+
+- `DATABASE_URL`
+- `DIRECT_URL`
+
+وتم استخدام اتصال Supabase Session Pooler مع تشفير كلمة المرور بشكل صحيح لأن كلمة المرور تحتوي على الرمز `@`.
+
+## إصلاح خطأ Migration
+
+كان الخطأ السابق بسبب أن قاعدة Supabase كانت تحتوي على نسخة أقدم من جداول الصلاحيات، منها:
+
+- `PermissionGroup` كانت تستخدم `code` بدلاً من `key`.
+- `Permission` كانت تحتوي `groupCode` ولا تحتوي `key/groupId` بالشكل الجديد.
+- `UserPermission` كانت تستخدم `isGranted` بدلاً من `effect`.
+- `AuditPermissionLog` كان ينقصه بعض الأعمدة المطلوبة.
+
+تم إصلاح قاعدة البيانات بإضافة طبقة Repair Migration:
+
+`prisma/migrations/20260711000200_enterprise_rbac_schema_repair/migration.sql`
+
+ثم تم تشغيل:
+
+```bash
+npx prisma migrate deploy
+```
+
+والنتيجة:
+
+- كل Migrations تم تطبيقها بنجاح.
+- لا توجد Migrations معلقة.
+
+## حالة قاعدة البيانات بعد الإصلاح
+
+تم التحقق من قاعدة Supabase بعد الإصلاح:
+
+- عدد Roles: 17
+- عدد Permissions: 195
+- عدد Permission Groups: 20
+- Migration الأساسي للصلاحيات تم معالجته وتسجيله.
+- Repair Migration تم تطبيقه بنجاح.
+
+## Seed نظام الصلاحيات
+
+تم تشغيل Seed مخصص لنظام الصلاحيات:
+
+- إنشاء/تحديث Permission Groups.
+- إنشاء/تحديث Permissions.
+- إنشاء/تحديث Roles المطلوبة.
+- ربط RolePermission حسب Templates.
+
+النتيجة:
+
+`Enterprise RBAC seed completed`
 
 ## ما تم تنفيذه في نظام الصلاحيات
 
-- إعادة بناء RBAC ليصبح مبنياً على:
-  - Role Permissions
-  - Custom User Permissions
-  - Inherited Permissions
-  - Effective Permissions
-  - Grant / Deny لكل مستخدم بشكل منفصل
-- أي موظف يمكن إعطاؤه صلاحيات مستقلة بدون تعديل Role.
-- أي Role يمكن استخدامه كقالب صلاحيات، مع دعم التعديل المستقبلي.
-- أي Permission يمكن إضافتها مستقبلاً بدون كسر النظام.
+- Role + Custom Permissions لكل مستخدم.
+- Inherited Permissions.
+- Custom Grants.
+- Custom Denies.
+- Effective Permissions.
+- Audit Log لتغييرات الصلاحيات.
+- إمكانية إعطاء أي موظف أي صلاحية بشكل منفصل بدون تعديل Role.
+- API محمي لتعديل صلاحيات Role.
+- Permission Tree كامل قابل للتوسع.
 
-## الأدوار المضافة
-
-تمت إضافة الأدوار المطلوبة:
+## الأدوار الموجودة
 
 - SUPER_ADMIN
 - HR_DIRECTOR
@@ -50,162 +112,37 @@ Commit: b2fdce0 - Rebuild enterprise RBAC custom permissions
 - SYSTEM_ADMIN
 - READ_ONLY
 
-## شجرة الصلاحيات
+بالإضافة إلى أدوار قديمة موجودة من النظام السابق، لذلك أصبح العدد الحالي 17 Role.
 
-تم إنشاء شجرة صلاحيات Enterprise للوحدات التالية:
+## APIs المحمية
 
-- Employees
-- Departments
-- Branches
-- Hospitals
-- Positions
-- Contracts
-- Attendance
-- Leave
-- Payroll
-- Overtime
-- Performance
-- Training
-- Assets
-- Documents
-- Reports
-- Odoo Integration
-- Settings
-- Users
-- AI
+- `GET/PATCH /api/enterprise/permissions`
+- `PATCH /api/enterprise/users/[userId]`
+- `PATCH /api/enterprise/employees/[employeeId]`
+- `PATCH /api/enterprise/roles/[roleId]`
 
-مع صلاحيات تفصيلية مثل View, Create, Edit, Delete, Archive, Restore, Import, Export, Sync Odoo, View Salaries, Edit Salaries وغيرها.
+كل API يتحقق من الصلاحية ويرجع:
 
-## صفحة إدارة الصلاحيات
-
-تم تحديث صفحة `/permissions-management` لتدعم:
-
-- Tree View
-- Switch ON/OFF لكل Permission
-- Select All
-- Clear All
-- Search Permission
-- Filter حسب النظام
-- Role Templates
-- Custom Grant
-- Custom Deny
-- Effective Permissions
-- Audit Log مباشر
-
-## ملف الموظف
-
-تمت إضافة Tab داخل ملف الموظف باسم:
-
-- الصلاحيات
-
-ويعرض:
-
-- Role
-- Inherited Permissions
-- Custom Permissions
-- Effective Permissions
-
-## إدارة الحساب
-
-تمت إضافة بيانات وإجراءات الحساب:
-
-- اسم المستخدم
-- الدور
-- الحالة
-- آخر تسجيل دخول
-- عدد مرات الدخول
-- آخر تغيير لكلمة المرور
-- هل يجب تغيير كلمة المرور؟
-- الحساب مقفل؟
-- سبب القفل
-
-وأزرار الإدارة:
-
-- Reset Password
-- Force Password Change
-- Unlock Account
-- Disable Account
-- Enable Account
-- Archive Employee
-- Restore Employee
-- Send Welcome Email placeholder
-
-## Audit Log
-
-أي تغيير في الصلاحيات أو إجراءات الحساب يتم تسجيله في:
-
-- AuditPermissionLog
-- AuditLog العام
-
-ويحفظ:
-
-- من قام بالتعديل
-- المستخدم المستهدف
-- وقت العملية
-- IP
-- User Agent / Device
-- القيمة القديمة
-- القيمة الجديدة
-- سبب/نوع العملية
-
-## تغييرات قاعدة البيانات
-
-Migration جديد:
-
-`prisma/migrations/20260711000100_enterprise_rbac_custom_permissions/migration.sql`
-
-أضاف:
-
-- PermissionGroup
-- UserPermission
-- AuditPermissionLog
-- PermissionEffect enum
-- أعمدة جديدة في Permission: key, label, groupId, isSystem, sortOrder
-- أعمدة حساب المستخدم: status, loginCount, passwordChangedAt, mustChangePassword, isLocked, lockedAt, lockReason, disabledAt
-- archivedAt في Employee
-- isEditable في Role
-
-## الأمان
-
-- تم حماية APIs الخاصة بالصلاحيات وإدارة المستخدمين والموظفين.
-- عند عدم وجود Session يتم إرجاع 401.
-- عند عدم وجود Permission يتم إرجاع 403.
-- النظام لا يعتمد فقط على إخفاء الأزرار من الواجهة.
-
-## الأداء
-
-- استخدام Prisma select لتقليل البيانات المحملة.
-- Pagination لقائمة الموظفين.
-- Lazy Loading لملف صلاحيات المستخدم المختار.
-- تحميل Audit Log بحد أقصى.
-- بنية قابلة لإضافة Virtualization لاحقاً إذا زاد عدد الصلاحيات/الموظفين بشكل كبير.
+- `401 Unauthorized` عند عدم وجود جلسة.
+- `403 Forbidden` عند عدم امتلاك الصلاحية.
 
 ## التحقق الفني
 
-تم تنفيذ:
+تم بنجاح:
 
-- npm run typecheck: نجح
-- npm run build: نجح محلياً
-- Vercel Production Build: نجح
-- Vercel Deployment: نجح
+- إنشاء Vercel Environment Variables.
+- تطبيق Prisma migrations على Supabase.
+- إصلاح Migration السابق الفاشل.
+- تشغيل Enterprise RBAC seed.
+- إعادة نشر Vercel Production.
+- فحص رابط Production.
 
-## ملاحظة مهمة عن قاعدة البيانات
+## ملاحظة أمان
 
-عند محاولة تشغيل `prisma migrate deploy` من البيئة الحالية، تبين أن متغير `DATABASE_URL` في بيئة Vercel Production موجود لكنه فارغ، ومتغير `DIRECT_URL` غير موجود. لذلك لم يتم تطبيق migration على قاعدة Supabase من هنا.
+تم استخدام Tokens وكلمة مرور قاعدة البيانات داخل المحادثة. يوصى بتدوير/تغيير:
 
-النشر نجح، لكن لكي تعمل الجداول الجديدة في Production يجب ضبط متغيرات قاعدة البيانات في Vercel:
+- Vercel Token
+- GitHub Token
+- Supabase Database Password
 
-- DATABASE_URL
-- DIRECT_URL
-
-ثم تشغيل:
-
-```bash
-npx prisma migrate deploy
-```
-
-أو إضافته إلى pipeline النشر إذا كان لديكم إعداد آمن لذلك.
-
-## تنبيه أمني
-
-تمت مشاركة Tokens داخل المحادثة. يوصى بتدوير/إلغاء GitHub و Vercel tokens بعد انتهاء المهمة لحماية المشروع.
+بعد الانتهاء من العمل لضمان الأمان.
