@@ -47,6 +47,19 @@ function delegateFor(modelName: string) {
   return (prisma as unknown as Record<string, CrudDelegate>)[modelName];
 }
 
+function buildSafeRecordSelect(resource: HrmsModule) {
+  const keys = new Set<string>([
+    "id",
+    "createdAt",
+    "updatedAt",
+    ...resource.fields.map((field) => field.name),
+    ...resource.tableFields,
+    ...resource.searchFields,
+    ...resource.filterFields,
+  ]);
+  return Object.fromEntries(Array.from(keys).filter(Boolean).map((key) => [key, true]));
+}
+
 function serialize(value: unknown): unknown {
   if (value instanceof Date) return value.toISOString();
   if (typeof value === "bigint") return value.toString();
@@ -329,7 +342,7 @@ export async function getModuleRecord(resourceKey: string, id: string) {
   if (!resource) throw new Error("Unknown module");
   const session = await requireModulePermission(resource, "read");
   try {
-    const record = await delegateFor(resource.model).findUnique({ where: { id } });
+    const record = await delegateFor(resource.model).findUnique({ where: { id }, select: buildSafeRecordSelect(resource) });
     await assertRecordVisible(resource, record, session);
     return serialize(record) as Record<string, unknown> | null;
   } catch (error: any) {
@@ -367,7 +380,7 @@ export async function createModuleRecord(input: MutationInput) {
 
       const existingEmployee = await prisma.employee.findUnique({
         where: { nationalId },
-        include: { user: true }
+        select: { id: true, userId: true }
       });
       if (existingEmployee?.userId) {
         return { success: false, message: "An account already exists for this National ID." };
