@@ -22,7 +22,9 @@ export interface EmployeeCardData {
   position?: { title: string } | null;
   branch?: { name: string } | null;
   employmentType?: { name: string } | null;
+  userId?: string | null;
   lastLoginAt?: string | null;
+  user?: { id: string; username?: string | null; email?: string | null; roles?: { role: { name: string } }[] } | null;
 }
 
 interface EmployeeCardProps {

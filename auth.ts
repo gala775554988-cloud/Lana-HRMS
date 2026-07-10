@@ -214,8 +214,8 @@ export const authConfig = {
           return null;
         }
 
-        if (!user.isActive) {
-          console.log("[Auth] User is inactive:", user.id);
+        if (!user.isActive || (user as any).isLocked) {
+          console.log("[Auth] User is inactive or locked:", user.id);
           return null;
         }
 
@@ -236,7 +236,7 @@ export const authConfig = {
 
         await prisma.user.update({
           where: { id: user.id },
-          data: { lastLoginAt: new Date() }
+          data: { lastLoginAt: new Date(), loginCount: { increment: 1 } as any }
         });
 
         const authorization = await getAuthorization(user.id);

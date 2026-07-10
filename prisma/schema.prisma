@@ -17,12 +17,24 @@ model User {
   image                 String?
   passwordHash          String?
   isActive              Boolean                  @default(true)
+  status                String                   @default("ACTIVE")
   lastLoginAt           DateTime?
+  loginCount            Int                      @default(0)
+  passwordChangedAt     DateTime?
+  mustChangePassword    Boolean                  @default(false)
+  isLocked              Boolean                  @default(false)
+  lockedAt              DateTime?
+  lockReason            String?
+  disabledAt            DateTime?
   createdAt             DateTime                 @default(now())
   updatedAt             DateTime                 @updatedAt
   accounts              Account[]
   sessions              Session[]
   roles                 UserRole[]
+  customPermissions     UserPermission[]         @relation("UserCustomPermissions")
+  assignedUserPermissions UserPermission[]       @relation("UserPermissionAssignedBy")
+  auditPermissionLogs   AuditPermissionLog[]     @relation("PermissionAuditActor")
+  targetPermissionLogs  AuditPermissionLog[]     @relation("PermissionAuditTarget")
   passwordResetTokens   PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
   employeeProfile         Employee?
@@ -72,6 +84,7 @@ model Role {
   name        String           @unique
   description String?
   isSystem    Boolean          @default(false)
+  isEditable  Boolean          @default(true)
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
   users       UserRole[]
@@ -80,14 +93,90 @@ model Role {
 
 model Permission {
   id          String           @id @default(cuid())
+  key         String?          @unique
   action      String
   resource    String
+  label       String?
   description String?
+  groupId     String?
+  isSystem    Boolean          @default(true)
+  sortOrder   Int              @default(0)
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
+  group       PermissionGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
   roles       RolePermission[]
+  users       UserPermission[]
+  auditLogs   AuditPermissionLog[]
 
   @@unique([action, resource])
+  @@index([resource])
+  @@index([groupId])
+}
+
+model PermissionGroup {
+  id          String       @id @default(cuid())
+  key         String       @unique
+  name        String
+  nameAr      String?
+  description String?
+  parentId    String?
+  sortOrder   Int          @default(0)
+  isSystem    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  parent      PermissionGroup?  @relation("PermissionGroupTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children    PermissionGroup[] @relation("PermissionGroupTree")
+  permissions Permission[]
+
+  @@index([parentId])
+}
+
+enum PermissionEffect {
+  GRANT
+  DENY
+}
+
+model UserPermission {
+  id           String           @id @default(cuid())
+  userId       String
+  permissionId String
+  effect       PermissionEffect @default(GRANT)
+  reason       String?
+  expiresAt    DateTime?
+  assignedById String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  user         User             @relation("UserCustomPermissions", fields: [userId], references: [id], onDelete: Cascade)
+  permission   Permission       @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  assignedBy   User?            @relation("UserPermissionAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@unique([userId, permissionId])
+  @@index([userId, effect])
+  @@index([permissionId])
+  @@index([expiresAt])
+}
+
+model AuditPermissionLog {
+  id           String      @id @default(cuid())
+  actorUserId  String?
+  targetUserId String
+  permissionId String?
+  action       String
+  oldValue     Json?
+  newValue     Json?
+  ipAddress    String?
+  userAgent    String?
+  device       String?
+  reason       String?
+  createdAt    DateTime    @default(now())
+  actor        User?        @relation("PermissionAuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  target       User         @relation("PermissionAuditTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  permission   Permission?  @relation(fields: [permissionId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId])
+  @@index([targetUserId])
+  @@index([permissionId])
+  @@index([createdAt])
 }
 
 model UserRole {
@@ -237,6 +326,7 @@ model Employee {
   dateOfBirth      DateTime?
   hireDate         DateTime
   terminationDate  DateTime?
+  archivedAt       DateTime?
   status           EmployeeStatus     @default(ACTIVE)
   address          String?
   emergencyContact String?

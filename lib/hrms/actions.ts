@@ -235,7 +235,7 @@ export async function listModuleRecords(input: QueryInput) {
             position: { select: { title: true } },
             branch: { select: { name: true } },
             employmentType: { select: { name: true } },
-            user: { select: { lastLoginAt: true } },
+            user: { select: { id: true, username: true, email: true, lastLoginAt: true, roles: { select: { role: { select: { name: true } } } } } },
           },
         }),
         prisma.employee.count({ where }),
@@ -256,6 +256,8 @@ export async function listModuleRecords(input: QueryInput) {
         position: r.position,
         branch: r.branch,
         employmentType: r.employmentType,
+        userId: r.userId,
+        user: r.user ? { id: r.user.id, username: r.user.username, email: r.user.email, roles: r.user.roles } : null,
         lastLoginAt: r.user?.lastLoginAt ? new Date(r.user.lastLoginAt).toLocaleString("ar-SA") : null,
         createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : null,
       }));

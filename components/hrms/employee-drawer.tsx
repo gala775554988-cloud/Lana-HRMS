@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, memo } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { X, User, Briefcase, DollarSign, Clock, FileText, BarChart3, Package, Activity } from "lucide-react";
+import { X, User, Briefcase, DollarSign, Clock, FileText, BarChart3, Package, Activity, ShieldCheck } from "lucide-react";
 import type { EmployeeCardData } from "@/components/hrms/employee-card";
 
 const tabs = [
@@ -18,6 +18,7 @@ const tabs = [
   { id: "performance" as const, label: { en: "Performance", ar: "الأداء" }, icon: BarChart3 },
   { id: "assets" as const, label: { en: "Assets", ar: "الأصول" }, icon: Package },
   { id: "activity" as const, label: { en: "Activity Log", ar: "سجل النشاط" }, icon: Activity },
+  { id: "permissions" as const, label: { en: "Permissions", ar: "الصلاحيات" }, icon: ShieldCheck },
 ];
 
 type TabId = typeof tabs[number]["id"];
@@ -70,6 +71,41 @@ const JobTab = memo(function JobTab({ employee, locale }: { employee: EmployeeCa
         <InfoBlock label={locale === "ar" ? "تاريخ التعيين" : "Hire Date"} value={employee.hireDate} />
         <InfoBlock label={locale === "ar" ? "الحالة" : "Status"}><StatusBadge status={employee.status} locale={locale} size="sm" /></InfoBlock>
       </div>
+    </div>
+  );
+});
+
+const PermissionsTab = memo(function PermissionsTab({ employee, locale }: { employee: EmployeeCardData; locale: "en" | "ar" }) {
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (!employee.userId) return;
+    setLoading(true);
+    fetch(`/api/enterprise/permissions?userId=${employee.userId}`, { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => setProfile(data.profile))
+      .catch(() => setProfile(null))
+      .finally(() => setLoading(false));
+  }, [employee.userId]);
+  const roles = profile?.roles ?? employee.user?.roles?.map((item: any) => item.role.name) ?? [];
+  const renderList = (titleAr: string, titleEn: string, values: string[]) => (
+    <div className="rounded-xl border p-3">
+      <div className="mb-2 flex items-center justify-between"><p className="text-sm font-semibold">{locale === "ar" ? titleAr : titleEn}</p><span className="rounded-full bg-muted px-2 py-0.5 text-xs">{values.length}</span></div>
+      <div className="max-h-32 overflow-auto space-y-1">{values.slice(0, 80).map((value) => <code key={value} className="block rounded bg-muted px-2 py-1 text-xs">{value}</code>)}</div>
+    </div>
+  );
+  if (!employee.userId) return <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">{locale === "ar" ? "لا يوجد حساب مرتبط بهذا الموظف." : "No linked user account."}</div>;
+  return (
+    <div className="space-y-4 animate-fade-in">
+      <InfoBlock label="Role" value={roles.join(", ") || "EMPLOYEE"} />
+      {loading ? <p className="text-sm text-muted-foreground">{locale === "ar" ? "تحميل الصلاحيات..." : "Loading permissions..."}</p> : (
+        <div className="grid gap-3">
+          {renderList("Inherited Permissions", "Inherited Permissions", profile?.inheritedPermissions ?? [])}
+          {renderList("Custom Permissions", "Custom Permissions", profile?.customPermissions ?? [])}
+          {renderList("Effective Permissions", "Effective Permissions", profile?.effectivePermissions ?? [])}
+        </div>
+      )}
+      <Button asChild variant="outline"><a href={`/permissions-management?userId=${employee.userId}`}>{locale === "ar" ? "فتح إدارة الصلاحيات" : "Open permissions management"}</a></Button>
     </div>
   );
 });
@@ -131,6 +167,7 @@ export function EmployeeDrawer({ employee, open, onClose, locale = "ar", onEdit 
       case "overview": return <OverviewTab employee={employee} locale={locale} />;
       case "personal": return <PersonalTab employee={employee} locale={locale} />;
       case "job": return <JobTab employee={employee} locale={locale} />;
+      case "permissions": return <PermissionsTab employee={employee} locale={locale} />;
       default: return <RelatedDataTab tabId={activeTab} employee={employee} locale={locale} />;
     }
   }, [activeTab, employee, locale]);
