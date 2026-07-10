@@ -22,10 +22,16 @@ model User {
   loginCount            Int                      @default(0)
   passwordChangedAt     DateTime?
   mustChangePassword    Boolean                  @default(false)
-  isLocked              Boolean                  @default(false)
-  lockedAt              DateTime?
-  lockReason            String?
-  disabledAt            DateTime?
+  isLocked                Boolean                @default(false)
+  lockedAt                DateTime?
+  lockReason              String?
+  lockedReason            String?
+  lockedById              String?
+  loginAttempts           Int                    @default(0)
+  failedLoginAttempts     Int                    @default(0)
+  lastFailedLoginAt       DateTime?
+  lockedUntil             DateTime?
+  disabledAt              DateTime?
   createdAt             DateTime                 @default(now())
   updatedAt             DateTime                 @updatedAt
   accounts              Account[]

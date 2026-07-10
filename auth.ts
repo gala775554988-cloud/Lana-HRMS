@@ -7,6 +7,36 @@ import { verifyPassword } from "@/lib/password";
 import { mergeEffectivePermissions } from "@/lib/enterprise/permissions";
 import { inferEnterpriseRolesFromPosition } from "@/lib/enterprise/role-inference";
 
+const authUserSelect = {
+  id: true,
+  name: true,
+  username: true,
+  email: true,
+  emailVerified: true,
+  image: true,
+  passwordHash: true,
+  isActive: true,
+  lastLoginAt: true,
+  createdAt: true,
+  updatedAt: true,
+  isLocked: true,
+} as const;
+
+type AuthDbUser = {
+  id: string;
+  name: string | null;
+  username?: string | null;
+  email: string | null;
+  emailVerified?: Date | null;
+  image: string | null;
+  passwordHash: string | null;
+  isActive: boolean;
+  lastLoginAt?: Date | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+  isLocked?: boolean | null;
+};
+
 async function getAuthorization(userId: string) {
   const assignments: any = await prisma.userRole.findMany({
     where: { userId },
@@ -42,14 +72,24 @@ async function getAuthorization(userId: string) {
   };
 }
 
-async function findUserByIdentifier(identifier: string) {
+async function findUserByIdentifier(identifier: string): Promise<AuthDbUser | null> {
   const normalized = identifier.trim();
   const lower = normalized.toLowerCase();
+  const debug = {
+    identifier: normalized,
+    searches: [] as string[],
+    userFound: false,
+    employeeFound: false,
+    accountActive: null as boolean | null,
+    passwordHashExists: null as boolean | null,
+    reason: "start"
+  };
 
   
   // 1. AUTO-REPAIR ADMIN ACCOUNT ON LOGIN ATTEMPT
   if (normalized === "admin") {
-    let adminUser = await prisma.user.findFirst({ where: { username: "admin" } });
+    debug.searches.push("admin auto-repair: User.username = admin");
+    let adminUser = await prisma.user.findFirst({ where: { username: "admin" }, select: authUserSelect });
     const superAdminRole = await prisma.role.upsert({
       where: { name: "SUPER_ADMIN" },
       update: { isSystem: true },
@@ -67,7 +107,8 @@ async function findUserByIdentifier(identifier: string) {
           passwordHash: hashedPassword,
           isActive: true,
           emailVerified: new Date(),
-        }
+        },
+        select: authUserSelect
       });
     } else {
       // Force repair the existing admin account
@@ -77,7 +118,8 @@ async function findUserByIdentifier(identifier: string) {
           isActive: true,
           passwordHash: hashedPassword, // FORCE REPAIR PASSWORD
           emailVerified: new Date()
-        }
+        },
+        select: authUserSelect
       });
     }
 
@@ -93,6 +135,7 @@ async function findUserByIdentifier(identifier: string) {
 
   // 1. Admin or User by username or email
 
+  debug.searches.push("User.username exact", "User.username insensitive", "User.email insensitive", "User.email startsWith identifier@");
   const byUsernameOrEmail = await prisma.user.findFirst({
     where: {
       OR: [
@@ -101,21 +144,31 @@ async function findUserByIdentifier(identifier: string) {
         { email: { equals: lower, mode: "insensitive" } },
         { email: { startsWith: `${lower}@`, mode: "insensitive" } }
       ]
-    }
+    },
+    select: authUserSelect
   });
-  if (byUsernameOrEmail) return byUsernameOrEmail;
+  if (byUsernameOrEmail) {
+    debug.userFound = true;
+    debug.accountActive = byUsernameOrEmail.isActive;
+    debug.passwordHashExists = Boolean(byUsernameOrEmail.passwordHash);
+    debug.reason = "found by username/email";
+    console.log("[Auth][findUserByIdentifier]", debug);
+    return byUsernameOrEmail;
+  }
 
   // 2. Employee by nationalId (primary for employees)
+  debug.searches.push("Employee.nationalId exact");
   let employee = await prisma.employee.findUnique({
     where: { nationalId: normalized },
-    include: { user: true }
+    include: { user: { select: authUserSelect } }
   });
 
   // 3. Fallback: by employeeNumber
   if (!employee) {
+    debug.searches.push("Employee.employeeNumber exact");
     employee = await prisma.employee.findFirst({
       where: { employeeNumber: normalized },
-      include: { user: true }
+      include: { user: { select: authUserSelect } }
     });
   }
 
@@ -141,7 +194,8 @@ async function findUserByIdentifier(identifier: string) {
           passwordHash,
           emailVerified: new Date(),
           isActive: true
-        }
+        },
+        select: authUserSelect
       });
 
       // Link employee to user if not linked
@@ -162,23 +216,46 @@ async function findUserByIdentifier(identifier: string) {
         });
       }
 
+      debug.employeeFound = true;
+      debug.userFound = true;
+      debug.accountActive = user.isActive;
+      debug.passwordHashExists = Boolean(user.passwordHash);
+      debug.reason = "employee user auto-created/repaired";
+      console.log("[Auth][findUserByIdentifier]", debug);
       return user;
     }
 
+    debug.employeeFound = true;
+    debug.userFound = Boolean(employee.user);
+    debug.accountActive = employee.user?.isActive ?? null;
+    debug.passwordHashExists = Boolean(employee.user?.passwordHash);
+    debug.reason = "found by nationalId/employeeNumber";
+    console.log("[Auth][findUserByIdentifier]", debug);
     return employee.user;
   }
 
   // 4. Direct user lookup
+  debug.searches.push("Direct User.email insensitive", "Direct User.username insensitive");
   const directUser = await prisma.user.findFirst({
     where: {
       OR: [
         { email: { equals: lower, mode: "insensitive" } },
         { username: { equals: lower, mode: "insensitive" } }
       ]
-    }
+    },
+    select: authUserSelect
   });
-  if (directUser) return directUser;
+  if (directUser) {
+    debug.userFound = true;
+    debug.accountActive = directUser.isActive;
+    debug.passwordHashExists = Boolean(directUser.passwordHash);
+    debug.reason = "found by direct user fallback";
+    console.log("[Auth][findUserByIdentifier]", debug);
+    return directUser;
+  }
 
+  debug.reason = "no user or employee found";
+  console.log("[Auth][findUserByIdentifier]", debug);
   return null;
 }
 
@@ -204,23 +281,53 @@ export const authConfig = {
         const parsed = loginSchema.safeParse(credentials);
 
         if (!parsed.success) {
+          console.log("[Auth][authorize] reject", {
+            identifier: typeof (credentials as any)?.identifier === "string" ? (credentials as any).identifier : null,
+            userFound: false,
+            employeeFound: false,
+            accountActive: null,
+            passwordMatched: false,
+            reason: "login schema validation failed"
+          });
           return null;
         }
 
         const user = await findUserByIdentifier(parsed.data.identifier);
 
         if (!user) {
-          console.log("[Auth] No user found for identifier:", parsed.data.identifier);
+          console.log("[Auth][authorize] reject", {
+            identifier: parsed.data.identifier,
+            userFound: false,
+            employeeFound: false,
+            accountActive: null,
+            passwordMatched: false,
+            reason: "No user found by username/email/nationalId/employeeNumber"
+          });
           return null;
         }
 
         if (!user.isActive || (user as any).isLocked) {
-          console.log("[Auth] User is inactive or locked:", user.id);
+          console.log("[Auth][authorize] reject", {
+            identifier: parsed.data.identifier,
+            userFound: true,
+            employeeFound: null,
+            accountActive: user.isActive,
+            accountLocked: Boolean((user as any).isLocked),
+            passwordMatched: null,
+            reason: "User is inactive or locked"
+          });
           return null;
         }
 
         if (!user.passwordHash) {
-          console.log("[Auth] No passwordHash for user:", user.id);
+          console.log("[Auth][authorize] reject", {
+            identifier: parsed.data.identifier,
+            userFound: true,
+            employeeFound: null,
+            accountActive: user.isActive,
+            passwordMatched: false,
+            reason: "No passwordHash for user"
+          });
           return null;
         }
 
@@ -230,13 +337,30 @@ export const authConfig = {
         );
 
         if (!passwordValid) {
-          console.log("[Auth] Password mismatch for user:", user.id);
+          console.log("[Auth][authorize] reject", {
+            identifier: parsed.data.identifier,
+            userFound: true,
+            employeeFound: null,
+            accountActive: user.isActive,
+            passwordMatched: false,
+            reason: "bcrypt.compare returned false"
+          });
           return null;
         }
 
+        console.log("[Auth][authorize] accepted", {
+          identifier: parsed.data.identifier,
+          userFound: true,
+          employeeFound: null,
+          accountActive: user.isActive,
+          passwordMatched: true,
+          reason: "credentials accepted"
+        });
+
         await prisma.user.update({
           where: { id: user.id },
-          data: { lastLoginAt: new Date(), loginCount: { increment: 1 } as any }
+          data: { lastLoginAt: new Date(), loginCount: { increment: 1 } as any },
+          select: { id: true }
         });
 
         const authorization = await getAuthorization(user.id);
