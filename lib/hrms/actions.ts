@@ -377,7 +377,7 @@ export async function createModuleRecord(input: MutationInput) {
         ? emailInput.toLowerCase()
         : `employee.${nationalId}@lana.local`;
 
-      const emailUser = await prisma.user.findUnique({ where: { email: userEmail } }).catch(() => null);
+      const emailUser = await prisma.user.findUnique({ where: { email: userEmail }, select: { id: true, name: true, email: true, passwordHash: true, isActive: true } }).catch(() => null);
 
       const defaultPassword = defaultEmployeePasswordFromNationalId(nationalId);
       const passwordHash = await hashPassword(defaultPassword);
@@ -395,7 +395,8 @@ export async function createModuleRecord(input: MutationInput) {
               emailVerified: new Date(),
               passwordHash,
               isActive: true,
-            }
+            },
+            select: { id: true, name: true, email: true, passwordHash: true, isActive: true }
           });
         } else {
           user = await tx.user.update({
@@ -404,7 +405,8 @@ export async function createModuleRecord(input: MutationInput) {
               name: fullName || user.name,
               passwordHash: user.passwordHash ?? passwordHash,
               isActive: true,
-            }
+            },
+            select: { id: true, name: true, email: true, passwordHash: true, isActive: true }
           });
         }
 

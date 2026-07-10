@@ -12,12 +12,13 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
     "verify": "node scripts/verify-project.mjs",
-    "vercel-build": "prisma generate && NODE_OPTIONS=--max-old-space-size=2048 next build",
+    "vercel-build": "prisma generate && node scripts/preflight-production.mjs && NODE_OPTIONS=--max-old-space-size=2048 next build",
     "prisma:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "production:setup": "prisma generate && prisma migrate deploy && tsx prisma/seed.ts",
     "pwa:check": "next build",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "preflight:production": "node scripts/preflight-production.mjs"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.4",

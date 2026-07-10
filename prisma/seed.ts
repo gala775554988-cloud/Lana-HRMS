@@ -79,7 +79,8 @@ async function main() {
   const adminRoleId = roles.get("SUPER_ADMIN");
   const adminPasswordHash = await hashPassword(adminPassword);
   const existingAdmin = await prisma.user.findFirst({
-    where: { OR: [{ username: adminUsername }, { email: adminEmail }] }
+    where: { OR: [{ username: adminUsername }, { email: adminEmail }] },
+    select: { id: true }
   });
   const admin = existingAdmin
     ? await prisma.user.update({
@@ -91,7 +92,8 @@ async function main() {
           emailVerified: new Date(),
           passwordHash: adminPasswordHash,
           isActive: true
-        }
+        },
+        select: { id: true }
       })
     : await prisma.user.create({
         data: {
@@ -101,7 +103,8 @@ async function main() {
           emailVerified: new Date(),
           passwordHash: adminPasswordHash,
           isActive: true
-        }
+        },
+        select: { id: true }
       });
   if (adminRoleId) await prisma.userRole.createMany({ data: [{ userId: admin.id, roleId: adminRoleId }], skipDuplicates: true });
   for (const department of departments) await client.department.upsert({ where: { code: department.code }, update: department, create: department });
