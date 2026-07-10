@@ -13,9 +13,9 @@ GitHub branch: main
 - Production:
   - https://lana-hrms.vercel.app
 - آخر Deployment مباشر:
-  - https://lana-hrms-9kmn8l9n9-lanahr.vercel.app
+  - https://lana-hrms-pc4q9ur24-lanahr.vercel.app
 - Vercel Inspect:
-  - https://vercel.com/lanahr/lana-hrms/qNYLdxZ3m5aGWMfd1RZrvebQ2gHv
+  - https://vercel.com/lanahr/lana-hrms/Cd5iVj6jyRN8iz4ocjxDihsWaU1V
 
 تم فحص رابط Production، وهو يعمل ويرجع إلى `/login` بشكل صحيح.
 
