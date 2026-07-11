@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-export const dynamic = "force-dynamic";
+// Removed force-dynamic for better caching and performance
 
 export default async function HrmsDashboard() {
   const session = await auth();
