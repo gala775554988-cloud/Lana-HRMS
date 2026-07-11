@@ -28,6 +28,7 @@ function buildPdf(lines: string[]) {
 export async function GET() {
   const employee = await getCurrentEmployeeCached();
   if (!employee) return NextResponse.json({ error: "Employee not found" }, { status: 404 });
+  
   const salary = await getPayrollSummary(employee.id).catch(() => null);
   const fullName = `${employee.firstName} ${employee.lastName}`.trim();
   const lines = [
