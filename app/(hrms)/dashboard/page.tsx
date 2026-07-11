@@ -36,56 +36,27 @@ export default async function HrmsDashboard() {
           </div>
           <h1 className="mb-2 text-2xl font-black text-slate-900 dark:text-slate-100">غير مصرح لك</h1>
           <p className="mb-6 text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-            هذه الصفحة مخصصة للمسؤولين فقط. أنت مسجل الدخول كموظف ولا تملك صلاحيات إدارة التنفيذيين.
+            هذه الصفحة مخصصة للمسؤولين فقط.
           </p>
-          <div className="flex flex-col gap-3">
-            <a
-              href="/employee/dashboard"
-              className="inline-block rounded-2xl bg-[#2E2A8C] px-6 py-3.5 font-bold text-white shadow-lg shadow-[#2E2A8C]/20 hover:bg-[#24206f] dark:bg-[#6D6AF8] dark:text-slate-950 dark:shadow-none transition-all"
-            >
-              الذهاب إلى بوابة الموظف الذاتية
-            </a>
-            <a href="/login" className="text-sm font-semibold text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400">
-              تسجيل الدخول بحساب مسؤول آخر
-            </a>
-          </div>
+          <a href="/employee/dashboard" className="inline-block rounded-2xl bg-[#2E2A8C] px-6 py-3.5 font-bold text-white">
+            الذهاب إلى بوابة الموظف
+          </a>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 lana-fade-in pb-12">
+    <div className="space-y-8">
       {/* Hero Banner */}
-      <div className="relative overflow-hidden rounded-[2.5rem] border border-slate-200/80 bg-white p-6 shadow-xl shadow-slate-200/40 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none md:p-10">
-        <div className="absolute -left-20 -top-24 h-72 w-72 rounded-full bg-gradient-to-br from-[#6D6AF8]/20 to-purple-500/10 blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-28 right-10 h-72 w-72 rounded-full bg-gradient-to-br from-[#2E2A8C]/15 to-indigo-500/10 blur-3xl pointer-events-none" />
-        
-        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200/80 bg-indigo-50/80 px-3.5 py-1 text-xs font-bold text-indigo-700 dark:border-indigo-800/60 dark:bg-indigo-950/60 dark:text-indigo-300">
-              <Sparkles className="h-3.5 w-3.5 text-[#6D6AF8]" />
-              <span>Lana Executive Workspace 2.0</span>
-            </div>
-            <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-slate-100 sm:text-4xl md:text-5xl">
-              لوحة تحكم Lana HRMS التنفيذية
-            </h1>
-            <p className="max-w-3xl text-sm sm:text-base leading-7 text-slate-600 dark:text-slate-400">
-              مركز قيادة متكامل مدعوم بالذكاء الاصطناعي لمتابعة الموظفين، الإدارات، المستشفيات، الاعتمادات، الرواتب، وسجلات الحضور اللحظية في مؤسستك.
-            </p>
-          </div>
-          
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400 flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                <Activity className="h-4 w-4" />
-              </div>
-              <div>
-                <p className="font-extrabold text-slate-900 dark:text-slate-100">حالة النظام: نشط ومستقر</p>
-                <p className="text-[11px] text-slate-400">تحديث فوري للبيانات</p>
-              </div>
-            </div>
-          </div>
+      <div className="relative overflow-hidden rounded-[2.5rem] border border-slate-200/80 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900 md:p-10">
+        <div className="relative">
+          <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-slate-100 sm:text-4xl md:text-5xl">
+            لوحة تحكم Lana HRMS التنفيذية
+          </h1>
+          <p className="mt-3 max-w-3xl text-sm sm:text-base text-slate-600 dark:text-slate-400">
+            مركز قيادة متكامل لمتابعة الموظفين، الإدارات، الرواتب، والحضور.
+          </p>
         </div>
       </div>
 
