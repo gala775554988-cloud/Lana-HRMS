@@ -283,6 +283,15 @@ export const authConfig = {
           if (dbUser) {
             (token as any).mustChangePassword = dbUser.mustChangePassword;
             (token as any).passwordChanged = dbUser.passwordChanged;
+            console.log("[Auth][JWT_STATE]", {
+              trigger,
+              userId: token.sub,
+              jwtMustChangePassword: (token as any).mustChangePassword,
+              jwtFirstLoginCompleted: (token as any).passwordChanged,
+              dbMustChangePassword: dbUser.mustChangePassword,
+              dbFirstLoginCompleted: dbUser.passwordChanged,
+              roles: token.roles ?? []
+            });
           }
         } catch {}
       }
@@ -312,6 +321,12 @@ export const authConfig = {
         session.user.image = (token.picture as string | null) ?? session.user.image;
         (session.user as any).mustChangePassword = (token as any).mustChangePassword || false;
         (session.user as any).passwordChanged = (token as any).passwordChanged || false;
+        console.log("[Auth][SESSION_STATE]", {
+          userId: session.user.id,
+          sessionMustChangePassword: (session.user as any).mustChangePassword,
+          sessionFirstLoginCompleted: (session.user as any).passwordChanged,
+          roles: session.user.roles ?? []
+        });
       }
 
       return session;
