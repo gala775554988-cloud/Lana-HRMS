@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmployeeProfileActions } from "@/components/hrms/employee-profile-actions";
+import { EmployeeDocumentsManager } from "@/components/hrms/employee-documents-manager";
 
 function display(value: unknown) {
   if (value === null || value === undefined || value === "") return "-";
@@ -219,7 +220,7 @@ export default async function RecordPage({ params, searchParams }: { params: Pro
         {activeEmployeeTab === "payroll" ? <SimpleRows rows={related?.payrollItems ?? []} /> : null}
         {activeEmployeeTab === "attendance" ? <SimpleRows rows={related?.attendance ?? []} /> : null}
         {activeEmployeeTab === "leave" ? <SimpleRows rows={related?.leaveRequests ?? []} /> : null}
-        {activeEmployeeTab === "documents" ? <SimpleRows rows={related?.documents ?? []} /> : null}
+        {activeEmployeeTab === "documents" ? <EmployeeDocumentsManager employeeId={id} initialDocuments={related?.documents ?? []} /> : null}
         {activeEmployeeTab === "contracts" ? <SimpleRows rows={related?.contracts ?? []} /> : null}
         {activeEmployeeTab === "performance" ? <SimpleRows rows={related?.performance ?? []} /> : null}
         {activeEmployeeTab === "assets" ? <SimpleRows rows={related?.assets ?? []} /> : null}
