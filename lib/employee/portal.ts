@@ -33,14 +33,14 @@ export function fmtDate(value: unknown, locale = 'ar-SA') {
 }
 
 export async function getPortalDashboard(employeeId: string, userId?: string) {
-  const today = new Date();
-  today.setHours(0,0,0,0);
+  const today = new Date(); today.setHours(0,0,0,0);
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-  const [attendanceToday, attendanceMonth, leaves, payroll, documents, assets, notifications, latestDoc, latestAttendance, latestLeave, latestAudit] = await Promise.all([
+  const [attendanceToday, attendanceMonth, leaves, permissionRequests, payroll, documents, assets, notifications, latestDoc, latestAttendance, latestLeave, latestAudit, portalTasks] = await Promise.all([
     prisma.attendanceRecord.findFirst({ where: { employeeId, workDate: { gte: today } }, orderBy: { workDate: 'desc' } }),
     prisma.attendanceRecord.findMany({ where: { employeeId, workDate: { gte: monthStart, lt: nextMonth } }, orderBy: { workDate: 'asc' } }),
     prisma.leaveRequest.findMany({ where: { employeeId }, include: { leaveType: true }, orderBy: { createdAt: 'desc' }, take: 20 }),
+    (prisma as any).employeePermissionRequest?.findMany?.({ where: { employeeId }, orderBy: { createdAt: 'desc' }, take: 20 }) ?? [],
     prisma.payrollItem.findFirst({ where: { employeeId }, include: { payrollRun: true }, orderBy: { createdAt: 'desc' } }).catch(() => null),
     prisma.employeeDocument.count({ where: { employeeId } }),
     prisma.asset.count({ where: { assignedEmployeeId: employeeId } }),
@@ -49,21 +49,20 @@ export async function getPortalDashboard(employeeId: string, userId?: string) {
     prisma.attendanceRecord.findFirst({ where: { employeeId }, orderBy: { workDate: 'desc' } }),
     prisma.leaveRequest.findFirst({ where: { employeeId }, include: { leaveType: true }, orderBy: { createdAt: 'desc' } }),
     prisma.auditLog.findFirst({ where: { OR: [{ entityId: employeeId }, { metadata: { path: ['employeeId'], equals: employeeId } }] as any }, orderBy: { createdAt: 'desc' } }).catch(() => null),
+    (prisma as any).employeePortalTask?.findMany?.({ where: { employeeId, status: { not: 'COMPLETED' } }, take: 20 }) ?? [],
   ]);
   const leaveUsed = leaves.filter(l => l.status === 'APPROVED').reduce((s,l)=>s+asNumber(l.days),0);
-  const monthHours = attendanceMonth.reduce((sum, r) => {
-    if (r.checkIn && r.checkOut) return sum + Math.max(0, (r.checkOut.getTime() - r.checkIn.getTime()) / 36e5);
-    return sum;
-  }, 0);
+  const monthHours = attendanceMonth.reduce((sum, r) => r.checkIn && r.checkOut ? sum + Math.max(0, (r.checkOut.getTime() - r.checkIn.getTime()) / 36e5) : sum, 0);
   const presentDays = attendanceMonth.filter(r => ['PRESENT','LATE','REMOTE'].includes(r.status)).length;
   const timeline = [
     latestLeave && { type: 'طلب', title: `آخر طلب إجازة: ${latestLeave.leaveType?.name ?? latestLeave.reason ?? 'إجازة'}`, date: latestLeave.createdAt, status: latestLeave.status },
+    permissionRequests[0] && { type: 'استئذان', title: `آخر استئذان: ${permissionRequests[0].reason}`, date: permissionRequests[0].createdAt, status: permissionRequests[0].status },
     latestAudit && { type: 'موافقة/نشاط', title: `${latestAudit.action} - ${latestAudit.entity}`, date: latestAudit.createdAt, status: 'مسجل' },
     notifications[0] && { type: 'إشعار', title: notifications[0].title, date: notifications[0].createdAt, status: notifications[0].type },
     latestAttendance && { type: 'حضور', title: `آخر حضور: ${latestAttendance.status}`, date: latestAttendance.workDate, status: latestAttendance.checkOut ? 'مكتمل' : 'مفتوح' },
     latestDoc && { type: 'مستند', title: `تم رفع: ${latestDoc.name}`, date: latestDoc.uploadedAt, status: latestDoc.status },
   ].filter(Boolean) as Array<{type:string;title:string;date:Date;status:string}>;
-  return { attendanceToday, attendanceMonth, leaves, payroll, documents, assets, notifications, leaveUsed, leaveRemaining: Math.max(30 - leaveUsed, 0), monthHours, presentDays, timeline };
+  return { attendanceToday, attendanceMonth, leaves, permissionRequests, payroll, documents, assets, notifications, leaveUsed, leaveRemaining: Math.max(30 - leaveUsed, 0), monthHours, presentDays, timeline, taskCount: portalTasks.length };
 }
 
 export function profileCompletion(employee: any) {
@@ -71,15 +70,81 @@ export function profileCompletion(employee: any) {
   return Math.round((checks.filter(Boolean).length / checks.length) * 100);
 }
 
+function serializeRows(rows: any[]) { return rows.map(row => ({ ...row, from: row.fromDate?.toISOString?.().slice(0,10), to: row.toDate?.toISOString?.().slice(0,10) })); }
+
 export async function getEmployeeSetting<T = unknown>(employeeId: string, section: string, fallback: T): Promise<T> {
-  const setting = await prisma.appSetting.findUnique({ where: { key: `employee.portal.${employeeId}.${section}` }, select: { value: true } }).catch(() => null);
-  return (setting?.value as T) ?? fallback;
+  const db = prisma as any;
+  if (section === 'bank') {
+    const row = await db.employeeBankAccount?.findFirst?.({ where: { employeeId, isPrimary: true } });
+    return (row ? { bank: row.bank, iban: row.iban, account: row.account } : fallback) as T;
+  }
+  if (section === 'family') {
+    const rows = await db.employeeFamilyMember?.findMany?.({ where: { employeeId }, orderBy: { createdAt: 'asc' } }) ?? [];
+    return { members: rows, spouse: rows.find((r:any)=>r.relation==='spouse')?.name ?? '', children: String(rows.filter((r:any)=>r.relation==='child').length || ''), emergency: rows.find((r:any)=>r.isEmergencyContact)?.phone ?? '' } as T;
+  }
+  const map: Record<string,string> = { qualifications:'employeeQualification', experiences:'employeeExperience', skills:'employeeSkill', languages:'employeeLanguage', permissionRequests:'employeePermissionRequest', tasks:'employeePortalTask' };
+  if (map[section]) {
+    const rows = await db[map[section]]?.findMany?.({ where: { employeeId }, orderBy: { createdAt: 'desc' }, include: section === 'tasks' ? { comments: true, attachments: true } : undefined }) ?? [];
+    return serializeRows(rows) as T;
+  }
+  if (section === 'chat') {
+    const threads = await db.employeeChatThread?.findMany?.({ where: { employeeId }, include: { messages: { orderBy: { createdAt: 'desc' } } }, orderBy: { updatedAt: 'desc' } }) ?? [];
+    return threads.flatMap((t:any)=>t.messages.map((m:any)=>({ id:m.id, to:t.participantType, text:m.body, fileName:m.fileName, createdAt:m.createdAt }))) as T;
+  }
+  return fallback;
 }
 
-export async function setEmployeeSetting(employeeId: string, section: string, value: unknown) {
-  return prisma.appSetting.upsert({
-    where: { key: `employee.portal.${employeeId}.${section}` },
-    update: { value: value as any },
-    create: { key: `employee.portal.${employeeId}.${section}`, value: value as any, description: `Employee portal ${section}` },
-  });
+export async function setEmployeeSetting(employeeId: string, section: string, value: unknown, userId?: string) {
+  const db = prisma as any;
+  if (section === 'bank') {
+    const data = value as any;
+    const existing = await db.employeeBankAccount.findFirst({ where: { employeeId, isPrimary: true } });
+    return existing ? db.employeeBankAccount.update({ where: { id: existing.id }, data: { bank: data.bank || 'غير محدد', iban: data.iban || 'غير محدد', account: data.account || null } }) : db.employeeBankAccount.create({ data: { employeeId, bank: data.bank || 'غير محدد', iban: data.iban || 'غير محدد', account: data.account || null } });
+  }
+  if (section === 'family') {
+    const data = value as any;
+    await db.employeeFamilyMember.deleteMany({ where: { employeeId } });
+    const creates = [];
+    if (data.spouse) creates.push({ employeeId, relation: 'spouse', name: data.spouse });
+    const count = Number(data.children || 0); for (let i=0;i<count;i++) creates.push({ employeeId, relation: 'child', name: `ابن/ابنة ${i+1}` });
+    if (data.emergency) creates.push({ employeeId, relation: 'emergency', name: 'جهة اتصال طوارئ', phone: data.emergency, isEmergencyContact: true });
+    if (creates.length) await db.employeeFamilyMember.createMany({ data: creates });
+    return true;
+  }
+  const rows = Array.isArray(value) ? value : [];
+  if (['qualifications','experiences','skills','languages'].includes(section)) {
+    const modelMap: Record<string,string> = { qualifications:'employeeQualification', experiences:'employeeExperience', skills:'employeeSkill', languages:'employeeLanguage' };
+    const model = db[modelMap[section]];
+    await model.deleteMany({ where: { employeeId } });
+    for (const row of rows) {
+      if (section === 'qualifications') await model.create({ data: { employeeId, title: row.title || 'غير محدد', organization: row.org || row.organization || null, field: row.field || null, fromDate: row.from ? new Date(row.from) : null, toDate: row.to ? new Date(row.to) : null, notes: row.notes || null } });
+      if (section === 'experiences') await model.create({ data: { employeeId, title: row.title || 'غير محدد', organization: row.org || row.organization || null, fromDate: row.from ? new Date(row.from) : null, toDate: row.to ? new Date(row.to) : null, notes: row.notes || null } });
+      if (section === 'skills') await model.create({ data: { employeeId, name: row.title || row.name || 'مهارة', level: Number(row.level || 1), notes: row.notes || null } });
+      if (section === 'languages') await model.create({ data: { employeeId, name: row.title || row.name || 'لغة', level: row.level || row.org || 'BASIC', notes: row.notes || null } });
+    }
+    return true;
+  }
+  if (section === 'permissionRequests') {
+    await db.employeePermissionRequest.deleteMany({ where: { employeeId } });
+    for (const row of rows) await db.employeePermissionRequest.create({ data: { employeeId, requestDate: row.date ? new Date(row.date) : new Date(), fromTime: row.from || '00:00', toTime: row.to || '00:00', reason: row.reason || 'استئذان', status: row.status || 'PENDING_MANAGER', workflow: row.workflow || ['Employee'] } });
+    return true;
+  }
+  if (section === 'tasks') {
+    await db.employeePortalTask.deleteMany({ where: { employeeId, source: 'employee' } });
+    for (const row of rows.filter((r:any)=>r.source==='employee')) {
+      const task = await db.employeePortalTask.create({ data: { employeeId, title: row.title || 'مهمة', status: row.status || 'PENDING', progress: Number(row.progress || 0), source: 'employee' } });
+      for (const c of row.comments || []) await db.employeePortalTaskComment.create({ data: { taskId: task.id, authorUserId: userId, body: c } });
+      for (const a of row.attachments || []) await db.employeePortalTaskAttachment.create({ data: { taskId: task.id, fileName: a, fileUrl: a } });
+    }
+    return true;
+  }
+  if (section === 'chat') {
+    const messages = rows;
+    for (const row of messages.slice(0,1)) {
+      const thread = await db.employeeChatThread.upsert({ where: { id: row.threadId || row.id }, update: { updatedAt: new Date() }, create: { id: row.threadId || row.id, employeeId, participantType: row.to || 'Manager', subject: 'Employee chat' } }).catch(async()=> db.employeeChatThread.create({ data: { employeeId, participantType: row.to || 'Manager', subject: 'Employee chat' } }));
+      await db.employeeChatMessage.create({ data: { threadId: thread.id, senderUserId: userId, body: row.text || '', fileName: row.fileName || null, fileUrl: row.fileName || null } });
+    }
+    return true;
+  }
+  return true;
 }

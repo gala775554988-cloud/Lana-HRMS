@@ -12,10 +12,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const { employee } = await requireEmployee();
+  const { employee, session } = await requireEmployee();
   const body = await request.json();
   const section = String(body.section || '');
   if (!sections.has(section)) return NextResponse.json({ success: false, message: 'Invalid section' }, { status: 400 });
-  await setEmployeeSetting(employee.id, section, body.data ?? (section === 'bank' ? {} : []));
+  await setEmployeeSetting(employee.id, section, body.data ?? (section === 'bank' ? {} : []), session.user.id);
   return NextResponse.json({ success: true });
 }
