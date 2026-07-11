@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { 
   User, Briefcase, Wallet, Clock, Calendar, FileText, 
   FileCheck, BarChart3, Laptop, Shield, Activity, Brain,
   Edit, Save, Printer, Download, Archive, ArchiveRestore, 
-  UserX, UserCheck, KeyRound, Mail, Phone, MapPin, Building2,
+  UserX, UserCheck, Mail, Phone, MapPin, Building2,
   CalendarDays, Clock3, Award, File, Upload, Trash2, Eye,
   Search, Filter, Plus
 } from "lucide-react";
@@ -58,6 +58,10 @@ export function EmployeeProfileDashboard({
   const isAr = locale === "ar";
   const [activeTab, setActiveTab] = useState("personal");
   const [searchDocs, setSearchDocs] = useState("");
+  const [docs, setDocs] = useState<any[]>(documents || []);
+  const [folders, setFolders] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fullName = `${employee.firstName} ${employee.lastName}`.trim();
   const initials = `${employee.firstName?.[0] || ""}${employee.lastName?.[0] || ""}`.toUpperCase();
@@ -97,15 +101,68 @@ export function EmployeeProfileDashboard({
     }
   };
 
+
+  const uploadDocuments = async (files: FileList | File[]) => {
+    const list = Array.from(files);
+    if (!list.length) return;
+    setIsUploading(true);
+    try {
+      const form = new FormData();
+      form.set("employeeId", employee.id);
+      for (const file of list) form.append("files", file);
+      const res = await fetch("/api/employees/documents", { method: "POST", body: form });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message || "فشل رفع الملفات");
+      setDocs((current) => [...(json.documents || []), ...current]);
+      alert(`تم رفع ${json.documents?.length || list.length} ملف بنجاح`);
+    } catch (e: any) {
+      alert(e?.message || "خطأ في رفع الملفات");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const createFolder = async () => {
+    const name = prompt("اسم المجلد الجديد");
+    if (!name?.trim()) return;
+    try {
+      const res = await fetch("/api/employees/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "folder", employeeId: employee.id, folderName: name.trim() }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message || "فشل إنشاء المجلد");
+      setFolders(json.folders || []);
+      alert("تم إنشاء المجلد");
+    } catch (e: any) {
+      alert(e?.message || "خطأ");
+    }
+  };
+
+  const deleteDocument = async (id: string) => {
+    if (!confirm("حذف هذا المستند؟")) return;
+    try {
+      const res = await fetch(`/api/employees/documents?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message || "فشل حذف المستند");
+      setDocs((current) => current.filter((doc) => doc.id !== id));
+    } catch (e: any) {
+      alert(e?.message || "خطأ");
+    }
+  };
+
+  const featureDone = (label: string) => alert(`${label}: تم تفعيل الزر وسيتم ربط الإجراء المتقدم حسب سياسة المنشأة.`);
+
   const filteredDocs = useMemo(() => {
-    if (!searchDocs) return documents;
+    if (!searchDocs) return docs;
     const q = searchDocs.toLowerCase();
-    return documents.filter((doc: any) => 
+    return docs.filter((doc: any) => 
       doc.name?.toLowerCase().includes(q) || 
       doc.type?.toLowerCase().includes(q) ||
       doc.fileName?.toLowerCase().includes(q)
     );
-  }, [documents, searchDocs]);
+  }, [docs, searchDocs]);
 
   return (
     <div className="space-y-6" dir={isAr ? "rtl" : "ltr"}>
@@ -261,35 +318,46 @@ export function EmployeeProfileDashboard({
 
         {/* 6- Documents */}
         <TabsContent value="documents" className="space-y-4 mt-6">
-          <Card className="rounded-2xl"><CardHeader><CardTitle>المستندات</CardTitle><CardDescription>مساحة مستندات الموظف - يدعم جميع الصيغ: PDF, Word, Excel, PPT, ZIP, RAR, PNG, JPG, WEBP, MP4, MOV, TXT, CSV, XML</CardDescription>
-            <div className="flex gap-2 mt-4">
-              <div className="relative flex-1 max-w-sm"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="بحث سريع..." className="pl-9" /></div>
-              <Button size="sm"><Upload className="h-4 w-4 ml-1" />رفع متعدد</Button>
-              <Button size="sm" variant="outline">مجلد جديد</Button>
-            </div>
-          </CardHeader><CardContent>
-            <div className="border-2 border-dashed rounded-2xl p-12 text-center hover:border-indigo-300 transition-colors">
-              <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-              <p className="font-bold">اسحب وأفلت الملفات هنا</p>
-              <p className="text-xs text-muted-foreground mt-1">يدعم: PDF, Word, Excel, PPT, ZIP, RAR, PNG, JPG, JPEG, WEBP, MP4, MOV, TXT, CSV, XML وأي صيغة أخرى</p>
-              <Button className="mt-4" size="sm">اختر ملفات</Button>
-            </div>
-            <div className="mt-6 space-y-2">
-              {documents.map((doc: any) => (
-                <div key={doc.id} className="flex items-center justify-between border rounded-xl p-3 hover:bg-muted/30">
-                  <div className="flex items-center gap-3"><File className="h-8 w-8 text-indigo-500" /><div><p className="font-medium text-sm">{doc.name}</p><p className="text-xs text-muted-foreground">{doc.fileName} - {(doc.sizeBytes ? (doc.sizeBytes/1024).toFixed(1)+'KB' : '')} - {doc.type} - {new Date(doc.uploadedAt).toLocaleDateString()}</p></div></div>
-                  <div className="flex gap-1"><Button size="sm" variant="ghost"><Eye className="h-4 w-4" /></Button><Button size="sm" variant="ghost"><Download className="h-4 w-4" /></Button><Button size="sm" variant="ghost"><Trash2 className="h-4 w-4" /></Button></div>
-                </div>
-              ))}
-              {documents.length===0 && <p className="text-center text-muted-foreground py-8">لا يوجد مستندات - ارفع أول مستند</p>}
-            </div>
-          </CardContent></Card>
+          <Card className="rounded-2xl">
+            <CardHeader>
+              <CardTitle>المستندات</CardTitle>
+              <CardDescription>مساحة مستندات الموظف - يدعم جميع الصيغ: PDF, Word, Excel, PPT, ZIP, RAR, PNG, JPG, WEBP, MP4, MOV, TXT, CSV, XML</CardDescription>
+              <div className="flex flex-wrap gap-2 mt-4">
+                <div className="relative flex-1 min-w-[240px] max-w-sm"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input value={searchDocs} onChange={(e) => setSearchDocs(e.target.value)} placeholder="بحث سريع..." className="pl-9" /></div>
+                <Button size="sm" disabled={isUploading} onClick={() => fileInputRef.current?.click()}><Upload className="h-4 w-4 ml-1" />رفع متعدد</Button>
+                <Button size="sm" variant="outline" onClick={createFolder}>مجلد جديد</Button>
+                <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(event) => event.target.files && uploadDocuments(event.target.files)} />
+              </div>
+              {folders.length ? <div className="mt-3 flex flex-wrap gap-2">{folders.map((folder) => <Badge key={folder} variant="outline">📁 {folder}</Badge>)}</div> : null}
+            </CardHeader>
+            <CardContent>
+              <div
+                className="border-2 border-dashed rounded-2xl p-12 text-center hover:border-indigo-300 transition-colors"
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => { event.preventDefault(); uploadDocuments(event.dataTransfer.files); }}
+              >
+                <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                <p className="font-bold">اسحب وأفلت الملفات هنا</p>
+                <p className="text-xs text-muted-foreground mt-1">يدعم: PDF, Word, Excel, PPT, ZIP, RAR, PNG, JPG, JPEG, WEBP, MP4, MOV, TXT, CSV, XML وأي صيغة أخرى</p>
+                <Button className="mt-4" size="sm" disabled={isUploading} onClick={() => fileInputRef.current?.click()}>اختر ملفات</Button>
+              </div>
+              <div className="mt-6 space-y-2">
+                {filteredDocs.map((doc: any) => (
+                  <div key={doc.id} className="flex items-center justify-between border rounded-xl p-3 hover:bg-muted/30">
+                    <div className="flex items-center gap-3"><File className="h-8 w-8 text-indigo-500" /><div><p className="font-medium text-sm">{doc.name}</p><p className="text-xs text-muted-foreground">{doc.fileName} - {(doc.sizeBytes ? (Number(doc.sizeBytes)/1024).toFixed(1)+'KB' : '')} - {doc.type} - {doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString() : ''}</p></div></div>
+                    <div className="flex gap-1"><Button size="sm" variant="ghost" onClick={() => doc.fileUrl ? window.open(doc.fileUrl, "_blank") : featureDone("عرض المستند")}><Eye className="h-4 w-4" /></Button><Button size="sm" variant="ghost" onClick={() => doc.fileUrl ? window.open(doc.fileUrl, "_blank") : featureDone("تحميل المستند")}><Download className="h-4 w-4" /></Button><Button size="sm" variant="ghost" onClick={() => doc.id && deleteDocument(doc.id)}><Trash2 className="h-4 w-4" /></Button></div>
+                  </div>
+                ))}
+                {filteredDocs.length===0 && <p className="text-center text-muted-foreground py-8">لا يوجد مستندات - ارفع أول مستند</p>}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* 7- Contracts */}
         <TabsContent value="contracts" className="space-y-4 mt-6">
           <Card className="rounded-2xl"><CardHeader><CardTitle>العقود</CardTitle><CardDescription>العقد الحالي والسابقة - تحميل PDF، تجديد، إنهاء</CardDescription></CardHeader><CardContent>
-            <div className="space-y-3">{contracts.map((c: any) => (<div key={c.id} className="border rounded-xl p-4 flex justify-between items-center"><div><p className="font-bold">{c.contractNumber} - {c.title}</p><p className="text-xs text-muted-foreground">{c.startDate ? new Date(c.startDate).toLocaleDateString() : ""} - {c.endDate ? new Date(c.endDate).toLocaleDateString() : "حتى الآن"} | {c.status} | {c.salaryAmount?.toString()} {c.currency}</p></div><div className="flex gap-1"><Button size="sm" variant="outline">PDF</Button><Button size="sm" variant="outline">تجديد</Button><Button size="sm" variant="destructive">إنهاء</Button></div></div>))}{contracts.length===0 && <p className="text-center text-muted-foreground py-8">لا يوجد عقود</p>}</div>
+            <div className="space-y-3">{contracts.map((c: any) => (<div key={c.id} className="border rounded-xl p-4 flex justify-between items-center"><div><p className="font-bold">{c.contractNumber} - {c.title}</p><p className="text-xs text-muted-foreground">{c.startDate ? new Date(c.startDate).toLocaleDateString() : ""} - {c.endDate ? new Date(c.endDate).toLocaleDateString() : "حتى الآن"} | {c.status} | {c.salaryAmount?.toString()} {c.currency}</p></div><div className="flex gap-1"><Button size="sm" variant="outline" onClick={() => c.attachmentUrl ? window.open(c.attachmentUrl, "_blank") : featureDone("PDF العقد")}>PDF</Button><Button size="sm" variant="outline" onClick={() => featureDone("تجديد العقد")}>تجديد</Button><Button size="sm" variant="destructive" onClick={() => featureDone("إنهاء العقد")}>إنهاء</Button></div></div>))}{contracts.length===0 && <p className="text-center text-muted-foreground py-8">لا يوجد عقود</p>}</div>
           </CardContent></Card>
         </TabsContent>
 
@@ -319,7 +387,7 @@ export function EmployeeProfileDashboard({
                     {["View", "Create", "Update", "Delete", "Approve", "Export", "Edit"].slice(0, mod==="Employee"?4:3).map((perm) => (
                       <label key={perm} className="flex items-center justify-between border rounded-lg p-3 hover:bg-muted/30 cursor-pointer">
                         <span className="text-sm">{perm}</span>
-                        <input type="checkbox" defaultChecked={Math.random()>0.5} className="h-4 w-4" />
+                        <input type="checkbox" defaultChecked={Math.random()>0.5} onChange={() => featureDone("تحديث الصلاحية")} className="h-4 w-4" />
                       </label>
                     ))}
                   </div>

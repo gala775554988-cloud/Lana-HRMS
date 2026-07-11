@@ -18,7 +18,7 @@ import { ArchivedEmployees } from "@/components/hrms/archived-employees";
 import { DuplicateAccounts } from "@/components/hrms/duplicate-accounts";
 
 type ViewMode = "card" | "table";
-type TabType = "all" | "archived" | "duplicates";
+type TabType = "all" | "active" | "archived" | "duplicates";
 
 interface EmployeeListProps {
   resource: HrmsModule;
@@ -172,10 +172,10 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
       <section className="space-y-6" dir={isAr ? "rtl" : "ltr"}>
         {isPending && <div className="h-1 w-full bg-indigo-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-600 animate-pulse w-full"></div></div>}
       <div className="flex flex-wrap gap-2 border-b pb-4">
-          <Button variant={activeTab === "all" ? "default" : "outline"} size="sm" onClick={() => switchTab("all")}><Users className="h-4 w-4 ml-1" />جميع الموظفين ({totalCount})</Button>
-          <Button variant={activeTab === "active" ? "default" : "outline"} size="sm" onClick={() => switchTab("active")}><Users className="h-4 w-4 ml-1 text-green-600" />النشطون</Button>
-          <Button variant={activeTab === "archived" ? "default" : "outline"} size="sm" onClick={() => switchTab("archived")}><Archive className="h-4 w-4 ml-1" />الموظفون المؤرشفون / غير النشطين</Button>
-          <Button variant={activeTab === "duplicates" ? "default" : "outline"} size="sm" onClick={() => switchTab("duplicates")}><UsersRound className="h-4 w-4 ml-1" />الحسابات المكررة</Button>
+          <Button variant={(activeTab as string) === "all" ? "default" : "outline"} size="sm" onClick={() => switchTab("all")}><Users className="h-4 w-4 ml-1" />جميع الموظفين ({totalCount})</Button>
+          <Button variant={(activeTab as string) === "active" ? "default" : "outline"} size="sm" onClick={() => switchTab("active")}><Users className="h-4 w-4 ml-1 text-green-600" />النشطون</Button>
+          <Button variant={(activeTab as string) === "archived" ? "default" : "outline"} size="sm" onClick={() => switchTab("archived")}><Archive className="h-4 w-4 ml-1" />الموظفون المؤرشفون / غير النشطين</Button>
+          <Button variant={(activeTab as string) === "duplicates" ? "default" : "outline"} size="sm" onClick={() => switchTab("duplicates")}><UsersRound className="h-4 w-4 ml-1" />الحسابات المكررة</Button>
         </div>
         <ArchivedEmployees />
       </section>
@@ -187,10 +187,10 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
       <section className="space-y-6" dir={isAr ? "rtl" : "ltr"}>
         {isPending && <div className="h-1 w-full bg-indigo-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-600 animate-pulse w-full"></div></div>}
       <div className="flex flex-wrap gap-2 border-b pb-4">
-          <Button variant={activeTab === "all" ? "default" : "outline"} size="sm" onClick={() => switchTab("all")}><Users className="h-4 w-4 ml-1" />جميع الموظفين ({totalCount})</Button>
-          <Button variant={activeTab === "active" ? "default" : "outline"} size="sm" onClick={() => switchTab("active")}><Users className="h-4 w-4 ml-1 text-green-600" />النشطون</Button>
-          <Button variant={activeTab === "archived" ? "default" : "outline"} size="sm" onClick={() => switchTab("archived")}><Archive className="h-4 w-4 ml-1" />الموظفون المؤرشفون</Button>
-          <Button variant={activeTab === "duplicates" ? "default" : "outline"} size="sm" onClick={() => switchTab("duplicates")}><UsersRound className="h-4 w-4 ml-1" />الحسابات المكررة</Button>
+          <Button variant={(activeTab as string) === "all" ? "default" : "outline"} size="sm" onClick={() => switchTab("all")}><Users className="h-4 w-4 ml-1" />جميع الموظفين ({totalCount})</Button>
+          <Button variant={(activeTab as string) === "active" ? "default" : "outline"} size="sm" onClick={() => switchTab("active")}><Users className="h-4 w-4 ml-1 text-green-600" />النشطون</Button>
+          <Button variant={(activeTab as string) === "archived" ? "default" : "outline"} size="sm" onClick={() => switchTab("archived")}><Archive className="h-4 w-4 ml-1" />الموظفون المؤرشفون</Button>
+          <Button variant={(activeTab as string) === "duplicates" ? "default" : "outline"} size="sm" onClick={() => switchTab("duplicates")}><UsersRound className="h-4 w-4 ml-1" />الحسابات المكررة</Button>
         </div>
         <DuplicateAccounts />
       </section>
@@ -203,10 +203,10 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
       <section className="space-y-6" dir={isAr ? "rtl" : "ltr"}>
         {isPending && <div className="h-1 w-full bg-indigo-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-600 animate-pulse w-full"></div></div>}
       <div className="flex flex-wrap gap-2 border-b pb-4">
-          <Button variant={activeTab === "all" ? "default" : "outline"} size="sm" onClick={() => switchTab("all")}><Users className="h-4 w-4 ml-1" />جميع الموظفين ({totalCount})</Button>
-          <Button variant={activeTab === "active" ? "default" : "outline"} size="sm" onClick={() => switchTab("active")}><Users className="h-4 w-4 ml-1 text-green-600" />النشطون ({activeRecords.length})</Button>
-          <Button variant={activeTab === "archived" ? "default" : "outline"} size="sm" onClick={() => switchTab("archived")}><Archive className="h-4 w-4 ml-1" />الموظفون المؤرشفون</Button>
-          <Button variant={activeTab === "duplicates" ? "default" : "outline"} size="sm" onClick={() => switchTab("duplicates")}><UsersRound className="h-4 w-4 ml-1" />الحسابات المكررة</Button>
+          <Button variant={(activeTab as string) === "all" ? "default" : "outline"} size="sm" onClick={() => switchTab("all")}><Users className="h-4 w-4 ml-1" />جميع الموظفين ({totalCount})</Button>
+          <Button variant={(activeTab as string) === "active" ? "default" : "outline"} size="sm" onClick={() => switchTab("active")}><Users className="h-4 w-4 ml-1 text-green-600" />النشطون ({activeRecords.length})</Button>
+          <Button variant={(activeTab as string) === "archived" ? "default" : "outline"} size="sm" onClick={() => switchTab("archived")}><Archive className="h-4 w-4 ml-1" />الموظفون المؤرشفون</Button>
+          <Button variant={(activeTab as string) === "duplicates" ? "default" : "outline"} size="sm" onClick={() => switchTab("duplicates")}><UsersRound className="h-4 w-4 ml-1" />الحسابات المكررة</Button>
         </div>
 
         <div className="rounded-2xl border border-green-100 bg-green-50/30 p-4 text-sm text-green-800 dark:border-green-900/30 dark:bg-green-950/20 dark:text-green-300">
@@ -249,9 +249,9 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
     <section className="space-y-6" dir={isAr ? "rtl" : "ltr"}>
       {isPending && <div className="h-1 w-full bg-indigo-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-600 animate-pulse w-full"></div></div>}
       <div className="flex flex-wrap gap-2 border-b pb-4">
-        <Button variant={activeTab === "all" ? "default" : "outline"} size="sm" onClick={() => switchTab("all")}><Users className="h-4 w-4 ml-1" />جميع الموظفين ({totalCount})</Button>
-        <Button variant={activeTab === "archived" ? "default" : "outline"} size="sm" onClick={() => switchTab("archived")}><Archive className="h-4 w-4 ml-1" />الموظفون المؤرشفون</Button>
-        <Button variant={activeTab === "duplicates" ? "default" : "outline"} size="sm" onClick={() => switchTab("duplicates")}><UsersRound className="h-4 w-4 ml-1" />الحسابات المكررة</Button>
+        <Button variant={(activeTab as string) === "all" ? "default" : "outline"} size="sm" onClick={() => switchTab("all")}><Users className="h-4 w-4 ml-1" />جميع الموظفين ({totalCount})</Button>
+        <Button variant={(activeTab as string) === "archived" ? "default" : "outline"} size="sm" onClick={() => switchTab("archived")}><Archive className="h-4 w-4 ml-1" />الموظفون المؤرشفون</Button>
+        <Button variant={(activeTab as string) === "duplicates" ? "default" : "outline"} size="sm" onClick={() => switchTab("duplicates")}><UsersRound className="h-4 w-4 ml-1" />الحسابات المكررة</Button>
       </div>
 
       <div className="grid gap-4 grid-cols-2 md:grid-cols-4">

@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     if (resetAll) {
       // Reset all employees
       const allEmployees = await prisma.employee.findMany({
-        where: { nationalId: { not: null } },
+        where: { nationalId: { not: "" } },
         select: { id: true },
       });
       targets = allEmployees.map(e => e.id);

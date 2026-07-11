@@ -4,7 +4,7 @@ import PasswordManagementClient from "@/components/hrms/password-management-clie
 export default async function PasswordManagementPage() {
   // Get counts for display
   const totalEmployees = await prisma.employee.count().catch(() => 0);
-  const employeesWithNationalId = await prisma.employee.count({ where: { nationalId: { not: null } } }).catch(() => 0);
+  const employeesWithNationalId = await prisma.employee.count({ where: { nationalId: { not: "" } } }).catch(() => 0);
   const employeesWithoutNationalId = totalEmployees - employeesWithNationalId;
 
   return (
