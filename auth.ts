@@ -255,65 +255,19 @@ export const authConfig = {
     })
   ],
   callbacks: {
-    async jwt({ token, user, trigger }) {
-      if (user?.id) {
+    async jwt({ token, user }) {
+      // Only set roles/permissions when user first logs in
+      if (user) {
         token.sub = user.id;
-        token.name = user.name ?? token.name;
-        token.email = user.email ?? token.email;
-        token.picture = user.image ?? token.picture;
+        token.name = user.name;
+        token.email = user.email;
+        token.picture = user.image;
+
+        // Save roles and permissions directly from the authorize function
+        token.roles = (user as any).roles || [];
+        token.permissions = (user as any).permissions || [];
         (token as any).mustChangePassword = (user as any).mustChangePassword || false;
         (token as any).passwordChanged = (user as any).passwordChanged || false;
-
-        if (Array.isArray((user as any).roles)) {
-          token.roles = (user as any).roles;
-        }
-        if (Array.isArray((user as any).permissions)) {
-          token.permissions = (user as any).permissions;
-        }
-
-        if (!token.roles || (token.roles as string[]).length === 0) {
-          try {
-            const authorization = await getAuthorization(user.id);
-            token.roles = authorization.roles as string[];
-            token.permissions = authorization.permissions as string[];
-          } catch {
-            token.roles = (token.roles as string[]) ?? [];
-            token.permissions = (token.permissions as string[]) ?? [];
-          }
-        }
-      }
-
-      // Always fetch fresh mustChangePassword flag from DB on each JWT check
-      if (token.sub) {
-        try {
-          const dbUser = await prisma.user.findUnique({ where: { id: token.sub }, select: { mustChangePassword: true, passwordChanged: true } });
-          if (dbUser) {
-            (token as any).mustChangePassword = dbUser.mustChangePassword;
-            (token as any).passwordChanged = dbUser.passwordChanged;
-            console.log("[Auth][JWT_STATE]", {
-              trigger,
-              userId: token.sub,
-              jwtMustChangePassword: (token as any).mustChangePassword,
-              jwtFirstLoginCompleted: (token as any).passwordChanged,
-              dbMustChangePassword: dbUser.mustChangePassword,
-              dbFirstLoginCompleted: dbUser.passwordChanged,
-              roles: token.roles ?? []
-            });
-          }
-        } catch {}
-      }
-
-      if (!token.roles) token.roles = [];
-      if (!token.permissions) token.permissions = [];
-
-      if (trigger === "update" && token.sub) {
-        try {
-          const authorization = await getAuthorization(token.sub);
-          token.roles = authorization.roles as string[];
-          token.permissions = authorization.permissions as string[];
-        } catch {
-          // ignore
-        }
       }
 
       return token;
@@ -328,12 +282,6 @@ export const authConfig = {
         session.user.image = (token.picture as string | null) ?? session.user.image;
         (session.user as any).mustChangePassword = (token as any).mustChangePassword || false;
         (session.user as any).passwordChanged = (token as any).passwordChanged || false;
-        console.log("[Auth][SESSION_STATE]", {
-          userId: session.user.id,
-          sessionMustChangePassword: (session.user as any).mustChangePassword,
-          sessionFirstLoginCompleted: (session.user as any).passwordChanged,
-          roles: session.user.roles ?? []
-        });
       }
 
       return session;
