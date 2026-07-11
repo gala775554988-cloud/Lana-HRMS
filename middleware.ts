@@ -69,6 +69,21 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
+  // Prevent employee-only accounts from rendering the HR route group. This was
+  // the reason employees still saw the old HR layout when opening cached
+  // /employees links: the route was valid and rendered app/(hrms)/layout.tsx.
+  if (isLoggedIn && !isAuthRoute && !isForceChangeRoute && !normalizedPath.startsWith("/employee") && !normalizedPath.startsWith("/logout")) {
+    const roles = Array.isArray(token?.roles) ? (token.roles as string[]) : [];
+    const mustUseEmployeePortal = roles.includes("EMPLOYEE") && !roles.includes("SUPER_ADMIN");
+    if (mustUseEmployeePortal) {
+      const targetDashboard = "/employee/dashboard";
+      console.log("[ROUTE_TRACE]", { currentRoute: normalizedPath, currentRole: roles, targetDashboard, reason: "employee-role-block-hr-layout" });
+      const response = NextResponse.redirect(new URL(pathLocale ? withLocale(targetDashboard, activeLocale) : targetDashboard, nextUrl));
+      response.cookies.set("lana-locale", activeLocale, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
+      return response;
+    }
+  }
+
   // Root path: redirect to login only if NOT logged in
   if (normalizedPath === "/") {
     if (!isLoggedIn) {

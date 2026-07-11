@@ -9,11 +9,19 @@ export const DEFAULT_LOGIN_REDIRECT = "/employee/dashboard";
 export function resolveRoleDashboard(userRoles?: string[] | null): string {
   if (!userRoles || !Array.isArray(userRoles)) return DEFAULT_LOGIN_REDIRECT;
   const roleSet = new Set(userRoles);
+
+  // SUPER_ADMIN is always sent to the HR administration area.
+  if (roleSet.has("SUPER_ADMIN")) return "/employees";
+
+  // Any normal user that has EMPLOYEE must land in the Employee Portal, even if
+  // a position-title inference added HR_MANAGER/DEPARTMENT_MANAGER. This was the
+  // real reason some employee accounts still rendered the old HR layout.
+  if (roleSet.has("EMPLOYEE")) return "/employee/dashboard";
+
   const isAdminOrManager = userRoles.some((role) =>
-    ["SUPER_ADMIN", "HR_MANAGER", "PAYROLL_MANAGER", "RECRUITER", "MANAGER", "HR", "DEPARTMENT_MANAGER", "BRANCH_MANAGER", "SUPERVISOR", "PROJECT_MANAGER"].includes(role)
+    ["HR_MANAGER", "PAYROLL_MANAGER", "RECRUITER", "MANAGER", "HR", "DEPARTMENT_MANAGER", "BRANCH_MANAGER", "SUPERVISOR", "PROJECT_MANAGER"].includes(role)
   );
   if (isAdminOrManager) return "/employees";
-  if (roleSet.has("EMPLOYEE")) return "/employee/dashboard";
   return DEFAULT_LOGIN_REDIRECT;
 }
 

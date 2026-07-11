@@ -1,10 +1,31 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 
+function isPoolTimeout(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('Timed out fetching a new connection') || message.includes('P2024');
+}
+
+export async function dbQuery<T>(label: string, fn: () => Promise<T>, fallback?: T): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (!isPoolTimeout(error) || attempt === 3) break;
+      await new Promise((resolve) => setTimeout(resolve, attempt * 350));
+    }
+  }
+  console.error('[EmployeePortal][DB_QUERY_FAILED]', { label, error: lastError instanceof Error ? lastError.message : String(lastError) });
+  if (fallback !== undefined) return fallback;
+  throw lastError;
+}
+
 export async function requireEmployee() {
   const session = await auth();
   if (!session?.user?.id) throw new Error('Unauthorized');
-  const employee = await prisma.employee.findFirst({
+  const employee = await dbQuery('requireEmployee.employee.findFirst', () => prisma.employee.findFirst({
     where: { userId: session.user.id },
     include: {
       department: true,
@@ -15,7 +36,7 @@ export async function requireEmployee() {
       manager: { select: { id: true, firstName: true, lastName: true, employeeNumber: true, email: true } },
       user: { select: { id: true, username: true, email: true, isActive: true, lastLoginAt: true, mustChangePassword: true, passwordChangedAt: true } },
     },
-  });
+  }));
   if (!employee) throw new Error('Employee profile is not linked to this account');
   return { session, employee };
 }
@@ -36,21 +57,22 @@ export async function getPortalDashboard(employeeId: string, userId?: string) {
   const today = new Date(); today.setHours(0,0,0,0);
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-  const [attendanceToday, attendanceMonth, leaves, permissionRequests, payroll, documents, assets, notifications, latestDoc, latestAttendance, latestLeave, latestAudit, portalTasks] = await Promise.all([
-    prisma.attendanceRecord.findFirst({ where: { employeeId, workDate: { gte: today } }, orderBy: { workDate: 'desc' } }),
-    prisma.attendanceRecord.findMany({ where: { employeeId, workDate: { gte: monthStart, lt: nextMonth } }, orderBy: { workDate: 'asc' } }),
-    prisma.leaveRequest.findMany({ where: { employeeId }, include: { leaveType: true }, orderBy: { createdAt: 'desc' }, take: 20 }),
-    (prisma as any).employeePermissionRequest?.findMany?.({ where: { employeeId }, orderBy: { createdAt: 'desc' }, take: 20 }) ?? [],
-    prisma.payrollItem.findFirst({ where: { employeeId }, include: { payrollRun: true }, orderBy: { createdAt: 'desc' } }).catch(() => null),
-    prisma.employeeDocument.count({ where: { employeeId } }),
-    prisma.asset.count({ where: { assignedEmployeeId: employeeId } }),
-    prisma.notification.findMany({ where: { OR: [{ userId }, { userId: null }], readAt: null }, take: 10, orderBy: { createdAt: 'desc' } }),
-    prisma.employeeDocument.findFirst({ where: { employeeId }, orderBy: { uploadedAt: 'desc' } }),
-    prisma.attendanceRecord.findFirst({ where: { employeeId }, orderBy: { workDate: 'desc' } }),
-    prisma.leaveRequest.findFirst({ where: { employeeId }, include: { leaveType: true }, orderBy: { createdAt: 'desc' } }),
-    prisma.auditLog.findFirst({ where: { OR: [{ entityId: employeeId }, { metadata: { path: ['employeeId'], equals: employeeId } }] as any }, orderBy: { createdAt: 'desc' } }).catch(() => null),
-    (prisma as any).employeePortalTask?.findMany?.({ where: { employeeId, status: { not: 'COMPLETED' } }, take: 20 }) ?? [],
-  ]);
+
+  // Sequential + retry. Production pool is small; Promise.all caused P2024 and made all employee pages crash.
+  const attendanceToday = await dbQuery('dashboard.attendanceRecord.findFirst.today', () => prisma.attendanceRecord.findFirst({ where: { employeeId, workDate: { gte: today } }, orderBy: { workDate: 'desc' } }), null);
+  const attendanceMonth = await dbQuery('dashboard.attendanceRecord.findMany.month', () => prisma.attendanceRecord.findMany({ where: { employeeId, workDate: { gte: monthStart, lt: nextMonth } }, orderBy: { workDate: 'asc' } }), []);
+  const leaves = await dbQuery('dashboard.leaveRequest.findMany', () => prisma.leaveRequest.findMany({ where: { employeeId }, include: { leaveType: true }, orderBy: { createdAt: 'desc' }, take: 20 }), []);
+  const permissionRequests = await dbQuery<any[]>('dashboard.employeePermissionRequest.findMany', () => (prisma as any).employeePermissionRequest?.findMany?.({ where: { employeeId }, orderBy: { createdAt: 'desc' }, take: 20 }) ?? Promise.resolve([]), []);
+  const payroll = await dbQuery('dashboard.payrollItem.findFirst', () => prisma.payrollItem.findFirst({ where: { employeeId }, include: { payrollRun: true }, orderBy: { createdAt: 'desc' } }), null);
+  const documents = await dbQuery('dashboard.employeeDocument.count', () => prisma.employeeDocument.count({ where: { employeeId } }), 0);
+  const assets = await dbQuery('dashboard.asset.count', () => prisma.asset.count({ where: { assignedEmployeeId: employeeId } }), 0);
+  const notifications = await dbQuery('dashboard.notification.findMany', () => prisma.notification.findMany({ where: { OR: [{ userId }, { userId: null }], readAt: null }, take: 10, orderBy: { createdAt: 'desc' } }), []);
+  const latestDoc = await dbQuery('dashboard.employeeDocument.findFirst', () => prisma.employeeDocument.findFirst({ where: { employeeId }, orderBy: { uploadedAt: 'desc' } }), null);
+  const latestAttendance = await dbQuery('dashboard.attendanceRecord.findFirst.latest', () => prisma.attendanceRecord.findFirst({ where: { employeeId }, orderBy: { workDate: 'desc' } }), null);
+  const latestLeave = await dbQuery('dashboard.leaveRequest.findFirst', () => prisma.leaveRequest.findFirst({ where: { employeeId }, include: { leaveType: true }, orderBy: { createdAt: 'desc' } }), null);
+  const latestAudit = await dbQuery('dashboard.auditLog.findFirst', () => prisma.auditLog.findFirst({ where: { OR: [{ entityId: employeeId }, { metadata: { path: ['employeeId'], equals: employeeId } }] as any }, orderBy: { createdAt: 'desc' } }), null);
+  const portalTasks = await dbQuery<any[]>('dashboard.employeePortalTask.findMany', () => (prisma as any).employeePortalTask?.findMany?.({ where: { employeeId, status: { not: 'COMPLETED' } }, take: 20 }) ?? Promise.resolve([]), []);
+
   const leaveUsed = leaves.filter(l => l.status === 'APPROVED').reduce((s,l)=>s+asNumber(l.days),0);
   const monthHours = attendanceMonth.reduce((sum, r) => r.checkIn && r.checkOut ? sum + Math.max(0, (r.checkOut.getTime() - r.checkIn.getTime()) / 36e5) : sum, 0);
   const presentDays = attendanceMonth.filter(r => ['PRESENT','LATE','REMOTE'].includes(r.status)).length;
@@ -75,20 +97,20 @@ function serializeRows(rows: any[]) { return rows.map(row => ({ ...row, from: ro
 export async function getEmployeeSetting<T = unknown>(employeeId: string, section: string, fallback: T): Promise<T> {
   const db = prisma as any;
   if (section === 'bank') {
-    const row = await db.employeeBankAccount?.findFirst?.({ where: { employeeId, isPrimary: true } });
+    const row = await dbQuery<any | null>('portal.employeeBankAccount.findFirst', () => db.employeeBankAccount?.findFirst?.({ where: { employeeId, isPrimary: true } }) ?? Promise.resolve(null), null);
     return (row ? { bank: row.bank, iban: row.iban, account: row.account } : fallback) as T;
   }
   if (section === 'family') {
-    const rows = await db.employeeFamilyMember?.findMany?.({ where: { employeeId }, orderBy: { createdAt: 'asc' } }) ?? [];
+    const rows = await dbQuery<any[]>('portal.employeeFamilyMember.findMany', () => db.employeeFamilyMember?.findMany?.({ where: { employeeId }, orderBy: { createdAt: 'asc' } }) ?? Promise.resolve([]), []);
     return { members: rows, spouse: rows.find((r:any)=>r.relation==='spouse')?.name ?? '', children: String(rows.filter((r:any)=>r.relation==='child').length || ''), emergency: rows.find((r:any)=>r.isEmergencyContact)?.phone ?? '' } as T;
   }
   const map: Record<string,string> = { qualifications:'employeeQualification', experiences:'employeeExperience', skills:'employeeSkill', languages:'employeeLanguage', permissionRequests:'employeePermissionRequest', tasks:'employeePortalTask' };
   if (map[section]) {
-    const rows = await db[map[section]]?.findMany?.({ where: { employeeId }, orderBy: { createdAt: 'desc' }, include: section === 'tasks' ? { comments: true, attachments: true } : undefined }) ?? [];
+    const rows = await dbQuery<any[]>(`portal.${map[section]}.findMany`, () => db[map[section]]?.findMany?.({ where: { employeeId }, orderBy: { createdAt: 'desc' }, include: section === 'tasks' ? { comments: true, attachments: true } : undefined }) ?? Promise.resolve([]), []);
     return serializeRows(rows) as T;
   }
   if (section === 'chat') {
-    const threads = await db.employeeChatThread?.findMany?.({ where: { employeeId }, include: { messages: { orderBy: { createdAt: 'desc' } } }, orderBy: { updatedAt: 'desc' } }) ?? [];
+    const threads = await dbQuery<any[]>('portal.employeeChatThread.findMany', () => db.employeeChatThread?.findMany?.({ where: { employeeId }, include: { messages: { orderBy: { createdAt: 'desc' } } }, orderBy: { updatedAt: 'desc' } }) ?? Promise.resolve([]), []);
     return threads.flatMap((t:any)=>t.messages.map((m:any)=>({ id:m.id, to:t.participantType, text:m.body, fileName:m.fileName, createdAt:m.createdAt }))) as T;
   }
   return fallback;
