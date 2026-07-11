@@ -130,13 +130,70 @@ async function resolveEmployeePositionId(value: unknown) {
 
 async function requireModulePermission(resource: HrmsModule, action: "read" | "manage") {
   const session = await auth();
-  if (!session?.user) throw new Error("Unauthorized");
-  if (!hasPermission(session.user.permissions, { action, resource: resource.permissionResource }, session.user.roles as string[])) {
+  const requiredPermission = `${action}:${resource.permissionResource}`;
+  if (!session?.user) {
+    console.log("[RBAC][HRMS] denied", {
+      module: resource.key,
+      userId: null,
+      username: null,
+      roles: [],
+      permissions: [],
+      requiredPermission,
+      reason: "Unauthorized: no session user"
+    });
+    throw new Error("Unauthorized");
+  }
+
+  const roles = (session.user.roles as string[] | undefined) ?? [];
+  const permissions = (session.user.permissions as string[] | undefined) ?? [];
+  const username = await prisma.user.findUnique({ where: { id: session.user.id }, select: { username: true, email: true } }).catch(() => null);
+
+  if (roles.includes("SUPER_ADMIN") || permissions.includes("*:*") || permissions.includes("SUPER_ADMIN")) {
+    console.log("[RBAC][HRMS] allowed", {
+      module: resource.key,
+      userId: session.user.id,
+      username: username?.username ?? username?.email ?? session.user.email ?? null,
+      roles,
+      permissions,
+      requiredPermission,
+      reason: "SUPER_ADMIN bypass"
+    });
+    return session;
+  }
+
+  if (!hasPermission(permissions, { action, resource: resource.permissionResource }, roles)) {
+    console.log("[RBAC][HRMS] denied", {
+      module: resource.key,
+      userId: session.user.id,
+      username: username?.username ?? username?.email ?? session.user.email ?? null,
+      roles,
+      permissions,
+      requiredPermission,
+      reason: "Missing permission in effective session permissions"
+    });
     throw new Error("Forbidden");
   }
-  if (!isEnterpriseResourceAllowed(session.user.roles as string[] | undefined, resource.permissionResource)) {
+  if (!isEnterpriseResourceAllowed(roles, resource.permissionResource)) {
+    console.log("[RBAC][HRMS] denied", {
+      module: resource.key,
+      userId: session.user.id,
+      username: username?.username ?? username?.email ?? session.user.email ?? null,
+      roles,
+      permissions,
+      requiredPermission,
+      reason: "Role resource-access policy denied resource"
+    });
     throw new Error("Forbidden");
   }
+  console.log("[RBAC][HRMS] allowed", {
+    module: resource.key,
+    userId: session.user.id,
+    username: username?.username ?? username?.email ?? session.user.email ?? null,
+    roles,
+    permissions,
+    requiredPermission,
+    reason: "Permission matched"
+  });
   return session;
 }
 
