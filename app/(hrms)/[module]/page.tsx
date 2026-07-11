@@ -128,8 +128,8 @@ export default async function ResourcePage({ params, searchParams }: { params: P
             </div>
             <h3 className="text-lg font-semibold text-foreground mb-2">{errorMessage}</h3>
             <p className="text-sm text-muted-foreground mb-4">الوحدة: {resourceTitle}</p>
-            <Button variant="outline" onClick={() => typeof window !== "undefined" && window.location.reload()}>
-              إعادة المحاولة
+            <Button asChild variant="outline">
+              <a href={`/${resourceKey}`}>إعادة المحاولة</a>
             </Button>
           </div>
         </div>
