@@ -14,6 +14,14 @@ export default async function EmployeeDashboard() {
   const { employee, session } = await requireEmployee();
   const data = await getPortalDashboard(employee.id, session.user.id);
   const completion = profileCompletion(employee);
+  console.log("[LAYOUT_TRACE]", {
+    currentLayout: "app/employee/layout.tsx",
+    currentRoute: "/employee/dashboard",
+    currentRole: session.user.roles ?? [],
+    currentSidebarComponent: "components/employee/EmployeeDesktopSidebar.tsx",
+    currentDashboardComponent: "app/employee/dashboard/page.tsx",
+    employeeId: employee.id,
+  });
   const fullName = `${employee.firstName} ${employee.lastName}`.trim();
   const nextSalary = data.payroll ? `${asNumber(data.payroll.netPay || data.payroll.baseSalary).toLocaleString('ar-SA')} ${data.payroll.currency}` : 'غير مسجل';
   return (

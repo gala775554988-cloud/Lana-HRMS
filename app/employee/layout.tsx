@@ -27,6 +27,14 @@ export default async function EmployeeLayout({ children }: { children: ReactNode
 
   const requestHeaders = await headers();
   const pathname = requestHeaders.get("x-lana-pathname") ?? "";
+  console.log("[LAYOUT_TRACE]", {
+    currentLayout: "app/employee/layout.tsx",
+    currentRoute: pathname,
+    currentRole: session.user.roles ?? [],
+    currentSidebarComponent: "components/employee/EmployeeDesktopSidebar.tsx",
+    currentDashboardComponent: pathname.includes("/employee/dashboard") ? "app/employee/dashboard/page.tsx" : null,
+    employeeId: employee?.id ?? null,
+  });
   if (await isPasswordChangeRequired(session.user.id) && pathname !== "/employee/settings/password") {
     redirect("/employee/settings/password");
   }

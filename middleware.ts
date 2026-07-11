@@ -84,7 +84,12 @@ export async function middleware(request: NextRequest) {
       response.cookies.set("lana-locale", activeLocale, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
       return response;
     }
-    return NextResponse.next({ request: { headers: requestHeaders } });
+    const roles = Array.isArray(token?.roles) ? (token.roles as string[]) : [];
+    const targetDashboard = roles.length > 0 ? resolveRoleDashboard(roles) : DEFAULT_LOGIN_REDIRECT;
+    console.log("[ROUTE_TRACE]", { currentRoute: normalizedPath, currentRole: roles, targetDashboard, reason: "root-logged-in-redirect" });
+    const response = NextResponse.redirect(new URL(pathLocale ? withLocale(targetDashboard, activeLocale) : targetDashboard, nextUrl));
+    response.cookies.set("lana-locale", activeLocale, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
+    return response;
   }
 
   if (isAuthRoute && isLoggedIn) {
@@ -97,6 +102,7 @@ export async function middleware(request: NextRequest) {
     }
     const roles = Array.isArray(token?.roles) ? (token.roles as string[]) : [];
     const targetDashboard = roles.length > 0 ? resolveRoleDashboard(roles) : "/";
+    console.log("[ROUTE_TRACE]", { currentRoute: normalizedPath, currentRole: roles, targetDashboard, reason: "auth-route-logged-in-redirect" });
     const response = NextResponse.redirect(new URL(pathLocale ? withLocale(targetDashboard, activeLocale) : targetDashboard, nextUrl));
     response.cookies.set("lana-locale", activeLocale, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
     return response;

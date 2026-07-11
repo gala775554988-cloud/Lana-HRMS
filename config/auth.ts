@@ -4,18 +4,17 @@ const moduleResources = [
 
 export const authRoutes = ["/login", "/forgot-password", "/reset-password", "/verify-email"];
 export const publicRoutes = [...authRoutes];
-export const DEFAULT_LOGIN_REDIRECT = "/employees"; // الموظفون هي قلب النظام - أول صفحة بعد تسجيل الدخول
+export const DEFAULT_LOGIN_REDIRECT = "/employee/dashboard";
 
 export function resolveRoleDashboard(userRoles?: string[] | null): string {
   if (!userRoles || !Array.isArray(userRoles)) return DEFAULT_LOGIN_REDIRECT;
+  const roleSet = new Set(userRoles);
   const isAdminOrManager = userRoles.some((role) =>
     ["SUPER_ADMIN", "HR_MANAGER", "PAYROLL_MANAGER", "RECRUITER", "MANAGER", "HR", "DEPARTMENT_MANAGER", "BRANCH_MANAGER", "SUPERVISOR", "PROJECT_MANAGER"].includes(role)
   );
-  // جميع الأدوار تذهب للموظفين أولاً - قلب النظام
-  if (isAdminOrManager) {
-    return "/employees";
-  }
-  return "/employees";
+  if (isAdminOrManager) return "/employees";
+  if (roleSet.has("EMPLOYEE")) return "/employee/dashboard";
+  return DEFAULT_LOGIN_REDIRECT;
 }
 
 export const permissions = Object.fromEntries(
