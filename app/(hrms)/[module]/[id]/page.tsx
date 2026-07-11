@@ -9,6 +9,8 @@ import { ModuleForm } from "@/components/hrms/module-form";
 import { EmployeeList } from "@/components/hrms/employee-list";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { EmployeeProfileActions } from "@/components/hrms/employee-profile-actions";
 
 function display(value: unknown) {
   if (value === null || value === undefined || value === "") return "-";
@@ -38,14 +40,49 @@ async function safeFindMany(
 
 async function getEmployeeRelated(id: string) {
   const client = prisma as unknown as Record<string, RelatedDelegate>;
-  const [documents, contracts, attendance, leaveRequests, assets] = await Promise.all([
-    safeFindMany(client, "employeeDocument", { where: { employeeId: id }, take: 5, orderBy: { uploadedAt: "desc" } }),
-    safeFindMany(client, "employeeContract", { where: { employeeId: id }, take: 5, orderBy: { createdAt: "desc" } }),
-    safeFindMany(client, "attendanceRecord", { where: { employeeId: id }, take: 5, orderBy: { workDate: "desc" } }),
-    safeFindMany(client, "leaveRequest", { where: { employeeId: id }, take: 5, orderBy: { createdAt: "desc" } }),
-    safeFindMany(client, "asset", { where: { assignedEmployeeId: id }, take: 5, orderBy: { updatedAt: "desc" } })
+  const [documents, contracts, attendance, leaveRequests, assets, performance, payrollItems, auditLogs] = await Promise.all([
+    safeFindMany(client, "employeeDocument", { where: { employeeId: id }, take: 20, orderBy: { uploadedAt: "desc" } }),
+    safeFindMany(client, "employeeContract", { where: { employeeId: id }, take: 20, orderBy: { createdAt: "desc" } }),
+    safeFindMany(client, "attendanceRecord", { where: { employeeId: id }, take: 20, orderBy: { workDate: "desc" } }),
+    safeFindMany(client, "leaveRequest", { where: { employeeId: id }, take: 20, orderBy: { createdAt: "desc" } }),
+    safeFindMany(client, "asset", { where: { assignedEmployeeId: id }, take: 20, orderBy: { updatedAt: "desc" } }),
+    safeFindMany(client, "performanceEvaluation", { where: { employeeId: id }, take: 20, orderBy: { updatedAt: "desc" } }),
+    safeFindMany(client, "payrollItem", { where: { employeeId: id }, take: 20, orderBy: { createdAt: "desc" } }),
+    safeFindMany(client, "auditLog", { where: { OR: [{ entityId: id }, { entity: "employee" }] }, take: 20, orderBy: { createdAt: "desc" } })
   ]);
-  return { documents, contracts, attendance, leaveRequests, assets };
+  return { documents, contracts, attendance, leaveRequests, assets, performance, payrollItems, auditLogs };
+}
+
+const employeeTabs = [
+  { id: "personal", label: "الشخصية" },
+  { id: "job", label: "الوظيفة" },
+  { id: "payroll", label: "الرواتب" },
+  { id: "attendance", label: "الحضور" },
+  { id: "leave", label: "الإجازات" },
+  { id: "documents", label: "المستندات" },
+  { id: "contracts", label: "العقود" },
+  { id: "performance", label: "الأداء" },
+  { id: "assets", label: "الأصول" },
+  { id: "permissions", label: "الصلاحيات" },
+  { id: "activity", label: "النشاط" },
+  { id: "ai", label: "AI" },
+] as const;
+
+function SimpleRows({ rows }: { rows: Record<string, unknown>[] }) {
+  if (!rows.length) return <p className="rounded-lg border border-dashed p-6 text-center text-muted-foreground">لا توجد بيانات مسجلة.</p>;
+  return (
+    <div className="space-y-2">
+      {rows.map((row, index) => (
+        <div key={String(row.id ?? index)} className="rounded-lg border p-3 text-sm">
+          <div className="grid gap-2 md:grid-cols-3">
+            {Object.entries(row).slice(0, 9).map(([key, value]) => (
+              <div key={key}><span className="text-muted-foreground">{key}: </span><span>{display(value)}</span></div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default async function RecordPage({ params, searchParams }: { params: Promise<{ module: string; id: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
@@ -66,6 +103,8 @@ export default async function RecordPage({ params, searchParams }: { params: Pro
 
   const { dictionary, locale } = await getRequestDictionary();
   const resourceTitle = resource.key in dictionary.nav ? dictionary.nav[resource.key as keyof typeof dictionary.nav] : resource.title;
+  const requestedTab = typeof query.tab === "string" ? query.tab : "personal";
+  const activeEmployeeTab = employeeTabs.some((tab) => tab.id === requestedTab) ? requestedTab : "personal";
 
   let related = null;
   let scopedEmployees = null as Awaited<ReturnType<typeof listModuleRecords>> | null;
@@ -157,7 +196,7 @@ export default async function RecordPage({ params, searchParams }: { params: Pro
   );
 
   const editCard = (
-    <Card>
+    <Card id="edit">
       <CardHeader>
         <CardTitle>{rec.edit}</CardTitle>
         <CardDescription>{rec.editDesc}</CardDescription>
@@ -168,22 +207,72 @@ export default async function RecordPage({ params, searchParams }: { params: Pro
     </Card>
   );
 
+  const employeeTabCard = resource.key === "employees" ? (
+    <Card>
+      <CardHeader>
+        <CardTitle>{employeeTabs.find((tab) => tab.id === activeEmployeeTab)?.label ?? "ملف الموظف"}</CardTitle>
+        <CardDescription>بيانات تفصيلية مرتبطة بملف الموظف الحالي.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {activeEmployeeTab === "personal" ? detailsCard : null}
+        {activeEmployeeTab === "job" ? <SimpleRows rows={[{ departmentId: record.departmentId, branchId: record.branchId, positionId: record.positionId, employmentTypeId: record.employmentTypeId, hireDate: record.hireDate, status: record.status }]} /> : null}
+        {activeEmployeeTab === "payroll" ? <SimpleRows rows={related?.payrollItems ?? []} /> : null}
+        {activeEmployeeTab === "attendance" ? <SimpleRows rows={related?.attendance ?? []} /> : null}
+        {activeEmployeeTab === "leave" ? <SimpleRows rows={related?.leaveRequests ?? []} /> : null}
+        {activeEmployeeTab === "documents" ? <SimpleRows rows={related?.documents ?? []} /> : null}
+        {activeEmployeeTab === "contracts" ? <SimpleRows rows={related?.contracts ?? []} /> : null}
+        {activeEmployeeTab === "performance" ? <SimpleRows rows={related?.performance ?? []} /> : null}
+        {activeEmployeeTab === "assets" ? <SimpleRows rows={related?.assets ?? []} /> : null}
+        {activeEmployeeTab === "permissions" ? <div className="space-y-3"><p className="text-sm text-muted-foreground">إدارة صلاحيات الموظف المباشرة والفعالة.</p><Button asChild><Link href={`/permissions-management?userId=${String(record.userId ?? "")}`}>فتح صفحة الصلاحيات</Link></Button></div> : null}
+        {activeEmployeeTab === "activity" ? <SimpleRows rows={related?.auditLogs ?? []} /> : null}
+        {activeEmployeeTab === "ai" ? <div className="space-y-3"><Badge variant="outline">AI</Badge><p className="text-sm text-muted-foreground">تحليل مبدئي: راجع اكتمال بيانات الموظف والمستندات والعقود والحضور من التبويبات السابقة.</p><Button asChild variant="outline"><Link href="/lana-ai">فتح Lana AI</Link></Button></div> : null}
+      </CardContent>
+    </Card>
+  ) : null;
+
   return (
     <section className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-sm font-medium text-muted-foreground">{resourceTitle}</p>
           <h1 className="text-3xl font-semibold">{rec.title}</h1>
         </div>
-        <Button asChild variant="outline">
-          <Link href={"/" + resource.key}>{rec.back}</Link>
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {resource.key === "employees" ? (
+            <EmployeeProfileActions
+              employeeId={id}
+              userId={typeof record.userId === "string" ? record.userId : null}
+              isArchived={Boolean(record.archivedAt)}
+              pdfHref={`/api/hr/employees/export?format=pdf&search=${encodeURIComponent(String(record.employeeNumber ?? ""))}`}
+              editHref="#edit"
+            />
+          ) : null}
+          <Button asChild variant="outline">
+            <Link href={"/" + resource.key}>{rec.back}</Link>
+          </Button>
+        </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
-        {resource.key === "employees" ? editCard : detailsCard}
-        {resource.key === "employees" ? detailsCard : editCard}
-      </div>
+      {resource.key === "employees" ? (
+        <div className="overflow-x-auto rounded-2xl border bg-card p-3 print:hidden">
+          <nav className="flex min-w-max gap-2" aria-label="Employee profile tabs">
+            {employeeTabs.map((tab) => (
+              <Link key={tab.id} href={`/${resource.key}/${id}/${tab.id}`} className={`rounded-full px-4 py-2 text-sm font-semibold transition ${activeEmployeeTab === tab.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}>
+                {tab.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
+      ) : null}
+
+      {resource.key === "employees" ? employeeTabCard : (
+        <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
+          {detailsCard}
+          {editCard}
+        </div>
+      )}
+
+      {resource.key === "employees" && activeEmployeeTab === "personal" ? editCard : null}
 
       {(resource.key === "departments" || resource.key === "branches") && scopedEmployees && scopedEmployeeResource ? (
         <EmployeeList

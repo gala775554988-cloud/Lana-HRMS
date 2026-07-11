@@ -57,6 +57,12 @@ function buildSafeRecordSelect(resource: HrmsModule) {
     ...resource.searchFields,
     ...resource.filterFields,
   ]);
+  if (resource.key === "employees") {
+    keys.add("userId");
+    keys.add("archivedAt");
+    keys.add("isPendingActivation");
+    keys.add("pendingActivationUntil");
+  }
   return Object.fromEntries(Array.from(keys).filter(Boolean).map((key) => [key, true]));
 }
 
