@@ -7,11 +7,9 @@ import { prisma } from "@/lib/prisma";
 import { getEmployeeSalaryProfile, salaryProfileFields, salaryProfileLabels } from "@/lib/employee/salary-profile";
 import { ModuleForm } from "@/components/hrms/module-form";
 import { EmployeeList } from "@/components/hrms/employee-list";
+import { EmployeeArchiveButton } from "@/components/hrms/employee-archive-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { EmployeeProfileActions } from "@/components/hrms/employee-profile-actions";
-import { EmployeeDocumentsManager } from "@/components/hrms/employee-documents-manager";
 
 function display(value: unknown) {
   if (value === null || value === undefined || value === "") return "-";
@@ -41,49 +39,14 @@ async function safeFindMany(
 
 async function getEmployeeRelated(id: string) {
   const client = prisma as unknown as Record<string, RelatedDelegate>;
-  const [documents, contracts, attendance, leaveRequests, assets, performance, payrollItems, auditLogs] = await Promise.all([
-    safeFindMany(client, "employeeDocument", { where: { employeeId: id }, take: 20, orderBy: { uploadedAt: "desc" } }),
-    safeFindMany(client, "employeeContract", { where: { employeeId: id }, take: 20, orderBy: { createdAt: "desc" } }),
-    safeFindMany(client, "attendanceRecord", { where: { employeeId: id }, take: 20, orderBy: { workDate: "desc" } }),
-    safeFindMany(client, "leaveRequest", { where: { employeeId: id }, take: 20, orderBy: { createdAt: "desc" } }),
-    safeFindMany(client, "asset", { where: { assignedEmployeeId: id }, take: 20, orderBy: { updatedAt: "desc" } }),
-    safeFindMany(client, "performanceEvaluation", { where: { employeeId: id }, take: 20, orderBy: { updatedAt: "desc" } }),
-    safeFindMany(client, "payrollItem", { where: { employeeId: id }, take: 20, orderBy: { createdAt: "desc" } }),
-    safeFindMany(client, "auditLog", { where: { OR: [{ entityId: id }, { entity: "employee" }] }, take: 20, orderBy: { createdAt: "desc" } })
+  const [documents, contracts, attendance, leaveRequests, assets] = await Promise.all([
+    safeFindMany(client, "employeeDocument", { where: { employeeId: id }, take: 5, orderBy: { uploadedAt: "desc" } }),
+    safeFindMany(client, "employeeContract", { where: { employeeId: id }, take: 5, orderBy: { createdAt: "desc" } }),
+    safeFindMany(client, "attendanceRecord", { where: { employeeId: id }, take: 5, orderBy: { workDate: "desc" } }),
+    safeFindMany(client, "leaveRequest", { where: { employeeId: id }, take: 5, orderBy: { createdAt: "desc" } }),
+    safeFindMany(client, "asset", { where: { assignedEmployeeId: id }, take: 5, orderBy: { updatedAt: "desc" } })
   ]);
-  return { documents, contracts, attendance, leaveRequests, assets, performance, payrollItems, auditLogs };
-}
-
-const employeeTabs = [
-  { id: "personal", label: "الشخصية" },
-  { id: "job", label: "الوظيفة" },
-  { id: "payroll", label: "الرواتب" },
-  { id: "attendance", label: "الحضور" },
-  { id: "leave", label: "الإجازات" },
-  { id: "documents", label: "المستندات" },
-  { id: "contracts", label: "العقود" },
-  { id: "performance", label: "الأداء" },
-  { id: "assets", label: "الأصول" },
-  { id: "permissions", label: "الصلاحيات" },
-  { id: "activity", label: "النشاط" },
-  { id: "ai", label: "AI" },
-] as const;
-
-function SimpleRows({ rows }: { rows: Record<string, unknown>[] }) {
-  if (!rows.length) return <p className="rounded-lg border border-dashed p-6 text-center text-muted-foreground">لا توجد بيانات مسجلة.</p>;
-  return (
-    <div className="space-y-2">
-      {rows.map((row, index) => (
-        <div key={String(row.id ?? index)} className="rounded-lg border p-3 text-sm">
-          <div className="grid gap-2 md:grid-cols-3">
-            {Object.entries(row).slice(0, 9).map(([key, value]) => (
-              <div key={key}><span className="text-muted-foreground">{key}: </span><span>{display(value)}</span></div>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+  return { documents, contracts, attendance, leaveRequests, assets };
 }
 
 export default async function RecordPage({ params, searchParams }: { params: Promise<{ module: string; id: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
@@ -104,8 +67,6 @@ export default async function RecordPage({ params, searchParams }: { params: Pro
 
   const { dictionary, locale } = await getRequestDictionary();
   const resourceTitle = resource.key in dictionary.nav ? dictionary.nav[resource.key as keyof typeof dictionary.nav] : resource.title;
-  const requestedTab = typeof query.tab === "string" ? query.tab : "personal";
-  const activeEmployeeTab = employeeTabs.some((tab) => tab.id === requestedTab) ? requestedTab : "personal";
 
   let related = null;
   let scopedEmployees = null as Awaited<ReturnType<typeof listModuleRecords>> | null;
@@ -168,36 +129,90 @@ export default async function RecordPage({ params, searchParams }: { params: Pro
       </CardHeader>
       <CardContent className="grid gap-3 sm:grid-cols-2">
         {resource.key === "employees" ? (
-          <div className="rounded-md border p-3 sm:col-span-2">
-            <p className="mb-2 text-xs uppercase text-muted-foreground">{(dictionary.fields as any)?.profilePhotoUrl ?? "الصورة الشخصية"}</p>
-            {typeof record.profilePhotoUrl === "string" && record.profilePhotoUrl ? (
-              <img src={record.profilePhotoUrl} alt="Employee photo" className="h-32 w-32 rounded-2xl object-cover" />
-            ) : (
-              <div className="flex h-32 w-32 items-center justify-center rounded-2xl bg-muted text-3xl text-muted-foreground">👤</div>
-            )}
-          </div>
-        ) : null}
-        {resource.key === "employees" ? (
-          <div className="rounded-md border p-3">
-            <p className="text-xs uppercase text-muted-foreground">{(dictionary.fields as any)?.fullName ?? "الاسم الكامل"}</p>
-            <p className="break-words text-sm">{`${String(record.firstName ?? "")} ${String(record.lastName ?? "")}`.trim() || "-"}</p>
-          </div>
-        ) : null}
-        {Object.entries(record).filter(([key]) => key !== "id" && key !== "profilePhotoUrl" && key !== "emergencyContact" && key !== "firstName" && key !== "lastName" && key !== "salaryCosts" && key !== "salaryDeductInsurance" && !(salaryProfileFields as readonly string[]).includes(key)).map(([key, value]) => {
-          const fieldLabel = (dictionary.fields as any)?.[key] ?? key;
-          return (
-            <div key={key} className="rounded-md border p-3">
-              <p className="text-xs uppercase text-muted-foreground">{fieldLabel}</p>
-              <p className="break-words text-sm">{display(value)}</p>
+          <>
+            <div className="rounded-md border p-3 sm:col-span-2">
+              <p className="mb-2 text-xs uppercase text-muted-foreground">{(dictionary.fields as any)?.profilePhotoUrl ?? "الصورة الشخصية"}</p>
+              {typeof record.profilePhotoUrl === "string" && record.profilePhotoUrl ? (
+                <img src={record.profilePhotoUrl} alt="Employee photo" className="h-32 w-32 rounded-2xl object-cover" />
+              ) : (
+                <div className="flex h-32 w-32 items-center justify-center rounded-2xl bg-muted text-3xl text-muted-foreground">👤</div>
+              )}
             </div>
-          );
-        })}
+            <div className="rounded-md border p-3">
+              <p className="text-xs uppercase text-muted-foreground">{(dictionary.fields as any)?.fullName ?? "الاسم الكامل"}</p>
+              <p className="break-words text-sm font-medium">{`${String(record.firstName ?? "")} ${String(record.lastName ?? "")}`.trim() || "-"}</p>
+            </div>
+            <div className="rounded-md border p-3">
+              <p className="text-xs uppercase text-muted-foreground">الرقم الوظيفي</p>
+              <p className="break-words text-sm font-mono">{String((record as any).employeeNumber || "-")}</p>
+            </div>
+            <div className="rounded-md border p-3">
+              <p className="text-xs uppercase text-muted-foreground">رقم الهوية</p>
+              <p className="break-words text-sm font-mono">{String((record as any).nationalId || "-")}</p>
+            </div>
+            <div className="rounded-md border p-3">
+              <p className="text-xs uppercase text-muted-foreground">البريد الإلكتروني</p>
+              <p className="break-words text-sm">{String((record as any).email || "-")}</p>
+            </div>
+            <div className="rounded-md border p-3">
+              <p className="text-xs uppercase text-muted-foreground">الجوال</p>
+              <p className="break-words text-sm">{String((record as any).phone || "-")}</p>
+            </div>
+            <div className="rounded-md border p-3">
+              <p className="text-xs uppercase text-muted-foreground">الحالة</p>
+              <p className="break-words text-sm"><span className="rounded-full bg-green-50 px-2 py-1 text-xs text-green-700">{String((record as any).status || "-")}</span></p>
+            </div>
+            <div className="rounded-md border p-3">
+              <p className="text-xs uppercase text-muted-foreground">تاريخ التوظيف</p>
+              <p className="break-words text-sm">{(record as any).hireDate ? new Date((record as any).hireDate).toLocaleDateString("ar-SA") : "-"}</p>
+            </div>
+            {(record as any).department ? (
+              <div className="rounded-md border p-3">
+                <p className="text-xs uppercase text-muted-foreground">القسم</p>
+                <p className="break-words text-sm">{(record as any).department?.name || "-"}</p>
+              </div>
+            ) : null}
+            {(record as any).position ? (
+              <div className="rounded-md border p-3">
+                <p className="text-xs uppercase text-muted-foreground">الوظيفة</p>
+                <p className="break-words text-sm">{(record as any).position?.title || "-"}</p>
+              </div>
+            ) : null}
+            {(record as any).branch ? (
+              <div className="rounded-md border p-3">
+                <p className="text-xs uppercase text-muted-foreground">الفرع</p>
+                <p className="break-words text-sm">{(record as any).branch?.name || "-"}</p>
+              </div>
+            ) : null}
+            {(record as any).user ? (
+              <div className="rounded-md border p-3 sm:col-span-2 bg-blue-50/50 dark:bg-blue-950/20">
+                <p className="text-xs uppercase text-muted-foreground">حالة الحساب</p>
+                <p className="break-words text-sm">{(record as any).user?.isActive ? "نشط" : "غير نشط"} { (record as any).user?.mustChangePassword ? "- يجب تغيير كلمة المرور" : ""}</p>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          Object.entries(record).filter(([key]) => 
+            !["id", "profilePhotoUrl", "emergencyContact", "firstName", "lastName", "salaryCosts", "salaryDeductInsurance", "user", "department", "position", "branch", "employmentType", "nationality", "manager", "managedEmployees", "documents", "contracts", "assignedAssets", "trainingEnrollments", "evaluations", "deductions", "allowances", "overtimeRequests", "loans", "payrollItems", "leaveRequests", "attendanceRecords", "preferences", "workflowInstances", "expenseRequests", "letterRequests", "departmentId", "positionId", "branchId", "employmentTypeId", "nationalityId", "managerId", "userId", "createdAt", "updatedAt", "odooId", "odooWriteDate", "odooCreateDate", "odooActive", "odooDepartmentId", "odooJobId", "odooCompanyId", "odooParentId", "lastActiveDate", "lastActiveSource", "archivedAt", "archiveReason", "terminationDate", "dateOfBirth", "gender", "address", "hireDate", "status", "employeeNumber", "nationalId", "email", "phone"].includes(key) &&
+            !(salaryProfileFields as readonly string[]).includes(key)
+          ).map(([key, value]) => {
+            const fieldLabel = (dictionary.fields as any)?.[key] ?? key;
+            // Skip if value is object or empty
+            if (value === null || value === undefined || value === "" || typeof value === "object") return null;
+            return (
+              <div key={key} className="rounded-md border p-3">
+                <p className="text-xs uppercase text-muted-foreground">{fieldLabel}</p>
+                <p className="break-words text-sm">{display(value)}</p>
+              </div>
+            );
+          })
+        )}
       </CardContent>
     </Card>
   );
 
   const editCard = (
-    <Card id="edit">
+    <Card>
       <CardHeader>
         <CardTitle>{rec.edit}</CardTitle>
         <CardDescription>{rec.editDesc}</CardDescription>
@@ -208,45 +223,16 @@ export default async function RecordPage({ params, searchParams }: { params: Pro
     </Card>
   );
 
-  const employeeTabCard = resource.key === "employees" ? (
-    <Card>
-      <CardHeader>
-        <CardTitle>{employeeTabs.find((tab) => tab.id === activeEmployeeTab)?.label ?? "ملف الموظف"}</CardTitle>
-        <CardDescription>بيانات تفصيلية مرتبطة بملف الموظف الحالي.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {activeEmployeeTab === "personal" ? detailsCard : null}
-        {activeEmployeeTab === "job" ? <SimpleRows rows={[{ departmentId: record.departmentId, branchId: record.branchId, positionId: record.positionId, employmentTypeId: record.employmentTypeId, hireDate: record.hireDate, status: record.status }]} /> : null}
-        {activeEmployeeTab === "payroll" ? <SimpleRows rows={related?.payrollItems ?? []} /> : null}
-        {activeEmployeeTab === "attendance" ? <SimpleRows rows={related?.attendance ?? []} /> : null}
-        {activeEmployeeTab === "leave" ? <SimpleRows rows={related?.leaveRequests ?? []} /> : null}
-        {activeEmployeeTab === "documents" ? <EmployeeDocumentsManager employeeId={id} initialDocuments={related?.documents ?? []} /> : null}
-        {activeEmployeeTab === "contracts" ? <SimpleRows rows={related?.contracts ?? []} /> : null}
-        {activeEmployeeTab === "performance" ? <SimpleRows rows={related?.performance ?? []} /> : null}
-        {activeEmployeeTab === "assets" ? <SimpleRows rows={related?.assets ?? []} /> : null}
-        {activeEmployeeTab === "permissions" ? <div className="space-y-3"><p className="text-sm text-muted-foreground">إدارة صلاحيات الموظف المباشرة والفعالة.</p><Button asChild><Link href={`/permissions-management?userId=${String(record.userId ?? "")}`}>فتح صفحة الصلاحيات</Link></Button></div> : null}
-        {activeEmployeeTab === "activity" ? <SimpleRows rows={related?.auditLogs ?? []} /> : null}
-        {activeEmployeeTab === "ai" ? <div className="space-y-3"><Badge variant="outline">AI</Badge><p className="text-sm text-muted-foreground">تحليل مبدئي: راجع اكتمال بيانات الموظف والمستندات والعقود والحضور من التبويبات السابقة.</p><Button asChild variant="outline"><Link href="/lana-ai">فتح Lana AI</Link></Button></div> : null}
-      </CardContent>
-    </Card>
-  ) : null;
-
   return (
     <section className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-muted-foreground">{resourceTitle}</p>
           <h1 className="text-3xl font-semibold">{rec.title}</h1>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex gap-2">
           {resource.key === "employees" ? (
-            <EmployeeProfileActions
-              employeeId={id}
-              userId={typeof record.userId === "string" ? record.userId : null}
-              isArchived={Boolean(record.archivedAt)}
-              pdfHref={`/api/hr/employees/export?format=pdf&search=${encodeURIComponent(String(record.employeeNumber ?? ""))}`}
-              editHref={`/${resource.key}/${id}/edit`}
-            />
+            <EmployeeArchiveButton employeeId={id} status={String((record as any).status || "ACTIVE")} locale={locale} />
           ) : null}
           <Button asChild variant="outline">
             <Link href={"/" + resource.key}>{rec.back}</Link>
@@ -254,26 +240,10 @@ export default async function RecordPage({ params, searchParams }: { params: Pro
         </div>
       </div>
 
-      {resource.key === "employees" ? (
-        <div className="overflow-x-auto rounded-2xl border bg-card p-3 print:hidden">
-          <nav className="flex min-w-max gap-2" aria-label="Employee profile tabs">
-            {employeeTabs.map((tab) => (
-              <Link key={tab.id} href={`/${resource.key}/${id}/${tab.id}`} className={`rounded-full px-4 py-2 text-sm font-semibold transition ${activeEmployeeTab === tab.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}>
-                {tab.label}
-              </Link>
-            ))}
-          </nav>
-        </div>
-      ) : null}
-
-      {resource.key === "employees" ? employeeTabCard : (
-        <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
-          {detailsCard}
-          {editCard}
-        </div>
-      )}
-
-      {resource.key === "employees" && activeEmployeeTab === "personal" ? editCard : null}
+      <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
+        {resource.key === "employees" ? editCard : detailsCard}
+        {resource.key === "employees" ? detailsCard : editCard}
+      </div>
 
       {(resource.key === "departments" || resource.key === "branches") && scopedEmployees && scopedEmployeeResource ? (
         <EmployeeList
@@ -306,26 +276,34 @@ export default async function RecordPage({ params, searchParams }: { params: Pro
       {resource.key === "employees" ? (
         <Card>
           <CardHeader>
-            <CardTitle>تفاصيل الراتب</CardTitle>
-            <CardDescription>الراتب الأساسي والبدلات والخصومات وصافي الراتب.</CardDescription>
+            <CardTitle>الحساب</CardTitle>
+            <CardDescription>معلومات حساب تسجيل الدخول - اسم المستخدم هو رقم الهوية</CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <CardContent className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-md border p-3">
-              <p className="text-xs uppercase text-muted-foreground">خصم التأمينات</p>
-              <p className="text-lg font-semibold">{salaryProfile?.salaryDeductInsurance ? "مفعل" : "غير مفعل"}</p>
+              <p className="text-xs uppercase text-muted-foreground">اسم المستخدم (رقم الهوية)</p>
+              <p className="text-sm font-mono font-bold">{String((record as any).nationalId || "-")}</p>
             </div>
-            {(salaryProfile?.salaryCosts ?? []).map((cost, index) => (
-              <div key={`cost-${index}`} className="rounded-md border p-3">
-                <p className="text-xs uppercase text-muted-foreground">{index === 0 ? "التكلفة" : `التكلفة ${index + 1}`}</p>
-                <p className="text-lg font-semibold">{display(cost)}</p>
-              </div>
-            ))}
-            {salaryProfileFields.map((field) => (
-              <div key={field} className="rounded-md border p-3">
-                <p className="text-xs uppercase text-muted-foreground">{salaryProfileLabels[field]}</p>
-                <p className="text-lg font-semibold">{display(salaryProfile?.[field])}</p>
-              </div>
-            ))}
+            <div className="rounded-md border p-3">
+              <p className="text-xs uppercase text-muted-foreground">هل تم تغيير كلمة المرور؟</p>
+              <p className="text-sm">{(record as any).user?.passwordChanged ? "نعم" : "لا - يجب تغييرها (افتراضية)"}</p>
+            </div>
+            <div className="rounded-md border p-3">
+              <p className="text-xs uppercase text-muted-foreground">آخر تغيير لكلمة المرور</p>
+              <p className="text-sm">{(record as any).user?.passwordChangedAt ? new Date((record as any).user.passwordChangedAt).toLocaleDateString("ar-SA") : "لم يتم التغيير بعد"}</p>
+            </div>
+            <div className="rounded-md border p-3">
+              <p className="text-xs uppercase text-muted-foreground">آخر تسجيل دخول</p>
+              <p className="text-sm">{(record as any).user?.lastLoginAt ? new Date((record as any).user.lastLoginAt).toLocaleString("ar-SA") : "لم يسجل دخول بعد"}</p>
+            </div>
+            <div className="rounded-md border p-3">
+              <p className="text-xs uppercase text-muted-foreground">حالة الحساب</p>
+              <p className="text-sm">{(record as any).user?.isActive ? "نشط" : "غير نشط"} - {String((record as any).status || "-")}</p>
+            </div>
+            <div className="rounded-md border p-3">
+              <p className="text-xs uppercase text-muted-foreground">يجب تغيير كلمة المرور؟</p>
+              <p className="text-sm">{(record as any).user?.mustChangePassword ? "نعم - سيُجبر على التغيير" : "لا"}</p>
+            </div>
           </CardContent>
         </Card>
       ) : null}

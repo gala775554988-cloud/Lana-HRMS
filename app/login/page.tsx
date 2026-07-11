@@ -132,13 +132,6 @@ export default async function LoginPage() {
           <Suspense>
             <LoginForm dictionary={dictionary} />
           </Suspense>
-
-          <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800 text-center">
-            <div className="flex items-center justify-center gap-2 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 p-3 rounded-2xl">
-              <ShieldCheck className="h-4 w-4 shrink-0" />
-              <span>يتم التوجيه تلقائياً لبوابة المشرف أو الموظف حسب صلاحياتك المخزنة بالنظام.</span>
-            </div>
-          </div>
         </div>
       </div>
     </section>

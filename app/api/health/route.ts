@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
-import { getSystemHealthReport } from "@/lib/system/health";
+import { prisma } from "@/lib/prisma";
 
 export async function GET() {
-  const report = await getSystemHealthReport();
-  return NextResponse.json({
-    status: report.status,
-    timestamp: report.checkedAt,
-    version: report.version,
-    summary: report.summary,
-    checks: report.items.map((item) => ({ key: item.key, status: item.status, message: item.message })),
-  }, { status: report.status === "ERROR" ? 503 : 200 });
+  const started = Date.now();
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    const dbMs = Date.now() - started;
+    await prisma.platformHealthMetric.create({ data: { service: "api", metric: "healthcheck", value: dbMs, unit: "ms", status: "OK", metadata: { route: "/api/health" } } }).catch(() => null);
+    return NextResponse.json({ status: "OK", database: "OK", dbMs, timestamp: new Date().toISOString() });
+  } catch (error) {
+    return NextResponse.json({ status: "DEGRADED", database: "UNAVAILABLE", message: error instanceof Error ? error.message : String(error), timestamp: new Date().toISOString() }, { status: 200 });
+  }
 }

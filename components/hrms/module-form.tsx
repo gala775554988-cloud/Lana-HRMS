@@ -178,63 +178,10 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
       </div>
 
       {isEmployeeForm ? (
-        <section className="space-y-4 rounded-2xl border bg-muted/20 p-4">
-          <div>
-            <h3 className="text-lg font-semibold">الراتب</h3>
-            <p className="text-sm text-muted-foreground">تفاصيل راتب الموظف وبدلاته بدون التأثير على أي بيانات قائمة.</p>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            {salaryProfileFields.filter((field) => !["salaryInsuranceDeduction", "salaryTotal"].includes(field)).map((field) => (
-              <div key={field} className="space-y-2">
-                <Label htmlFor={field}>{salaryProfileLabels[field]}</Label>
-                <Input
-                  id={field}
-                  type="number"
-                  step="0.01"
-                  value={String(field === "salaryNet" ? (salaryValues[field] ?? derivedNetSalary) : (salaryValues[field] ?? ""))}
-                  onChange={(event) => setSalaryValues((current) => ({ ...current, [field]: event.target.value }))}
-                  readOnly={field === "salaryNet"}
-                />
-              </div>
-            ))}
-            <label className="flex items-center gap-3 rounded-xl border bg-background p-3 md:col-span-2">
-              <input
-                type="checkbox"
-                checked={Boolean(salaryValues.salaryDeductInsurance)}
-                onChange={(event) => setSalaryValues((current) => ({ ...current, salaryDeductInsurance: event.target.checked }))}
-                className="h-4 w-4"
-              />
-              <span>خصم التأمينات</span>
-            </label>
-            <div className="space-y-2">
-              <Label htmlFor="salaryInsuranceDeduction">{salaryProfileLabels.salaryInsuranceDeduction}</Label>
-              <Input id="salaryInsuranceDeduction" type="number" value={insuranceDeduction.toFixed(2)} readOnly />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="salaryTotal">{salaryProfileLabels.salaryTotal}</Label>
-              <Input id="salaryTotal" type="number" value={totalSalary.toFixed(2)} readOnly />
-            </div>
-          </div>
-
-          <div className="space-y-3 rounded-xl border bg-background p-3">
-            <div className="flex items-center justify-between gap-3">
-              <Label>التكلفة</Label>
-              <Button type="button" variant="outline" size="sm" onClick={() => setCostValues((current) => [...current, ""])}>إضافة تكلفة جديدة</Button>
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              {costValues.map((cost, index) => (
-                <Input
-                  key={index}
-                  type="number"
-                  step="0.01"
-                  value={cost}
-                  placeholder={index === 0 ? "Cost" : `Cost ${index + 1}`}
-                  onChange={(event) => setCostValues((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))}
-                />
-              ))}
-            </div>
-          </div>
-        </section>
+        <div className="rounded-xl border border-dashed bg-muted/20 p-4 text-center text-sm text-muted-foreground">
+          <p>تفاصيل الراتب تتم مزامنتها تلقائياً من Odoo</p>
+          <p className="text-xs mt-1">اضغط على زر <strong>الراتب الإجمالي</strong> في ملف الحساب لعرض التفاصيل المتزامنة مع Odoo</p>
+        </div>
       ) : null}
 
       <Button type="submit" disabled={isPending}>{isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}{recordId ? dictionary.form.saveChanges : dictionary.form.createRecord}</Button>

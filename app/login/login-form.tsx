@@ -23,8 +23,8 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
     defaultValues: { identifier: "", password: "" }
   });
 
-  const identifierLabel = "اسم المستخدم، البريد الإلكتروني، أو رقم الهوية الوطنية";
-  const identifierPlaceholder = "admin أو 1000000001 أو name@company.com";
+  const identifierLabel = "اسم المستخدم";
+  const identifierPlaceholder = "أدخل اسم المستخدم";
 
   useEffect(() => {
     const rememberedIdentifier = window.localStorage.getItem("lana.hrms.rememberedIdentifier");
@@ -71,9 +71,7 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-4">
           <Label htmlFor="password" className="font-bold text-slate-800 dark:text-slate-200">{dictionary.auth.password}</Label>
-          <Link href="/forgot-password" className="text-sm font-medium text-primary underline-offset-4 hover:underline">
-            {dictionary.auth.forgotPassword}
-          </Link>
+          <span className="text-xs text-muted-foreground">إذا نسيت كلمة المرور يرجى مراجعة إدارة الموارد البشرية</span>
         </div>
         <div className="relative">
           <LockKeyhole className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground rtl:left-auto rtl:right-3" aria-hidden="true" />

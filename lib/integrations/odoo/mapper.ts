@@ -225,6 +225,14 @@ export function mapOdooEmployeeToLana(record: OdooRecord): Record<string, unknow
   const companyOdooId = many2oneId(record.company_id);
   const managerOdooId = many2oneId(record.parent_id);
 
+  // Last active date & archived
+  const departureDate = asDate(record.departure_date);
+  const writeDate = asDate(record.write_date);
+  const createDate = asDate(record.create_date);
+  const lastActiveDate = departureDate || writeDate || createDate || undefined;
+  const archivedAt = record.active === false ? (departureDate || writeDate || undefined) : undefined;
+  const archiveReason = textValue(record.departure_description);
+
   return stripEmpty({
     employeeNumber: String(record.barcode || record.id || `ODOO-${record.id}`),
     nationalId: String(record.identification_id || `ODOO-${record.id}`),
@@ -238,14 +246,17 @@ export function mapOdooEmployeeToLana(record: OdooRecord): Record<string, unknow
     terminationDate,
     emergencyContact,
     profilePhotoUrl,
-    address: undefined, // address_home_id is m2o – could be resolved separately
+    address: undefined,
     status: record.active === false ? "INACTIVE" : "ACTIVE",
+    lastActiveDate,
+    lastActiveSource: record.active === false ? "ODOO_DEPARTURE" : "ODOO_WRITE_DATE",
+    archivedAt,
+    archiveReason,
     // Pass-through Odoo relation IDs for resolver
     odooDepartmentId: departmentOdooId,
     odooJobId: jobOdooId,
     odooCompanyId: companyOdooId,
     odooManagerId: managerOdooId,
-    // also keep raw for debugging
     _odooId: record.id,
     _odooName: record.name
   });

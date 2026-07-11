@@ -6,6 +6,7 @@ import type { SyncOptions } from "@/lib/integrations/odoo/types";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+export const maxDuration = 300;
 
 function statusFor(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
@@ -24,14 +25,28 @@ export async function POST(request: NextRequest) {
         mappingId: body.mappingId,
         direction: body.direction || "BIDIRECTIONAL",
         entity: body.entity || "all",
-        payload: { dryRun: Boolean(body.dryRun), batchSize: body.batchSize, incremental: body.incremental, since: body.since }
+        payload: { dryRun: Boolean(body.dryRun), batchSize: body.batchSize ?? 500, incremental: body.incremental, since: body.since }
       });
       return NextResponse.json({ success: true, queued });
     }
 
     const service = await OdooSyncService.forConnection(body.connectionId);
     const result = await service.sync(body as SyncOptions);
-    return NextResponse.json({ success: true, result });
+    // Enterprise report: include summary
+    return NextResponse.json({ 
+      success: true, 
+      result,
+      report: {
+        total: (result.pulled || 0) + (result.skipped || 0),
+        pulled: result.pulled,
+        created: result.created,
+        updated: result.updated,
+        skipped: result.skipped,
+        errors: result.errors?.length || 0,
+        errorsList: result.errors?.slice(0, 100), // أول 100 خطأ للتقرير
+        summary: result.operations?.find((op:any) => op.model==="summary")?.reason,
+      }
+    });
   } catch (error) {
     return NextResponse.json({ success: false, message: error instanceof Error ? error.message : String(error) }, { status: statusFor(error) });
   }

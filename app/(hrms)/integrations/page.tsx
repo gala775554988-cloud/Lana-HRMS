@@ -18,7 +18,11 @@ export default async function IntegrationsDashboard() {
 
   return (
     <IntegrationShell title="ERP Integrations" description="Enterprise integration hub for Odoo JSON-RPC, synchronization, queues, jobs, webhooks, API keys, and OAuth clients.">
-      <form action={seed}><Button type="submit">Initialize Odoo Provider & Mappings</Button></form>
+      <div className="flex flex-wrap gap-2">
+        <form action={seed}><Button type="submit">Initialize Odoo Provider & Mappings</Button></form>
+        <a href="/integrations/duplicate-national-ids"><Button variant="outline">تقرير أرقام الهوية المكررة</Button></a>
+        <a href="/integrations/synchronization"><Button variant="outline">المزامنة</Button></a>
+      </div>
       <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
         {[ ["Providers", providers], ["Connections", connections], ["Mappings", mappings], ["Queued", queued], ["Jobs", jobs], ["Conflicts", conflicts] ].map(([label, value]) => <DataCard key={String(label)} title={String(label)}><div className="text-3xl font-bold">{String(value)}</div></DataCard>)}
       </div>

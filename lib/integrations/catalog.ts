@@ -4,6 +4,7 @@ export const integrationPages = [
   { href: "/integrations/connections", label: "Connections" },
   { href: "/integrations/mappings", label: "Mappings" },
   { href: "/integrations/synchronization", label: "Synchronization" },
+  { href: "/integrations/duplicate-national-ids", label: "تقرير أرقام الهوية المكررة" },
   { href: "/integrations/queues", label: "Queues" },
   { href: "/integrations/jobs", label: "Jobs" },
   { href: "/integrations/logs", label: "Logs" },

@@ -15,22 +15,35 @@ export async function middleware(request: NextRequest) {
   requestHeaders.set("x-lana-locale", activeLocale);
   requestHeaders.set("x-lana-pathname", normalizedPath);
 
-  // Auth.js v5 JWT handling - try both secure and non-secure cookie names
+  // Fast path for public routes - no need to check token
+  const isAuthRoute = authRoutes.some((route) => normalizedPath === route || normalizedPath.startsWith(route + "/"));
+  const isPublicRoute = publicRoutes.some(
+    (route) => route === normalizedPath || normalizedPath.startsWith(route + "/")
+  );
+
+  // Auth.js v5 JWT handling - try auto then secure and non-secure for compatibility
   let token: JWT | null = null;
+  let isLoggedIn = false;
+  
   if (AUTH_SECRET) {
     try {
-      // Try secure cookie first (production)
-      token = await getToken({
-        req: request,
-        secret: AUTH_SECRET,
-        secureCookie: true,
-        salt: "__Secure-authjs.session-token",
-        cookieName: "__Secure-authjs.session-token",
-      });
+      token = await getToken({ req: request, secret: AUTH_SECRET });
     } catch {}
+    
     if (!token) {
       try {
-        // Fallback to non-secure cookie (development)
+        token = await getToken({
+          req: request,
+          secret: AUTH_SECRET,
+          secureCookie: true,
+          salt: "__Secure-authjs.session-token",
+          cookieName: "__Secure-authjs.session-token",
+        });
+      } catch {}
+    }
+
+    if (!token) {
+      try {
         token = await getToken({
           req: request,
           secret: AUTH_SECRET,
@@ -40,16 +53,23 @@ export async function middleware(request: NextRequest) {
         });
       } catch {}
     }
+
+    isLoggedIn = Boolean(token?.sub ?? token?.email ?? token);
   }
 
-  const isLoggedIn = Boolean(token?.sub ?? token?.email ?? token);
+  // Force change password check - if mustChangePassword true, redirect to force-change-password
+  const mustChangePassword = (token as any)?.mustChangePassword === true;
+  const isForceChangeRoute = normalizedPath === "/force-change-password" || normalizedPath.startsWith("/force-change-password");
+  const isApiForceChange = normalizedPath.startsWith("/api/auth/force-change-password") || normalizedPath.startsWith("/api/auth/change-password");
+  
+  if (isLoggedIn && mustChangePassword && !isForceChangeRoute && !isApiForceChange && !normalizedPath.startsWith("/api/auth/signout") && !normalizedPath.startsWith("/logout") && !isAuthRoute) {
+    const forceChangePath = pathLocale ? withLocale("/force-change-password", activeLocale) : "/force-change-password";
+    const response = NextResponse.redirect(new URL(forceChangePath, nextUrl));
+    response.cookies.set("lana-locale", activeLocale, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
+    return response;
+  }
 
-  const isAuthRoute = authRoutes.some((route) => normalizedPath === route || normalizedPath.startsWith(route + "/"));
-  const isPublicRoute = publicRoutes.some(
-    (route) => route === normalizedPath || normalizedPath.startsWith(route + "/")
-  );
-
-  // Root path: redirect to login only if NOT logged in (no standalone landing page).
+  // Root path: redirect to login only if NOT logged in
   if (normalizedPath === "/") {
     if (!isLoggedIn) {
       const loginPath = pathLocale ? withLocale("/login", activeLocale) : "/login";
@@ -57,10 +77,24 @@ export async function middleware(request: NextRequest) {
       response.cookies.set("lana-locale", activeLocale, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
       return response;
     }
+    // If logged in but must change password, go to force change
+    if (mustChangePassword) {
+      const forceChangePath = pathLocale ? withLocale("/force-change-password", activeLocale) : "/force-change-password";
+      const response = NextResponse.redirect(new URL(forceChangePath, nextUrl));
+      response.cookies.set("lana-locale", activeLocale, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
+      return response;
+    }
     return NextResponse.next({ request: { headers: requestHeaders } });
   }
 
   if (isAuthRoute && isLoggedIn) {
+    // If must change password, don't allow access to login page, redirect to force change
+    if (mustChangePassword) {
+      const forceChangePath = pathLocale ? withLocale("/force-change-password", activeLocale) : "/force-change-password";
+      const response = NextResponse.redirect(new URL(forceChangePath, nextUrl));
+      response.cookies.set("lana-locale", activeLocale, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
+      return response;
+    }
     const roles = Array.isArray(token?.roles) ? (token.roles as string[]) : [];
     const targetDashboard = roles.length > 0 ? resolveRoleDashboard(roles) : "/";
     const response = NextResponse.redirect(new URL(pathLocale ? withLocale(targetDashboard, activeLocale) : targetDashboard, nextUrl));

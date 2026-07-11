@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { Search, LayoutGrid, List, Plus, SlidersHorizontal, Upload, Download } from "lucide-react";
+import { useState, useMemo, useCallback, useTransition, useDeferredValue } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Search, LayoutGrid, List, Plus, SlidersHorizontal, Upload, Download, Archive, UsersRound, Users, UserCheck, Clock, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatCard } from "@/components/ui/stat-card";
@@ -12,11 +12,13 @@ import { ModuleTable } from "@/components/hrms/module-table";
 import { ModuleForm } from "@/components/hrms/module-form";
 import { EmployeeBulkImportDialog } from "@/components/hrms/employee-bulk-import-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
-import { Users, UserCheck, Clock, UserPlus } from "lucide-react";
 import type { HrmsModule } from "@/config/hrms";
 import type { Dictionary, Locale } from "@/lib/i18n";
+import { ArchivedEmployees } from "@/components/hrms/archived-employees";
+import { DuplicateAccounts } from "@/components/hrms/duplicate-accounts";
 
 type ViewMode = "card" | "table";
+type TabType = "all" | "archived" | "duplicates";
 
 interface EmployeeListProps {
   resource: HrmsModule;
@@ -33,13 +35,17 @@ interface EmployeeListProps {
 
 export function EmployeeList({ resource, records, totalCount, page, pageCount, search: initialSearch, filters = {}, pageSize, dictionary, locale }: EmployeeListProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeTab = (searchParams.get("tab") as TabType) || "active";
   const [viewMode, setViewMode] = useState<ViewMode>("card");
   const [search, setSearch] = useState(initialSearch);
+  const deferredSearch = useDeferredValue(search);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeCardData | null>(null);
   const [addEmployeeOpen, setAddEmployeeOpen] = useState(false);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const isAr = locale === "ar";
 
   const stats = useMemo(() => {
@@ -67,7 +73,7 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
   ] as const, [isAr]);
 
   const buildQuery = useCallback((updates: Record<string, string | number | undefined> = {}) => {
-    const params = new URLSearchParams();
+    const params = new URLSearchParams(searchParams.toString());
     if (search) params.set("search", search);
     Object.entries(filters).forEach(([key, value]) => { if (value) params.set(key, value); });
     params.set("pageSize", String(pageSize));
@@ -76,15 +82,70 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
       else params.set(key, String(value));
     });
     return params.toString();
-  }, [filters, pageSize, search]);
+  }, [filters, pageSize, search, searchParams]);
 
-  const handleView = useCallback((id: string) => { const emp = records.find((r) => r.id === id); if (emp) { setSelectedEmployee(emp); setDrawerOpen(true); } }, [records]);
-  const handleEdit = useCallback((id: string) => { router.push(`/employees/${id}`); }, [router]);
-  const handleDocuments = useCallback((id: string) => { router.push(`/documents?employeeId=${id}`); }, [router]);
+  const switchTab = useCallback((tab: TabType) => {
+    // Immediate UI feedback
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", tab);
+    params.set("page", "1");
+    startTransition(() => {
+      router.push(`/employees?${params.toString()}`);
+    });
+  }, [router, searchParams]);
+
+  const handleView = useCallback((id: string) => { 
+    // Instant feedback - no server call
+    const emp = records.find((r) => r.id === id); 
+    if (emp) { 
+      setSelectedEmployee(emp); 
+      setDrawerOpen(true); 
+    } 
+  }, [records]);
+  
+  const handleEdit = useCallback((id: string) => { 
+    // Prefetch and instant navigation
+    router.prefetch(`/employees/${id}`);
+    startTransition(() => {
+      router.push(`/employees/${id}`); 
+    });
+  }, [router]);
+  
+  const handleDocuments = useCallback((id: string) => { 
+    router.prefetch(`/documents?employeeId=${id}`);
+    startTransition(() => {
+      router.push(`/documents?employeeId=${id}`); 
+    });
+  }, [router]);
+
+  const handleArchive = useCallback(async (id: string, currentStatus: string) => {
+    const isArchived = currentStatus === "INACTIVE" || currentStatus === "TERMINATED";
+    const reason = isArchived ? "" : prompt(isAr ? "سبب الأرشفة (اختياري):" : "Archive reason (optional):") || "";
+    if (!isArchived && reason === null) return; // cancelled
+
+    try {
+      const res = await fetch("/api/employees/archive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeeId: id, archiveReason: reason, unarchive: isArchived }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        alert(json.message);
+        router.refresh();
+      } else {
+        alert("خطأ: " + json.message);
+      }
+    } catch (e) {
+      alert("خطأ في الأرشفة");
+    }
+  }, [isAr, router]);
 
   const handleSearch = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    router.push(`/employees?${buildQuery({ search, page: 1 })}`);
+    startTransition(() => {
+      router.push(`/employees?${buildQuery({ search, page: 1 })}`);
+    });
   }, [buildQuery, search, router]);
 
   const handleApplyFilters = useCallback((e: React.FormEvent<HTMLFormElement>) => {
@@ -106,8 +167,93 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
   const handleCloseDrawer = useCallback(() => { setDrawerOpen(false); }, []);
   const handleCloseAddEmployee = useCallback((open: boolean) => { setAddEmployeeOpen(open); }, []);
 
+  if (activeTab === "archived") {
+    return (
+      <section className="space-y-6" dir={isAr ? "rtl" : "ltr"}>
+        {isPending && <div className="h-1 w-full bg-indigo-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-600 animate-pulse w-full"></div></div>}
+      <div className="flex flex-wrap gap-2 border-b pb-4">
+          <Button variant={activeTab === "all" ? "default" : "outline"} size="sm" onClick={() => switchTab("all")}><Users className="h-4 w-4 ml-1" />جميع الموظفين ({totalCount})</Button>
+          <Button variant={activeTab === "active" ? "default" : "outline"} size="sm" onClick={() => switchTab("active")}><Users className="h-4 w-4 ml-1 text-green-600" />النشطون</Button>
+          <Button variant={activeTab === "archived" ? "default" : "outline"} size="sm" onClick={() => switchTab("archived")}><Archive className="h-4 w-4 ml-1" />الموظفون المؤرشفون / غير النشطين</Button>
+          <Button variant={activeTab === "duplicates" ? "default" : "outline"} size="sm" onClick={() => switchTab("duplicates")}><UsersRound className="h-4 w-4 ml-1" />الحسابات المكررة</Button>
+        </div>
+        <ArchivedEmployees />
+      </section>
+    );
+  }
+
+  if (activeTab === "duplicates") {
+    return (
+      <section className="space-y-6" dir={isAr ? "rtl" : "ltr"}>
+        {isPending && <div className="h-1 w-full bg-indigo-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-600 animate-pulse w-full"></div></div>}
+      <div className="flex flex-wrap gap-2 border-b pb-4">
+          <Button variant={activeTab === "all" ? "default" : "outline"} size="sm" onClick={() => switchTab("all")}><Users className="h-4 w-4 ml-1" />جميع الموظفين ({totalCount})</Button>
+          <Button variant={activeTab === "active" ? "default" : "outline"} size="sm" onClick={() => switchTab("active")}><Users className="h-4 w-4 ml-1 text-green-600" />النشطون</Button>
+          <Button variant={activeTab === "archived" ? "default" : "outline"} size="sm" onClick={() => switchTab("archived")}><Archive className="h-4 w-4 ml-1" />الموظفون المؤرشفون</Button>
+          <Button variant={activeTab === "duplicates" ? "default" : "outline"} size="sm" onClick={() => switchTab("duplicates")}><UsersRound className="h-4 w-4 ml-1" />الحسابات المكررة</Button>
+        </div>
+        <DuplicateAccounts />
+      </section>
+    );
+  }
+
+  if (activeTab === "active") {
+    const activeRecords = records.filter((r) => r.status === "ACTIVE" || r.status === "ON_LEAVE");
+    return (
+      <section className="space-y-6" dir={isAr ? "rtl" : "ltr"}>
+        {isPending && <div className="h-1 w-full bg-indigo-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-600 animate-pulse w-full"></div></div>}
+      <div className="flex flex-wrap gap-2 border-b pb-4">
+          <Button variant={activeTab === "all" ? "default" : "outline"} size="sm" onClick={() => switchTab("all")}><Users className="h-4 w-4 ml-1" />جميع الموظفين ({totalCount})</Button>
+          <Button variant={activeTab === "active" ? "default" : "outline"} size="sm" onClick={() => switchTab("active")}><Users className="h-4 w-4 ml-1 text-green-600" />النشطون ({activeRecords.length})</Button>
+          <Button variant={activeTab === "archived" ? "default" : "outline"} size="sm" onClick={() => switchTab("archived")}><Archive className="h-4 w-4 ml-1" />الموظفون المؤرشفون</Button>
+          <Button variant={activeTab === "duplicates" ? "default" : "outline"} size="sm" onClick={() => switchTab("duplicates")}><UsersRound className="h-4 w-4 ml-1" />الحسابات المكررة</Button>
+        </div>
+
+        <div className="rounded-2xl border border-green-100 bg-green-50/30 p-4 text-sm text-green-800 dark:border-green-900/30 dark:bg-green-950/20 dark:text-green-300">
+          ✅ يتم عرض الموظفين النشطين فقط في هذه الخانة. الموظفون المؤرشفون / غير النشطين تم سحبهم إلى خانة <strong>الموظفون المؤرشفون</strong>.
+        </div>
+
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {activeRecords.map((employee) => (
+            <EmployeeCard key={employee.id} employee={employee} locale={locale} onView={handleView} onEdit={handleEdit} onDocuments={handleDocuments} onArchive={handleArchive} />
+          ))}
+          {activeRecords.length === 0 && (
+            <div className="col-span-full flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <Users className="h-12 w-12 mb-3 opacity-40" />
+              <p className="text-sm font-medium">لا يوجد موظفون نشطون</p>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-3 rounded-lg border bg-card p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <span>{isAr ? `النشطون: ${activeRecords.length} من ${totalCount}` : `Active: ${activeRecords.length} of ${totalCount}`}</span>
+        </div>
+
+        <Dialog open={addEmployeeOpen} onOpenChange={handleCloseAddEmployee}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{isAr ? "إضافة موظف جديد" : "Add New Employee"}</DialogTitle>
+              <DialogClose onClick={() => setAddEmployeeOpen(false)} />
+            </DialogHeader>
+            <ModuleForm resource={resource} dictionary={dictionary} locale={locale} />
+          </DialogContent>
+        </Dialog>
+
+        <EmployeeBulkImportDialog open={bulkImportOpen} onOpenChange={setBulkImportOpen} locale={locale} />
+        <EmployeeDrawer employee={selectedEmployee} open={drawerOpen} onClose={handleCloseDrawer} locale={locale} onEdit={handleEdit} />
+      </section>
+    );
+  }
+
   return (
     <section className="space-y-6" dir={isAr ? "rtl" : "ltr"}>
+      {isPending && <div className="h-1 w-full bg-indigo-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-600 animate-pulse w-full"></div></div>}
+      <div className="flex flex-wrap gap-2 border-b pb-4">
+        <Button variant={activeTab === "all" ? "default" : "outline"} size="sm" onClick={() => switchTab("all")}><Users className="h-4 w-4 ml-1" />جميع الموظفين ({totalCount})</Button>
+        <Button variant={activeTab === "archived" ? "default" : "outline"} size="sm" onClick={() => switchTab("archived")}><Archive className="h-4 w-4 ml-1" />الموظفون المؤرشفون</Button>
+        <Button variant={activeTab === "duplicates" ? "default" : "outline"} size="sm" onClick={() => switchTab("duplicates")}><UsersRound className="h-4 w-4 ml-1" />الحسابات المكررة</Button>
+      </div>
+
       <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
         <StatCard title={isAr ? "إجمالي الموظفين" : "Total Employees"} value={totalCount} icon={Users} description={isAr ? "جميع الموظفين" : "All employees"} />
         <StatCard title={isAr ? "نشط في الصفحة" : "Active on page"} value={stats.active} icon={UserCheck} description={isAr ? "حسب نتائج الصفحة الحالية" : "Current page results"} />
@@ -126,7 +272,7 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
             <Button type="button" size="sm" variant="outline" onClick={() => setFiltersOpen((value) => !value)} className="border-indigo-100 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800 dark:border-indigo-900/50 dark:text-indigo-300 dark:hover:bg-indigo-950/30"><SlidersHorizontal className="h-4 w-4 ml-1.5" />الفلاتر</Button>
           </form>
           <div className="flex flex-wrap items-center gap-2">
-            <select value={pageSize} onChange={(event) => router.push(`/employees?${buildQuery({ pageSize: event.target.value, page: 1 })}`)} className="h-9 rounded-md border bg-background px-3 text-sm">
+            <select value={pageSize} onChange={(event) => { const val = event.target.value; startTransition(() => { router.push(`/employees?${buildQuery({ pageSize: val, page: 1 })}`); }); }} className="h-9 rounded-md border bg-background px-3 text-sm" disabled={isPending}>
               {[30, 50, 100, 200].map((size) => <option key={size} value={size}>{size}</option>)}
             </select>
             <div className="flex rounded-lg border overflow-hidden">
@@ -160,7 +306,7 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
       {viewMode === "card" && (
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {records.map((employee) => (
-            <EmployeeCard key={employee.id} employee={employee} locale={locale} onView={handleView} onEdit={handleEdit} onDocuments={handleDocuments} />
+            <EmployeeCard key={employee.id} employee={employee} locale={locale} onView={handleView} onEdit={handleEdit} onDocuments={handleDocuments} onArchive={handleArchive} />
           ))}
           {records.length === 0 && (
             <div className="col-span-full flex flex-col items-center justify-center py-16 text-muted-foreground">
@@ -177,10 +323,10 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
       )}
 
       <div className="flex flex-col gap-3 rounded-lg border bg-card p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-        <span>{isAr ? `صفحة ${page} من ${pageCount} - ${totalCount} سجل` : `Page ${page} of ${pageCount} - ${totalCount} records`}</span>
+        <span>{isAr ? `صفحة ${page} من ${pageCount} - ${totalCount} سجل` : `Page ${page} of ${pageCount} - ${totalCount} records`}{isPending && " (جاري التحميل...)"}</span>
         <div className="flex gap-2">
-          <Button asChild variant="outline" size="sm"><a href={`?${buildQuery({ page: Math.max(page - 1, 1) })}`}>{isAr ? "السابق" : "Previous"}</a></Button>
-          <Button asChild variant="outline" size="sm"><a href={`?${buildQuery({ page: Math.min(page + 1, pageCount) })}`}>{isAr ? "التالي" : "Next"}</a></Button>
+          <Button variant="outline" size="sm" disabled={isPending || page <= 1} onClick={() => { startTransition(() => { router.push(`/employees?${buildQuery({ page: Math.max(page - 1, 1) })}`); }); }}><span className={isPending ? "animate-pulse" : ""}>{isAr ? "السابق" : "Previous"}</span></Button>
+          <Button variant="outline" size="sm" disabled={isPending || page >= pageCount} onClick={() => { startTransition(() => { router.push(`/employees?${buildQuery({ page: Math.min(page + 1, pageCount) })}`); }); }}><span className={isPending ? "animate-pulse" : ""}>{isAr ? "التالي" : "Next"}</span></Button>
         </div>
       </div>
 

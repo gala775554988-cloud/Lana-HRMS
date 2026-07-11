@@ -43,27 +43,29 @@ type CountDelegate = {
   findMany(args?: Record<string, unknown>): Promise<Record<string, unknown>[]>;
 };
 
-function delegateFor(modelName: string) {
-  return (prisma as unknown as Record<string, CrudDelegate>)[modelName];
+// Simple in-memory cache for counts (30s TTL) - performance improvement for 10000+ employees
+const countCache = new Map<string, { count: number; timestamp: number }>();
+const CACHE_TTL = 30 * 1000;
+
+function getCachedCount(key: string): number | null {
+  const cached = countCache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.count;
+  }
+  return null;
 }
 
-function buildSafeRecordSelect(resource: HrmsModule) {
-  const keys = new Set<string>([
-    "id",
-    "createdAt",
-    "updatedAt",
-    ...resource.fields.map((field) => field.name),
-    ...resource.tableFields,
-    ...resource.searchFields,
-    ...resource.filterFields,
-  ]);
-  if (resource.key === "employees") {
-    keys.add("userId");
-    keys.add("archivedAt");
-    keys.add("isPendingActivation");
-    keys.add("pendingActivationUntil");
+function setCachedCount(key: string, count: number) {
+  countCache.set(key, { count, timestamp: Date.now() });
+  // Clean old entries if cache grows too large
+  if (countCache.size > 100) {
+    const oldestKey = countCache.keys().next().value;
+    if (oldestKey) countCache.delete(oldestKey);
   }
-  return Object.fromEntries(Array.from(keys).filter(Boolean).map((key) => [key, true]));
+}
+
+function delegateFor(modelName: string) {
+  return (prisma as unknown as Record<string, CrudDelegate>)[modelName];
 }
 
 function serialize(value: unknown): unknown {
@@ -240,25 +242,73 @@ export async function listModuleRecords(input: QueryInput) {
   const accessProfile = await getAccessProfile(session.user.id, (session.user.roles as string[]) ?? []);
   const where = await applyScopedWhere(resource.key, baseWhere, accessProfile);
 
-  // Special handling for employees: include relations for card view
+  // Special handling for employees: optimized with select + cache + performance
   if (resource.key === "employees") {
     try {
-      const [records, total] = await Promise.all([
-        prisma.employee.findMany({
+      // Cache key for count
+      const cacheKey = JSON.stringify({ resource: resource.key, where, search: input.search, filters: input.filters });
+      let total = getCachedCount(cacheKey);
+      let records: any[];
+
+      if (total === null) {
+        // No cache, fetch both
+        const [recs, cnt] = await Promise.all([
+          prisma.employee.findMany({
+            where,
+            skip: (page - 1) * pageSize,
+            take: pageSize,
+            orderBy: { createdAt: "desc" },
+            select: {
+              id: true,
+              employeeNumber: true,
+              nationalId: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phone: true,
+              profilePhotoUrl: true,
+              status: true,
+              hireDate: true,
+              createdAt: true,
+              department: { select: { name: true, code: true } },
+              position: { select: { title: true } },
+              branch: { select: { name: true } },
+              employmentType: { select: { name: true } },
+              user: { select: { lastLoginAt: true } },
+            },
+          }),
+          prisma.employee.count({ where }),
+        ]);
+        records = recs;
+        total = cnt;
+        setCachedCount(cacheKey, total);
+      } else {
+        // Use cached count, only fetch records
+        records = await prisma.employee.findMany({
           where,
           skip: (page - 1) * pageSize,
           take: pageSize,
           orderBy: { createdAt: "desc" },
-          include: {
+          select: {
+            id: true,
+            employeeNumber: true,
+            nationalId: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            profilePhotoUrl: true,
+            status: true,
+            hireDate: true,
+            createdAt: true,
             department: { select: { name: true, code: true } },
             position: { select: { title: true } },
             branch: { select: { name: true } },
             employmentType: { select: { name: true } },
-            user: { select: { id: true, username: true, email: true, lastLoginAt: true, roles: { select: { role: { select: { name: true } } } } } },
+            user: { select: { lastLoginAt: true } },
           },
-        }),
-        prisma.employee.count({ where }),
-      ]);
+        });
+      }
 
       const serializedRecords = records.map((r: any) => ({
         id: r.id,
@@ -275,8 +325,6 @@ export async function listModuleRecords(input: QueryInput) {
         position: r.position,
         branch: r.branch,
         employmentType: r.employmentType,
-        userId: r.userId,
-        user: r.user ? { id: r.user.id, username: r.user.username, email: r.user.email, roles: r.user.roles } : null,
         lastLoginAt: r.user?.lastLoginAt ? new Date(r.user.lastLoginAt).toLocaleString("ar-SA") : null,
         createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : null,
       }));
@@ -348,7 +396,20 @@ export async function getModuleRecord(resourceKey: string, id: string) {
   if (!resource) throw new Error("Unknown module");
   const session = await requireModulePermission(resource, "read");
   try {
-    const record = await delegateFor(resource.model).findUnique({ where: { id }, select: buildSafeRecordSelect(resource) });
+    let record: any;
+    if (resourceKey === "employees") {
+      record = await prisma.employee.findUnique({
+        where: { id },
+        include: {
+          department: { select: { name: true } },
+          position: { select: { title: true } },
+          branch: { select: { name: true } },
+          user: { select: { id: true, username: true, email: true, isActive: true, lastLoginAt: true, mustChangePassword: true, passwordChanged: true, passwordChangedAt: true, lastPasswordResetAt: true, lastPasswordResetBy: true } },
+        },
+      });
+    } else {
+      record = await delegateFor(resource.model).findUnique({ where: { id } });
+    }
     await assertRecordVisible(resource, record, session);
     return serialize(record) as Record<string, unknown> | null;
   } catch (error: any) {
@@ -386,7 +447,7 @@ export async function createModuleRecord(input: MutationInput) {
 
       const existingEmployee = await prisma.employee.findUnique({
         where: { nationalId },
-        select: { id: true, userId: true }
+        include: { user: true }
       });
       if (existingEmployee?.userId) {
         return { success: false, message: "An account already exists for this National ID." };
@@ -396,7 +457,7 @@ export async function createModuleRecord(input: MutationInput) {
         ? emailInput.toLowerCase()
         : `employee.${nationalId}@lana.local`;
 
-      const emailUser = await prisma.user.findUnique({ where: { email: userEmail }, select: { id: true, name: true, email: true, passwordHash: true, isActive: true } }).catch(() => null);
+      const emailUser = await prisma.user.findUnique({ where: { email: userEmail } }).catch(() => null);
 
       const defaultPassword = defaultEmployeePasswordFromNationalId(nationalId);
       const passwordHash = await hashPassword(defaultPassword);
@@ -414,8 +475,7 @@ export async function createModuleRecord(input: MutationInput) {
               emailVerified: new Date(),
               passwordHash,
               isActive: true,
-            },
-            select: { id: true, name: true, email: true, passwordHash: true, isActive: true }
+            }
           });
         } else {
           user = await tx.user.update({
@@ -424,8 +484,7 @@ export async function createModuleRecord(input: MutationInput) {
               name: fullName || user.name,
               passwordHash: user.passwordHash ?? passwordHash,
               isActive: true,
-            },
-            select: { id: true, name: true, email: true, passwordHash: true, isActive: true }
+            }
           });
         }
 

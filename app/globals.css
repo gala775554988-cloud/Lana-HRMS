@@ -121,3 +121,52 @@
   0%, 100% { transform: translateY(0) rotate(var(--tw-rotate, 0deg)); }
   50% { transform: translateY(-12px) rotate(var(--tw-rotate, 0deg)); }
 }
+
+/* Fast response for buttons and interactive elements - make system light and instant */
+@layer components {
+  button, [role="button"], a {
+    @apply select-none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  
+  button:active, [role="button"]:active {
+    transform: scale(0.98);
+    transition: transform 80ms ease-out;
+  }
+  
+  /* Instant feedback for all clickable elements */
+  .instant-feedback:active {
+    transform: scale(0.97);
+    opacity: 0.9;
+  }
+  
+  /* Light and fast transitions */
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Optimize for fast rendering */
+  .fast-render {
+    content-visibility: auto;
+    contain-intrinsic-size: 0 500px;
+  }
+  
+  /* Top loader animation */
+  @keyframes topLoader {
+    0% { transform: translateX(-100%); }
+    50% { transform: translateX(0%); }
+    100% { transform: translateX(100%); }
+  }
+  
+  /* Pulse animation for loading */
+  @keyframes pulse-fast {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  
+  .animate-pulse-fast {
+    animation: pulse-fast 0.8s ease-in-out infinite;
+  }
+}

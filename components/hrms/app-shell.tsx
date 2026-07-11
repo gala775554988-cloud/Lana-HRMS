@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import type { ReactNode } from "react";
 import {
-  LogOut, ChevronLeft, ChevronRight, Search,
+  LayoutDashboard, LogOut, ChevronLeft, ChevronRight, Search,
   Users, Building2, MapPin, Briefcase, FileText, Clock, Calendar,
   DollarSign, GraduationCap, Package, Megaphone, BarChart3, Settings,
   Shield, GitPullRequest, Sparkles, Menu, X, PlugZap
@@ -28,38 +28,36 @@ interface AppShellProps {
 }
 
 const navItems = [
-  { href: "/request-center", label: "استقبال الطلبات", icon: GitPullRequest, group: "main", resource: "leave" },
+  // ① الموظفون - قلب النظام - أول صفحة بعد تسجيل الدخول
   { href: "/employees", label: "الموظفون", icon: Users, group: "people", resource: "employees" },
+  // ② الإدارات
   { href: "/departments", label: "الإدارات", icon: Building2, group: "people", resource: "departments" },
+  // ③ الفروع
   { href: "/branches", label: "الفروع", icon: MapPin, group: "people", resource: "branches" },
+  // ④ المستشفيات
   { href: "/hospitals", label: "المستشفيات", icon: Building2, group: "people", resource: "employees" },
-  { href: "/positions", label: "المناصب", icon: Briefcase, group: "people", resource: "positions" },
-  { href: "/contracts", label: "العقود", icon: FileText, group: "people", resource: "contracts" },
+  // ⑦ الحضور
   { href: "/attendance", label: "الحضور", icon: Clock, group: "ops", resource: "attendance" },
+  // ⑧ الإجازات
   { href: "/leave-requests", label: "الإجازات", icon: Calendar, group: "ops", resource: "leave" },
+  // ⑨ الأوفر تايم
   { href: "/overtime", label: "الأوفر تايم", icon: Clock, group: "ops", resource: "overtime" },
+  // ⑩ الرواتب - بدلاً من آخر القائمة
   { href: "/payroll-runs", label: "الرواتب", icon: DollarSign, group: "ops", resource: "payroll" },
-  { href: "/performance", label: "الأداء", icon: GraduationCap, group: "ops", resource: "performance" },
-  { href: "/training", label: "التدريب", icon: GraduationCap, group: "ops", resource: "training" },
-  { href: "/assets", label: "الأصول", icon: Package, group: "ops", resource: "assets" },
-  { href: "/announcements", label: "الإعلانات", icon: Megaphone, group: "admin", resource: "announcements" },
+  // ⑪ المستندات
+  { href: "/documents", label: "المستندات", icon: FileText, group: "ops", resource: "documents" },
+  // ⑫ التقارير
   { href: "/reports", label: "التقارير", icon: BarChart3, group: "admin", resource: "reports" },
-  { href: "/integrations", label: "ERP Integrations", icon: PlugZap, group: "admin", resource: "settings" },
-  { href: "/enterprise-suite", label: "Enterprise Suites", icon: Briefcase, group: "admin", resource: "settings" },
-  { href: "/enterprise-production", label: "Production Centers", icon: BarChart3, group: "admin", resource: "settings" },
-  { href: "/phase2-production", label: "Phase 2 Enterprise", icon: Briefcase, group: "admin", resource: "settings" },
-  { href: "/enterprise-erp", label: "Enterprise ERP", icon: Building2, group: "admin", resource: "settings" },
-  { href: "/infra", label: "Infrastructure", icon: PlugZap, group: "admin", resource: "settings" },
-  { href: "/saas-platform", label: "SaaS Platform", icon: DollarSign, group: "admin", resource: "settings" },
-  { href: "/intelligent", label: "Intelligent Platform", icon: Sparkles, group: "admin", resource: "settings" },
-  { href: "/digital-twin", label: "Digital Twin", icon: BarChart3, group: "admin", resource: "settings" },
+  // ⑬ مزامنة Odoo - صفحة كاملة
+  { href: "/integrations/synchronization", label: "مزامنة Odoo", icon: PlugZap, group: "admin", resource: "settings" },
+  // إضافي - إدارة
+  { href: "/request-center", label: "استقبال الطلبات", icon: GitPullRequest, group: "admin", resource: "leave" },
   { href: "/lana-ai", label: "Lana AI", icon: Sparkles, group: "admin", resource: "reports" },
   { href: "/audit-logs", label: "سجل التدقيق", icon: Shield, group: "admin", resource: "audit-logs" },
   { href: "/system-settings", label: "إعدادات النظام", icon: Settings, group: "admin", resource: "settings" },
-  { href: "/administration", label: "الصلاحيات والإدارة", icon: Shield, group: "admin", resource: "permissions" },
 ];
 
-const groups: Record<string, string> = { main: "الرئيسية", people: "الأفراد", ops: "العمليات", admin: "الإدارة" };
+const groups: Record<string, string> = { people: "الأفراد 👥", ops: "العمليات ⏰", admin: "الإدارة 🔧" };
 
 export function AppShell({ children, companyLogo }: AppShellProps) {
   const router = useRouter();
@@ -95,7 +93,8 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
   }, []);
 
   const isActive = useCallback((href: string) => {
-    return pathname === href || pathname.startsWith(href + "/");
+    if (href === "/") return pathname === "/" || pathname === "/dashboard";
+    return pathname.startsWith(href);
   }, [pathname]);
 
   const groupedNav = useMemo(() => {
@@ -150,7 +149,7 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
               {sidebarCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             </button>
             <BrandLogo
-              href="/employees"
+              href="/"
               src={companyLogo}
               size="sm"
               showText={!sidebarCollapsed}
@@ -238,7 +237,7 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
         >
           {/* Mobile header inside sidebar */}
           <div className="flex h-16 items-center justify-between border-b border-slate-100 px-4 lg:hidden dark:border-slate-800">
-            <BrandLogo href="/employees" size="sm" showText={true} />
+            <BrandLogo href="/" size="sm" showText={true} />
             <button
               onClick={() => setMobileMenuOpen(false)}
               className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"

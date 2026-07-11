@@ -4,7 +4,7 @@ import { memo } from "react";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
-import { Eye, Pencil, FileText, MoreHorizontal, Building2, Briefcase, Calendar, Clock } from "lucide-react";
+import { Eye, Pencil, FileText, MoreHorizontal, Building2, Briefcase, Calendar, Clock, Archive, ArchiveRestore } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { EmployeeStatus } from "@/lib/design-system/tokens";
 
@@ -22,9 +22,7 @@ export interface EmployeeCardData {
   position?: { title: string } | null;
   branch?: { name: string } | null;
   employmentType?: { name: string } | null;
-  userId?: string | null;
   lastLoginAt?: string | null;
-  user?: { id: string; username?: string | null; email?: string | null; roles?: { role: { name: string } }[] } | null;
 }
 
 interface EmployeeCardProps {
@@ -34,6 +32,7 @@ interface EmployeeCardProps {
   onEdit: (id: string) => void;
   onDocuments: (id: string) => void;
   onMore?: (id: string) => void;
+  onArchive?: (id: string, currentStatus: string) => void;
 }
 
 const InfoRow = memo(function InfoRow({ icon: Icon, value }: { icon: LucideIcon; value?: string | null }) {
@@ -46,7 +45,7 @@ const InfoRow = memo(function InfoRow({ icon: Icon, value }: { icon: LucideIcon;
   );
 });
 
-export const EmployeeCard = memo(function EmployeeCard({ employee, locale = "ar", onView, onEdit, onDocuments, onMore }: EmployeeCardProps) {
+export const EmployeeCard = memo(function EmployeeCard({ employee, locale = "ar", onView, onEdit, onDocuments, onMore, onArchive }: EmployeeCardProps) {
   const fullName = `${employee.firstName} ${employee.lastName}`;
   const initials = `${employee.firstName.charAt(0)}${employee.lastName.charAt(0)}`.toUpperCase();
 
@@ -91,6 +90,12 @@ export const EmployeeCard = memo(function EmployeeCard({ employee, locale = "ar"
           <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 dark:text-slate-300 dark:hover:bg-indigo-950/40 dark:hover:text-indigo-300" onClick={() => onDocuments(employee.id)}>
             <FileText className="h-3.5 w-3.5" />{locale === "ar" ? "مستندات" : "Docs"}
           </Button>
+          {onArchive && (
+            <Button variant="ghost" size="sm" className={`h-8 gap-1.5 text-xs ${employee.status === "INACTIVE" || employee.status === "TERMINATED" ? "text-green-600 hover:bg-green-50 hover:text-green-700" : "text-amber-600 hover:bg-amber-50 hover:text-amber-700"} dark:hover:bg-slate-800`} onClick={() => onArchive(employee.id, employee.status)}>
+              {employee.status === "INACTIVE" || employee.status === "TERMINATED" ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
+              {employee.status === "INACTIVE" || employee.status === "TERMINATED" ? (locale === "ar" ? "إلغاء الأرشفة" : "Unarchive") : (locale === "ar" ? "أرشفة" : "Archive")}
+            </Button>
+          )}
         </div>
         {onMore && (
           <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => onMore(employee.id)}>

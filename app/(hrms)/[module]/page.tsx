@@ -70,6 +70,15 @@ export default async function ResourcePage({ params, searchParams }: { params: P
     ["department", "hospital", "branch", "project", "section", "position", "nationality", "employmentType", "manager", "hireDate"].forEach((field) => {
       if (typeof query[field] === "string") filters[field] = query[field] as string;
     });
+    // Handle tab filtering for active/archived
+    const tab = typeof query.tab === "string" ? query.tab : (resourceKey === "employees" ? "active" : "all");
+    if (tab === "active") {
+      filters.status = "ACTIVE";
+    } else if (tab === "archived") {
+      // Archived tab uses separate component, but for generic list we filter INACTIVE
+      // This will be overridden by ArchivedEmployees component, but keep for consistency
+      // filters.status = "INACTIVE"; // Don't filter here, let component handle
+    }
   }
   const page = Number(query.page ?? 1);
   const pageSize = Number(query.pageSize ?? (resourceKey === "employees" ? 30 : 10));

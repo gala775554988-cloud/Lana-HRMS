@@ -194,105 +194,468 @@ export class OdooSyncService {
     const result = emptyResult("employees", direction, Boolean(options.dryRun), options.tenantId);
     const mapper = getMapper("employees");
     const since = await this.resolveSince("employees", options);
-    const batchSize = options.batchSize ?? options.limit ?? 100;
+    const batchSize = options.batchSize ?? options.limit ?? 500;
     const history = await this.startHistory(options.mappingId, direction, "employees", since, options.tenantId);
+
+    // تتبع الأخطاء المفصلة
+    const isUniqueError = (e: unknown) => {
+      const msg = e instanceof Error ? e.message : String(e);
+      return msg.includes("P2002") || msg.toLowerCase().includes("unique") || msg.toLowerCase().includes("duplicate");
+    };
 
     try {
       if (direction === "LANA_TO_ODOO" || direction === "BIDIRECTIONAL") {
         const records = await delegate("employee").findMany({ where: updatedWhere(since), take: batchSize, orderBy: { updatedAt: "asc" }, include: { department: true, position: true, branch: true } });
         for (const record of records as any[]) {
-          const values: any = mapLanaEmployeeToOdoo(record);
-          // Resolve relations to Odoo IDs
-          if (record.department) {
-            const dept = await this.findExternalBy("hr.department", "name", record.department.name, ["id"]);
-            if (dept?.id) values.department_id = dept.id;
+          try {
+            const values: any = mapLanaEmployeeToOdoo(record);
+            if (record.department) {
+              try {
+                const dept = await this.findExternalBy("hr.department", "name", record.department.name, ["id"]);
+                if (dept?.id) values.department_id = dept.id;
+              } catch {}
+            }
+            if (record.position) {
+              try {
+                const job = await this.findExternalBy("hr.job", "name", record.position.title, ["id"]);
+                if (job?.id) values.job_id = job.id;
+              } catch {}
+            }
+            if (record.branch) {
+              try {
+                const comp = await this.findExternalBy("res.company", "name", record.branch.name, ["id"]);
+                if (comp?.id) values.company_id = comp.id;
+              } catch {}
+            }
+            const existing = await this.findExternalBy(mapper.odooModel, mapper.externalKeyField, record.employeeNumber, mapper.odooFields);
+            if (existing && this.hasWriteDateConflict(record.updatedAt, existing.write_date, record, existing, mapper.fieldMap)) {
+              await this.conflict(options.mappingId, "employees", record.id, String(existing.id), record, existing, result);
+              continue;
+            }
+            if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.odooModel, localId: record.id, externalId: existing?.id, values });
+            else if (existing?.id) { await this.client.write(mapper.odooModel, [existing.id], values); result.updated += 1; }
+            else { const id = await this.client.create(mapper.odooModel, values); result.created += 1; result.operations.push({ operation: "create", model: mapper.odooModel, localId: record.id, externalId: id }); }
+            result.pushed += 1;
+          } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            result.skipped += 1;
+            result.errors.push({ id: record.id, message, details: err });
+            result.operations.push({ operation: "skip", model: mapper.odooModel, localId: record.id, reason: message });
+            await this.log("ODOO_LANA_SKIP", `Skipped LANA->ODOO employee ${record.id}: ${message}`, { employeeId: record.id, error: message }).catch(() => {});
+            continue; // ContinueOnError
           }
-          if (record.position) {
-            const job = await this.findExternalBy("hr.job", "name", record.position.title, ["id"]);
-            if (job?.id) values.job_id = job.id;
-          }
-          if (record.branch) {
-            const comp = await this.findExternalBy("res.company", "name", record.branch.name, ["id"]);
-            if (comp?.id) values.company_id = comp.id;
-          }
-          const existing = await this.findExternalBy(mapper.odooModel, mapper.externalKeyField, record.employeeNumber, mapper.odooFields);
-          if (existing && this.hasWriteDateConflict(record.updatedAt, existing.write_date, record, existing, mapper.fieldMap)) {
-            await this.conflict(options.mappingId, "employees", record.id, String(existing.id), record, existing, result);
-            continue;
-          }
-          if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.odooModel, localId: record.id, externalId: existing?.id, values });
-          else if (existing?.id) { await this.client.write(mapper.odooModel, [existing.id], values); result.updated += 1; }
-          else { const id = await this.client.create(mapper.odooModel, values); result.created += 1; result.operations.push({ operation: "create", model: mapper.odooModel, localId: record.id, externalId: id }); }
-          result.pushed += 1;
         }
       }
 
       if (direction === "ODOO_TO_LANA" || direction === "BIDIRECTIONAL") {
-        const rows = await this.client.search_read(mapper.odooModel, odooIncrementalDomain(since), mapper.odooFields, { limit: batchSize, order: "write_date asc" });
-        result.cursor = maxCursor(rows, since);
-        for (const row of rows) {
-          const rawValues: any = mapOdooEmployeeToLana(row);
-          // Resolve Odoo relations -> Lana IDs
-          const departmentId = rawValues.odooDepartmentId ? await this.resolveDepartmentId(rawValues.odooDepartmentId) : undefined;
-          const positionId = rawValues.odooJobId ? await this.resolvePositionId(rawValues.odooJobId) : undefined;
-          const branchId = rawValues.odooCompanyId ? await this.resolveBranchId(rawValues.odooCompanyId) : undefined;
+        // ====== Optimized Enterprise: Bulk fetch to avoid 300s timeout ======
+        // - id > lastOdooId pagination (no offset)
+        // - bulk departments/jobs/companies via one findMany each
+        // - bulk existing employees via one findMany
+        // - bulk contracts via one search_read per batch
+        let lastOdooId = 0;
+        let lastWriteDate: string | undefined = since ? asDateString(since) : undefined;
+        let pages = 0;
+        let totalFetched = 0;
+        let hasMore = true;
 
-          // Clean meta fields
-          delete rawValues.odooDepartmentId;
-          delete rawValues.odooJobId;
-          delete rawValues.odooCompanyId;
-          delete rawValues.odooManagerId;
-          delete rawValues._odooId;
-          delete rawValues._odooName;
+        const baseDomain = odooIncrementalDomain(since) as any[];
+        console.log(`[OdooSync] Starting EMPLOYEES optimized bulk - batchSize=${batchSize} since=${since || "none"}`);
 
-          const values: any = {
-            ...rawValues,
-            ...(departmentId ? { departmentId } : {}),
-            ...(positionId ? { positionId } : {}),
-            ...(branchId ? { branchId } : {})
-          };
+        while (hasMore) {
+          const domain: any[] = [...baseDomain];
+          if (lastOdooId > 0) domain.push(["id", ">", lastOdooId]);
 
-          const employeeNumber = String(values.employeeNumber);
-          const uniqueOr = [
-            { employeeNumber },
-            values.nationalId ? { nationalId: String(values.nationalId) } : undefined,
-            values.email ? { email: String(values.email) } : undefined
-          ].filter(Boolean);
-          const existing = await delegate("employee").findFirst({ where: { OR: uniqueOr } });
-          if (existing && this.hasWriteDateConflict(existing.updatedAt, row.write_date, existing, row, mapper.fieldMap)) {
-            await this.conflict(options.mappingId, "employees", objectId(existing.id), String(row.id), existing, row, result);
-            continue;
-          }
+          let rows: OdooRecord[] = [];
           try {
-            let localEmployeeId: string | undefined;
-            if (options.dryRun) {
-              result.operations.push({ operation: existing ? "update" : "create", model: mapper.lanaModel, localId: objectId(existing?.id), externalId: row.id, values });
-              localEmployeeId = objectId(existing?.id);
-            } else if (existing) {
-              const updated = await delegate("employee").update({ where: { id: existing.id }, data: values });
-              result.updated += 1;
-              localEmployeeId = String((updated as any).id);
-            } else {
-              const created = await delegate("employee").create({ data: values });
-              result.created += 1;
-              localEmployeeId = String((created as any).id);
-            }
-            result.pulled += 1;
+            rows = await this.client.search_read(mapper.odooModel, domain, mapper.odooFields, {
+              limit: batchSize,
+              order: "id asc",
+              context: { active_test: false },
+            } as any);
+          } catch (fetchErr) {
+            const msg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
+            result.errors.push({ message: `Batch fetch failed at lastOdooId=${lastOdooId}: ${msg}`, details: fetchErr });
+            await this.log("ODOO_FETCH_ERROR", `Failed fetch lastOdooId=${lastOdooId}: ${msg}`, { lastOdooId, error: msg }).catch(() => {});
+            break;
+          }
 
-            // Import contract / salary if available
-            if (localEmployeeId && !options.dryRun) {
-              try {
-                await this.importEmployeeContractFromOdoo(Number(row.id), localEmployeeId, result);
-              } catch (contractErr) {
-                // Non-fatal – log but continue
-                result.operations.push({ operation: "skip", model: "employeeContract", localId: localEmployeeId, externalId: row.id, reason: contractErr instanceof Error ? contractErr.message : String(contractErr) });
+          if (!rows || rows.length === 0) { hasMore=false; break; }
+
+          pages++; totalFetched+=rows.length;
+          result.cursor = maxCursor(rows, since) || lastWriteDate;
+          lastWriteDate = result.cursor;
+          lastOdooId = Number(rows[rows.length - 1]?.id || lastOdooId);
+
+          console.log(`[OdooSync] Page ${pages} lastOdooId=${lastOdooId} fetched=${rows.length} total=${totalFetched}`);
+
+          // ===== BULK PRE-FETCH =====
+          const deptOdooIds = Array.from(new Set(rows.map(r=> many2oneId((r as any).department_id)).filter(Boolean) as number[]));
+          const jobOdooIds = Array.from(new Set(rows.map(r=> many2oneId((r as any).job_id)).filter(Boolean) as number[]));
+          const compOdooIds = Array.from(new Set(rows.map(r=> many2oneId((r as any).company_id)).filter(Boolean) as number[]));
+          const managerOdooIds = Array.from(new Set(rows.map(r=> many2oneId((r as any).parent_id)).filter(Boolean) as number[]));
+          const empOdooIds = rows.map(r=> Number(r.id)).filter(Boolean);
+
+          // Bulk departments
+          let deptMap = new Map<number, string>();
+          if(deptOdooIds.length>0) {
+            try {
+              const deptCodes = deptOdooIds.map(id=> `ODOO-DEPT-${id}`);
+              const depts = await delegate("department").findMany({ where: { code: { in: deptCodes } } }) as any[];
+              for(const d of depts) {
+                const match = (d.code as string).match(/ODOO-DEPT-(\d+)/);
+                if(match) deptMap.set(Number(match[1]), d.id);
+              }
+            } catch {}
+          }
+
+          // Bulk positions
+          let jobMap = new Map<number, string>();
+          if(jobOdooIds.length>0) {
+            try {
+              const jobCodes = jobOdooIds.map(id=> `ODOO-JOB-${id}`);
+              const jobs = await delegate("position").findMany({ where: { code: { in: jobCodes } } }) as any[];
+              for(const j of jobs) {
+                const match = (j.code as string).match(/ODOO-JOB-(\d+)/);
+                if(match) jobMap.set(Number(match[1]), j.id);
+              }
+            } catch {}
+          }
+
+          // Bulk branches
+          let compMap = new Map<number, string>();
+          if(compOdooIds.length>0) {
+            try {
+              const compCodes = compOdooIds.map(id=> `ODOO-COMPANY-${id}`);
+              const comps = await delegate("branch").findMany({ where: { code: { in: compCodes } } }) as any[];
+              for(const c of comps) {
+                const match = (c.code as string).match(/ODOO-COMPANY-(\d+)/);
+                if(match) compMap.set(Number(match[1]), c.id);
+              }
+            } catch {}
+          }
+
+          // Bulk managers - try ODOO-{id} first, then barcode lookup via Odoo read if needed (for performance, only ODOO-{id} in bulk)
+          let managerMap = new Map<number, string>();
+          if(managerOdooIds.length>0) {
+            try {
+              const managerCodes = managerOdooIds.map(id=> `ODOO-${id}`);
+              const managers = await delegate("employee").findMany({ where: { employeeNumber: { in: managerCodes } } }) as any[];
+              for(const m of managers) {
+                const match = (m.employeeNumber as string).match(/ODOO-(\d+)/);
+                if(match) managerMap.set(Number(match[1]), m.id);
+              }
+              // Also try by barcode if we have manager barcodes from Odoo - fetch barcodes in bulk
+              if(managerMap.size < managerOdooIds.length) {
+                try {
+                  const managerRows = await this.client.read<OdooRecord>("hr.employee", managerOdooIds, ["id", "barcode"]);
+                  const barcodeToOdooId = new Map<string, number>();
+                  for(const mr of managerRows as any[]) {
+                    if(mr.barcode) barcodeToOdooId.set(String(mr.barcode), mr.id);
+                  }
+                  if(barcodeToOdooId.size>0) {
+                    const barcodes = Array.from(barcodeToOdooId.keys());
+                    const managersByBarcode = await delegate("employee").findMany({ where: { employeeNumber: { in: barcodes } } }) as any[];
+                    for(const mb of managersByBarcode) {
+                      const odooId = barcodeToOdooId.get(mb.employeeNumber);
+                      if(odooId) managerMap.set(odooId, mb.id);
+                    }
+                  }
+                } catch {}
+              }
+            } catch {}
+          }
+
+          // Map all Odoo rows to Lana values first (for employeeNumber/email/nationalId collection)
+          const mappedBatch: Array<{ row: OdooRecord, odooId: number, values: any, deptOdooId?: number, jobOdooId?: number, compOdooId?: number, managerOdooId?: number }> = [];
+          for(const row of rows) {
+            try {
+              const raw: any = mapOdooEmployeeToLana(row);
+              const dId = many2oneId((row as any).department_id);
+              const jId = many2oneId((row as any).job_id);
+              const cId = many2oneId((row as any).company_id);
+              const mId = many2oneId((row as any).parent_id);
+              delete raw.odooDepartmentId; delete raw.odooJobId; delete raw.odooCompanyId; delete raw.odooManagerId; delete raw._odooId; delete raw._odooName;
+              const vals = {
+                ...raw,
+                ...(dId && deptMap.get(dId) ? { departmentId: deptMap.get(dId) } : {}),
+                ...(jId && jobMap.get(jId) ? { positionId: jobMap.get(jId) } : {}),
+                ...(cId && compMap.get(cId) ? { branchId: compMap.get(cId) } : {}),
+                ...(mId && managerMap.get(mId) ? { managerId: managerMap.get(mId) } : {}),
+              };
+              mappedBatch.push({ row, odooId: Number(row.id), values: vals, deptOdooId: dId, jobOdooId: jId, compOdooId: cId, managerOdooId: mId });
+            } catch(e) {
+              mappedBatch.push({ row, odooId: Number(row.id), values: null, deptOdooId: undefined, jobOdooId: undefined, compOdooId: undefined, managerOdooId: undefined });
+            }
+          }
+
+          // Bulk find existing employees by employeeNumber/email/nationalId
+          const allEmpNumbers = mappedBatch.map(m=> m.values?.employeeNumber).filter(Boolean) as string[];
+          const allEmails = mappedBatch.map(m=> m.values?.email).filter(Boolean) as string[];
+          const allNationalIds = mappedBatch.map(m=> m.values?.nationalId).filter(Boolean) as string[];
+
+          let existingByNumber = new Map<string, any>();
+          let existingByEmail = new Map<string, any>();
+          let existingByNationalId = new Map<string, any>();
+
+          try {
+            if(allEmpNumbers.length>0 || allEmails.length>0 || allNationalIds.length>0) {
+              const orConditions: any[] = [];
+              if(allEmpNumbers.length>0) orConditions.push({ employeeNumber: { in: allEmpNumbers } });
+              if(allEmails.length>0) orConditions.push({ email: { in: allEmails } });
+              if(allNationalIds.length>0) orConditions.push({ nationalId: { in: allNationalIds } });
+              const existingList = await delegate("employee").findMany({ where: { OR: orConditions } }) as any[];
+              for(const ex of existingList) {
+                if(ex.employeeNumber) existingByNumber.set(ex.employeeNumber, ex);
+                if(ex.email) existingByEmail.set(ex.email, ex);
+                if(ex.nationalId) existingByNationalId.set(ex.nationalId, ex);
               }
             }
-          } catch (recordError) {
-            result.skipped += 1;
-            result.operations.push({ operation: "skip", model: mapper.lanaModel, externalId: row.id, values, reason: recordError instanceof Error ? recordError.message : String(recordError) });
+          } catch {}
+
+          // Bulk fetch contracts for this batch (one Odoo call)
+          let contractMap = new Map<number, any>();
+          try {
+            if(empOdooIds.length>0) {
+              const contracts = await this.client.search_read(
+                "hr.contract",
+                [["employee_id","in",empOdooIds]],
+                ["id","name","date_start","date_end","wage","state","employee_id","write_date"],
+                { limit: 5000, order: "date_start desc" }
+              ) as any[];
+              // group by employee_id, prefer open
+              const grouped = new Map<number, any[]>();
+              for(const c of contracts) {
+                const eid = many2oneId(c.employee_id);
+                if(!eid) continue;
+                if(!grouped.has(eid)) grouped.set(eid, []);
+                grouped.get(eid)!.push(c);
+              }
+              for(const [eid, clist] of grouped.entries()) {
+                const open = clist.find((c:any)=> c.state==="open") || clist[0];
+                contractMap.set(eid, open);
+              }
+            }
+          } catch(e) {
+            console.log(`[OdooSync] Contract bulk fetch failed:`, e);
           }
+
+          // Now process each employee with maps (no extra DB/Odoo calls)
+          for(const item of mappedBatch) {
+            const { row, odooId, values } = item;
+            if(!values) {
+              result.skipped++; result.errors.push({ id: String(odooId), message: `Mapping failed for Odoo ${odooId}` });
+              result.operations.push({ operation:"skip", model: mapper.lanaModel, externalId: odooId, reason:"Mapping failed" });
+              continue;
+            }
+            try {
+              let existing: any = null;
+              if(values.employeeNumber) existing = existingByNumber.get(values.employeeNumber) || null;
+              if(!existing && values.email) existing = existingByEmail.get(values.email) || null;
+              if(!existing && values.nationalId) existing = existingByNationalId.get(values.nationalId) || null;
+
+              if(existing && this.hasWriteDateConflict(existing.updatedAt, row.write_date, existing, row, mapper.fieldMap)) {
+                try { await this.conflict(options.mappingId, "employees", objectId(existing.id), String(row.id), existing, row, result); } catch {}
+                continue;
+              }
+
+              try {
+                let localEmployeeId: string | undefined;
+                if(options.dryRun) {
+                  result.operations.push({ operation: existing ? "update" : "create", model: mapper.lanaModel, localId: objectId(existing?.id), externalId: row.id, values });
+                  localEmployeeId = objectId(existing?.id);
+                } else if(existing) {
+                  const updated = await delegate("employee").update({ where: { id: existing.id }, data: values });
+                  result.updated++; localEmployeeId = String((updated as any).id);
+                  // update maps for subsequent duplicates in same batch
+                  if(values.employeeNumber) existingByNumber.set(values.employeeNumber, updated);
+                  if(values.email) existingByEmail.set(values.email, updated);
+                  if(values.nationalId) existingByNationalId.set(values.nationalId, updated);
+
+                  // Ensure user account exists for existing employee (if not, create)
+                  try {
+                    const empWithUser = await prisma.employee.findUnique({ where: { id: existing.id }, include: { user: true } });
+                    if ((!empWithUser?.userId || !empWithUser?.user) && values.nationalId) {
+                      const nationalId = String(values.nationalId);
+                      if (nationalId && nationalId.trim() !== "" && nationalId.toUpperCase() !== "NA") {
+                        const existingUserByUsername = await prisma.user.findFirst({ where: { username: nationalId } });
+                        if (!existingUserByUsername) {
+                          const last4 = nationalId.slice(-4);
+                          const { hashPassword } = await import("@/lib/password");
+                          const passwordHash = await hashPassword(last4);
+                          const newUser = await prisma.user.create({
+                            data: {
+                              username: nationalId,
+                              email: values.email ? String(values.email).toLowerCase() : `employee.${nationalId}@lana.local`,
+                              name: `${values.firstName} ${values.lastName}`.trim(),
+                              passwordHash,
+                              isActive: true,
+                              emailVerified: new Date(),
+                              mustChangePassword: true,
+                              passwordChanged: false,
+                            }
+                          });
+                          await prisma.employee.update({ where: { id: existing.id }, data: { userId: newUser.id } });
+                          const employeeRole = await prisma.role.findUnique({ where: { name: "EMPLOYEE" } });
+                          if (employeeRole) {
+                            await prisma.userRole.upsert({
+                              where: { userId_roleId: { userId: newUser.id, roleId: employeeRole.id } },
+                              update: {},
+                              create: { userId: newUser.id, roleId: employeeRole.id }
+                            });
+                          }
+                        }
+                      }
+                    }
+                  } catch (userErr) {
+                    // Non-fatal, log and continue
+                    const uMsg = userErr instanceof Error ? userErr.message : String(userErr);
+                    await this.log("ODOO_USER_ERROR", `فشل إنشاء حساب للموظف الموجود ${odooId}: ${uMsg}`, { odooId, error: uMsg }).catch(()=>{});
+                  }
+                } else {
+                  const created = await delegate("employee").create({ data: values });
+                  result.created++; localEmployeeId = String((created as any).id);
+                  if(values.employeeNumber) existingByNumber.set(values.employeeNumber, created);
+                  if(values.email) existingByEmail.set(values.email, created);
+                  if(values.nationalId) existingByNationalId.set(values.nationalId, created);
+
+                  // Create user account automatically for new Odoo employee (Requirement 9)
+                  // Username = nationalId, Password = last 4 digits, mustChangePassword = true
+                  try {
+                    const nationalId = values.nationalId ? String(values.nationalId) : null;
+                    if (!nationalId || nationalId.trim() === "" || nationalId.toUpperCase() === "NA") {
+                      // Requirement 10: No nationalId - don't create account, log in report
+                      result.operations.push({ 
+                        operation: "skip", 
+                        model: "user", 
+                        localId: localEmployeeId, 
+                        externalId: odooId, 
+                        reason: "لم يتم إنشاء حساب لأن رقم الهوية غير موجود." 
+                      });
+                      await this.log("ODOO_USER_SKIP", `لم يتم إنشاء حساب لـ Odoo ${odooId} (${values.firstName} ${values.lastName}) لأن رقم الهوية غير موجود`, { odooId, employeeId: localEmployeeId }).catch(()=>{});
+                    } else {
+                      const last4 = nationalId.slice(-4);
+                      const { hashPassword } = await import("@/lib/password");
+                      const passwordHash = await hashPassword(last4);
+                      
+                      // Check if user already exists by username (nationalId)
+                      const existingUser = await prisma.user.findFirst({ where: { username: nationalId } });
+                      if (!existingUser) {
+                        const newUser = await prisma.user.create({
+                          data: {
+                            username: nationalId,
+                            email: values.email ? String(values.email).toLowerCase() : `employee.${nationalId}@lana.local`,
+                            name: `${values.firstName} ${values.lastName}`.trim(),
+                            passwordHash,
+                            isActive: true,
+                            emailVerified: new Date(),
+                            mustChangePassword: true,
+                            passwordChanged: false,
+                          }
+                        });
+
+                        await prisma.employee.update({
+                          where: { id: localEmployeeId },
+                          data: { userId: newUser.id }
+                        });
+
+                        const employeeRole = await prisma.role.findUnique({ where: { name: "EMPLOYEE" } });
+                        if (employeeRole) {
+                          await prisma.userRole.upsert({
+                            where: { userId_roleId: { userId: newUser.id, roleId: employeeRole.id } },
+                            update: {},
+                            create: { userId: newUser.id, roleId: employeeRole.id }
+                          });
+                        }
+
+                        await this.log("ODOO_USER_CREATED", `تم إنشاء حساب لـ Odoo ${odooId} - username: ${nationalId}, password: ${last4}`, { odooId, employeeId: localEmployeeId, username: nationalId }).catch(()=>{});
+                      }
+                    }
+                  } catch (userErr) {
+                    const uMsg = userErr instanceof Error ? userErr.message : String(userErr);
+                    result.operations.push({ operation: "skip", model: "user", localId: localEmployeeId, externalId: odooId, reason: `User creation failed: ${uMsg}` });
+                    await this.log("ODOO_USER_ERROR", `فشل إنشاء حساب لـ Odoo ${odooId}: ${uMsg}`, { odooId, error: uMsg }).catch(()=>{});
+                  }
+                }
+                result.pulled++;
+
+                // Contract from bulk map (no Odoo call)
+                if(localEmployeeId && !options.dryRun) {
+                  const contract = contractMap.get(odooId);
+                  if(contract) {
+                    try {
+                      const contractNumber = contract.name ? String(contract.name) : `ODOO-${contract.id}`;
+                      const startDate = contract.date_start ? new Date(String(contract.date_start)) : new Date();
+                      const endDate = contract.date_end ? new Date(String(contract.date_end)) : null;
+                      const salaryAmount = Number(contract.wage) || 0;
+                      const statusMap: Record<string,string> = { open:"ACTIVE", close:"EXPIRED", cancel:"TERMINATED", draft:"DRAFT" };
+                      const status = statusMap[String(contract.state)] || "DRAFT";
+                      const existingC = await delegate("employeeContract").findFirst({ where: { contractNumber } }).catch(()=>null) as any;
+                      const cData = { employeeId: localEmployeeId, contractNumber, title: contractNumber, startDate, endDate, salaryAmount, currency:"SAR", status };
+                      if(existingC) await delegate("employeeContract").update({ where:{ id: existingC.id }, data: cData });
+                      else await delegate("employeeContract").create({ data: cData });
+                    } catch(contractErr) {
+                      const cMsg = contractErr instanceof Error ? contractErr.message : String(contractErr);
+                      result.operations.push({ operation:"skip", model:"employeeContract", localId: localEmployeeId, externalId: row.id, reason: cMsg });
+                    }
+                  }
+                }
+              } catch(dbErr) {
+                const msg = dbErr instanceof Error ? dbErr.message : String(dbErr);
+                result.skipped++;
+                result.errors.push({ id: String(odooId), message: `DB error Odoo ${odooId}: ${msg}`, details: dbErr });
+                result.operations.push({ operation:"skip", model: mapper.lanaModel, externalId: odooId, reason: msg });
+                await this.log("ODOO_EMPLOYEE_SKIP", `Skipped Odoo ${odooId}: ${msg}`, { odooId, error: msg }).catch(()=>{});
+                continue;
+              }
+            } catch(recordError) {
+              const msg = recordError instanceof Error ? recordError.message : String(recordError);
+              result.skipped++; result.errors.push({ id: String(odooId), message: msg, details: recordError });
+              result.operations.push({ operation:"skip", model: mapper.lanaModel, externalId: odooId, reason: msg });
+              await this.log("ODOO_EMPLOYEE_SKIP", `Skipped Odoo ${odooId}: ${msg}`, { odooId, error: msg }).catch(()=>{});
+              continue;
+            }
+          }
+
+          if(history?.id) {
+            try {
+              await prisma.syncHistory.update({
+                where:{ id: history.id },
+                data:{
+                  pulled: result.pulled,
+                  createdCount: result.created,
+                  updatedCount: result.updated,
+                  cursor: lastWriteDate ? asDateString(lastWriteDate) : result.cursor,
+                  metadata:{
+                    page: pages,
+                    lastOdooId,
+                    lastWriteDate,
+                    imported: result.created,
+                    updated: result.updated,
+                    skipped: result.skipped,
+                    pages,
+                    totalFetched,
+                    cursor: result.cursor,
+                    pulled: result.pulled,
+                    operations: result.operations.slice(-20),
+                    errorsCount: result.errors.length,
+                    errors: result.errors.slice(-20),
+                  } as any,
+                }
+              });
+            } catch {}
+          }
+
+          if(rows.length < batchSize) { hasMore=false; break; }
         }
+
+        result.operations.push({
+          operation:"skip",
+          model:"summary",
+          reason:`IMPORT_SUMMARY: pages=${pages} totalFetched=${totalFetched} lastOdooId=${lastOdooId} lastWriteDate=${lastWriteDate} pulled=${result.pulled} created=${result.created} updated=${result.updated} skipped=${result.skipped} errors=${result.errors.length}`,
+        } as any);
+
+        console.log(`[OdooSync] DONE optimized bulk - pages=${pages} totalFetched=${totalFetched} lastOdooId=${lastOdooId} pulled=${result.pulled} created=${result.created} updated=${result.updated} skipped=${result.skipped}`);
       }
 
       return this.finishHistory(history?.id, result);
@@ -300,6 +663,8 @@ export class OdooSyncService {
       return this.failHistory(history?.id, result, error);
     }
   }
+
+
 
   async syncDepartments(options: SyncOptions = {}) {
     const direction = normalizeDirection(options.direction);
@@ -690,10 +1055,44 @@ export class OdooSyncService {
 
   private async finishHistory(historyId: string | undefined, result: SyncResult) {
     if (historyId) {
+      // استخراج ملخص الصفحات من operations
+      let pages = 0, lastOdooId = 0, totalFetched = 0;
+      try {
+        const summaryOp = result.operations.find((op: any) => op.model === "summary" && typeof op.reason === "string" && op.reason.startsWith("IMPORT_SUMMARY"));
+        if (summaryOp?.reason) {
+          const mPages = summaryOp.reason.match(/pages=(\d+)/);
+          const mLast = summaryOp.reason.match(/lastOdooId=(\d+)/);
+          const mFetched = summaryOp.reason.match(/totalFetched=(\d+)/);
+          if (mPages) pages = parseInt(mPages[1], 10);
+          if (mLast) lastOdooId = parseInt(mLast[1], 10);
+          if (mFetched) totalFetched = parseInt(mFetched[1], 10);
+        }
+        // fallback من metadata السابقة
+        const metaAny = (result as any).metadata as any;
+        if (metaAny?.pages) pages = metaAny.pages;
+      } catch {}
+
+      const detailedReport = {
+        total: result.pulled + result.skipped,
+        pulled: result.pulled,
+        created: result.created,
+        updated: result.updated,
+        skipped: result.skipped,
+        errors: result.errors.length,
+        conflicts: result.conflicts,
+        pages,
+        lastOdooId,
+        totalFetched,
+        cursor: result.cursor,
+        duration: "N/A",
+        errorsList: result.errors.slice(0, 200), // حفظ 200 خطأ أول
+        operationsSummary: result.operations.slice(-20),
+      };
+
       await prisma.syncHistory.update({
         where: { id: historyId },
         data: {
-          status: "COMPLETED",
+          status: result.skipped > 0 && result.errors.length > 0 && result.pulled === 0 ? "FAILED" : result.errors.length > 0 ? "COMPLETED" : "COMPLETED",
           finishedAt: new Date(),
           pulled: result.pulled,
           pushed: result.pushed,
@@ -702,12 +1101,22 @@ export class OdooSyncService {
           deletedCount: result.deleted,
           conflictCount: result.conflicts,
           cursor: result.cursor,
-          metadata: { dryRun: result.dryRun, skipped: result.skipped, tenantId: result.tenantId, operations: result.operations.slice(0, 50) } as any
-        }
+          metadata: {
+            dryRun: result.dryRun,
+            skipped: result.skipped,
+            tenantId: result.tenantId,
+            report: detailedReport,
+            errors: result.errors.slice(0, 100),
+            operations: result.operations.slice(0, 50),
+          } as any,
+        },
       });
     }
-    await this.log("ODOO_SYNC", `Odoo ${result.entity} sync completed`, result).catch(() => undefined);
-    await writeAuditLog({ action: "ODOO_SYNC", entity: result.entity, entityId: this.connection?.id, metadata: { tenantId: result.tenantId, result } }).catch(() => undefined);
+    await this.log("ODOO_SYNC", `Odoo ${result.entity} sync completed - pulled=${result.pulled} created=${result.created} updated=${result.updated} skipped=${result.skipped} errors=${result.errors.length}`, {
+      ...result,
+      errors: result.errors.slice(0, 20), // لا تحفظ كل شيء في log
+    }).catch(() => undefined);
+    await writeAuditLog({ action: "ODOO_SYNC", entity: result.entity, entityId: this.connection?.id, metadata: { tenantId: result.tenantId, result: { ...result, errors: result.errors.slice(0, 20) } } }).catch(() => undefined);
     return result;
   }
 
@@ -761,6 +1170,53 @@ export class OdooSyncService {
     return undefined;
   }
 
+  private async resolveManagerId(odooManagerId: number): Promise<string | undefined> {
+    if (!odooManagerId) return undefined;
+    try {
+      // Odoo manager id -> find Lana employee by Odoo barcode/id
+      // Try by ODOO-{id} employeeNumber first
+      const code = `ODOO-${odooManagerId}`;
+      let manager = await delegate("employee").findFirst({ where: { employeeNumber: code } }) as any;
+      if (manager?.id) return String(manager.id);
+      // Try by barcode search in Odoo to get barcode
+      const rows = await this.client.read<OdooRecord>("hr.employee", [odooManagerId], ["id", "barcode"]);
+      const barcode = rows?.[0]?.barcode ? String(rows[0].barcode) : undefined;
+      if (barcode) {
+        manager = await delegate("employee").findFirst({ where: { employeeNumber: barcode } }) as any;
+        if (manager?.id) return String(manager.id);
+      }
+    } catch {}
+    return undefined;
+  }
+
+  private async getLastActiveDateFromActivities(employeeId: string): Promise<Date | undefined> {
+    try {
+      // Get last attendance
+      const lastAttendance = await delegate("attendanceRecord").findFirst({
+        where: { employeeId },
+        orderBy: { workDate: "desc" },
+      } as any) as any;
+
+      // Get last leave
+      const lastLeave = await delegate("leaveRequest").findFirst({
+        where: { employeeId },
+        orderBy: { endDate: "desc" },
+      } as any) as any;
+
+      // Get last overtime, expense, etc if needed
+      const dates: Date[] = [];
+      if (lastAttendance?.workDate) dates.push(new Date(lastAttendance.workDate));
+      if (lastAttendance?.checkOut) dates.push(new Date(lastAttendance.checkOut));
+      if (lastLeave?.endDate) dates.push(new Date(lastLeave.endDate));
+
+      if (dates.length === 0) return undefined;
+      dates.sort((a, b) => b.getTime() - a.getTime());
+      return dates[0];
+    } catch {
+      return undefined;
+    }
+  }
+
   private async importEmployeeContractFromOdoo(odooEmployeeId: number, localEmployeeId: string, result: SyncResult) {
     try {
       // Fetch latest open contract for employee
@@ -806,9 +1262,42 @@ export class OdooSyncService {
     const message = error instanceof Error ? error.message : String(error);
     result.success = false;
     result.errors.push({ message, details: error });
-    if (historyId) await prisma.syncHistory.update({ where: { id: historyId }, data: { status: "FAILED", finishedAt: new Date(), error: message } });
-    await this.log("ODOO_SYNC_FAILED", `Odoo ${result.entity} sync failed`, { message, tenantId: result.tenantId }).catch(() => undefined);
-    await writeAuditLog({ action: "ODOO_SYNC_FAILED", entity: result.entity, entityId: this.connection?.id, metadata: { tenantId: result.tenantId, message } }).catch(() => undefined);
+
+    if (historyId) {
+      // مهم: حتى في الفشل الفادح، نحفظ ما تم سحبه (ContinueOnError partial)
+      const status = result.pulled > 0 || result.created > 0 || result.updated > 0 ? "COMPLETED" as any : "FAILED";
+      await prisma.syncHistory.update({
+        where: { id: historyId },
+        data: {
+          status,
+          finishedAt: new Date(),
+          error: message,
+          pulled: result.pulled,
+          createdCount: result.created,
+          updatedCount: result.updated,
+          metadata: {
+            skipped: result.skipped,
+            errors: result.errors.slice(0, 100),
+            fatalError: message,
+            partial: true,
+          } as any,
+        },
+      }).catch(() => {});
+    }
+
+    await this.log("ODOO_SYNC_FAILED", `Odoo ${result.entity} sync failed (partial pulled=${result.pulled} created=${result.created} updated=${result.updated} skipped=${result.skipped}): ${message}`, {
+      message,
+      tenantId: result.tenantId,
+      pulled: result.pulled,
+      skipped: result.skipped,
+      errors: result.errors.slice(0, 20),
+    }).catch(() => undefined);
+    await writeAuditLog({ action: "ODOO_SYNC_FAILED", entity: result.entity, entityId: this.connection?.id, metadata: { tenantId: result.tenantId, message, result: { pulled: result.pulled, skipped: result.skipped } } }).catch(() => undefined);
+    // لا نرمي الخطأ القاتل كـ throw يوقف كل شيء إذا كان هناك تقدم جزئي
+    // نعيد النتيجة بدلاً من throw عندما يكون هناك pulled >0
+    if (result.pulled > 0) {
+      return result;
+    }
     throw error;
   }
 

@@ -1,6 +1,5 @@
 import { prisma } from "../lib/prisma";
 import { hashPassword } from "../lib/password";
-import { ensureEnterpriseRbacSeed } from "../lib/enterprise/permissions";
 
 const resources = [
   "dashboard", "employees", "departments", "branches", "positions", "employment-types", "nationalities", "documents", "contracts", "attendance", "leave", "payroll", "loans", "overtime", "allowances", "deductions", "performance", "recruitment", "candidates", "training", "assets", "announcements", "reports", "notifications", "audit-logs", "settings"
@@ -56,7 +55,6 @@ const leaveTypes = [
 type Delegate = { upsert(args: unknown): Promise<Record<string, unknown>>; findUnique(args: unknown): Promise<Record<string, unknown> | null>; createMany(args: unknown): Promise<unknown> };
 
 async function main() {
-  await ensureEnterpriseRbacSeed();
   const client = prisma as unknown as Record<string, Delegate>;
   const permissions = new Map<string, string>();
   for (const permission of permissionSeeds) {
@@ -79,8 +77,7 @@ async function main() {
   const adminRoleId = roles.get("SUPER_ADMIN");
   const adminPasswordHash = await hashPassword(adminPassword);
   const existingAdmin = await prisma.user.findFirst({
-    where: { OR: [{ username: adminUsername }, { email: adminEmail }] },
-    select: { id: true }
+    where: { OR: [{ username: adminUsername }, { email: adminEmail }] }
   });
   const admin = existingAdmin
     ? await prisma.user.update({
@@ -92,8 +89,7 @@ async function main() {
           emailVerified: new Date(),
           passwordHash: adminPasswordHash,
           isActive: true
-        },
-        select: { id: true }
+        }
       })
     : await prisma.user.create({
         data: {
@@ -103,8 +99,7 @@ async function main() {
           emailVerified: new Date(),
           passwordHash: adminPasswordHash,
           isActive: true
-        },
-        select: { id: true }
+        }
       });
   if (adminRoleId) await prisma.userRole.createMany({ data: [{ userId: admin.id, roleId: adminRoleId }], skipDuplicates: true });
   for (const department of departments) await client.department.upsert({ where: { code: department.code }, update: department, create: department });
