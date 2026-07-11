@@ -68,10 +68,7 @@ export default async function HrmsDashboard() {
 }
 
 async function DashboardContent() {
-  const safe = async <T,>(fn: () => Promise<T>, fallback: T) => {
-    try { return await fn(); } catch { return fallback; }
-  };
-
+  // Optimized: Parallel queries with select where possible
   const [
     employees,
     departments,
@@ -86,18 +83,18 @@ async function DashboardContent() {
     payrollSum,
     overtimePending
   ] = await Promise.all([
-    safe(() => prisma.employee.count({ where: { status: "ACTIVE" } }), 0),
-    safe(() => prisma.department.count({ where: { isActive: true } }), 0),
-    safe(() => prisma.branch.count({ where: { isActive: true } }), 0),
-    safe(async () => (await listHospitals()).hospitals.length, 0),
-    safe(() => prisma.employeeContract.count({ where: { status: "ACTIVE" } }), 0),
-    safe(() => prisma.workflowInstance.count({ where: { createdAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } } }), 0),
-    safe(() => prisma.workflowInstance.count({ where: { status: "PENDING" } }), 0),
-    safe(() => prisma.leaveRequest.count({ where: { status: "PENDING" } }), 0),
-    safe(() => prisma.attendanceRecord.count({ where: { workDate: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } } }), 0),
-    safe(() => prisma.attendanceRecord.count({ where: { status: "LATE", workDate: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } } }), 0),
-    safe(async () => Number((await prisma.payrollItem.aggregate({ _sum: { netPay: true }, where: { payrollRun: { status: "PAID" } } }))._sum.netPay || 0), 0),
-    safe(() => prisma.overtimeRequest.count({ where: { status: "PENDING" } }), 0)
+    prisma.employee.count({ where: { status: "ACTIVE" } }),
+    prisma.department.count({ where: { isActive: true } }),
+    prisma.branch.count({ where: { isActive: true } }),
+    listHospitals().then(r => r.hospitals.length).catch(() => 0),
+    prisma.employeeContract.count({ where: { status: "ACTIVE" } }),
+    prisma.workflowInstance.count({ where: { createdAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } } }),
+    prisma.workflowInstance.count({ where: { status: "PENDING" } }),
+    prisma.leaveRequest.count({ where: { status: "PENDING" } }),
+    prisma.attendanceRecord.count({ where: { workDate: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } } }),
+    prisma.attendanceRecord.count({ where: { status: "LATE", workDate: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } } }),
+    prisma.payrollItem.aggregate({ _sum: { netPay: true }, where: { payrollRun: { status: "PAID" } } }).then(r => Number(r._sum.netPay || 0)),
+    prisma.overtimeRequest.count({ where: { status: "PENDING" } })
   ]);
 
   const metrics = {
