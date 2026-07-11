@@ -67,6 +67,13 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
+  // Aggressive prefetch for all nav items (instant navigation)
+  useEffect(() => {
+    navItems.forEach((item, index) => {
+      setTimeout(() => router.prefetch(item.href), index * 4);
+    });
+  }, [router]);
+
   const userRoles = useMemo(() => (session?.user?.roles as string[]) || [], [session?.user?.roles]);
   const userPermissions = useMemo(() => (session?.user?.permissions as string[]) || [], [session?.user?.permissions]);
 
