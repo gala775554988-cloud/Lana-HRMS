@@ -244,7 +244,7 @@ export default async function RecordPage({ params, searchParams }: { params: Pro
               userId={typeof record.userId === "string" ? record.userId : null}
               isArchived={Boolean(record.archivedAt)}
               pdfHref={`/api/hr/employees/export?format=pdf&search=${encodeURIComponent(String(record.employeeNumber ?? ""))}`}
-              editHref="#edit"
+              editHref={`/${resource.key}/${id}/edit`}
             />
           ) : null}
           <Button asChild variant="outline">
