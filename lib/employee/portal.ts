@@ -62,21 +62,7 @@ export async function getPortalDashboard(employeeId: string, userId?: string) {
   const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
 
   // OPTIMIZED: All queries in parallel + select only (no include)
-  const [
-    attendanceToday,
-    attendanceMonth,
-    leaves,
-    permissionRequests,
-    payroll,
-    documents,
-    assets,
-    notifications,
-    latestDoc,
-    latestAttendance,
-    latestLeave,
-    latestAudit,
-    portalTasks
-  ] = await Promise.all([
+  const results = await Promise.all([
     dbQuery('dashboard.attendance.today', () => prisma.attendanceRecord.findFirst({ where: { employeeId, workDate: { gte: today } }, select: { status: true } }), null),
     dbQuery('dashboard.attendance.month', () => prisma.attendanceRecord.findMany({ where: { employeeId, workDate: { gte: monthStart, lt: nextMonth } }, select: { status: true, checkIn: true, checkOut: true } }), []),
     dbQuery('dashboard.leave', () => prisma.leaveRequest.findMany({ where: { employeeId }, select: { status: true, days: true }, orderBy: { createdAt: 'desc' }, take: 20 }), []),
@@ -91,6 +77,22 @@ export async function getPortalDashboard(employeeId: string, userId?: string) {
     dbQuery('dashboard.latestAudit', () => prisma.auditLog.findFirst({ where: { entityId: employeeId }, select: { action: true }, orderBy: { createdAt: 'desc' } }), null),
     dbQuery('dashboard.tasks', () => (prisma as any).employeePortalTask?.findMany?.({ where: { employeeId, status: { not: 'COMPLETED' } }, take: 20 }) ?? Promise.resolve([]), []),
   ]);
+
+  const [
+    attendanceToday,
+    attendanceMonth,
+    leaves,
+    permissionRequests,
+    payroll,
+    documents,
+    assets,
+    notifications,
+    latestDoc,
+    latestAttendance,
+    latestLeave,
+    latestAudit,
+    portalTasks
+  ] = results;
 
   const leaveUsed = leaves.filter(l => l.status === 'APPROVED').reduce((s,l)=>s+asNumber(l.days),0);
   const monthHours = attendanceMonth.reduce((sum, r) => r.checkIn && r.checkOut ? sum + Math.max(0, (r.checkOut.getTime() - r.checkIn.getTime()) / 36e5) : sum, 0);

@@ -1,13 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import type { EmployeeProfile } from "@/types/employee";
+import { cache } from "react";
 
-export async function getCurrentEmployee() {
+// Cached version to prevent duplicate queries
+export const getCurrentEmployee = cache(async () => {
   try {
     const session = await auth();
     if (!session?.user?.id) return null;
 
-    // OPTIMIZED: Use select instead of include + minimal fields
     const employee = await prisma.employee.findFirst({
       where: { userId: session.user.id },
       select: {
@@ -25,7 +26,7 @@ export async function getCurrentEmployee() {
         position: { select: { title: true } },
         branch: { select: { name: true } },
       },
-    }).catch(() => null);
+    });
 
     if (!employee) return null;
 
@@ -48,4 +49,4 @@ export async function getCurrentEmployee() {
     console.error("[getCurrentEmployee] Error:", error);
     return null;
   }
-}
+});

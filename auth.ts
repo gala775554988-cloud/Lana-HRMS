@@ -8,14 +8,18 @@ import { mergeEffectivePermissions } from "@/lib/enterprise/permissions";
 import { inferEnterpriseRolesFromPosition } from "@/lib/enterprise/role-inference";
 
 async function getAuthorization(userId: string) {
-  const assignments: any = await prisma.userRole.findMany({
+  // Optimized: Use select instead of heavy includes
+  const assignments = await prisma.userRole.findMany({
     where: { userId },
-    include: {
+    select: {
       role: {
-        include: {
+        select: {
+          name: true,
           permissions: {
-            include: {
-              permission: true
+            select: {
+              permission: {
+                select: { action: true, resource: true }
+              }
             }
           }
         }
@@ -23,23 +27,26 @@ async function getAuthorization(userId: string) {
     }
   });
 
-  const roleNames = assignments.map((assignment: any) => assignment.role.name);
-  const employee = await prisma.employee.findFirst({ where: { userId }, include: { position: true } }).catch(() => null);
+  const roleNames = assignments.map(a => a.role.name);
+  const employee = await prisma.employee.findFirst({
+    where: { userId },
+    select: { position: { select: { title: true } } }
+  }).catch(() => null);
+
   const inferredRoles = inferEnterpriseRolesFromPosition(employee?.position?.title);
   const roles = Array.from(new Set([...roleNames, ...inferredRoles]));
   if (roles.length === 0 && employee) roles.push("EMPLOYEE");
-  const rolePermissions = assignments.flatMap((assignment: any) =>
-    assignment.role.permissions.map(
-      ({ permission }: any) => `${permission.action}:${permission.resource}`
-    )
+
+  const rolePermissions = assignments.flatMap(a =>
+    a.role.permissions.map(p => `${p.permission.action}:${p.permission.resource}`)
   );
-  const permissions = await mergeEffectivePermissions(Array.from(new Set(rolePermissions)), userId).catch(() => Array.from(new Set(rolePermissions)));
+
+  const permissions = await mergeEffectivePermissions(Array.from(new Set(rolePermissions)), userId)
+    .catch(() => Array.from(new Set(rolePermissions)));
+
   if (roles.includes("SUPER_ADMIN")) permissions.push("*:*");
 
-  return {
-    roles,
-    permissions
-  };
+  return { roles, permissions };
 }
 
 async function findUserByIdentifier(identifier: string) {

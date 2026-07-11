@@ -2,7 +2,7 @@ import { cache } from 'react';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 
-// Single source of truth - cached per request
+// Cached per request - prevents duplicate queries
 export const getCurrentEmployeeCached = cache(async () => {
   const session = await auth();
   if (!session?.user?.id) return null;
@@ -22,4 +22,9 @@ export const getCurrentEmployeeCached = cache(async () => {
       branch: { select: { name: true } },
     },
   });
+});
+
+// Cached auth function
+export const getCachedSession = cache(async () => {
+  return auth();
 });
