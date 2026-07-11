@@ -9,7 +9,11 @@ export async function PATCH(request: Request) {
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json();
-  const employee = await prisma.employee.findFirst({ where: { userId: session.user.id }, select: { id: true, userId: true } });
+  const employee = await prisma.employee.findFirst({
+    where: { userId: session.user.id },
+    select: { id: true, userId: true }
+  });
+
   if (!employee) return NextResponse.json({ error: "Employee not found" }, { status: 404 });
 
   const data: Record<string, unknown> = {};
