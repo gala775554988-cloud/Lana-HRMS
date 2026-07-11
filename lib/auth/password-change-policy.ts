@@ -20,17 +20,29 @@ async function writeStore(store: Store) {
 export async function requirePasswordChange(userId: string) {
   const store = await readStore();
   store[userId] = true;
+  await prisma.user.update({ where: { id: userId }, data: { mustChangePassword: true } }).catch(() => undefined);
   await writeStore(store);
 }
 
 export async function clearPasswordChangeRequirement(userId: string) {
   const store = await readStore();
-  if (!store[userId]) return;
-  delete store[userId];
-  await writeStore(store);
+  if (store[userId]) {
+    delete store[userId];
+    await writeStore(store);
+  }
+  await prisma.user.update({ where: { id: userId }, data: { mustChangePassword: false, passwordChanged: true, passwordChangedAt: new Date() } }).catch(() => undefined);
 }
 
 export async function isPasswordChangeRequired(userId: string) {
-  const store = await readStore();
-  return Boolean(store[userId]);
+  const [store, user] = await Promise.all([
+    readStore(),
+    prisma.user.findUnique({ where: { id: userId }, select: { mustChangePassword: true } }).catch(() => null)
+  ]);
+  const dbRequires = Boolean(user?.mustChangePassword);
+  if (!dbRequires && store[userId]) {
+    delete store[userId];
+    await writeStore(store).catch(() => undefined);
+    return false;
+  }
+  return dbRequires || Boolean(store[userId]);
 }

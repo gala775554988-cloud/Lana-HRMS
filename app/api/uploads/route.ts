@@ -31,6 +31,23 @@ async function optimizeImage(bytes: Buffer, fileName: string, mimeType: string):
   }
 }
 
+
+async function uploadToSupabaseStorage(buffer: Buffer, fileName: string, contentType: string) {
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const bucket = process.env.SUPABASE_EMPLOYEE_BUCKET || 'employee-files';
+  if (!supabaseUrl || !key) return null;
+  const objectPath = `profile-photos/${new Date().toISOString().slice(0,10)}/${fileName}`;
+  const endpoint = `${supabaseUrl.replace(/\/$/, '')}/storage/v1/object/${bucket}/${objectPath}`;
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': contentType, 'x-upsert': 'true' },
+    body: new Uint8Array(buffer),
+  }).catch(() => null);
+  if (!response?.ok) return null;
+  return `${supabaseUrl.replace(/\/$/, '')}/storage/v1/object/public/${bucket}/${objectPath}`;
+}
+
 function dataUrlFromImage(image: OptimizedImage) {
   return `data:${image.type};base64,${image.buffer.toString("base64")}`;
 }
@@ -59,6 +76,19 @@ export async function POST(request: NextRequest) {
     const fileName = randomUUID() + optimized.extension;
     const uploadDir = path.join(process.cwd(), "public", "uploads");
 
+    const supabaseUrl = await uploadToSupabaseStorage(optimized.buffer, fileName, optimized.type);
+    if (supabaseUrl) {
+      return NextResponse.json({
+        success: true,
+        url: supabaseUrl,
+        fileName: file.name,
+        size: optimized.buffer.length,
+        originalSize: file.size,
+        type: optimized.type,
+        storage: "supabase-storage"
+      });
+    }
+
     try {
       await mkdir(uploadDir, { recursive: true });
       await writeFile(path.join(uploadDir, fileName), optimized.buffer);
@@ -68,7 +98,8 @@ export async function POST(request: NextRequest) {
         fileName: file.name,
         size: optimized.buffer.length,
         originalSize: file.size,
-        type: optimized.type
+        type: optimized.type,
+        storage: "public-uploads"
       });
     } catch (fileSystemError) {
       const url = dataUrlFromImage(optimized);
