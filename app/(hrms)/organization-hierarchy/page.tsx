@@ -9,7 +9,7 @@ export default async function OrganizationHierarchyPage() {
   const session = await auth();
   const roles = (session?.user?.roles as string[]) ?? [];
   if (!session?.user) redirect("/login");
-  if (!roles.includes("SUPER_ADMIN")) redirect("/dashboard");
+  if (!roles.includes("SUPER_ADMIN")) redirect("/employees");
 
   return (
     <section className="space-y-6">

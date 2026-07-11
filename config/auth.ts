@@ -4,7 +4,7 @@ const moduleResources = [
 
 export const authRoutes = ["/login", "/forgot-password", "/reset-password", "/verify-email"];
 export const publicRoutes = [...authRoutes];
-export const DEFAULT_LOGIN_REDIRECT = "/employee/dashboard"; // Safe default (root page overrides for role-based redirect)
+export const DEFAULT_LOGIN_REDIRECT = "/employee/dashboard"; // employee portal default
 
 export function resolveRoleDashboard(userRoles?: string[] | null): string {
   if (!userRoles || !Array.isArray(userRoles)) return DEFAULT_LOGIN_REDIRECT;
@@ -12,7 +12,7 @@ export function resolveRoleDashboard(userRoles?: string[] | null): string {
     ["SUPER_ADMIN", "HR_MANAGER", "PAYROLL_MANAGER", "RECRUITER", "MANAGER", "HR", "DEPARTMENT_MANAGER", "BRANCH_MANAGER", "SUPERVISOR", "PROJECT_MANAGER"].includes(role)
   );
   if (isAdminOrManager) {
-    return "/dashboard";
+    return "/employees";
   }
   return "/employee/dashboard";
 }

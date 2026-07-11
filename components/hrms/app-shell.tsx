@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import type { ReactNode } from "react";
 import {
-  LayoutDashboard, LogOut, ChevronLeft, ChevronRight, Search,
+  LogOut, ChevronLeft, ChevronRight, Search,
   Users, Building2, MapPin, Briefcase, FileText, Clock, Calendar,
   DollarSign, GraduationCap, Package, Megaphone, BarChart3, Settings,
   Shield, GitPullRequest, Sparkles, Menu, X, PlugZap
@@ -28,7 +28,6 @@ interface AppShellProps {
 }
 
 const navItems = [
-  { href: "/", label: "لوحة التحكم", icon: LayoutDashboard, group: "main", resource: "dashboard" },
   { href: "/request-center", label: "استقبال الطلبات", icon: GitPullRequest, group: "main", resource: "leave" },
   { href: "/employees", label: "الموظفون", icon: Users, group: "people", resource: "employees" },
   { href: "/departments", label: "الإدارات", icon: Building2, group: "people", resource: "departments" },
@@ -96,8 +95,7 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
   }, []);
 
   const isActive = useCallback((href: string) => {
-    if (href === "/") return pathname === "/" || pathname === "/dashboard";
-    return pathname.startsWith(href);
+    return pathname === href || pathname.startsWith(href + "/");
   }, [pathname]);
 
   const groupedNav = useMemo(() => {
@@ -152,7 +150,7 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
               {sidebarCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             </button>
             <BrandLogo
-              href="/"
+              href="/employees"
               src={companyLogo}
               size="sm"
               showText={!sidebarCollapsed}
@@ -240,7 +238,7 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
         >
           {/* Mobile header inside sidebar */}
           <div className="flex h-16 items-center justify-between border-b border-slate-100 px-4 lg:hidden dark:border-slate-800">
-            <BrandLogo href="/" size="sm" showText={true} />
+            <BrandLogo href="/employees" size="sm" showText={true} />
             <button
               onClick={() => setMobileMenuOpen(false)}
               className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"

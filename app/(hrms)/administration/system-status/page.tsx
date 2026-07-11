@@ -29,7 +29,7 @@ function statusVariant(status: HealthStatus) {
 export default async function SystemStatusPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
-  if (!canViewSystem(session)) redirect("/dashboard");
+  if (!canViewSystem(session)) redirect("/employees");
 
   const report = await getSystemHealthReport();
   const cards = [
