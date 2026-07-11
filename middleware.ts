@@ -21,7 +21,7 @@ export async function middleware(request: NextRequest) {
     (route) => route === normalizedPath || normalizedPath.startsWith(route + "/")
   );
 
-  // Fast single token fetch
+  // Fast single token fetch (optimized)
   let token: JWT | null = null;
   let isLoggedIn = false;
   
