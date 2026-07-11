@@ -27,7 +27,8 @@ export async function POST(request: NextRequest) {
   try {
     await requireOdooIntegrationAccess("manage");
     const body = await request.json().catch(() => ({}));
-    const batchSize = Math.min(Math.max(Number(body.batchSize ?? 1000), 100), 2000);
+    const batchSize = Math.min(Math.max(Number(body.batchSize ?? 100), 20), 500);
+    const maxPages = Math.min(Math.max(Number(body.maxPages ?? 1), 1), 10);
     const dryRun = Boolean(body.dryRun);
 
     const client = OdooClient.fromEnv();
@@ -48,15 +49,17 @@ export async function POST(request: NextRequest) {
       if (employee.email) byEmail.set(employee.email.toLowerCase(), employee);
     }
 
-    let lastOdooId = 0;
+    let lastOdooId = Math.max(Number(body.afterId ?? 0), 0);
+    const startAfterId = lastOdooId;
     let fetched = 0;
+    let pages = 0;
     let updated = 0;
     let unchanged = 0;
     let skipped = 0;
     const errors: Array<Record<string, unknown>> = [];
     const samples: Array<Record<string, unknown>> = [];
 
-    while (true) {
+    while (pages < maxPages) {
       const rows = await client.search_read<OdooEmployeeNumberRow>(
         "hr.employee",
         lastOdooId > 0 ? [["id", ">", lastOdooId]] : [],
@@ -64,6 +67,7 @@ export async function POST(request: NextRequest) {
         { limit: batchSize, order: "id asc", context: { active_test: false } } as any
       );
       if (!rows.length) break;
+      pages += 1;
       fetched += rows.length;
       lastOdooId = Number(rows[rows.length - 1].id || lastOdooId);
 
@@ -128,11 +132,15 @@ export async function POST(request: NextRequest) {
       success: true,
       source: "hr.employee.id",
       dryRun,
+      startAfterId,
       fetched,
+      pages,
       updated,
       unchanged,
       skipped,
       lastOdooId,
+      nextAfterId: lastOdooId,
+      hasMore: fetched === batchSize * pages && pages === maxPages,
       samples,
       errors,
     });
