@@ -33,7 +33,7 @@ export function EmployeeDesktopSidebar() {
   const pathname = usePathname();
   const router = useRouter();
 
-  // ULTRA AGGRESSIVE PREFETCH - instant navigation
+  // Ultra fast menu navigation: warm all employee portal routes after layout mounts.
   useEffect(() => {
     items.forEach((item, index) => {
       setTimeout(() => router.prefetch(item.href), index * 6);
@@ -57,7 +57,7 @@ export function EmployeeDesktopSidebar() {
               prefetch={true}
               onMouseEnter={() => handleMouseEnter(item.href)}
               className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-2xl text-sm font-medium transition-all active:scale-[0.985]',
+                'flex items-center gap-3 px-3 py-2.5 rounded-2xl text-sm font-medium transition-all duration-200 will-change-transform hover:-translate-y-0.5 active:scale-[0.985]',
                 active 
                   ? 'bg-indigo-600 text-white shadow' 
                   : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800'

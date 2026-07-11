@@ -15,12 +15,17 @@ export const getCurrentEmployeeCached = cache(async () => {
       lastName: true,
       employeeNumber: true,
       nationalId: true,
+      email: true,
+      phone: true,
+      userId: true,
       profilePhotoUrl: true,
       sponsor: true,
       status: true,
       department: { select: { name: true } },
       position: { select: { title: true } },
       branch: { select: { name: true } },
+      user: { select: { id: true, username: true, email: true, isActive: true, lastLoginAt: true } },
+      manager: { select: { id: true, firstName: true, lastName: true, employeeNumber: true } },
     },
   });
 });

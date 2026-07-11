@@ -1,7 +1,7 @@
 "use server";
 
 import { AuthError } from "next-auth";
-import { isRedirectError } from "next/dist/client/components/redirect";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { signIn, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";

@@ -50,3 +50,58 @@ export const getCurrentEmployee = cache(async () => {
     return null;
   }
 });
+export const getPayrollSummary = cache(async (employeeId: string) => {
+  const row = await prisma.payrollItem.findFirst({
+    where: { employeeId },
+    select: {
+      baseSalary: true,
+      allowanceTotal: true,
+      deductionTotal: true,
+      overtimeTotal: true,
+      netPay: true,
+      currency: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+  if (!row) {
+    return { baseSalary: 0, allowanceTotal: 0, deductionTotal: 0, overtimeTotal: 0, netPay: 0, currency: 'SAR', lastPayDate: null as string | null };
+  }
+  return {
+    baseSalary: Number(row.baseSalary ?? 0),
+    allowanceTotal: Number(row.allowanceTotal ?? 0),
+    deductionTotal: Number(row.deductionTotal ?? 0),
+    overtimeTotal: Number(row.overtimeTotal ?? 0),
+    netPay: Number(row.netPay ?? 0),
+    currency: row.currency || 'SAR',
+    lastPayDate: row.createdAt.toISOString().slice(0, 10),
+  };
+});
+
+export const getRecentNotifications = cache(async (employeeId: string) => {
+  const employee = await prisma.employee.findUnique({ where: { id: employeeId }, select: { userId: true } });
+  return prisma.notification.findMany({
+    where: { OR: [{ userId: employee?.userId ?? undefined }, { userId: null }] },
+    select: { id: true, title: true, body: true, type: true, readAt: true, createdAt: true },
+    orderBy: { createdAt: 'desc' },
+    take: 50,
+  });
+});
+
+type RecentTask = { id: string; title: string; status: string; dueDate: string | null };
+
+export const getRecentTasks = cache(async (employeeId: string): Promise<RecentTask[]> => {
+  const db = prisma as any;
+  const rows = await (db.employeePortalTask?.findMany?.({
+    where: { employeeId },
+    select: { id: true, title: true, status: true, dueDate: true, updatedAt: true },
+    orderBy: { updatedAt: 'desc' },
+    take: 10,
+  }) ?? Promise.resolve([]));
+  return rows.map((task: any): RecentTask => ({
+    id: task.id,
+    title: task.title,
+    status: task.status,
+    dueDate: task.dueDate?.toISOString?.().slice(0, 10) ?? null,
+  }));
+});
