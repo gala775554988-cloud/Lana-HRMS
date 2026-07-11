@@ -3,7 +3,6 @@ import { prisma } from '@/lib/prisma';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Clock, Timer, AlertTriangle, TrendingUp } from 'lucide-react';
 
-export const dynamic = 'force-dynamic';
 
 export default async function AttendancePage() {
   const { employee } = await requireEmployee();

@@ -4,7 +4,6 @@ import { requireEmployee, getPortalDashboard, profileCompletion, fmtDate, asNumb
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
-export const dynamic = 'force-dynamic';
 
 function Stat({ title, value, icon: Icon, tone }: { title: string; value: string | number; icon: any; tone: string }) {
   return <Card className="overflow-hidden rounded-3xl border-0 bg-white/90 shadow-sm dark:bg-slate-900/80"><CardContent className="p-5"><div className="flex items-center justify-between gap-4"><div><p className="text-sm text-muted-foreground">{title}</p><p className="mt-2 text-2xl font-black">{value}</p></div><div className={`grid h-12 w-12 place-items-center rounded-2xl ${tone}`}><Icon className="h-6 w-6" /></div></div></CardContent></Card>;
