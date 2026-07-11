@@ -1,11 +1,11 @@
-import { getCurrentEmployee } from "@/lib/employee/data";
+import { getCurrentEmployeeCached } from "@/lib/employee/employee-cache";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 
 export default async function EmployeeRequests() {
-  const employee = await getCurrentEmployee();
+  const employee = await getCurrentEmployeeCached();
   if (!employee) {
     return (
       <div className="p-8 text-center">

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { getCurrentEmployee } from "@/lib/employee/data";
+import { getCurrentEmployeeCached } from "@/lib/employee/employee-cache";
 
 const settingsLinks = [
   { href: "/employee/settings/account", label: "الحساب" },
@@ -12,7 +12,7 @@ const settingsLinks = [
 ];
 
 export default async function SettingsLayout({ children }: { children: ReactNode }) {
-  const employee = await getCurrentEmployee();
+  const employee = await getCurrentEmployeeCached();
 
   return (
     <div className="flex gap-8">

@@ -1,4 +1,4 @@
-import { getCurrentEmployee } from "@/lib/employee/data";
+import { getCurrentEmployeeCached } from "@/lib/employee/employee-cache";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ function formatAmount(value: unknown) {
 }
 
 export default async function ExpensesPage() {
-  const employee = await getCurrentEmployee();
+  const employee = await getCurrentEmployeeCached();
   const expenses = employee
     ? await prisma.expenseRequest.findMany({
         where: { employeeId: employee.id },

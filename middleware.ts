@@ -21,40 +21,15 @@ export async function middleware(request: NextRequest) {
     (route) => route === normalizedPath || normalizedPath.startsWith(route + "/")
   );
 
-  // Auth.js v5 JWT handling - try auto then secure and non-secure for compatibility
+  // Optimized: Single token fetch (fast path)
   let token: JWT | null = null;
   let isLoggedIn = false;
   
   if (AUTH_SECRET) {
     try {
       token = await getToken({ req: request, secret: AUTH_SECRET });
+      isLoggedIn = Boolean(token?.sub ?? token?.email ?? token);
     } catch {}
-    
-    if (!token) {
-      try {
-        token = await getToken({
-          req: request,
-          secret: AUTH_SECRET,
-          secureCookie: true,
-          salt: "__Secure-authjs.session-token",
-          cookieName: "__Secure-authjs.session-token",
-        });
-      } catch {}
-    }
-
-    if (!token) {
-      try {
-        token = await getToken({
-          req: request,
-          secret: AUTH_SECRET,
-          secureCookie: false,
-          salt: "authjs.session-token",
-          cookieName: "authjs.session-token",
-        });
-      } catch {}
-    }
-
-    isLoggedIn = Boolean(token?.sub ?? token?.email ?? token);
   }
 
   // Force change password check - if mustChangePassword true, redirect to force-change-password

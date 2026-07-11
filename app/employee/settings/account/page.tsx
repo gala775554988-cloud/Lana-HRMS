@@ -1,8 +1,8 @@
-import { getCurrentEmployee } from "@/lib/employee/data";
+import { getCurrentEmployeeCached } from "@/lib/employee/employee-cache";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default async function AccountSettings() {
-  const employee = await getCurrentEmployee();
+  const employee = await getCurrentEmployeeCached();
 
   return (
     <div className="max-w-lg space-y-6">

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getCurrentEmployee, getPayrollSummary } from "@/lib/employee/data";
+import { getCurrentEmployeeCached } from "@/lib/employee/employee-cache";
+import { getPayrollSummary } from "@/lib/employee/data";
 
 function escapePdfText(value: string) {
   return value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)").replace(/[^\x20-\x7E]/g, "?");
@@ -25,7 +26,7 @@ function buildPdf(lines: string[]) {
 }
 
 export async function GET() {
-  const employee = await getCurrentEmployee();
+  const employee = await getCurrentEmployeeCached();
   if (!employee) return NextResponse.json({ error: "Employee not found" }, { status: 404 });
   const salary = await getPayrollSummary(employee.id).catch(() => null);
   const fullName = `${employee.firstName} ${employee.lastName}`.trim();

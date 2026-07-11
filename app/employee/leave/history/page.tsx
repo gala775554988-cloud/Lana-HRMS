@@ -1,8 +1,8 @@
-import { getCurrentEmployee } from "@/lib/employee/data";
+import { getCurrentEmployeeCached } from "@/lib/employee/employee-cache";
 import { prisma } from "@/lib/prisma";
 
 export default async function LeaveHistory() {
-  const employee = await getCurrentEmployee();
+  const employee = await getCurrentEmployeeCached();
   const leaves = await prisma.leaveRequest.findMany({
     where: { employeeId: employee?.id },
     orderBy: { createdAt: "desc" },

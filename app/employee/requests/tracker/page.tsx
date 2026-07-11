@@ -1,8 +1,8 @@
-import { getCurrentEmployee } from "@/lib/employee/data";
+import { getCurrentEmployeeCached } from "@/lib/employee/employee-cache";
 import { prisma } from "@/lib/prisma";
 
 export default async function Tracker() {
-  const employee = await getCurrentEmployee();
+  const employee = await getCurrentEmployeeCached();
   
   const workflows = await prisma.workflowInstance.findMany({
     where: { employeeId: employee?.id },
