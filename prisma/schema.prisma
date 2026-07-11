@@ -388,15 +388,17 @@ model Employee {
   expenseRequests        ExpenseRequest[]
   letterRequests         LetterRequest[]
 
-  bankAccounts       EmployeeBankAccount[]
-  familyMembers      EmployeeFamilyMember[]
-  qualifications     EmployeeQualification[]
-  experiences        EmployeeExperience[]
-  skills             EmployeeSkill[]
-  languages          EmployeeLanguage[]
-  permissionRequests EmployeePermissionRequest[]
-  portalTasks        EmployeePortalTask[]
-  chatThreads        EmployeeChatThread[]
+  bankAccounts           EmployeeBankAccount[]
+  familyMembers          EmployeeFamilyMember[]
+  qualifications         EmployeeQualification[]
+  experiences            EmployeeExperience[]
+  skills                 EmployeeSkill[]
+  languages              EmployeeLanguage[]
+  permissionRequests     EmployeePermissionRequest[]
+  portalTasks            EmployeePortalTask[]
+  chatThreads            EmployeeChatThread[]
+  employeeSalaryAdvances EmployeeSalaryAdvance[]
+  employeeComplaints     EmployeeComplaint[]
 
   @@index([nationalId])
   @@index([firstName, lastName])
@@ -3026,4 +3028,55 @@ model EmployeeChatMessage {
   thread       EmployeeChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
 
   @@index([threadId])
+}
+
+model EmployeeSalaryAdvance {
+  id               String   @id @default(cuid())
+  employeeId       String
+  amount           Decimal  @db.Decimal(12, 2)
+  reason           String
+  installments     Int      @default(1)
+  monthlyDeduction Decimal  @db.Decimal(12, 2)
+  startDate        DateTime
+  status           String   @default("PENDING_MANAGER")
+  managerStatus    String   @default("PENDING")
+  hrStatus         String   @default("PENDING")
+  financeStatus    String   @default("PENDING")
+  managerComment   String?
+  hrComment        String?
+  financeComment   String?
+  attachments      Json?
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  employee         Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model EmployeeComplaint {
+  id          String   @id @default(cuid())
+  employeeId  String
+  type        String
+  category    String
+  title       String
+  description String
+  priority    String   @default("Medium")
+  status      String   @default("OPEN")
+  anonymous   Boolean  @default(false)
+  assignedTo  String?
+  resolution  String?
+  attachments Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([type])
+  @@index([category])
+  @@index([status])
+  @@index([priority])
+  @@index([createdAt])
 }

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Clock, Calendar, FileText, DollarSign, Bell, User, FolderOpen, Settings, ShieldCheck, CheckSquare, Package, Award, GraduationCap, MessageCircle } from 'lucide-react';
+import { Home, Clock, Calendar, FileText, DollarSign, Bell, User, FolderOpen, Settings, ShieldCheck, CheckSquare, Package, Award, GraduationCap, MessageCircle, HandCoins, MessageSquareWarning } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const items = [
@@ -13,6 +13,8 @@ const items = [
   { href: '/employee/permissions', label: 'الاستئذانات', icon: ShieldCheck },
   { href: '/employee/tasks', label: 'المهام', icon: CheckSquare },
   { href: '/employee/salary', label: 'الرواتب', icon: DollarSign },
+  { href: '/employee/advances', label: 'طلبات السلف', icon: HandCoins },
+  { href: '/employee/complaints', label: 'الشكاوى والاقتراحات', icon: MessageSquareWarning },
   { href: '/employee/assets', label: 'العهد', icon: Package },
   { href: '/employee/documents', label: 'المستندات', icon: FolderOpen },
   { href: '/employee/performance', label: 'التقييم', icon: Award },
