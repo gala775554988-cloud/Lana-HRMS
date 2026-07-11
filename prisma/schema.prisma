@@ -319,53 +319,54 @@ model Nationality {
 }
 
 model Employee {
-  id                  String                  @id @default(cuid())
-  employeeNumber      String                  @unique
-  nationalId          String                  @unique
-  firstName           String
-  lastName            String
-  email               String?                 @unique
-  profilePhotoUrl     String?
-  phone               String?
-  gender              String?
-  dateOfBirth         DateTime?
-  hireDate            DateTime
-  terminationDate     DateTime?
-  archivedAt          DateTime?
-  isPendingActivation Boolean                 @default(false)
-  status              EmployeeStatus          @default(ACTIVE)
-  address             String?
-  emergencyContact    String?
-  userId              String?                 @unique
-  departmentId        String?
-  positionId          String?
-  branchId            String?
-  employmentTypeId    String?
-  nationalityId       String?
-  createdAt           DateTime                @default(now())
-  updatedAt           DateTime                @updatedAt
-  user                User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
-  department          Department?             @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  position            Position?               @relation(fields: [positionId], references: [id], onDelete: SetNull)
-  branch              Branch?                 @relation(fields: [branchId], references: [id], onDelete: SetNull)
-  employmentType      EmploymentType?         @relation(fields: [employmentTypeId], references: [id], onDelete: SetNull)
-  nationality         Nationality?            @relation(fields: [nationalityId], references: [id], onDelete: SetNull)
-  documents           EmployeeDocument[]
-  contracts           EmployeeContract[]
-  assignedAssets      Asset[]
-  trainingEnrollments TrainingEnrollment[]
-  evaluations         PerformanceEvaluation[]
-  deductions          Deduction[]
-  allowances          Allowance[]
-  overtimeRequests    OvertimeRequest[]
-  loans               Loan[]
-  payrollItems        PayrollItem[]
-  leaveRequests       LeaveRequest[]
-  attendanceRecords   AttendanceRecord[]
-  preferences         EmployeePreference?
-  workflowInstances   WorkflowInstance[]
-  expenseRequests     ExpenseRequest[]
-  letterRequests      LetterRequest[]
+  id                     String                  @id @default(cuid())
+  employeeNumber         String                  @unique
+  nationalId             String                  @unique
+  firstName              String
+  lastName               String
+  email                  String?                 @unique
+  profilePhotoUrl        String?
+  phone                  String?
+  gender                 String?
+  dateOfBirth            DateTime?
+  hireDate               DateTime
+  terminationDate        DateTime?
+  archivedAt             DateTime?
+  isPendingActivation    Boolean                 @default(false)
+  pendingActivationUntil DateTime?
+  status                 EmployeeStatus          @default(ACTIVE)
+  address                String?
+  emergencyContact       String?
+  userId                 String?                 @unique
+  departmentId           String?
+  positionId             String?
+  branchId               String?
+  employmentTypeId       String?
+  nationalityId          String?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  user                   User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  department             Department?             @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  position               Position?               @relation(fields: [positionId], references: [id], onDelete: SetNull)
+  branch                 Branch?                 @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  employmentType         EmploymentType?         @relation(fields: [employmentTypeId], references: [id], onDelete: SetNull)
+  nationality            Nationality?            @relation(fields: [nationalityId], references: [id], onDelete: SetNull)
+  documents              EmployeeDocument[]
+  contracts              EmployeeContract[]
+  assignedAssets         Asset[]
+  trainingEnrollments    TrainingEnrollment[]
+  evaluations            PerformanceEvaluation[]
+  deductions             Deduction[]
+  allowances             Allowance[]
+  overtimeRequests       OvertimeRequest[]
+  loans                  Loan[]
+  payrollItems           PayrollItem[]
+  leaveRequests          LeaveRequest[]
+  attendanceRecords      AttendanceRecord[]
+  preferences            EmployeePreference?
+  workflowInstances      WorkflowInstance[]
+  expenseRequests        ExpenseRequest[]
+  letterRequests         LetterRequest[]
 
   @@index([nationalId])
   @@index([firstName, lastName])

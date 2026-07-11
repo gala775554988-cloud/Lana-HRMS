@@ -24,7 +24,7 @@ if (!databaseUrl || databaseUrl.trim() === '') {
 
 const requiredColumns = {
   User: ['id', 'username', 'email', 'passwordHash', 'isActive', 'status', 'lastLoginAt', 'loginCount', 'passwordChangedAt', 'mustChangePassword', 'isLocked', 'lockedAt', 'lockReason', 'lockedReason', 'lockedById', 'loginAttempts', 'failedLoginAttempts', 'lastFailedLoginAt', 'lockedUntil', 'disabledAt'],
-  Employee: ['id', 'employeeNumber', 'nationalId', 'firstName', 'lastName', 'isPendingActivation', 'status'],
+  Employee: ['id', 'employeeNumber', 'nationalId', 'firstName', 'lastName', 'isPendingActivation', 'pendingActivationUntil', 'status'],
   Permission: ['id', 'key', 'action', 'resource', 'label', 'groupId', 'isSystem', 'sortOrder'], 
   PermissionGroup: ['id', 'key', 'name', 'nameAr', 'parentId', 'isSystem', 'sortOrder'],
   UserPermission: ['id', 'userId', 'permissionId', 'effect', 'assignedById', 'expiresAt', 'createdAt', 'updatedAt'],

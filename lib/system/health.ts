@@ -54,7 +54,7 @@ export const REQUIRED_USER_COLUMNS = [
 
 export const REQUIRED_RBAC_COLUMNS: Record<string, string[]> = {
   User: [...REQUIRED_USER_COLUMNS],
-  Employee: ["id", "employeeNumber", "nationalId", "firstName", "lastName", "isPendingActivation", "status"],
+  Employee: ["id", "employeeNumber", "nationalId", "firstName", "lastName", "isPendingActivation", "pendingActivationUntil", "status"],
   Permission: ["id", "key", "action", "resource", "label", "groupId", "isSystem", "sortOrder"],
   PermissionGroup: ["id", "key", "name", "nameAr", "parentId", "isSystem", "sortOrder"],
   UserPermission: ["id", "userId", "permissionId", "effect", "assignedById", "expiresAt", "createdAt", "updatedAt"],
