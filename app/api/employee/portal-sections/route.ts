@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireEmployee, getEmployeeSetting, setEmployeeSetting } from '@/lib/employee/portal';
 
-const sections = new Set(['qualifications','experiences','skills','languages','bank','family','permissionRequests','chat']);
+const sections = new Set(['qualifications','experiences','skills','languages','bank','family','permissionRequests','chat','tasks','securitySettings']);
 
 export async function GET(request: NextRequest) {
   const { employee } = await requireEmployee();
