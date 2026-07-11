@@ -27,14 +27,17 @@ export async function requireEmployee() {
   if (!session?.user?.id) throw new Error('Unauthorized');
   const employee = await dbQuery('requireEmployee.employee.findFirst', () => prisma.employee.findFirst({
     where: { userId: session.user.id },
-    include: {
-      department: true,
-      position: true,
-      branch: true,
-      employmentType: true,
-      nationality: true,
-      manager: { select: { id: true, firstName: true, lastName: true, employeeNumber: true, email: true } },
-      user: { select: { id: true, username: true, email: true, isActive: true, lastLoginAt: true, mustChangePassword: true, passwordChangedAt: true } },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      employeeNumber: true,
+      nationalId: true,
+      profilePhotoUrl: true,
+      status: true,
+      department: { select: { name: true } },
+      position: { select: { title: true } },
+      branch: { select: { name: true } },
     },
   }));
   if (!employee) throw new Error('Employee profile is not linked to this account');
@@ -58,20 +61,36 @@ export async function getPortalDashboard(employeeId: string, userId?: string) {
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
 
-  // Sequential + retry. Production pool is small; Promise.all caused P2024 and made all employee pages crash.
-  const attendanceToday = await dbQuery('dashboard.attendanceRecord.findFirst.today', () => prisma.attendanceRecord.findFirst({ where: { employeeId, workDate: { gte: today } }, orderBy: { workDate: 'desc' } }), null);
-  const attendanceMonth = await dbQuery('dashboard.attendanceRecord.findMany.month', () => prisma.attendanceRecord.findMany({ where: { employeeId, workDate: { gte: monthStart, lt: nextMonth } }, orderBy: { workDate: 'asc' } }), []);
-  const leaves = await dbQuery('dashboard.leaveRequest.findMany', () => prisma.leaveRequest.findMany({ where: { employeeId }, include: { leaveType: true }, orderBy: { createdAt: 'desc' }, take: 20 }), []);
-  const permissionRequests = await dbQuery<any[]>('dashboard.employeePermissionRequest.findMany', () => (prisma as any).employeePermissionRequest?.findMany?.({ where: { employeeId }, orderBy: { createdAt: 'desc' }, take: 20 }) ?? Promise.resolve([]), []);
-  const payroll = await dbQuery('dashboard.payrollItem.findFirst', () => prisma.payrollItem.findFirst({ where: { employeeId }, include: { payrollRun: true }, orderBy: { createdAt: 'desc' } }), null);
-  const documents = await dbQuery('dashboard.employeeDocument.count', () => prisma.employeeDocument.count({ where: { employeeId } }), 0);
-  const assets = await dbQuery('dashboard.asset.count', () => prisma.asset.count({ where: { assignedEmployeeId: employeeId } }), 0);
-  const notifications = await dbQuery('dashboard.notification.findMany', () => prisma.notification.findMany({ where: { OR: [{ userId }, { userId: null }], readAt: null }, take: 10, orderBy: { createdAt: 'desc' } }), []);
-  const latestDoc = await dbQuery('dashboard.employeeDocument.findFirst', () => prisma.employeeDocument.findFirst({ where: { employeeId }, orderBy: { uploadedAt: 'desc' } }), null);
-  const latestAttendance = await dbQuery('dashboard.attendanceRecord.findFirst.latest', () => prisma.attendanceRecord.findFirst({ where: { employeeId }, orderBy: { workDate: 'desc' } }), null);
-  const latestLeave = await dbQuery('dashboard.leaveRequest.findFirst', () => prisma.leaveRequest.findFirst({ where: { employeeId }, include: { leaveType: true }, orderBy: { createdAt: 'desc' } }), null);
-  const latestAudit = await dbQuery('dashboard.auditLog.findFirst', () => prisma.auditLog.findFirst({ where: { OR: [{ entityId: employeeId }, { metadata: { path: ['employeeId'], equals: employeeId } }] as any }, orderBy: { createdAt: 'desc' } }), null);
-  const portalTasks = await dbQuery<any[]>('dashboard.employeePortalTask.findMany', () => (prisma as any).employeePortalTask?.findMany?.({ where: { employeeId, status: { not: 'COMPLETED' } }, take: 20 }) ?? Promise.resolve([]), []);
+  // OPTIMIZED: All queries in parallel + select only (no include)
+  const [
+    attendanceToday,
+    attendanceMonth,
+    leaves,
+    permissionRequests,
+    payroll,
+    documents,
+    assets,
+    notifications,
+    latestDoc,
+    latestAttendance,
+    latestLeave,
+    latestAudit,
+    portalTasks
+  ] = await Promise.all([
+    dbQuery('dashboard.attendance.today', () => prisma.attendanceRecord.findFirst({ where: { employeeId, workDate: { gte: today } }, select: { status: true } }), null),
+    dbQuery('dashboard.attendance.month', () => prisma.attendanceRecord.findMany({ where: { employeeId, workDate: { gte: monthStart, lt: nextMonth } }, select: { status: true, checkIn: true, checkOut: true } }), []),
+    dbQuery('dashboard.leave', () => prisma.leaveRequest.findMany({ where: { employeeId }, select: { status: true, days: true }, orderBy: { createdAt: 'desc' }, take: 20 }), []),
+    dbQuery('dashboard.permission', () => (prisma as any).employeePermissionRequest?.findMany?.({ where: { employeeId }, select: { reason: true, status: true }, take: 20 }) ?? Promise.resolve([]), []),
+    dbQuery('dashboard.payroll', () => prisma.payrollItem.findFirst({ where: { employeeId }, select: { netPay: true, currency: true }, orderBy: { createdAt: 'desc' } }), null),
+    dbQuery('dashboard.documents', () => prisma.employeeDocument.count({ where: { employeeId } }), 0),
+    dbQuery('dashboard.assets', () => prisma.asset.count({ where: { assignedEmployeeId: employeeId } }), 0),
+    dbQuery('dashboard.notifications', () => prisma.notification.findMany({ where: { OR: [{ userId }, { userId: null }], readAt: null }, select: { title: true }, take: 10 }), []),
+    dbQuery('dashboard.latestDoc', () => prisma.employeeDocument.findFirst({ where: { employeeId }, select: { name: true }, orderBy: { uploadedAt: 'desc' } }), null),
+    dbQuery('dashboard.latestAttendance', () => prisma.attendanceRecord.findFirst({ where: { employeeId }, select: { status: true }, orderBy: { workDate: 'desc' } }), null),
+    dbQuery('dashboard.latestLeave', () => prisma.leaveRequest.findFirst({ where: { employeeId }, select: { status: true }, orderBy: { createdAt: 'desc' } }), null),
+    dbQuery('dashboard.latestAudit', () => prisma.auditLog.findFirst({ where: { entityId: employeeId }, select: { action: true }, orderBy: { createdAt: 'desc' } }), null),
+    dbQuery('dashboard.tasks', () => (prisma as any).employeePortalTask?.findMany?.({ where: { employeeId, status: { not: 'COMPLETED' } }, take: 20 }) ?? Promise.resolve([]), []),
+  ]);
 
   const leaveUsed = leaves.filter(l => l.status === 'APPROVED').reduce((s,l)=>s+asNumber(l.days),0);
   const monthHours = attendanceMonth.reduce((sum, r) => r.checkIn && r.checkOut ? sum + Math.max(0, (r.checkOut.getTime() - r.checkIn.getTime()) / 36e5) : sum, 0);
