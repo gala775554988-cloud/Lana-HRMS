@@ -3,7 +3,7 @@ import { getToken } from "@auth/core/jwt";
 import { resolveRoleDashboard } from "@/config/auth";
 
 const AUTH_SECRET =
-  process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? "";
+  process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
 
 const MATCHER_EXCLUDES =
   /^\/(?:api|_next\/static|_next\/image|favicon\.ico|manifest\.webmanifest)/;
