@@ -38,22 +38,24 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
     if (rememberMe) window.localStorage.setItem("lana.hrms.rememberedIdentifier", values.identifier);
     else window.localStorage.removeItem("lana.hrms.rememberedIdentifier");
 
-    // Native HTML form POST — browser handles Set-Cookie + redirect natively
+    // Build a native HTML form and submit it.
+    // The browser handles the 302 redirect + Set-Cookie atomically.
+    // This is the only reliable way to set cookies across page navigations.
     const formEl = document.createElement("form");
     formEl.method = "POST";
     formEl.action = "/api/auth/callback/credentials";
 
     const csrf = document.createElement("input");
     csrf.type = "hidden"; csrf.name = "csrfToken"; csrf.value = csrfToken;
-    const cb = document.createElement("input");
-    cb.type = "hidden"; cb.name = "callbackUrl"; cb.value = "/";
+    const redirectUrl = document.createElement("input");
+    redirectUrl.type = "hidden"; redirectUrl.name = "callbackUrl"; redirectUrl.value = "/";
     const idF = document.createElement("input");
     idF.type = "hidden"; idF.name = "identifier"; idF.value = values.identifier;
     const pwF = document.createElement("input");
     pwF.type = "hidden"; pwF.name = "password"; pwF.value = values.password;
 
     formEl.appendChild(csrf);
-    formEl.appendChild(cb);
+    formEl.appendChild(redirectUrl);
     formEl.appendChild(idF);
     formEl.appendChild(pwF);
     document.body.appendChild(formEl);

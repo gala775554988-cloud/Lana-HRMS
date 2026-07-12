@@ -28,29 +28,17 @@ interface AppShellProps {
 }
 
 const navItems = [
-  // ① الموظفون - قلب النظام - أول صفحة بعد تسجيل الدخول
   { href: "/employees", label: "الموظفون", icon: Users, group: "people", resource: "employees" },
-  // ② الإدارات
   { href: "/departments", label: "الإدارات", icon: Building2, group: "people", resource: "departments" },
-  // ③ الفروع
   { href: "/branches", label: "الفروع", icon: MapPin, group: "people", resource: "branches" },
-  // ④ المستشفيات
   { href: "/hospitals", label: "المستشفيات", icon: Building2, group: "people", resource: "employees" },
-  // ⑦ الحضور
   { href: "/attendance", label: "الحضور", icon: Clock, group: "ops", resource: "attendance" },
-  // ⑧ الإجازات
   { href: "/leave-requests", label: "الإجازات", icon: Calendar, group: "ops", resource: "leave" },
-  // ⑨ الأوفر تايم
   { href: "/overtime", label: "الأوفر تايم", icon: Clock, group: "ops", resource: "overtime" },
-  // ⑩ الرواتب - بدلاً من آخر القائمة
   { href: "/payroll-runs", label: "الرواتب", icon: DollarSign, group: "ops", resource: "payroll" },
-  // ⑪ المستندات
   { href: "/documents", label: "المستندات", icon: FileText, group: "ops", resource: "documents" },
-  // ⑫ التقارير
   { href: "/reports", label: "التقارير", icon: BarChart3, group: "admin", resource: "reports" },
-  // ⑬ مزامنة Odoo - صفحة كاملة
   { href: "/integrations/synchronization", label: "مزامنة Odoo", icon: PlugZap, group: "admin", resource: "settings" },
-  // إضافي - إدارة
   { href: "/request-center", label: "استقبال الطلبات", icon: GitPullRequest, group: "admin", resource: "leave" },
   { href: "/lana-ai", label: "Lana AI", icon: Sparkles, group: "admin", resource: "reports" },
   { href: "/audit-logs", label: "سجل التدقيق", icon: Shield, group: "admin", resource: "audit-logs" },
@@ -67,7 +55,6 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
-  // Aggressive prefetch for all nav items (instant navigation)
   useEffect(() => {
     navItems.forEach((item, index) => {
       setTimeout(() => router.prefetch(item.href), index * 4);
@@ -77,23 +64,10 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
   const userRoles = useMemo(() => (session?.user?.roles as string[]) || [], [session?.user?.roles]);
   const userPermissions = useMemo(() => (session?.user?.permissions as string[]) || [], [session?.user?.permissions]);
 
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login");
-    }
-  }, [status, router]);
-
-  // Global shortcut ⌘K / Ctrl+K
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        setSearchOpen(prev => !prev);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  // REMOVED: useEffect that redirects to /login on unauthenticated.
+  // Rely on middleware.ts for auth protection — it redirects to /login
+  // only when genuinely no token exists. AppShell should never kick out
+  // a user who passed middleware.
 
   const handleLogout = useCallback(async () => {
     await signOut({ redirect: true, callbackUrl: "/login" });
@@ -167,7 +141,6 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
             />
           </div>
 
-          {/* Quick Search Bar Trigger */}
           <div className="hidden md:flex flex-1 max-w-md items-center mx-auto">
             <button
               onClick={() => setSearchOpen(true)}
@@ -224,7 +197,6 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
         </div>
       </header>
 
-      {/* Mobile Sidebar Backdrop */}
       {mobileMenuOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs lg:hidden animate-in fade-in duration-200"
@@ -233,7 +205,6 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
       )}
 
       <div className="flex">
-        {/* Sidebar */}
         <aside
           className={cn(
             "fixed inset-y-0 right-0 z-50 flex flex-col border-l border-slate-200/80 bg-white shadow-xl transition-transform duration-300 ease-in-out lg:static lg:z-auto lg:shadow-none lg:translate-x-0 dark:border-slate-800 dark:bg-slate-950",
@@ -242,7 +213,6 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
             mobileMenuOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
           )}
         >
-          {/* Mobile header inside sidebar */}
           <div className="flex h-16 items-center justify-between border-b border-slate-100 px-4 lg:hidden dark:border-slate-800">
             <BrandLogo href="/" size="sm" showText={true} />
             <button
@@ -294,7 +264,6 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
             ))}
           </div>
 
-          {/* Sidebar bottom status / Lana AI widget */}
           {(!sidebarCollapsed || mobileMenuOpen) && (
             <div className="m-3 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/80 to-purple-50/50 p-3.5 dark:border-indigo-900/40 dark:from-indigo-950/30 dark:to-purple-950/20">
               <div className="flex items-center gap-2.5 text-indigo-900 dark:text-indigo-200 font-bold text-xs">
