@@ -71,7 +71,7 @@ export default async function ResourcePage({ params, searchParams }: { params: P
       if (typeof query[field] === "string") filters[field] = query[field] as string;
     });
     // Handle tab filtering for active/archived
-    const tab = typeof query.tab === "string" ? query.tab : (resourceKey === "employees" ? "active" : "all");
+    const tab = typeof query.tab === "string" ? query.tab : "all";
     if (tab === "active") {
       filters.status = "ACTIVE";
     } else if (tab === "archived") {

@@ -36,7 +36,7 @@ interface EmployeeListProps {
 export function EmployeeList({ resource, records, totalCount, page, pageCount, search: initialSearch, filters = {}, pageSize, dictionary, locale }: EmployeeListProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const activeTab = (searchParams.get("tab") as TabType) || "active";
+  const activeTab = (searchParams.get("tab") as TabType) || "all";
   const [viewMode, setViewMode] = useState<ViewMode>("card");
   const [search, setSearch] = useState(initialSearch);
   const deferredSearch = useDeferredValue(search);
@@ -173,7 +173,6 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
         {isPending && <div className="h-1 w-full bg-indigo-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-600 animate-pulse w-full"></div></div>}
       <div className="flex flex-wrap gap-2 border-b pb-4">
           <Button variant={(activeTab as string) === "all" ? "default" : "outline"} size="sm" onClick={() => switchTab("all")}><Users className="h-4 w-4 ml-1" />جميع الموظفين ({totalCount})</Button>
-          <Button variant={(activeTab as string) === "active" ? "default" : "outline"} size="sm" onClick={() => switchTab("active")}><Users className="h-4 w-4 ml-1 text-green-600" />النشطون</Button>
           <Button variant={(activeTab as string) === "archived" ? "default" : "outline"} size="sm" onClick={() => switchTab("archived")}><Archive className="h-4 w-4 ml-1" />الموظفون المؤرشفون / غير النشطين</Button>
           <Button variant={(activeTab as string) === "duplicates" ? "default" : "outline"} size="sm" onClick={() => switchTab("duplicates")}><UsersRound className="h-4 w-4 ml-1" />الحسابات المكررة</Button>
         </div>
@@ -188,59 +187,10 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
         {isPending && <div className="h-1 w-full bg-indigo-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-600 animate-pulse w-full"></div></div>}
       <div className="flex flex-wrap gap-2 border-b pb-4">
           <Button variant={(activeTab as string) === "all" ? "default" : "outline"} size="sm" onClick={() => switchTab("all")}><Users className="h-4 w-4 ml-1" />جميع الموظفين ({totalCount})</Button>
-          <Button variant={(activeTab as string) === "active" ? "default" : "outline"} size="sm" onClick={() => switchTab("active")}><Users className="h-4 w-4 ml-1 text-green-600" />النشطون</Button>
           <Button variant={(activeTab as string) === "archived" ? "default" : "outline"} size="sm" onClick={() => switchTab("archived")}><Archive className="h-4 w-4 ml-1" />الموظفون المؤرشفون</Button>
           <Button variant={(activeTab as string) === "duplicates" ? "default" : "outline"} size="sm" onClick={() => switchTab("duplicates")}><UsersRound className="h-4 w-4 ml-1" />الحسابات المكررة</Button>
         </div>
         <DuplicateAccounts />
-      </section>
-    );
-  }
-
-  if (activeTab === "active") {
-    const activeRecords = records.filter((r) => r.status === "ACTIVE" || r.status === "ON_LEAVE");
-    return (
-      <section className="space-y-6" dir={isAr ? "rtl" : "ltr"}>
-        {isPending && <div className="h-1 w-full bg-indigo-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-600 animate-pulse w-full"></div></div>}
-      <div className="flex flex-wrap gap-2 border-b pb-4">
-          <Button variant={(activeTab as string) === "all" ? "default" : "outline"} size="sm" onClick={() => switchTab("all")}><Users className="h-4 w-4 ml-1" />جميع الموظفين ({totalCount})</Button>
-          <Button variant={(activeTab as string) === "active" ? "default" : "outline"} size="sm" onClick={() => switchTab("active")}><Users className="h-4 w-4 ml-1 text-green-600" />النشطون ({activeRecords.length})</Button>
-          <Button variant={(activeTab as string) === "archived" ? "default" : "outline"} size="sm" onClick={() => switchTab("archived")}><Archive className="h-4 w-4 ml-1" />الموظفون المؤرشفون</Button>
-          <Button variant={(activeTab as string) === "duplicates" ? "default" : "outline"} size="sm" onClick={() => switchTab("duplicates")}><UsersRound className="h-4 w-4 ml-1" />الحسابات المكررة</Button>
-        </div>
-
-        <div className="rounded-2xl border border-green-100 bg-green-50/30 p-4 text-sm text-green-800 dark:border-green-900/30 dark:bg-green-950/20 dark:text-green-300">
-          ✅ يتم عرض الموظفين النشطين فقط في هذه الخانة. الموظفون المؤرشفون / غير النشطين تم سحبهم إلى خانة <strong>الموظفون المؤرشفون</strong>.
-        </div>
-
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {activeRecords.map((employee) => (
-            <EmployeeCard key={employee.id} employee={employee} locale={locale} onView={handleView} onEdit={handleEdit} onDocuments={handleDocuments} onArchive={handleArchive} />
-          ))}
-          {activeRecords.length === 0 && (
-            <div className="col-span-full flex flex-col items-center justify-center py-16 text-muted-foreground">
-              <Users className="h-12 w-12 mb-3 opacity-40" />
-              <p className="text-sm font-medium">لا يوجد موظفون نشطون</p>
-            </div>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-3 rounded-lg border bg-card p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <span>{isAr ? `النشطون: ${activeRecords.length} من ${totalCount}` : `Active: ${activeRecords.length} of ${totalCount}`}</span>
-        </div>
-
-        <Dialog open={addEmployeeOpen} onOpenChange={handleCloseAddEmployee}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>{isAr ? "إضافة موظف جديد" : "Add New Employee"}</DialogTitle>
-              <DialogClose onClick={() => setAddEmployeeOpen(false)} />
-            </DialogHeader>
-            <ModuleForm resource={resource} dictionary={dictionary} locale={locale} />
-          </DialogContent>
-        </Dialog>
-
-        <EmployeeBulkImportDialog open={bulkImportOpen} onOpenChange={setBulkImportOpen} locale={locale} />
-        <EmployeeDrawer employee={selectedEmployee} open={drawerOpen} onClose={handleCloseDrawer} locale={locale} onEdit={handleEdit} />
       </section>
     );
   }
