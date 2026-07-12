@@ -84,7 +84,7 @@ export const BULK_IMPORT_COLUMNS = [
   { key: "location", label: "الموقع", aliases: ["location"] },
   { key: "workLocation", label: "موقع العمل", aliases: ["work location"] },
   { key: "hospital", label: "المستشفى", aliases: ["hospital"] },
-  { key: "sponsor", label: "Sponsor", aliases: ["sponsor", "الكفيل"] },
+  { key: "sponsor", label: "Sponsor", aliases: ["sponsor", "Sponsor ID", "sponsor id", "الكفيل", "رقم الكفيل"] },
   { key: "bankName", label: "اسم البنك", aliases: ["bank name", "bank"] },
   { key: "iban", label: "IBAN", aliases: ["iban"] },
   { key: "salaryBase", label: "الراتب الأساسي", aliases: ["base salary", "salary base"] },
@@ -469,7 +469,8 @@ export async function importEmployees(rows: ParsedEmployeeRow[], options: BulkIm
         branchId: row.branch ? branchMap.get(normalizeLookup(row.branch))?.id : null,
         positionId: (row.position || row.section) ? positionMap.get(normalizeLookup(row.position || row.section || ""))?.id : null,
         employmentTypeId: row.employmentType ? employmentTypeMap.get(normalizeLookup(row.employmentType))?.id : null,
-        nationalityId: row.nationality ? nationalityMap.get(normalizeLookup(row.nationality))?.id : null
+        nationalityId: row.nationality ? nationalityMap.get(normalizeLookup(row.nationality))?.id : null,
+        sponsor: row.sponsor || null
       })),
       skipDuplicates: true
     });
@@ -496,7 +497,8 @@ export async function importEmployees(rows: ParsedEmployeeRow[], options: BulkIm
             branchId: row.branch ? branchMap.get(normalizeLookup(row.branch))?.id : undefined,
             positionId: (row.position || row.section) ? positionMap.get(normalizeLookup(row.position || row.section || ""))?.id : undefined,
             employmentTypeId: row.employmentType ? employmentTypeMap.get(normalizeLookup(row.employmentType))?.id : undefined,
-            nationalityId: row.nationality ? nationalityMap.get(normalizeLookup(row.nationality))?.id : undefined
+            nationalityId: row.nationality ? nationalityMap.get(normalizeLookup(row.nationality))?.id : undefined,
+            sponsor: row.sponsor || undefined
           }
         });
         updated++;

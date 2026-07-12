@@ -235,9 +235,9 @@ export function mapOdooEmployeeToLana(record: OdooRecord): Record<string, unknow
   const archiveReason = textValue(record.departure_description);
 
   return stripEmpty({
-    // الرقم الوظيفي الصحيح حسب اعتماد العميل هو رقم سجل الموظف في Odoo (hr.employee.id)
-    // وليس barcode، حتى لا يتم سحب أرقام باركود/بصمة أو أرقام غير موحدة.
-    employeeNumber: String(record.id || record.barcode || `ODOO-${record.id}`),
+    // كود الموظف = barcode (هذا هو الرقم الوظيفي المعتمد من العميل)
+    // id هو الرقم التسلسلي لقاعدة بيانات Odoo فقط — لا يستخدم كرقم وظيفي
+    employeeNumber: String(record.barcode || record.id || `ODOO-${record.id}`),
     nationalId: String(record.identification_id || `ODOO-${record.id}`),
     firstName: names.firstName,
     lastName: names.lastName,
