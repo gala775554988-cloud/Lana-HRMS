@@ -4,29 +4,23 @@ import { verifyPassword, hashPassword } from "@/lib/password";
 
 export async function GET() {
   try {
-    // Test 1: find admin
-    const users = await prisma.user.findMany({
-      where: { OR: [{ username: "admin" }, { email: "admin@lana.local" }] },
-      select: { id: true, username: true, email: true, isActive: true, name: true }
-    });
+    const user = await prisma.user.findFirst({ where: { OR: [{ username: "admin" }, { email: "admin@lana.local" }] } });
+    if (!user) return NextResponse.json({ error: "No admin" });
+
+    const full = await prisma.user.findUnique({ where: { id: user.id }, select: { passwordHash: true, mustChangePassword: true, passwordChanged: true } });
+    const pwOk = await verifyPassword("Admin@123456", full?.passwordHash || "");
     
-    // Test 2: verify password
-    const user = users[0];
-    let pwOk = false;
-    let hashPreview = "";
-    if (user?.id) {
-      const full = await prisma.user.findUnique({ where: { id: user.id }, select: { passwordHash: true } });
-      hashPreview = (full?.passwordHash || "").substring(0, 20) + "...";
-      pwOk = await verifyPassword("Admin@123456", full?.passwordHash || "");
-    }
+    // Check roles
+    const roles = await prisma.userRole.findMany({ where: { userId: user.id }, include: { role: { select: { name: true } } } });
     
     return NextResponse.json({
-      userCount: users.length,
-      users: users.map(u => ({ id: u.id, username: u.username, email: u.email, isActive: u.isActive, name: u.name })),
-      hashPreview,
+      id: user.id, name: user.name, email: user.email, isActive: user.isActive,
+      mustChangePassword: full?.mustChangePassword, passwordChanged: full?.passwordChanged,
+      hashStart: (full?.passwordHash || "").substring(0, 15) + "...",
       passwordOk: pwOk,
+      roles: roles.map(r => r.role.name),
     });
   } catch (e: any) {
-    return NextResponse.json({ error: e.message, stack: e.stack }, { status: 500 });
+    return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
