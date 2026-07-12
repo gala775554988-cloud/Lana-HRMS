@@ -7,7 +7,7 @@ export async function POST() {
   const employees = await prisma.employee.findMany({
     where: { userId: null },
     select: { id: true, employeeNumber: true, nationalId: true, firstName: true, lastName: true, email: true },
-    take: 50,
+    take: 10,
   });
 
   let created = 0;
