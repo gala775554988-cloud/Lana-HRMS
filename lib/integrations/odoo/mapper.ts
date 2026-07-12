@@ -60,8 +60,7 @@ export const ODOO_MAPPERS: Record<string, MapperDefinition> = {
       branchId: "company_id",
       emergencyContact: "emergency_contact",
       terminationDate: "departure_date",
-      address: "address_home_id",
-      sponsor: "sponsor"
+      address: "address_home_id"
     }
   },
   departments: {
