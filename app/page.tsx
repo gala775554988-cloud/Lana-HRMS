@@ -7,8 +7,11 @@ export default async function HomePage() {
 
   if (session?.user) {
     const roles = (session.user.roles as string[]) || [];
-    redirect(resolveRoleDashboard(roles));
+    const target = resolveRoleDashboard(roles);
+    const r = encodeURIComponent(`app/page.tsx: session.user EXISTS → resolveRoleDashboard(${JSON.stringify(roles)}) → ${target}`);
+    redirect(`${target}?reason=${r}`);
   }
 
-  redirect("/login");
+  const r = encodeURIComponent(`app/page.tsx: NO session → redirect("/login")`);
+  redirect(`/login?reason=${r}`);
 }

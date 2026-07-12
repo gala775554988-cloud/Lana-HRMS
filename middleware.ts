@@ -29,11 +29,14 @@ export async function middleware(request: NextRequest) {
     || pathname === "/";
 
   if (loggedIn && isAuthPage) {
-    return NextResponse.redirect(new URL(resolveRoleDashboard(roles), request.url));
+    const target = resolveRoleDashboard(roles);
+    const r = encodeURIComponent(`middleware.ts: loggedIn=true & isAuthPage=true → ${target} | roles:${JSON.stringify(roles)} | from:${pathname}`);
+    return NextResponse.redirect(new URL(`${target}?reason=${r}`, request.url));
   }
 
   if (!loggedIn && !isAuthPage) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    const r = encodeURIComponent(`middleware.ts: !loggedIn & !isAuthPage → /login | token:${!!token} | path:${pathname}`);
+    return NextResponse.redirect(new URL(`/login?reason=${r}`, request.url));
   }
 
   return NextResponse.next();

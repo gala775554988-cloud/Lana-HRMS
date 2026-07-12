@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, AlertTriangle, Info } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { loginAction } from "@/lib/auth/actions";
@@ -12,15 +12,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Dictionary } from "@/lib/i18n";
 
-export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
+export function LoginForm({ dictionary, redirectReason }: { dictionary: Dictionary; redirectReason?: string }) {
   const [message, setMessage] = useState<string | null>(null);
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const form = useForm<LoginInput>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: { identifier: "", password: "" },
-  });
+  const form = useForm<LoginInput>({ resolver: zodResolver(loginSchema), defaultValues: { identifier: "", password: "" } });
 
   useEffect(() => {
     const id = window.localStorage.getItem("lana.hrms.rememberedIdentifier");
@@ -31,7 +28,6 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
     setMessage(null);
     if (rememberMe) window.localStorage.setItem("lana.hrms.rememberedIdentifier", values.identifier);
     else window.localStorage.removeItem("lana.hrms.rememberedIdentifier");
-
     startTransition(async () => {
       const result = await loginAction(values);
       if (!result.success) setMessage(result.message);
@@ -40,6 +36,14 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
 
   return (
     <form className="space-y-5" onSubmit={form.handleSubmit(onSubmit)} noValidate>
+      {redirectReason && (
+        <Alert className="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription className="text-xs leading-relaxed break-all">
+            <span className="font-bold">🔍 سبب التحويل:</span> {redirectReason}
+          </AlertDescription>
+        </Alert>
+      )}
       {message ? (
         <Alert variant="destructive" aria-live="polite">
           <AlertDescription>{message}</AlertDescription>
@@ -64,10 +68,7 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
         </div>
       </div>
       <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border bg-slate-50/80 p-3.5 text-sm dark:bg-slate-900/50">
-        <span>
-          <span className="block font-bold text-slate-800 dark:text-slate-200">{dictionary.auth.rememberTitle}</span>
-          <span className="block text-xs text-muted-foreground">{dictionary.auth.rememberDescription}</span>
-        </span>
+        <span><span className="block font-bold text-slate-800 dark:text-slate-200">{dictionary.auth.rememberTitle}</span><span className="block text-xs text-muted-foreground">{dictionary.auth.rememberDescription}</span></span>
         <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} className="h-4 w-4 rounded border-input text-primary" />
       </label>
       <Button className="h-12 w-full text-base font-bold shadow-lg shadow-indigo-600/20 rounded-xl" type="submit" disabled={isPending}>
