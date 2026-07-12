@@ -296,7 +296,11 @@ export async function listModuleRecords(input: QueryInput) {
     if (employeeAnd.length) baseWhere = Object.keys(baseWhere).length ? { AND: [baseWhere, ...employeeAnd] } : { AND: employeeAnd };
   }
 
-  const accessProfile = await getAccessProfile(session.user.id, (session.user.roles as string[]) ?? []);
+  // Skip expensive hierarchy/profile queries for SUPER_ADMIN (no scope restrictions)
+  const roles = (session.user.roles as string[]) ?? [];
+  const accessProfile = roles.includes("SUPER_ADMIN")
+    ? { isSuperAdmin: true, isHrManager: false, userId: session.user.id, roles, employee: null, store: {} as any }
+    : await getAccessProfile(session.user.id, roles);
   const where = await applyScopedWhere(resource.key, baseWhere, accessProfile);
 
   // Special handling for employees: optimized with select + cache + performance
