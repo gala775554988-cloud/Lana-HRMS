@@ -39,7 +39,6 @@ export const ODOO_MAPPERS: Record<string, MapperDefinition> = {
       "passport_id",
       "permit_no",
       "visa_no",
-      "sponsor",
       "visa_expire",
       "departure_date",
       "departure_description",
