@@ -3,7 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations/auth";
-import { verifyPassword } from "@/lib/password";
+import { verifyPassword, hashPassword } from "@/lib/password";
 
 async function getAuthorization(userId: string) {
   const assignments = await prisma.userRole.findMany({
@@ -21,12 +21,40 @@ async function findUser(identifier: string) {
   const user = await prisma.user.findFirst({
     where: { OR: [{ username: value }, { username: lower }, { email: lower }, { email: { startsWith: `${lower}@` } }] },
   });
-  if (user) return user;
+  if (user) return { user, employee: null };
+
   const emp = await prisma.employee.findFirst({
     where: { OR: [{ nationalId: value }, { employeeNumber: value }] },
     include: { user: true },
   });
-  return emp?.user ?? null;
+  return emp?.user ? { user: emp.user, employee: emp } : { user: null, employee: emp };
+}
+
+async function ensureEmployeeAccount(emp: any) {
+  const nationalId = emp.nationalId || `EMP-${emp.employeeNumber}`;
+  const last4 = nationalId.slice(-4).padStart(4, "0");
+  const pwHash = await hashPassword(last4);
+  const fullName = `${emp.firstName} ${emp.lastName}`.trim();
+  const email = emp.email || `emp.${emp.employeeNumber}@lana.local`;
+
+  if (emp.userId) {
+    await prisma.user.update({
+      where: { id: emp.userId },
+      data: { name: fullName, email, passwordHash: pwHash, isActive: true, emailVerified: new Date(), mustChangePassword: true, passwordChanged: false },
+    });
+    return prisma.user.findUnique({ where: { id: emp.userId } });
+  }
+
+  const user = await prisma.user.create({
+    data: { name: fullName, email, passwordHash: pwHash, isActive: true, emailVerified: new Date(), mustChangePassword: true, passwordChanged: false },
+  });
+
+  await prisma.employee.update({ where: { id: emp.id }, data: { userId: user.id } });
+
+  const employeeRole = await prisma.role.upsert({ where: { name: "EMPLOYEE" }, update: {}, create: { name: "EMPLOYEE", description: "Employee", isSystem: true } });
+  await prisma.userRole.upsert({ where: { userId_roleId: { userId: user.id, roleId: employeeRole.id } }, update: {}, create: { userId: user.id, roleId: employeeRole.id } });
+
+  return user;
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -45,13 +73,29 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         const parsed = loginSchema.safeParse(credentials);
         if (!parsed.success) return null;
-        const user = await findUser(parsed.data.identifier);
+
+        const { user, employee } = await findUser(parsed.data.identifier);
+
+        // EMPLOYEE PATH: found via nationalId/employeeNumber but no user account yet → auto-create
+        if (!user?.passwordHash && employee) {
+          const createdUser = await ensureEmployeeAccount(employee);
+          if (!createdUser) return null;
+          const { roles } = await getAuthorization(createdUser.id);
+          return {
+            id: createdUser.id, name: createdUser.name, email: createdUser.email, image: createdUser.image,
+            roles,
+            mustChangePassword: createdUser.mustChangePassword ?? false,
+            passwordChanged: createdUser.passwordChanged ?? false,
+          };
+        }
+
+        // NORMAL PATH: existing user with password
         if (!user?.passwordHash || !user.isActive) return null;
         const ok = await verifyPassword(parsed.data.password, user.passwordHash);
         if (!ok) return null;
         await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }).catch(() => {});
+
         const { roles } = await getAuthorization(user.id);
-        // Only store roles in JWT, not permissions (too large → cookie chunking → middleware break)
         return {
           id: user.id, name: user.name, email: user.email, image: user.image,
           roles,
@@ -88,7 +132,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         (session.user as any).roles = token.roles ?? [];
         (session.user as any).mustChangePassword = (token as any).mustChangePassword ?? false;
         (session.user as any).passwordChanged = (token as any).passwordChanged ?? false;
-        // SUPER_ADMIN gets wildcard permission
         const roles: string[] = token.roles ?? [];
         (session.user as any).permissions = roles.includes("SUPER_ADMIN") ? ["*:*"] : [];
       }
