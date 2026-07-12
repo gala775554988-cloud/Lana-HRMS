@@ -1,10 +1,9 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, Loader2, LockKeyhole, UserRound } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { signIn } from "next-auth/react";
 import { loginSchema, type LoginInput } from "@/lib/validations/auth";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -17,6 +16,7 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [csrfToken, setCsrfToken] = useState("");
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     defaultValues: { identifier: "", password: "" }
@@ -25,32 +25,39 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
   useEffect(() => {
     const id = window.localStorage.getItem("lana.hrms.rememberedIdentifier");
     if (id) { form.setValue("identifier", id); setRememberMe(true); }
+
+    fetch("/api/auth/csrf")
+      .then(r => r.json())
+      .then(d => setCsrfToken(d.csrfToken))
+      .catch(() => {});
   }, [form]);
 
-  async function onSubmit(values: LoginInput) {
+  function onSubmit(values: LoginInput) {
     setMessage(null);
     setLoading(true);
     if (rememberMe) window.localStorage.setItem("lana.hrms.rememberedIdentifier", values.identifier);
     else window.localStorage.removeItem("lana.hrms.rememberedIdentifier");
 
-    try {
-      const result = await signIn("credentials", {
-        identifier: values.identifier,
-        password: values.password,
-        redirect: false,
-      });
+    // Native HTML form POST — browser handles Set-Cookie + redirect natively
+    const formEl = document.createElement("form");
+    formEl.method = "POST";
+    formEl.action = "/api/auth/callback/credentials";
 
-      if (!result?.ok) {
-        setMessage("Invalid username, national ID, password, or account status.");
-        setLoading(false);
-        return;
-      }
+    const csrf = document.createElement("input");
+    csrf.type = "hidden"; csrf.name = "csrfToken"; csrf.value = csrfToken;
+    const cb = document.createElement("input");
+    cb.type = "hidden"; cb.name = "callbackUrl"; cb.value = "/";
+    const idF = document.createElement("input");
+    idF.type = "hidden"; idF.name = "identifier"; idF.value = values.identifier;
+    const pwF = document.createElement("input");
+    pwF.type = "hidden"; pwF.name = "password"; pwF.value = values.password;
 
-      window.location.href = "/";
-    } catch {
-      setMessage("An unexpected error occurred. Please try again.");
-      setLoading(false);
-    }
+    formEl.appendChild(csrf);
+    formEl.appendChild(cb);
+    formEl.appendChild(idF);
+    formEl.appendChild(pwF);
+    document.body.appendChild(formEl);
+    formEl.submit();
   }
 
   return (
@@ -63,10 +70,8 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
       <div className="space-y-2">
         <Label htmlFor="identifier" className="font-bold text-slate-800 dark:text-slate-200">اسم المستخدم</Label>
         <div className="relative">
-          <UserRound className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground rtl:left-auto rtl:right-3" aria-hidden="true" />
-          <Input id="identifier" type="text" autoComplete="username" className="h-11 pl-9 rtl:pl-3 rtl:pr-9 text-base" placeholder="أدخل اسم المستخدم" aria-invalid={Boolean(form.formState.errors.identifier)} {...form.register("identifier")} />
+          <Input id="identifier" type="text" autoComplete="username" className="h-11 pl-9 rtl:pl-3 rtl:pr-9 text-base" placeholder="أدخل اسم المستخدم" {...form.register("identifier")} />
         </div>
-        {form.formState.errors.identifier ? <p className="text-sm text-destructive font-semibold" role="alert">{form.formState.errors.identifier.message}</p> : null}
       </div>
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-4">
@@ -74,23 +79,21 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
           <span className="text-xs text-muted-foreground">إذا نسيت كلمة المرور يرجى مراجعة إدارة الموارد البشرية</span>
         </div>
         <div className="relative">
-          <LockKeyhole className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground rtl:left-auto rtl:right-3" aria-hidden="true" />
-          <Input id="password" type={showPassword ? "text" : "password"} autoComplete="current-password" className="h-11 px-9 text-base" placeholder={dictionary.auth.passwordPlaceholder} aria-invalid={Boolean(form.formState.errors.password)} {...form.register("password")} />
-          <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-3 top-3 rounded p-1 text-muted-foreground hover:text-foreground rtl:left-3 rtl:right-auto" aria-label={showPassword ? "Hide password" : "Show password"}>
-            {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+          <Input id="password" type={showPassword ? "text" : "password"} autoComplete="current-password" className="h-11 px-9 text-base" placeholder={dictionary.auth.passwordPlaceholder} {...form.register("password")} />
+          <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-3 top-3 rounded p-1 text-muted-foreground hover:text-foreground">
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
-        {form.formState.errors.password ? <p className="text-sm text-destructive font-semibold" role="alert">{form.formState.errors.password.message}</p> : null}
       </div>
       <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border bg-slate-50/80 p-3.5 text-sm dark:bg-slate-900/50">
         <span>
           <span className="block font-bold text-slate-800 dark:text-slate-200">{dictionary.auth.rememberTitle}</span>
           <span className="block text-xs text-muted-foreground">{dictionary.auth.rememberDescription}</span>
         </span>
-        <input type="checkbox" checked={rememberMe} onChange={(event) => setRememberMe(event.target.checked)} className="h-4 w-4 rounded border-input text-primary" />
+        <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} className="h-4 w-4 rounded border-input text-primary" />
       </label>
       <Button className="h-12 w-full text-base font-bold shadow-lg shadow-indigo-600/20 rounded-xl" type="submit" disabled={loading}>
-        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
         {dictionary.auth.submit}
       </Button>
     </form>
