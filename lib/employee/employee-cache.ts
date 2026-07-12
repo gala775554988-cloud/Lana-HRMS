@@ -16,6 +16,7 @@ export const getCurrentEmployeeCached = cache(async () => {
       employeeNumber: true,
       nationalId: true,
       profilePhotoUrl: true,
+      sponsor: true,
       status: true,
       department: { select: { name: true } },
       position: { select: { title: true } },

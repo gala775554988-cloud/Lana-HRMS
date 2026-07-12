@@ -22,6 +22,7 @@ interface Props {
     nationalId: string;
     profilePhotoUrl?: string | null;
     phone?: string | null;
+    sponsor?: string | null;
     department?: { name: string } | null;
     position?: { title: string } | null;
   } | null;
@@ -115,6 +116,7 @@ export function EmployeeSelfService({ employee, salaryInfo, userName }: Props) {
               <div><span className="text-muted-foreground">الاسم:</span> {fullName}</div>
               <div><span className="text-muted-foreground">رقم الموظف:</span> {employee.employeeNumber}</div>
               <div><span className="text-muted-foreground">الهوية الوطنية:</span> {employee.nationalId}</div>
+              {employee.sponsor && <div><span className="text-muted-foreground">الكفيل:</span> {employee.sponsor}</div>}
               <div><span className="text-muted-foreground">الإدارة:</span> {employee.department?.name || '—'}</div>
               <div><span className="text-muted-foreground">المنصب:</span> {employee.position?.title || '—'}</div>
               {employee.phone && <div><span className="text-muted-foreground">الهاتف:</span> {employee.phone}</div>}
