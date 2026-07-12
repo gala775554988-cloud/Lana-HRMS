@@ -71,37 +71,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
+        try {
         const parsed = loginSchema.safeParse(credentials);
         if (!parsed.success) return null;
 
         const { user, employee } = await findUser(parsed.data.identifier);
 
-        // EMPLOYEE PATH: found via nationalId/employeeNumber but no user account yet → auto-create
         if (!user?.passwordHash && employee) {
           const createdUser = await ensureEmployeeAccount(employee);
           if (!createdUser) return null;
           const { roles } = await getAuthorization(createdUser.id);
-          return {
-            id: createdUser.id, name: createdUser.name, email: createdUser.email, image: createdUser.image,
-            roles,
-            mustChangePassword: createdUser.mustChangePassword ?? false,
-            passwordChanged: createdUser.passwordChanged ?? false,
-          };
+          return { id: createdUser.id, name: createdUser.name, email: createdUser.email, image: createdUser.image, roles, mustChangePassword: true, passwordChanged: false };
         }
 
-        // NORMAL PATH: existing user with password
         if (!user?.passwordHash || !user.isActive) return null;
         const ok = await verifyPassword(parsed.data.password, user.passwordHash);
         if (!ok) return null;
         await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }).catch(() => {});
-
         const { roles } = await getAuthorization(user.id);
-        return {
-          id: user.id, name: user.name, email: user.email, image: user.image,
-          roles,
-          mustChangePassword: user.mustChangePassword ?? false,
-          passwordChanged: user.passwordChanged ?? false,
-        };
+        return { id: user.id, name: user.name, email: user.email, image: user.image, roles, mustChangePassword: user.mustChangePassword ?? false, passwordChanged: user.passwordChanged ?? false };
+        } catch(e) { console.error('[AUTH_ERROR]', e?.message||e); return null; }
       },
     }),
   ],
