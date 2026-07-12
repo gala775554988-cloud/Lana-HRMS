@@ -3082,3 +3082,49 @@ model EmployeeComplaint {
   @@index([priority])
   @@index([createdAt])
 }
+
+// ═══════════════════════════════════════════════════════════
+// HR ENTERPRISE PERMISSION SYSTEM (new tables only)
+// ═══════════════════════════════════════════════════════════
+
+model HrPermissionScope {
+  id        String   @id @default(cuid())
+  userId    String
+  module    String   // employees, attendance, payroll, leaves, etc
+  scope     String   @default("ALL") // ALL, BRANCH, DEPARTMENT, TEAM, SELF
+  branchId  String?
+  departmentId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, module])
+  @@index([userId])
+  @@index([module])
+}
+
+model HrApprovalChain {
+  id        String   @id @default(cuid())
+  module    String   // leave, overtime, loan, expense, etc
+  level     Int      @default(1)
+  approverRole String @default("DIRECT_MANAGER") // DIRECT_MANAGER, DEPARTMENT_MANAGER, BRANCH_MANAGER, HR_MANAGER, SUPER_ADMIN
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([module, level])
+  @@index([module])
+}
+
+model HrPermissionAudit {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  module    String?
+  oldValue  String?
+  newValue  String?
+  byUserId  String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
