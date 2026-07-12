@@ -39,6 +39,7 @@ export const ODOO_MAPPERS: Record<string, MapperDefinition> = {
       "passport_id",
       "permit_no",
       "visa_no",
+      "sponsor",
       "visa_expire",
       "departure_date",
       "departure_description",
@@ -60,7 +61,8 @@ export const ODOO_MAPPERS: Record<string, MapperDefinition> = {
       branchId: "company_id",
       emergencyContact: "emergency_contact",
       terminationDate: "departure_date",
-      address: "address_home_id"
+      address: "address_home_id",
+      sponsor: "sponsor"
     }
   },
   departments: {
@@ -202,6 +204,7 @@ export function mapLanaEmployeeToOdoo(employee: any): OdooWriteValues {
     active: employee.status ? employee.status !== "TERMINATED" && employee.status !== "INACTIVE" : undefined,
     birthday: asDateString(employee.dateOfBirth, true),
     emergency_contact: employee.emergencyContact,
+    sponsor: employee.sponsor,
     // Relations are resolved in sync service via IDs, not here
     // department_id, job_id, company_id handled externally
     image_1920: image1920
@@ -249,6 +252,7 @@ export function mapOdooEmployeeToLana(record: OdooRecord): Record<string, unknow
     emergencyContact,
     profilePhotoUrl,
     address: undefined,
+    sponsor: textValue(record.sponsor),
     status: record.active === false ? "INACTIVE" : "ACTIVE",
     lastActiveDate,
     lastActiveSource: record.active === false ? "ODOO_DEPARTURE" : "ODOO_WRITE_DATE",

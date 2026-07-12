@@ -344,6 +344,8 @@ model Employee {
   branchId               String?
   employmentTypeId       String?
   nationalityId          String?
+  // Odoo sync fields
+  sponsor                String? // كفيل / Sponsor name synced from Odoo
   // Archived employees & last active date
   managerId              String?
   lastActiveDate         DateTime?

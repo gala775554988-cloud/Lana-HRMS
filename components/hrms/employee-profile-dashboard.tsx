@@ -245,6 +245,7 @@ export function EmployeeProfileDashboard({
               { label: "الاسم انجليزي", value: `${employee.firstName} ${employee.lastName}` },
               { label: "رقم الهوية", value: employee.nationalId },
               { label: "الجنسية", value: (employee as any).nationality?.name || "-" },
+              { label: "الكفيل", value: (employee as any).sponsor || "-" },
               { label: "الجنس", value: employee.gender || "-" },
               { label: "الحالة الاجتماعية", value: "-" },
               { label: "تاريخ الميلاد", value: employee.dateOfBirth ? new Date(employee.dateOfBirth).toLocaleDateString() : "-" },
