@@ -1,20 +1,32 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyPassword } from "@/lib/password";
+import { verifyPassword, hashPassword } from "@/lib/password";
 
 export async function GET() {
   try {
-    const user = await prisma.user.findFirst({ where: { username: "admin" } });
-    if (!user) return NextResponse.json({ error: "Admin not found" });
-    const hash = user.passwordHash || "";
-    const ok = await verifyPassword("Admin@123456", hash);
+    // Test 1: find admin
+    const users = await prisma.user.findMany({
+      where: { OR: [{ username: "admin" }, { email: "admin@lana.local" }] },
+      select: { id: true, username: true, email: true, isActive: true, name: true }
+    });
+    
+    // Test 2: verify password
+    const user = users[0];
+    let pwOk = false;
+    let hashPreview = "";
+    if (user?.id) {
+      const full = await prisma.user.findUnique({ where: { id: user.id }, select: { passwordHash: true } });
+      hashPreview = (full?.passwordHash || "").substring(0, 20) + "...";
+      pwOk = await verifyPassword("Admin@123456", full?.passwordHash || "");
+    }
+    
     return NextResponse.json({
-      found: true, id: user.id, name: user.name,
-      isActive: user.isActive, hasHash: !!user.passwordHash,
-      hashStart: hash.substring(0, 15) + "...",
-      passwordOk: ok,
+      userCount: users.length,
+      users: users.map(u => ({ id: u.id, username: u.username, email: u.email, isActive: u.isActive, name: u.name })),
+      hashPreview,
+      passwordOk: pwOk,
     });
   } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    return NextResponse.json({ error: e.message, stack: e.stack }, { status: 500 });
   }
 }
