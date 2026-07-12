@@ -27,15 +27,13 @@ export async function loginAction(input: unknown): Promise<ActionState> {
     await signIn("credentials", {
       identifier: parsed.data.identifier,
       password: parsed.data.password,
-      redirectTo: "/",
+      redirect: false,
     });
+    return { success: true, message: "" };
   } catch (error) {
-    if (isRedirectError(error)) throw error;
     if (error instanceof AuthError) return { success: false, message: BAD_CREDENTIALS };
     throw error;
   }
-
-  return { success: true, message: "" };
 }
 
 export async function logoutAction() {

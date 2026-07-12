@@ -30,7 +30,11 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
     else window.localStorage.removeItem("lana.hrms.rememberedIdentifier");
     startTransition(async () => {
       const result = await loginAction(values);
-      if (!result.success) setMessage(result.message);
+      if (result.success) {
+        window.location.href = "/";
+      } else {
+        setMessage(result.message);
+      }
     });
   }
 
