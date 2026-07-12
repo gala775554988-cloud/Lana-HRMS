@@ -1,4 +1,4 @@
-'use server';
+"use server";
 
 import { AuthError } from "next-auth";
 import { signIn, signOut } from "@/auth";
@@ -9,7 +9,7 @@ import {
   emailVerificationSchema,
   forgotPasswordSchema,
   loginSchema,
-  resetPasswordSchema
+  resetPasswordSchema,
 } from "@/lib/validations/auth";
 
 type ActionState = {
@@ -17,8 +17,7 @@ type ActionState = {
   message: string;
 };
 
-const genericResetMessage =
-  "If the account exists, HR administrators can issue a secure password reset token.";
+// ── Login ──
 
 export async function loginAction(input: unknown): Promise<ActionState> {
   const parsed = loginSchema.safeParse(input);
@@ -26,7 +25,7 @@ export async function loginAction(input: unknown): Promise<ActionState> {
   if (!parsed.success) {
     return {
       success: false,
-      message: parsed.error.errors[0]?.message ?? "Invalid login."
+      message: parsed.error.errors[0]?.message ?? "Invalid login.",
     };
   }
 
@@ -34,52 +33,66 @@ export async function loginAction(input: unknown): Promise<ActionState> {
     await signIn("credentials", {
       identifier: parsed.data.identifier,
       password: parsed.data.password,
-      redirectTo: "/"
+      redirect: false,
     });
 
-    return {
-      success: true,
-      message: ""
-    };
+    // If we get here, sign-in succeeded without throwing.
+    // Auth.js has already set the session cookie on the response.
+    // The caller (login form) is responsible for navigating to the dashboard.
+    return { success: true, message: "" };
   } catch (error) {
     if (error instanceof AuthError) {
       return {
         success: false,
-        message: "Invalid username, national ID, password, or account status."
+        message:
+          "Invalid username, national ID, password, or account status.",
       };
     }
-
+    // Re-throw redirect errors so Next.js handles them
     throw error;
   }
 }
+
+// ── Logout ──
 
 export async function logoutAction() {
   await signOut({ redirectTo: "/login" });
 }
 
-export async function forgotPasswordAction(input: unknown): Promise<ActionState> {
+// ── Forgot password ──
+
+const genericResetMessage =
+  "If the account exists, HR administrators can issue a secure password reset token.";
+
+export async function forgotPasswordAction(
+  input: unknown,
+): Promise<ActionState> {
   const parsed = forgotPasswordSchema.safeParse(input);
 
   if (!parsed.success) {
     return {
       success: false,
-      message: parsed.error.errors[0]?.message ?? "Invalid account identifier."
+      message:
+        parsed.error.errors[0]?.message ?? "Invalid account identifier.",
     };
   }
 
-  return {
-    success: true,
-    message: genericResetMessage
-  };
+  return { success: true, message: genericResetMessage };
 }
 
-export async function resetPasswordAction(input: unknown): Promise<ActionState> {
+// ── Reset password ──
+
+export async function resetPasswordAction(
+  input: unknown,
+): Promise<ActionState> {
   const parsed = resetPasswordSchema.safeParse(input);
 
   if (!parsed.success) {
     return {
       success: false,
-      message: parsed.error.errors[0]?.message ?? "Invalid password reset request."
+      message:
+        parsed.error.errors[0]?.message ??
+        "Invalid password reset request.",
     };
   }
 
@@ -87,49 +100,51 @@ export async function resetPasswordAction(input: unknown): Promise<ActionState> 
 
   const resetToken = await prisma.passwordResetToken.findUnique({
     where: { tokenHash },
-    include: { user: true }
+    include: { user: true },
   });
 
   if (!resetToken || resetToken.usedAt || resetToken.expiresAt < new Date()) {
     return {
       success: false,
-      message: "Password reset link is invalid or expired."
+      message: "Password reset link is invalid or expired.",
     };
   }
 
   await prisma.$transaction([
     prisma.user.update({
       where: { id: resetToken.userId },
-      data: {
-        passwordHash: await hashPassword(parsed.data.password)
-      }
+      data: { passwordHash: await hashPassword(parsed.data.password) },
     }),
     prisma.passwordResetToken.update({
       where: { id: resetToken.id },
-      data: { usedAt: new Date() }
-    })
+      data: { usedAt: new Date() },
+    }),
   ]);
 
   return {
     success: true,
-    message: "Password has been reset. You can sign in now."
+    message: "Password has been reset. You can sign in now.",
   };
 }
 
-export async function verifyEmailAction(input: unknown): Promise<ActionState> {
+// ── Verify email ──
+
+export async function verifyEmailAction(
+  input: unknown,
+): Promise<ActionState> {
   const parsed = emailVerificationSchema.safeParse(input);
 
   if (!parsed.success) {
     return {
       success: false,
-      message: parsed.error.errors[0]?.message ?? "Invalid verification request."
+      message:
+        parsed.error.errors[0]?.message ??
+        "Invalid verification request.",
     };
   }
 
   const verificationToken = await prisma.emailVerificationToken.findUnique({
-    where: {
-      tokenHash: hashToken(parsed.data.token)
-    }
+    where: { tokenHash: hashToken(parsed.data.token) },
   });
 
   if (
@@ -139,27 +154,23 @@ export async function verifyEmailAction(input: unknown): Promise<ActionState> {
   ) {
     return {
       success: false,
-      message: "Verification link is invalid or expired."
+      message: "Verification link is invalid or expired.",
     };
   }
 
   await prisma.$transaction([
     prisma.user.update({
       where: { id: verificationToken.userId },
-      data: {
-        emailVerified: new Date()
-      }
+      data: { emailVerified: new Date() },
     }),
     prisma.emailVerificationToken.update({
       where: { id: verificationToken.id },
-      data: {
-        usedAt: new Date()
-      }
-    })
+      data: { usedAt: new Date() },
+    }),
   ]);
 
   return {
     success: true,
-    message: "Account verified. You can sign in now."
+    message: "Account verified. You can sign in now.",
   };
 }

@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff, Loader2, LockKeyhole, UserRound } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
+import { useRouter } from "next/navigation";
 import { loginAction } from "@/lib/auth/actions";
 import { loginSchema, type LoginInput } from "@/lib/validations/auth";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -18,6 +19,7 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     defaultValues: { identifier: "", password: "" }
@@ -41,7 +43,11 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
 
     startTransition(async () => {
       const result = await loginAction(values);
-      if (!result.success) setMessage(result.message);
+      if (result.success) {
+        router.push("/");
+      } else {
+        setMessage(result.message);
+      }
     });
   }
 
