@@ -42,8 +42,8 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
     <form className="space-y-5" onSubmit={form.handleSubmit(onSubmit)} noValidate>
       {message ? (<Alert variant="destructive"><AlertDescription>{message}</AlertDescription></Alert>) : null}
       <div className="space-y-2">
-        <Label htmlFor="identifier" className="font-bold text-slate-800 dark:text-slate-200">اسم المستخدم</Label>
-        <Input id="identifier" type="text" autoComplete="username" className="h-11 pl-9 rtl:pl-3 rtl:pr-9 text-base" placeholder="أدخل اسم المستخدم" {...form.register("identifier")} />
+        <Label htmlFor="identifier" className="font-bold text-slate-800 dark:text-slate-200">اسم المستخدم أو رقم الهوية</Label>
+        <p className="text-xs text-muted-foreground -mt-1">للموظفين: استخدم رقم الهوية وكلمة المرور (آخر 4 أرقام من الهوية)</p>
       </div>
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-4">
