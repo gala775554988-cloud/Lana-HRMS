@@ -8,7 +8,6 @@ const AUTH_SECRET =
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  // Skip excluded paths
   if (/^\/(?:api|_next\/static|_next\/image|favicon\.ico|manifest\.webmanifest)/.test(pathname)) {
     return NextResponse.next();
   }
@@ -16,8 +15,8 @@ export async function middleware(request: NextRequest) {
   const token = await getToken({
     req: request,
     secret: AUTH_SECRET,
-    salt: "authjs.session-token",
-    secureCookie: process.env.NODE_ENV === "production",
+    secureCookie: true,
+    cookieName: "__Secure-authjs.session-token",
   });
 
   const loggedIn = !!token;
