@@ -3,20 +3,23 @@ import { getToken } from "@auth/core/jwt";
 import { resolveRoleDashboard } from "@/config/auth";
 
 const AUTH_SECRET =
-  process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
-
-const MATCHER_EXCLUDES =
-  /^\/(?:api|_next\/static|_next\/image|favicon\.ico|manifest\.webmanifest)/;
+  process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? "";
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  // Skip excluded paths entirely
-  if (MATCHER_EXCLUDES.test(pathname)) {
+  // Skip excluded paths
+  if (/^\/(?:api|_next\/static|_next\/image|favicon\.ico|manifest\.webmanifest)/.test(pathname)) {
     return NextResponse.next();
   }
 
-  const token = await getToken({ req: request, secret: AUTH_SECRET });
+  const token = await getToken({
+    req: request,
+    secret: AUTH_SECRET,
+    salt: "authjs.session-token",
+    secureCookie: process.env.NODE_ENV === "production",
+  });
+
   const loggedIn = !!token;
   const roles: string[] = (token?.roles as string[]) ?? [];
 
@@ -26,13 +29,10 @@ export async function middleware(request: NextRequest) {
     || pathname.startsWith("/verify-email")
     || pathname === "/";
 
-  // ── Logged in → redirect away from auth pages ──
   if (loggedIn && isAuthPage) {
-    const target = resolveRoleDashboard(roles);
-    return NextResponse.redirect(new URL(target, request.url));
+    return NextResponse.redirect(new URL(resolveRoleDashboard(roles), request.url));
   }
 
-  // ── Not logged in + protected route → /login ──
   if (!loggedIn && !isAuthPage) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
