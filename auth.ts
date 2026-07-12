@@ -17,10 +17,12 @@ async function getAuthorization(userId: string) {
 async function findUser(identifier: string) {
   const value = identifier.trim();
   const lower = value.toLowerCase();
-  const user = await prisma.user.findFirst({
-    where: { OR: [{ username: value }, { username: lower }, { email: lower }, { email: { startsWith: `${lower}@` } }] },
+  // findMany + active+hash filter — fixes duplicate-user bug (admin@example.com vs admin@lana.local)
+  const users = await prisma.user.findMany({
+    where: { OR: [{ username: value }, { username: lower }, { email: lower }, { email: { startsWith: `${lower}@` } }], passwordHash: { not: null }, isActive: true },
+    orderBy: { createdAt: "asc" },
   });
-  if (user) return user;
+  if (users.length > 0) return users[0];
   const emp = await prisma.employee.findFirst({
     where: { OR: [{ nationalId: value }, { employeeNumber: value }] },
     include: { user: true },
