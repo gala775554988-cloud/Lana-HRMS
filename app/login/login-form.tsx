@@ -1,11 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff, Loader2, LockKeyhole, UserRound } from "lucide-react";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { loginAction } from "@/lib/auth/actions";
+import { signIn } from "next-auth/react";
 import { loginSchema, type LoginInput } from "@/lib/validations/auth";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -17,36 +16,41 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
   const [message, setMessage] = useState<string | null>(null);
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [isPending, startTransition] = useTransition();
+  const [loading, setLoading] = useState(false);
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     defaultValues: { identifier: "", password: "" }
   });
 
-  const identifierLabel = "اسم المستخدم";
-  const identifierPlaceholder = "أدخل اسم المستخدم";
-
   useEffect(() => {
-    const rememberedIdentifier = window.localStorage.getItem("lana.hrms.rememberedIdentifier");
-    if (rememberedIdentifier) {
-      form.setValue("identifier", rememberedIdentifier);
-      setRememberMe(true);
-    }
+    const id = window.localStorage.getItem("lana.hrms.rememberedIdentifier");
+    if (id) { form.setValue("identifier", id); setRememberMe(true); }
   }, [form]);
 
-  function onSubmit(values: LoginInput) {
+  async function onSubmit(values: LoginInput) {
     setMessage(null);
+    setLoading(true);
     if (rememberMe) window.localStorage.setItem("lana.hrms.rememberedIdentifier", values.identifier);
     else window.localStorage.removeItem("lana.hrms.rememberedIdentifier");
 
-    startTransition(async () => {
-      const result = await loginAction(values);
-      if (result.success) {
-        window.location.href = "/";
-      } else {
-        setMessage(result.message);
+    try {
+      const result = await signIn("credentials", {
+        identifier: values.identifier,
+        password: values.password,
+        redirect: false,
+      });
+
+      if (!result?.ok) {
+        setMessage("Invalid username, national ID, password, or account status.");
+        setLoading(false);
+        return;
       }
-    });
+
+      window.location.href = "/";
+    } catch {
+      setMessage("An unexpected error occurred. Please try again.");
+      setLoading(false);
+    }
   }
 
   return (
@@ -57,18 +61,10 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
         </Alert>
       ) : null}
       <div className="space-y-2">
-        <Label htmlFor="identifier" className="font-bold text-slate-800 dark:text-slate-200">{identifierLabel}</Label>
+        <Label htmlFor="identifier" className="font-bold text-slate-800 dark:text-slate-200">اسم المستخدم</Label>
         <div className="relative">
           <UserRound className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground rtl:left-auto rtl:right-3" aria-hidden="true" />
-          <Input 
-            id="identifier" 
-            type="text" 
-            autoComplete="username" 
-            className="h-11 pl-9 rtl:pl-3 rtl:pr-9 text-base" 
-            placeholder={identifierPlaceholder} 
-            aria-invalid={Boolean(form.formState.errors.identifier)} 
-            {...form.register("identifier")} 
-          />
+          <Input id="identifier" type="text" autoComplete="username" className="h-11 pl-9 rtl:pl-3 rtl:pr-9 text-base" placeholder="أدخل اسم المستخدم" aria-invalid={Boolean(form.formState.errors.identifier)} {...form.register("identifier")} />
         </div>
         {form.formState.errors.identifier ? <p className="text-sm text-destructive font-semibold" role="alert">{form.formState.errors.identifier.message}</p> : null}
       </div>
@@ -93,8 +89,8 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
         </span>
         <input type="checkbox" checked={rememberMe} onChange={(event) => setRememberMe(event.target.checked)} className="h-4 w-4 rounded border-input text-primary" />
       </label>
-      <Button className="h-12 w-full text-base font-bold shadow-lg shadow-indigo-600/20 rounded-xl" type="submit" disabled={isPending}>
-        {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+      <Button className="h-12 w-full text-base font-bold shadow-lg shadow-indigo-600/20 rounded-xl" type="submit" disabled={loading}>
+        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" /> : null}
         {dictionary.auth.submit}
       </Button>
     </form>
