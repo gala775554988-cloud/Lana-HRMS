@@ -1,6 +1,7 @@
 "use server";
 
 import { AuthError } from "next-auth";
+import { isRedirectError } from "next/dist/client/components/redirect";
 import { signIn, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
@@ -12,165 +13,81 @@ import {
   resetPasswordSchema,
 } from "@/lib/validations/auth";
 
-type ActionState = {
-  success: boolean;
-  message: string;
-};
+type ActionState = { success: boolean; message: string };
 
-// ── Login ──
+const BAD_CREDENTIALS = "Invalid username, national ID, password, or account status.";
 
 export async function loginAction(input: unknown): Promise<ActionState> {
   const parsed = loginSchema.safeParse(input);
-
   if (!parsed.success) {
-    return {
-      success: false,
-      message: parsed.error.errors[0]?.message ?? "Invalid login.",
-    };
+    return { success: false, message: parsed.error.errors[0]?.message ?? "Invalid login." };
   }
 
   try {
     await signIn("credentials", {
       identifier: parsed.data.identifier,
       password: parsed.data.password,
-      redirect: false,
+      redirectTo: "/",
     });
-
-    // If we get here, sign-in succeeded without throwing.
-    // Auth.js has already set the session cookie on the response.
-    // The caller (login form) is responsible for navigating to the dashboard.
-    return { success: true, message: "" };
   } catch (error) {
-    if (error instanceof AuthError) {
-      return {
-        success: false,
-        message:
-          "Invalid username, national ID, password, or account status.",
-      };
-    }
-    // Re-throw redirect errors so Next.js handles them
+    if (isRedirectError(error)) throw error;
+    if (error instanceof AuthError) return { success: false, message: BAD_CREDENTIALS };
     throw error;
   }
-}
 
-// ── Logout ──
+  return { success: true, message: "" };
+}
 
 export async function logoutAction() {
   await signOut({ redirectTo: "/login" });
 }
 
-// ── Forgot password ──
-
-const genericResetMessage =
-  "If the account exists, HR administrators can issue a secure password reset token.";
-
-export async function forgotPasswordAction(
-  input: unknown,
-): Promise<ActionState> {
+export async function forgotPasswordAction(input: unknown): Promise<ActionState> {
   const parsed = forgotPasswordSchema.safeParse(input);
-
   if (!parsed.success) {
-    return {
-      success: false,
-      message:
-        parsed.error.errors[0]?.message ?? "Invalid account identifier.",
-    };
+    return { success: false, message: parsed.error.errors[0]?.message ?? "Invalid account identifier." };
   }
-
-  return { success: true, message: genericResetMessage };
+  return { success: true, message: "If the account exists, HR administrators can issue a secure password reset token." };
 }
 
-// ── Reset password ──
-
-export async function resetPasswordAction(
-  input: unknown,
-): Promise<ActionState> {
+export async function resetPasswordAction(input: unknown): Promise<ActionState> {
   const parsed = resetPasswordSchema.safeParse(input);
-
   if (!parsed.success) {
-    return {
-      success: false,
-      message:
-        parsed.error.errors[0]?.message ??
-        "Invalid password reset request.",
-    };
+    return { success: false, message: parsed.error.errors[0]?.message ?? "Invalid password reset request." };
   }
 
   const tokenHash = hashToken(parsed.data.token);
-
   const resetToken = await prisma.passwordResetToken.findUnique({
-    where: { tokenHash },
-    include: { user: true },
+    where: { tokenHash }, include: { user: true },
   });
 
   if (!resetToken || resetToken.usedAt || resetToken.expiresAt < new Date()) {
-    return {
-      success: false,
-      message: "Password reset link is invalid or expired.",
-    };
+    return { success: false, message: "Password reset link is invalid or expired." };
   }
 
   await prisma.$transaction([
-    prisma.user.update({
-      where: { id: resetToken.userId },
-      data: { passwordHash: await hashPassword(parsed.data.password) },
-    }),
-    prisma.passwordResetToken.update({
-      where: { id: resetToken.id },
-      data: { usedAt: new Date() },
-    }),
+    prisma.user.update({ where: { id: resetToken.userId }, data: { passwordHash: await hashPassword(parsed.data.password) } }),
+    prisma.passwordResetToken.update({ where: { id: resetToken.id }, data: { usedAt: new Date() } }),
   ]);
 
-  return {
-    success: true,
-    message: "Password has been reset. You can sign in now.",
-  };
+  return { success: true, message: "Password has been reset. You can sign in now." };
 }
 
-// ── Verify email ──
-
-export async function verifyEmailAction(
-  input: unknown,
-): Promise<ActionState> {
+export async function verifyEmailAction(input: unknown): Promise<ActionState> {
   const parsed = emailVerificationSchema.safeParse(input);
-
   if (!parsed.success) {
-    return {
-      success: false,
-      message:
-        parsed.error.errors[0]?.message ??
-        "Invalid verification request.",
-    };
+    return { success: false, message: parsed.error.errors[0]?.message ?? "Invalid verification request." };
   }
 
-  const verificationToken = await prisma.emailVerificationToken.findUnique({
-    where: { tokenHash: hashToken(parsed.data.token) },
-  });
-
-  if (
-    !verificationToken ||
-    verificationToken.usedAt ||
-    verificationToken.expiresAt < new Date()
-  ) {
-    return {
-      success: false,
-      message: "Verification link is invalid or expired.",
-    };
+  const t = await prisma.emailVerificationToken.findUnique({ where: { tokenHash: hashToken(parsed.data.token) } });
+  if (!t || t.usedAt || t.expiresAt < new Date()) {
+    return { success: false, message: "Verification link is invalid or expired." };
   }
 
   await prisma.$transaction([
-    prisma.user.update({
-      where: { id: verificationToken.userId },
-      data: { emailVerified: new Date() },
-    }),
-    prisma.emailVerificationToken.update({
-      where: { id: verificationToken.id },
-      data: { usedAt: new Date() },
-    }),
+    prisma.user.update({ where: { id: t.userId }, data: { emailVerified: new Date() } }),
+    prisma.emailVerificationToken.update({ where: { id: t.id }, data: { usedAt: new Date() } }),
   ]);
 
-  return {
-    success: true,
-    message: "Account verified. You can sign in now.",
-  };
+  return { success: true, message: "Account verified. You can sign in now." };
 }

@@ -2,8 +2,9 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
+import { loginAction } from "@/lib/auth/actions";
 import { loginSchema, type LoginInput } from "@/lib/validations/auth";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -15,51 +16,26 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
   const [message, setMessage] = useState<string | null>(null);
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [csrfToken, setCsrfToken] = useState("");
+  const [isPending, startTransition] = useTransition();
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { identifier: "", password: "" }
+    defaultValues: { identifier: "", password: "" },
   });
 
   useEffect(() => {
     const id = window.localStorage.getItem("lana.hrms.rememberedIdentifier");
     if (id) { form.setValue("identifier", id); setRememberMe(true); }
-
-    fetch("/api/auth/csrf")
-      .then(r => r.json())
-      .then(d => setCsrfToken(d.csrfToken))
-      .catch(() => {});
   }, [form]);
 
   function onSubmit(values: LoginInput) {
     setMessage(null);
-    setLoading(true);
     if (rememberMe) window.localStorage.setItem("lana.hrms.rememberedIdentifier", values.identifier);
     else window.localStorage.removeItem("lana.hrms.rememberedIdentifier");
 
-    // Build a native HTML form and submit it.
-    // The browser handles the 302 redirect + Set-Cookie atomically.
-    // This is the only reliable way to set cookies across page navigations.
-    const formEl = document.createElement("form");
-    formEl.method = "POST";
-    formEl.action = "/api/auth/callback/credentials";
-
-    const csrf = document.createElement("input");
-    csrf.type = "hidden"; csrf.name = "csrfToken"; csrf.value = csrfToken;
-    const redirectUrl = document.createElement("input");
-    redirectUrl.type = "hidden"; redirectUrl.name = "callbackUrl"; redirectUrl.value = "/";
-    const idF = document.createElement("input");
-    idF.type = "hidden"; idF.name = "identifier"; idF.value = values.identifier;
-    const pwF = document.createElement("input");
-    pwF.type = "hidden"; pwF.name = "password"; pwF.value = values.password;
-
-    formEl.appendChild(csrf);
-    formEl.appendChild(redirectUrl);
-    formEl.appendChild(idF);
-    formEl.appendChild(pwF);
-    document.body.appendChild(formEl);
-    formEl.submit();
+    startTransition(async () => {
+      const result = await loginAction(values);
+      if (!result.success) setMessage(result.message);
+    });
   }
 
   return (
@@ -94,8 +70,8 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
         </span>
         <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} className="h-4 w-4 rounded border-input text-primary" />
       </label>
-      <Button className="h-12 w-full text-base font-bold shadow-lg shadow-indigo-600/20 rounded-xl" type="submit" disabled={loading}>
-        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+      <Button className="h-12 w-full text-base font-bold shadow-lg shadow-indigo-600/20 rounded-xl" type="submit" disabled={isPending}>
+        {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
         {dictionary.auth.submit}
       </Button>
     </form>
