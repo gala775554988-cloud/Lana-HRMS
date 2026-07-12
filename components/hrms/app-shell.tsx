@@ -43,6 +43,7 @@ const navItems = [
   { href: "/lana-ai", label: "Lana AI", icon: Sparkles, group: "admin", resource: "reports" },
   { href: "/audit-logs", label: "سجل التدقيق", icon: Shield, group: "admin", resource: "audit-logs" },
   { href: "/system-settings", label: "إعدادات النظام", icon: Settings, group: "admin", resource: "settings" },
+  { href: "/permissions-system", label: "نظام الصلاحيات", icon: Shield, group: "admin", resource: "permissions" },
 ];
 
 const groups: Record<string, string> = { people: "الأفراد 👥", ops: "العمليات ⏰", admin: "الإدارة 🔧" };
