@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, Loader2, AlertTriangle, Info } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { loginAction } from "@/lib/auth/actions";
@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Dictionary } from "@/lib/i18n";
 
-export function LoginForm({ dictionary, redirectReason }: { dictionary: Dictionary; redirectReason?: string }) {
+export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
   const [message, setMessage] = useState<string | null>(null);
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -36,24 +36,10 @@ export function LoginForm({ dictionary, redirectReason }: { dictionary: Dictiona
 
   return (
     <form className="space-y-5" onSubmit={form.handleSubmit(onSubmit)} noValidate>
-      {redirectReason && (
-        <Alert className="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription className="text-xs leading-relaxed break-all">
-            <span className="font-bold">🔍 سبب التحويل:</span> {redirectReason}
-          </AlertDescription>
-        </Alert>
-      )}
-      {message ? (
-        <Alert variant="destructive" aria-live="polite">
-          <AlertDescription>{message}</AlertDescription>
-        </Alert>
-      ) : null}
+      {message ? (<Alert variant="destructive"><AlertDescription>{message}</AlertDescription></Alert>) : null}
       <div className="space-y-2">
         <Label htmlFor="identifier" className="font-bold text-slate-800 dark:text-slate-200">اسم المستخدم</Label>
-        <div className="relative">
-          <Input id="identifier" type="text" autoComplete="username" className="h-11 pl-9 rtl:pl-3 rtl:pr-9 text-base" placeholder="أدخل اسم المستخدم" {...form.register("identifier")} />
-        </div>
+        <Input id="identifier" type="text" autoComplete="username" className="h-11 pl-9 rtl:pl-3 rtl:pr-9 text-base" placeholder="أدخل اسم المستخدم" {...form.register("identifier")} />
       </div>
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-4">
@@ -62,9 +48,7 @@ export function LoginForm({ dictionary, redirectReason }: { dictionary: Dictiona
         </div>
         <div className="relative">
           <Input id="password" type={showPassword ? "text" : "password"} autoComplete="current-password" className="h-11 px-9 text-base" placeholder={dictionary.auth.passwordPlaceholder} {...form.register("password")} />
-          <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-3 top-3 rounded p-1 text-muted-foreground hover:text-foreground">
-            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
+          <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-3 top-3 rounded p-1 text-muted-foreground hover:text-foreground">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
         </div>
       </div>
       <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border bg-slate-50/80 p-3.5 text-sm dark:bg-slate-900/50">
@@ -72,8 +56,7 @@ export function LoginForm({ dictionary, redirectReason }: { dictionary: Dictiona
         <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} className="h-4 w-4 rounded border-input text-primary" />
       </label>
       <Button className="h-12 w-full text-base font-bold shadow-lg shadow-indigo-600/20 rounded-xl" type="submit" disabled={isPending}>
-        {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-        {dictionary.auth.submit}
+        {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}{dictionary.auth.submit}
       </Button>
     </form>
   );

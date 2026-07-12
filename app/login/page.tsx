@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { Activity, Building2, CalendarCheck2, CheckCircle2, Clock3, FileText, Hospital, Smartphone, Users, WalletCards, ShieldCheck } from "lucide-react";
+import { Activity, Building2, CalendarCheck2, CheckCircle2, Clock3, FileText, Hospital, Smartphone, Users, WalletCards } from "lucide-react";
 import { getRequestDictionary } from "@/lib/i18n-server";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { ClientLanguageToggle } from "@/components/i18n/client-language-toggle";
@@ -51,17 +51,12 @@ function MarketingPanel() {
   );
 }
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ reason?: string; error?: string }> }) {
+export default async function LoginPage() {
   const { locale, dictionary } = await getRequestDictionary();
   const isAr = locale === "ar";
-  const params = await searchParams;
-  const reason = params.reason || params.error || "";
-
   const loginPanel = (
     <section className="relative flex min-h-screen items-center justify-center bg-slate-50/90 p-6 dark:bg-slate-950" dir={isAr ? "rtl" : "ltr"}>
-      <div className="absolute end-4 top-4">
-        <ClientLanguageToggle variant="outline" />
-      </div>
+      <div className="absolute end-4 top-4"><ClientLanguageToggle variant="outline" /></div>
       <div className="w-full max-w-md">
         <div className="mb-7 flex flex-col items-center text-center">
           <BrandLogo href="/" size="hero" showText={false} logoClassName="border-slate-300 shadow-2xl shadow-indigo-950/20 ring-4 ring-white/80 dark:border-slate-700 dark:ring-slate-800" imageClassName="p-2" />
@@ -69,19 +64,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <p className="mt-2 text-sm font-bold text-indigo-600 dark:text-indigo-400">البوابة الموحدة لدخول الموظفين والمسؤولين</p>
         </div>
         <div className="bg-white/95 dark:bg-slate-900/90 rounded-3xl shadow-xl border border-slate-200/80 dark:border-slate-800 p-8 backdrop-blur">
-          <Suspense>
-            <LoginForm dictionary={dictionary} redirectReason={reason} />
-          </Suspense>
+          <Suspense><LoginForm dictionary={dictionary} /></Suspense>
         </div>
       </div>
     </section>
   );
-
-  return (
-    <main className="min-h-screen bg-slate-50 dark:bg-slate-950" dir="ltr">
-      <div className="grid min-h-screen lg:grid-cols-[65fr_35fr]">
-        {isAr ? (<><MarketingPanel />{loginPanel}</>) : (<>{loginPanel}<MarketingPanel /></>)}
-      </div>
-    </main>
-  );
+  return (<main className="min-h-screen bg-slate-50 dark:bg-slate-950" dir="ltr"><div className="grid min-h-screen lg:grid-cols-[65fr_35fr]">{isAr ? (<><MarketingPanel />{loginPanel}</>) : (<>{loginPanel}<MarketingPanel /></>)}</div></main>);
 }

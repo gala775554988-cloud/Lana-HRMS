@@ -2,8 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getToken } from "@auth/core/jwt";
 import { resolveRoleDashboard } from "@/config/auth";
 
-const AUTH_SECRET =
-  process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? "";
+const AUTH_SECRET = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? "";
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -18,7 +17,6 @@ export async function middleware(request: NextRequest) {
     secureCookie: true,
     cookieName: "__Secure-authjs.session-token",
   });
-
   const loggedIn = !!token;
   const roles: string[] = (token?.roles as string[]) ?? [];
 
@@ -29,21 +27,14 @@ export async function middleware(request: NextRequest) {
     || pathname === "/";
 
   if (loggedIn && isAuthPage) {
-    const target = resolveRoleDashboard(roles);
-    const r = encodeURIComponent(`middleware.ts: loggedIn=true & isAuthPage=true → ${target} | roles:${JSON.stringify(roles)} | from:${pathname}`);
-    return NextResponse.redirect(new URL(`${target}?reason=${r}`, request.url));
+    return NextResponse.redirect(new URL(resolveRoleDashboard(roles), request.url));
   }
-
   if (!loggedIn && !isAuthPage) {
-    const r = encodeURIComponent(`middleware.ts: !loggedIn & !isAuthPage → /login | token:${!!token} | path:${pathname}`);
-    return NextResponse.redirect(new URL(`/login?reason=${r}`, request.url));
+    return NextResponse.redirect(new URL("/login", request.url));
   }
-
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|manifest.webmanifest).*)",
-  ],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|manifest.webmanifest).*)"],
 };
