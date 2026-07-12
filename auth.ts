@@ -22,39 +22,15 @@ async function findUser(identifier: string) {
     where: { OR: [{ username: value }, { username: lower }, { email: lower }, { email: { startsWith: `${lower}@` } }] },
   });
   if (user) return { user, employee: null };
-
   const emp = await prisma.employee.findFirst({
     where: { OR: [{ nationalId: value }, { employeeNumber: value }] },
-    include: { user: true },
   });
-  return emp?.user ? { user: emp.user, employee: emp } : { user: null, employee: emp };
-}
-
-async function ensureEmployeeAccount(emp: any) {
-  const nationalId = emp.nationalId || `EMP-${emp.employeeNumber}`;
-  const last4 = nationalId.slice(-4).padStart(4, "0");
-  const pwHash = await hashPassword(last4);
-  const fullName = `${emp.firstName} ${emp.lastName}`.trim();
-  const email = emp.email || `emp.${emp.employeeNumber}@lana.local`;
-
+  if (!emp) return { user: null, employee: null };
   if (emp.userId) {
-    await prisma.user.update({
-      where: { id: emp.userId },
-      data: { name: fullName, email, passwordHash: pwHash, isActive: true, emailVerified: new Date(), mustChangePassword: true, passwordChanged: false },
-    });
-    return prisma.user.findUnique({ where: { id: emp.userId } });
+    const linkedUser = await prisma.user.findUnique({ where: { id: emp.userId } });
+    return { user: linkedUser, employee: emp };
   }
-
-  const user = await prisma.user.create({
-    data: { name: fullName, email, passwordHash: pwHash, isActive: true, emailVerified: new Date(), mustChangePassword: true, passwordChanged: false },
-  });
-
-  await prisma.employee.update({ where: { id: emp.id }, data: { userId: user.id } });
-
-  const employeeRole = await prisma.role.upsert({ where: { name: "EMPLOYEE" }, update: {}, create: { name: "EMPLOYEE", description: "Employee", isSystem: true } });
-  await prisma.userRole.upsert({ where: { userId_roleId: { userId: user.id, roleId: employeeRole.id } }, update: {}, create: { userId: user.id, roleId: employeeRole.id } });
-
-  return user;
+  return { user: null, employee: emp };
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -72,25 +48,67 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       async authorize(credentials) {
         try {
-        const parsed = loginSchema.safeParse(credentials);
-        if (!parsed.success) return null;
+          const parsed = loginSchema.safeParse(credentials);
+          if (!parsed.success) return null;
 
-        const { user, employee } = await findUser(parsed.data.identifier);
+          const { user, employee } = await findUser(parsed.data.identifier);
 
-        if (!user?.passwordHash && employee) {
-          const createdUser = await ensureEmployeeAccount(employee);
-          if (!createdUser) return null;
-          const { roles } = await getAuthorization(createdUser.id);
-          return { id: createdUser.id, name: createdUser.name, email: createdUser.email, image: createdUser.image, roles, mustChangePassword: true, passwordChanged: false };
+          // Existing user with password → normal login
+          if (user?.passwordHash && user.isActive) {
+            const ok = await verifyPassword(parsed.data.password, user.passwordHash);
+            if (!ok) return null;
+            await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }).catch(() => {});
+            const { roles } = await getAuthorization(user.id);
+            return { id: user.id, name: user.name, email: user.email, image: user.image, roles, mustChangePassword: user.mustChangePassword ?? false, passwordChanged: user.passwordChanged ?? false };
+          }
+
+          // Employee found but no user → auto-create account
+          if (employee && !user?.passwordHash) {
+            const nationalId = employee.nationalId || `EMP-${employee.employeeNumber}`;
+            const expectedPassword = nationalId.slice(-4).padStart(4, "0");
+            if (parsed.data.password !== expectedPassword) return null;
+
+            const pwHash = await hashPassword(expectedPassword);
+            const fullName = `${employee.firstName} ${employee.lastName}`.trim();
+            const email = employee.email || `emp.${employee.employeeNumber}@lana.local`;
+
+            let newUser;
+            if (employee.userId) {
+              newUser = await prisma.user.upsert({
+                where: { id: employee.userId },
+                update: { name: fullName, email, passwordHash: pwHash, isActive: true, emailVerified: new Date(), mustChangePassword: true, passwordChanged: false },
+                create: { name: fullName, email, passwordHash: pwHash, isActive: true, emailVerified: new Date(), mustChangePassword: true, passwordChanged: false },
+              });
+            } else {
+              try {
+                newUser = await prisma.user.create({
+                  data: { name: fullName, email, passwordHash: pwHash, isActive: true, emailVerified: new Date(), mustChangePassword: true, passwordChanged: false },
+                });
+                await prisma.employee.update({ where: { id: employee.id }, data: { userId: newUser.id } }).catch(() => {});
+              } catch (createErr: any) {
+                if (createErr?.code === 'P2002') {
+                  newUser = await prisma.user.findUnique({ where: { email } });
+                  if (newUser) {
+                    await prisma.user.update({ where: { id: newUser.id }, data: { passwordHash: pwHash, isActive: true } });
+                    await prisma.employee.update({ where: { id: employee.id }, data: { userId: newUser.id } }).catch(() => {});
+                  }
+                } else throw createErr;
+              }
+            }
+
+            if (!newUser) return null;
+            const employeeRole = await prisma.role.upsert({ where: { name: "EMPLOYEE" }, update: {}, create: { name: "EMPLOYEE", description: "Employee", isSystem: true } });
+            await prisma.userRole.upsert({ where: { userId_roleId: { userId: newUser.id, roleId: employeeRole.id } }, update: {}, create: { userId: newUser.id, roleId: employeeRole.id } }).catch(() => {});
+
+            const { roles } = await getAuthorization(newUser.id);
+            return { id: newUser.id, name: newUser.name, email: newUser.email, image: newUser.image, roles, mustChangePassword: true, passwordChanged: false };
+          }
+
+          return null;
+        } catch (e: any) {
+          console.error("[AUTH_ERROR]", e?.message || e, e?.code);
+          return null;
         }
-
-        if (!user?.passwordHash || !user.isActive) return null;
-        const ok = await verifyPassword(parsed.data.password, user.passwordHash);
-        if (!ok) return null;
-        await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }).catch(() => {});
-        const { roles } = await getAuthorization(user.id);
-        return { id: user.id, name: user.name, email: user.email, image: user.image, roles, mustChangePassword: user.mustChangePassword ?? false, passwordChanged: user.passwordChanged ?? false };
-        } catch(e) { console.error('[AUTH_ERROR]', e?.message||e); return null; }
       },
     }),
   ],
