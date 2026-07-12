@@ -18,19 +18,58 @@ async function getAuthorization(userId: string) {
 async function findUser(identifier: string) {
   const value = identifier.trim();
   const lower = value.toLowerCase();
+  
+  // 1. Direct user lookup
   const user = await prisma.user.findFirst({
     where: { OR: [{ username: value }, { username: lower }, { email: lower }, { email: { startsWith: `${lower}@` } }] },
   });
-  if (user) return { user, employee: null };
+  if (user) return user;
+  
+  // 2. Employee lookup + auto-create user account if needed
   const emp = await prisma.employee.findFirst({
     where: { OR: [{ nationalId: value }, { employeeNumber: value }] },
   });
-  if (!emp) return { user: null, employee: null };
+  if (!emp) return null;
+  
+  // Return linked user if exists
   if (emp.userId) {
-    const linkedUser = await prisma.user.findUnique({ where: { id: emp.userId } });
-    return { user: linkedUser, employee: emp };
+    const linked = await prisma.user.findUnique({ where: { id: emp.userId } });
+    if (linked) return linked;
   }
-  return { user: null, employee: emp };
+  
+  // Auto-create user account for employee (first login)
+  const last4 = emp.nationalId.slice(-4);
+  const passwordHash = await hashPassword(last4);
+  const name = `${emp.firstName} ${emp.lastName}`.trim();
+  const email = emp.email ? emp.email.toLowerCase() : `emp.${emp.employeeNumber}@lana.local`;
+  
+  const newUser = await prisma.user.create({
+    data: {
+      username: emp.nationalId,
+      email,
+      name,
+      passwordHash,
+      emailVerified: new Date(),
+      isActive: true,
+      mustChangePassword: true,
+      passwordChanged: false,
+    },
+  });
+  
+  await prisma.employee.update({ where: { id: emp.id }, data: { userId: newUser.id } });
+  
+  const employeeRole = await prisma.role.upsert({
+    where: { name: "EMPLOYEE" },
+    update: {},
+    create: { name: "EMPLOYEE", description: "Employee", isSystem: true },
+  });
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: newUser.id, roleId: employeeRole.id } },
+    update: {},
+    create: { userId: newUser.id, roleId: employeeRole.id },
+  });
+  
+  return newUser;
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -47,68 +86,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        try {
-          const parsed = loginSchema.safeParse(credentials);
-          if (!parsed.success) return null;
-
-          const { user, employee } = await findUser(parsed.data.identifier);
-
-          // Existing user with password → normal login
-          if (user?.passwordHash && user.isActive) {
-            const ok = await verifyPassword(parsed.data.password, user.passwordHash);
-            if (!ok) return null;
-            await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }).catch(() => {});
-            const { roles } = await getAuthorization(user.id);
-            return { id: user.id, name: user.name, email: user.email, image: user.image, roles, mustChangePassword: user.mustChangePassword ?? false, passwordChanged: user.passwordChanged ?? false };
-          }
-
-          // Employee found but no user → auto-create account
-          if (employee && !user?.passwordHash) {
-            const nationalId = employee.nationalId || `EMP-${employee.employeeNumber}`;
-            const expectedPassword = nationalId.slice(-4).padStart(4, "0");
-            if (parsed.data.password !== expectedPassword) return null;
-
-            const pwHash = await hashPassword(expectedPassword);
-            const fullName = `${employee.firstName} ${employee.lastName}`.trim();
-            const email = employee.email || `emp.${employee.employeeNumber}@lana.local`;
-
-            let newUser;
-            if (employee.userId) {
-              newUser = await prisma.user.upsert({
-                where: { id: employee.userId },
-                update: { name: fullName, email, passwordHash: pwHash, isActive: true, emailVerified: new Date(), mustChangePassword: true, passwordChanged: false },
-                create: { name: fullName, email, passwordHash: pwHash, isActive: true, emailVerified: new Date(), mustChangePassword: true, passwordChanged: false },
-              });
-            } else {
-              try {
-                newUser = await prisma.user.create({
-                  data: { name: fullName, email, passwordHash: pwHash, isActive: true, emailVerified: new Date(), mustChangePassword: true, passwordChanged: false },
-                });
-                await prisma.employee.update({ where: { id: employee.id }, data: { userId: newUser.id } }).catch(() => {});
-              } catch (createErr: any) {
-                if (createErr?.code === 'P2002') {
-                  newUser = await prisma.user.findUnique({ where: { email } });
-                  if (newUser) {
-                    await prisma.user.update({ where: { id: newUser.id }, data: { passwordHash: pwHash, isActive: true } });
-                    await prisma.employee.update({ where: { id: employee.id }, data: { userId: newUser.id } }).catch(() => {});
-                  }
-                } else throw createErr;
-              }
-            }
-
-            if (!newUser) return null;
-            const employeeRole = await prisma.role.upsert({ where: { name: "EMPLOYEE" }, update: {}, create: { name: "EMPLOYEE", description: "Employee", isSystem: true } });
-            await prisma.userRole.upsert({ where: { userId_roleId: { userId: newUser.id, roleId: employeeRole.id } }, update: {}, create: { userId: newUser.id, roleId: employeeRole.id } }).catch(() => {});
-
-            const { roles } = await getAuthorization(newUser.id);
-            return { id: newUser.id, name: newUser.name, email: newUser.email, image: newUser.image, roles, mustChangePassword: true, passwordChanged: false };
-          }
-
-          return null;
-        } catch (e: any) {
-          console.error("[AUTH_ERROR]", e?.message || e, e?.code);
-          return null;
-        }
+        const parsed = loginSchema.safeParse(credentials);
+        if (!parsed.success) return null;
+        const user = await findUser(parsed.data.identifier);
+        if (!user?.passwordHash || !user.isActive) return null;
+        const ok = await verifyPassword(parsed.data.password, user.passwordHash);
+        if (!ok) return null;
+        await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }).catch(() => {});
+        const { roles } = await getAuthorization(user.id);
+        // Only store roles in JWT, not permissions (too large → cookie chunking → middleware break)
+        return {
+          id: user.id, name: user.name, email: user.email, image: user.image,
+          roles,
+          mustChangePassword: user.mustChangePassword ?? false,
+          passwordChanged: user.passwordChanged ?? false,
+        };
       },
     }),
   ],
@@ -139,6 +131,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         (session.user as any).roles = token.roles ?? [];
         (session.user as any).mustChangePassword = (token as any).mustChangePassword ?? false;
         (session.user as any).passwordChanged = (token as any).passwordChanged ?? false;
+        // SUPER_ADMIN gets wildcard permission
         const roles: string[] = token.roles ?? [];
         (session.user as any).permissions = roles.includes("SUPER_ADMIN") ? ["*:*"] : [];
       }
