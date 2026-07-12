@@ -3,7 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations/auth";
-import { verifyPassword, hashPassword } from "@/lib/password";
+import { verifyPassword } from "@/lib/password";
 
 async function getAuthorization(userId: string) {
   const assignments = await prisma.userRole.findMany({
@@ -18,58 +18,15 @@ async function getAuthorization(userId: string) {
 async function findUser(identifier: string) {
   const value = identifier.trim();
   const lower = value.toLowerCase();
-  
-  // 1. Direct user lookup
   const user = await prisma.user.findFirst({
     where: { OR: [{ username: value }, { username: lower }, { email: lower }, { email: { startsWith: `${lower}@` } }] },
   });
   if (user) return user;
-  
-  // 2. Employee lookup + auto-create user account if needed
   const emp = await prisma.employee.findFirst({
     where: { OR: [{ nationalId: value }, { employeeNumber: value }] },
+    include: { user: true },
   });
-  if (!emp) return null;
-  
-  // Return linked user if exists
-  if (emp.userId) {
-    const linked = await prisma.user.findUnique({ where: { id: emp.userId } });
-    if (linked) return linked;
-  }
-  
-  // Auto-create user account for employee (first login)
-  const last4 = emp.nationalId.slice(-4);
-  const passwordHash = await hashPassword(last4);
-  const name = `${emp.firstName} ${emp.lastName}`.trim();
-  const email = emp.email ? emp.email.toLowerCase() : `emp.${emp.employeeNumber}@lana.local`;
-  
-  const newUser = await prisma.user.create({
-    data: {
-      username: emp.nationalId,
-      email,
-      name,
-      passwordHash,
-      emailVerified: new Date(),
-      isActive: true,
-      mustChangePassword: true,
-      passwordChanged: false,
-    },
-  });
-  
-  await prisma.employee.update({ where: { id: emp.id }, data: { userId: newUser.id } });
-  
-  const employeeRole = await prisma.role.upsert({
-    where: { name: "EMPLOYEE" },
-    update: {},
-    create: { name: "EMPLOYEE", description: "Employee", isSystem: true },
-  });
-  await prisma.userRole.upsert({
-    where: { userId_roleId: { userId: newUser.id, roleId: employeeRole.id } },
-    update: {},
-    create: { userId: newUser.id, roleId: employeeRole.id },
-  });
-  
-  return newUser;
+  return emp?.user ?? null;
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
