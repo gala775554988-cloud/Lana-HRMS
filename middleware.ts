@@ -5,31 +5,26 @@ import { resolveRoleDashboard } from "@/config/auth";
 const AUTH_SECRET = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? "";
 
 export async function middleware(request: NextRequest) {
-  const pathname = request.nextUrl.pathname;
+  const p = request.nextUrl.pathname;
+  const isRoot = p === "/";
 
-  if (/^\/(?:api|_next\/static|_next\/image|favicon\.ico|manifest\.webmanifest)/.test(pathname)) {
+  // Skip getToken for public pages — no JWT verify needed
+  if (!isRoot && (p.startsWith("/login") || p.startsWith("/forgot-password") || p.startsWith("/reset-password") || p.startsWith("/verify-email"))) {
     return NextResponse.next();
   }
 
   const token = await getToken({
-    req: request,
-    secret: AUTH_SECRET,
+    req: request, secret: AUTH_SECRET,
     secureCookie: true,
     cookieName: "__Secure-authjs.session-token",
   });
   const loggedIn = !!token;
   const roles: string[] = (token?.roles as string[]) ?? [];
 
-  const isAuthPage = pathname.startsWith("/login")
-    || pathname.startsWith("/forgot-password")
-    || pathname.startsWith("/reset-password")
-    || pathname.startsWith("/verify-email")
-    || pathname === "/";
-
-  if (loggedIn && isAuthPage) {
+  if (loggedIn && (isRoot || p.startsWith("/login") || p.startsWith("/forgot-password") || p.startsWith("/reset-password") || p.startsWith("/verify-email"))) {
     return NextResponse.redirect(new URL(resolveRoleDashboard(roles), request.url));
   }
-  if (!loggedIn && !isAuthPage) {
+  if (!loggedIn) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
   return NextResponse.next();
