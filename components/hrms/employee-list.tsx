@@ -277,7 +277,7 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
             </select>
             <div className="flex rounded-lg border overflow-hidden">
               <Button variant={viewMode === "card" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("card")} className="rounded-none gap-1.5"><LayoutGrid className="h-4 w-4" />{isAr ? "بطاقات" : "Cards"}</Button>
-              <Button variant={viewMode === "table" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("table")} className="rounded-none gap-1.5"><List className="h-4 w-4" />{isAr ? "جدول" : "Table"}</Button>
+              
             </div>
             <Button asChild size="sm" variant="outline" className="gap-1.5"><a href={`/api/hr/employees/export?format=xlsx&${buildQuery({})}`}><Download className="h-4 w-4" />Excel</a></Button>
             <Button asChild size="sm" variant="outline" className="gap-1.5"><a href={`/api/hr/employees/export?format=pdf&${buildQuery({})}`}><Download className="h-4 w-4" />PDF</a></Button>
