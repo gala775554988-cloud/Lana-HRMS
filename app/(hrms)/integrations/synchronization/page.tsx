@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
 import { IntegrationShell, DataCard, SimpleTable } from "@/components/integrations/integration-shell";
 import { OdooEmployeeMasterSyncButton } from "@/components/integrations/OdooEmployeeMasterSyncButton";
+import { BioTimeAttendanceSyncButton } from "@/components/integrations/BioTimeAttendanceSyncButton";
 import { enqueueSync, syncMapping } from "@/lib/integrations/service";
 import Link from "next/link";
 
@@ -57,6 +58,7 @@ export default async function SynchronizationPage() {
     <IntegrationShell title="مزامنة Odoo 🔄" description="صفحة كاملة تحتوي حالة الاتصال، آخر مزامنة، عدد الموظفين، الإدارات، الفروع، العقود، الأخطاء، إعادة المزامنة، جدولة المزامنة، Logs - متوافقة بالكامل مع Odoo">
       
       <OdooEmployeeMasterSyncButton />
+      <BioTimeAttendanceSyncButton />
 
       {/* Connection Status & Last Sync */}
       <div className="grid gap-4 md:grid-cols-3">
