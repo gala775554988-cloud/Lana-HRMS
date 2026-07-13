@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const roles = (session.user.roles as string[]) || [];
+  if (!roles.includes("SUPER_ADMIN") && !roles.includes("HR_MANAGER")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
   const body = await request.json();
   const text = String(body.text || "");
   const entities = { emails: text.match(/[\w.-]+@[\w.-]+/g) || [], phones: text.match(/\+?\d[\d\s-]{7,}\d/g) || [], language: /[\u0600-\u06FF]/.test(text) ? "ar" : "en" };
