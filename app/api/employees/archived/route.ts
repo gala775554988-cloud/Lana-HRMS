@@ -90,56 +90,56 @@ export async function GET(request: NextRequest) {
       prisma.employee.count({ where }),
     ]);
 
-    // Calculate lastActiveDate if not present - try to get from attendance/leave
-    const enriched = await Promise.all(
-      records.map(async (emp: any) => {
-        let lastActive = emp.lastActiveDate;
-        let lastSource = emp.lastActiveSource || null;
+    // Calculate lastActiveDate if not present - try to get from attendance/leave (bulk, not per-row)
+    const missingIds = records
+      .filter((emp: any) => !emp.lastActiveDate && (emp.status === "INACTIVE" || emp.status === "TERMINATED" || emp.archivedAt))
+      .map((emp: any) => emp.id);
 
-        // If not present and employee is archived, try to calculate from activities
-        if (!lastActive && (emp.status === "INACTIVE" || emp.status === "TERMINATED" || emp.archivedAt)) {
-          try {
-            const lastAttendance = await prisma.attendanceRecord.findFirst({
-              where: { employeeId: emp.id },
-              orderBy: { workDate: "desc" },
-              select: { workDate: true },
-            });
-            const lastLeave = await prisma.leaveRequest.findFirst({
-              where: { employeeId: emp.id },
-              orderBy: { endDate: "desc" },
-              select: { endDate: true },
-            });
+    const [lastAttendanceByEmployee, lastLeaveByEmployee] = missingIds.length
+      ? await Promise.all([
+          prisma.attendanceRecord.groupBy({ by: ["employeeId"], where: { employeeId: { in: missingIds } }, _max: { workDate: true } }),
+          prisma.leaveRequest.groupBy({ by: ["employeeId"], where: { employeeId: { in: missingIds } }, _max: { endDate: true } }),
+        ])
+      : [[], []];
+    const lastAttendanceMap = new Map(lastAttendanceByEmployee.map((row) => [row.employeeId, row._max.workDate]));
+    const lastLeaveMap = new Map(lastLeaveByEmployee.map((row) => [row.employeeId, row._max.endDate]));
 
-            const dates: Date[] = [];
-            if (lastAttendance?.workDate) dates.push(new Date(lastAttendance.workDate));
-            if (lastLeave?.endDate) dates.push(new Date(lastLeave.endDate));
-            if (emp.terminationDate) dates.push(new Date(emp.terminationDate));
-            if (emp.archivedAt) dates.push(new Date(emp.archivedAt));
+    const enriched = records.map((emp: any) => {
+      let lastActive = emp.lastActiveDate;
+      let lastSource = emp.lastActiveSource || null;
 
-            if (dates.length > 0) {
-              dates.sort((a, b) => b.getTime() - a.getTime());
-              lastActive = dates[0];
-              lastSource = lastAttendance ? "ATTENDANCE" : lastLeave ? "LEAVE" : "TERMINATION";
-            }
-          } catch {}
+      if (!lastActive && (emp.status === "INACTIVE" || emp.status === "TERMINATED" || emp.archivedAt)) {
+        const lastAttendanceDate = lastAttendanceMap.get(emp.id);
+        const lastLeaveDate = lastLeaveMap.get(emp.id);
+
+        const dates: Date[] = [];
+        if (lastAttendanceDate) dates.push(new Date(lastAttendanceDate));
+        if (lastLeaveDate) dates.push(new Date(lastLeaveDate));
+        if (emp.terminationDate) dates.push(new Date(emp.terminationDate));
+        if (emp.archivedAt) dates.push(new Date(emp.archivedAt));
+
+        if (dates.length > 0) {
+          dates.sort((a, b) => b.getTime() - a.getTime());
+          lastActive = dates[0];
+          lastSource = lastAttendanceDate ? "ATTENDANCE" : lastLeaveDate ? "LEAVE" : "TERMINATION";
         }
+      }
 
-        return {
-          ...emp,
-          lastActiveDate: lastActive,
-          lastActiveSource: lastSource,
-          fullName: `${emp.firstName} ${emp.lastName}`.trim(),
-          departmentName: emp.department?.name || "",
-          positionTitle: emp.position?.title || "",
-          branchName: emp.branch?.name || "",
-          managerName: emp.manager ? `${emp.manager.firstName} ${emp.manager.lastName}`.trim() : "",
-          // For display
-          lastActiveDateFormatted: lastActive ? new Date(lastActive).toISOString().slice(0, 10) : null,
-          archivedAtFormatted: emp.archivedAt ? new Date(emp.archivedAt).toISOString().slice(0, 10) : null,
-          terminationDateFormatted: emp.terminationDate ? new Date(emp.terminationDate).toISOString().slice(0, 10) : null,
-        };
-      })
-    );
+      return {
+        ...emp,
+        lastActiveDate: lastActive,
+        lastActiveSource: lastSource,
+        fullName: `${emp.firstName} ${emp.lastName}`.trim(),
+        departmentName: emp.department?.name || "",
+        positionTitle: emp.position?.title || "",
+        branchName: emp.branch?.name || "",
+        managerName: emp.manager ? `${emp.manager.firstName} ${emp.manager.lastName}`.trim() : "",
+        // For display
+        lastActiveDateFormatted: lastActive ? new Date(lastActive).toISOString().slice(0, 10) : null,
+        archivedAtFormatted: emp.archivedAt ? new Date(emp.archivedAt).toISOString().slice(0, 10) : null,
+        terminationDateFormatted: emp.terminationDate ? new Date(emp.terminationDate).toISOString().slice(0, 10) : null,
+      };
+    });
 
     return NextResponse.json({
       success: true,

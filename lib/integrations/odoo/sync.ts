@@ -678,16 +678,21 @@ export class OdooSyncService {
       if (direction === "LANA_TO_ODOO" || direction === "BIDIRECTIONAL") {
         const records = await delegate("department").findMany({ where: updatedWhere(since), take: batchSize, orderBy: { updatedAt: "asc" } });
         for (const record of records as LanaDepartment[]) {
-          const values = mapLanaDepartmentToOdoo(record);
-          const existing = await this.findExternalBy(mapper.odooModel, mapper.externalKeyField, record.code, mapper.odooFields);
-          if (existing && this.hasWriteDateConflict(record.updatedAt, existing.write_date, record, existing, mapper.fieldMap)) {
-            await this.conflict(options.mappingId, "departments", record.id, String(existing.id), record, existing, result);
-            continue;
+          try {
+            const values = mapLanaDepartmentToOdoo(record);
+            const existing = await this.findExternalBy(mapper.odooModel, mapper.externalKeyField, record.code, mapper.odooFields);
+            if (existing && this.hasWriteDateConflict(record.updatedAt, existing.write_date, record, existing, mapper.fieldMap)) {
+              await this.conflict(options.mappingId, "departments", record.id, String(existing.id), record, existing, result);
+              continue;
+            }
+            if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.odooModel, localId: record.id, externalId: existing?.id, values });
+            else if (existing?.id) { await this.client.write(mapper.odooModel, [existing.id], values); result.updated += 1; }
+            else { await this.client.create(mapper.odooModel, values); result.created += 1; }
+            result.pushed += 1;
+          } catch (err: unknown) {
+            result.skipped += 1;
+            result.errors.push({ id: record.id, message: err instanceof Error ? err.message : String(err), details: err });
           }
-          if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.odooModel, localId: record.id, externalId: existing?.id, values });
-          else if (existing?.id) { await this.client.write(mapper.odooModel, [existing.id], values); result.updated += 1; }
-          else { await this.client.create(mapper.odooModel, values); result.created += 1; }
-          result.pushed += 1;
         }
       }
 
@@ -695,16 +700,21 @@ export class OdooSyncService {
         const rows = await this.client.search_read(mapper.odooModel, odooIncrementalDomain(since), mapper.odooFields, { limit: batchSize, order: "write_date asc" });
         result.cursor = maxCursor(rows, since);
         for (const row of rows) {
-          const values = mapOdooDepartmentToLana(row);
-          const existing = await delegate("department").findFirst({ where: { code: String(values.code) } });
-          if (existing && this.hasWriteDateConflict(existing.updatedAt, row.write_date, existing, row, mapper.fieldMap)) {
-            await this.conflict(options.mappingId, "departments", objectId(existing.id), String(row.id), existing, row, result);
-            continue;
+          try {
+            const values = mapOdooDepartmentToLana(row);
+            const existing = await delegate("department").findFirst({ where: { code: String(values.code) } });
+            if (existing && this.hasWriteDateConflict(existing.updatedAt, row.write_date, existing, row, mapper.fieldMap)) {
+              await this.conflict(options.mappingId, "departments", objectId(existing.id), String(row.id), existing, row, result);
+              continue;
+            }
+            if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.lanaModel, localId: objectId(existing?.id), externalId: row.id, values });
+            else if (existing) { await delegate("department").update({ where: { id: existing.id }, data: values }); result.updated += 1; }
+            else { await delegate("department").create({ data: values }); result.created += 1; }
+            result.pulled += 1;
+          } catch (err: unknown) {
+            result.skipped += 1;
+            result.errors.push({ id: String(row.id), message: err instanceof Error ? err.message : String(err), details: err });
           }
-          if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.lanaModel, localId: objectId(existing?.id), externalId: row.id, values });
-          else if (existing) { await delegate("department").update({ where: { id: existing.id }, data: values }); result.updated += 1; }
-          else { await delegate("department").create({ data: values }); result.created += 1; }
-          result.pulled += 1;
         }
       }
       return this.finishHistory(history?.id, result);
@@ -723,14 +733,19 @@ export class OdooSyncService {
       if (direction === "LANA_TO_ODOO" || direction === "BIDIRECTIONAL") {
         const records = await delegate("attendanceRecord").findMany({ where: updatedWhere(since), take: batchSize, orderBy: { updatedAt: "asc" }, include: { employee: true } });
         for (const record of records as LanaAttendance[]) {
-          const employeeId = await this.findOdooEmployeeId(record.employee);
-          if (!employeeId) { result.skipped += 1; result.operations.push({ operation: "skip", model: mapper.odooModel, localId: record.id, reason: "Missing matching Odoo employee" }); continue; }
-          const values = mapLanaAttendanceToOdoo(record, employeeId);
-          const existing = await this.findAttendance(employeeId, record.workDate);
-          if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.odooModel, localId: record.id, externalId: existing?.id, values });
-          else if (existing?.id) { await this.client.write(mapper.odooModel, [existing.id], values); result.updated += 1; }
-          else { await this.client.create(mapper.odooModel, values); result.created += 1; }
-          result.pushed += 1;
+          try {
+            const employeeId = await this.findOdooEmployeeId(record.employee);
+            if (!employeeId) { result.skipped += 1; result.operations.push({ operation: "skip", model: mapper.odooModel, localId: record.id, reason: "Missing matching Odoo employee" }); continue; }
+            const values = mapLanaAttendanceToOdoo(record, employeeId);
+            const existing = await this.findAttendance(employeeId, record.workDate);
+            if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.odooModel, localId: record.id, externalId: existing?.id, values });
+            else if (existing?.id) { await this.client.write(mapper.odooModel, [existing.id], values); result.updated += 1; }
+            else { await this.client.create(mapper.odooModel, values); result.created += 1; }
+            result.pushed += 1;
+          } catch (err: unknown) {
+            result.skipped += 1;
+            result.errors.push({ id: record.id, message: err instanceof Error ? err.message : String(err), details: err });
+          }
         }
       }
 
@@ -738,14 +753,19 @@ export class OdooSyncService {
         const rows = await this.client.search_read(mapper.odooModel, odooIncrementalDomain(since), mapper.odooFields, { limit: batchSize, order: "write_date asc" });
         result.cursor = maxCursor(rows, since);
         for (const row of rows) {
-          const localEmployeeId = await this.findLocalEmployeeId(row.employee_id);
-          if (!localEmployeeId) { result.skipped += 1; result.operations.push({ operation: "skip", model: mapper.lanaModel, externalId: row.id, reason: "Missing matching Lana employee" }); continue; }
-          const values = mapOdooAttendanceToLana(row, localEmployeeId);
-          const existing = await delegate("attendanceRecord").findFirst({ where: { employeeId: localEmployeeId, workDate: new Date(String(values.workDate)) } });
-          if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.lanaModel, localId: objectId(existing?.id), externalId: row.id, values });
-          else if (existing) { await delegate("attendanceRecord").update({ where: { id: existing.id }, data: values }); result.updated += 1; }
-          else { await delegate("attendanceRecord").create({ data: values }); result.created += 1; }
-          result.pulled += 1;
+          try {
+            const localEmployeeId = await this.findLocalEmployeeId(row.employee_id);
+            if (!localEmployeeId) { result.skipped += 1; result.operations.push({ operation: "skip", model: mapper.lanaModel, externalId: row.id, reason: "Missing matching Lana employee" }); continue; }
+            const values = mapOdooAttendanceToLana(row, localEmployeeId);
+            const existing = await delegate("attendanceRecord").findFirst({ where: { employeeId: localEmployeeId, workDate: new Date(String(values.workDate)) } });
+            if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.lanaModel, localId: objectId(existing?.id), externalId: row.id, values });
+            else if (existing) { await delegate("attendanceRecord").update({ where: { id: existing.id }, data: values }); result.updated += 1; }
+            else { await delegate("attendanceRecord").create({ data: values }); result.created += 1; }
+            result.pulled += 1;
+          } catch (err: unknown) {
+            result.skipped += 1;
+            result.errors.push({ id: String(row.id), message: err instanceof Error ? err.message : String(err), details: err });
+          }
         }
       }
       return this.finishHistory(history?.id, result);
@@ -765,14 +785,19 @@ export class OdooSyncService {
         const records = await delegate("leaveRequest").findMany({ where: updatedWhere(since), take: batchSize, orderBy: { updatedAt: "asc" }, include: { employee: true, leaveType: true } });
         const defaultLeaveTypeId = await this.findDefaultOdooLeaveTypeId();
         for (const record of records as LanaLeave[]) {
-          const employeeId = await this.findOdooEmployeeId(record.employee);
-          if (!employeeId || !defaultLeaveTypeId) { result.skipped += 1; result.operations.push({ operation: "skip", model: mapper.odooModel, localId: record.id, reason: "Missing Odoo employee or leave type" }); continue; }
-          const values = mapLanaLeaveToOdoo(record, employeeId, defaultLeaveTypeId);
-          const existing = await this.findOdooLeave(employeeId, record.startDate, record.endDate);
-          if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.odooModel, localId: record.id, externalId: existing?.id, values });
-          else if (existing?.id) { await this.client.write(mapper.odooModel, [existing.id], values); result.updated += 1; }
-          else { await this.client.create(mapper.odooModel, values); result.created += 1; }
-          result.pushed += 1;
+          try {
+            const employeeId = await this.findOdooEmployeeId(record.employee);
+            if (!employeeId || !defaultLeaveTypeId) { result.skipped += 1; result.operations.push({ operation: "skip", model: mapper.odooModel, localId: record.id, reason: "Missing Odoo employee or leave type" }); continue; }
+            const values = mapLanaLeaveToOdoo(record, employeeId, defaultLeaveTypeId);
+            const existing = await this.findOdooLeave(employeeId, record.startDate, record.endDate);
+            if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.odooModel, localId: record.id, externalId: existing?.id, values });
+            else if (existing?.id) { await this.client.write(mapper.odooModel, [existing.id], values); result.updated += 1; }
+            else { await this.client.create(mapper.odooModel, values); result.created += 1; }
+            result.pushed += 1;
+          } catch (err: unknown) {
+            result.skipped += 1;
+            result.errors.push({ id: record.id, message: err instanceof Error ? err.message : String(err), details: err });
+          }
         }
       }
 
@@ -781,14 +806,19 @@ export class OdooSyncService {
         result.cursor = maxCursor(rows, since);
         const leaveTypeId = await this.ensureLanaLeaveType();
         for (const row of rows) {
-          const localEmployeeId = await this.findLocalEmployeeId(row.employee_id);
-          if (!localEmployeeId) { result.skipped += 1; result.operations.push({ operation: "skip", model: mapper.lanaModel, externalId: row.id, reason: "Missing matching Lana employee" }); continue; }
-          const values = mapOdooLeaveToLana(row, localEmployeeId, leaveTypeId);
-          const existing = await this.findLocalLeave(localEmployeeId, values.startDate, values.endDate);
-          if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.lanaModel, localId: objectId(existing?.id), externalId: row.id, values });
-          else if (existing) { await delegate("leaveRequest").update({ where: { id: existing.id }, data: values }); result.updated += 1; }
-          else { await delegate("leaveRequest").create({ data: values }); result.created += 1; }
-          result.pulled += 1;
+          try {
+            const localEmployeeId = await this.findLocalEmployeeId(row.employee_id);
+            if (!localEmployeeId) { result.skipped += 1; result.operations.push({ operation: "skip", model: mapper.lanaModel, externalId: row.id, reason: "Missing matching Lana employee" }); continue; }
+            const values = mapOdooLeaveToLana(row, localEmployeeId, leaveTypeId);
+            const existing = await this.findLocalLeave(localEmployeeId, values.startDate, values.endDate);
+            if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.lanaModel, localId: objectId(existing?.id), externalId: row.id, values });
+            else if (existing) { await delegate("leaveRequest").update({ where: { id: existing.id }, data: values }); result.updated += 1; }
+            else { await delegate("leaveRequest").create({ data: values }); result.created += 1; }
+            result.pulled += 1;
+          } catch (err: unknown) {
+            result.skipped += 1;
+            result.errors.push({ id: String(row.id), message: err instanceof Error ? err.message : String(err), details: err });
+          }
         }
       }
       return this.finishHistory(history?.id, result);
@@ -808,16 +838,21 @@ export class OdooSyncService {
       if (direction === "LANA_TO_ODOO" || direction === "BIDIRECTIONAL") {
         const records = await delegate("position").findMany({ where: updatedWhere(since), take: batchSize, orderBy: { updatedAt: "asc" } });
         for (const record of records as Array<{ id?: string; title: string; code?: string; description?: string | null; updatedAt?: Date | string }>) {
-          const values = mapLanaJobToOdoo(record);
-          const existing = await this.findExternalBy(mapper.odooModel, "name", record.title, mapper.odooFields);
-          if (existing && this.hasWriteDateConflict(record.updatedAt, existing.write_date, record, existing, mapper.fieldMap)) {
-            await this.conflict(options.mappingId, "jobs", record.id, String(existing.id), record, existing, result);
-            continue;
+          try {
+            const values = mapLanaJobToOdoo(record);
+            const existing = await this.findExternalBy(mapper.odooModel, "name", record.title, mapper.odooFields);
+            if (existing && this.hasWriteDateConflict(record.updatedAt, existing.write_date, record, existing, mapper.fieldMap)) {
+              await this.conflict(options.mappingId, "jobs", record.id, String(existing.id), record, existing, result);
+              continue;
+            }
+            if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.odooModel, localId: record.id, externalId: existing?.id, values });
+            else if (existing?.id) { await this.client.write(mapper.odooModel, [existing.id], values); result.updated += 1; }
+            else { await this.client.create(mapper.odooModel, values); result.created += 1; }
+            result.pushed += 1;
+          } catch (err: unknown) {
+            result.skipped += 1;
+            result.errors.push({ id: record.id, message: err instanceof Error ? err.message : String(err), details: err });
           }
-          if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.odooModel, localId: record.id, externalId: existing?.id, values });
-          else if (existing?.id) { await this.client.write(mapper.odooModel, [existing.id], values); result.updated += 1; }
-          else { await this.client.create(mapper.odooModel, values); result.created += 1; }
-          result.pushed += 1;
         }
       }
 
@@ -825,16 +860,21 @@ export class OdooSyncService {
         const rows = await this.client.search_read(mapper.odooModel, odooIncrementalDomain(since), mapper.odooFields, { limit: batchSize, order: "write_date asc" });
         result.cursor = maxCursor(rows, since);
         for (const row of rows) {
-          const values = mapOdooJobToLana(row);
-          const existing = await delegate("position").findFirst({ where: { code: String(values.code) } });
-          if (existing && this.hasWriteDateConflict(existing.updatedAt, row.write_date, existing, row, mapper.fieldMap)) {
-            await this.conflict(options.mappingId, "jobs", objectId(existing.id), String(row.id), existing, row, result);
-            continue;
+          try {
+            const values = mapOdooJobToLana(row);
+            const existing = await delegate("position").findFirst({ where: { code: String(values.code) } });
+            if (existing && this.hasWriteDateConflict(existing.updatedAt, row.write_date, existing, row, mapper.fieldMap)) {
+              await this.conflict(options.mappingId, "jobs", objectId(existing.id), String(row.id), existing, row, result);
+              continue;
+            }
+            if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.lanaModel, localId: objectId(existing?.id), externalId: row.id, values });
+            else if (existing) { await delegate("position").update({ where: { id: existing.id }, data: values }); result.updated += 1; }
+            else { await delegate("position").create({ data: values }); result.created += 1; }
+            result.pulled += 1;
+          } catch (err: unknown) {
+            result.skipped += 1;
+            result.errors.push({ id: String(row.id), message: err instanceof Error ? err.message : String(err), details: err });
           }
-          if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.lanaModel, localId: objectId(existing?.id), externalId: row.id, values });
-          else if (existing) { await delegate("position").update({ where: { id: existing.id }, data: values }); result.updated += 1; }
-          else { await delegate("position").create({ data: values }); result.created += 1; }
-          result.pulled += 1;
         }
       }
       return this.finishHistory(history?.id, result);
@@ -853,27 +893,37 @@ export class OdooSyncService {
       if (direction === "LANA_TO_ODOO" || direction === "BIDIRECTIONAL") {
         const records = await delegate("employeeContract").findMany({ where: updatedWhere(since), take: batchSize, orderBy: { updatedAt: "asc" }, include: { employee: true } });
         for (const record of records as LanaContract[]) {
-          const employeeId = await this.findOdooEmployeeId(record.employee);
-          const values = mapLanaContractToOdoo(record, employeeId);
-          const existing = await this.findExternalBy(mapper.odooModel, mapper.externalKeyField, record.contractNumber, mapper.odooFields);
-          if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.odooModel, localId: record.id, externalId: existing?.id, values });
-          else if (existing?.id) { await this.client.write(mapper.odooModel, [existing.id], values); result.updated += 1; }
-          else { await this.client.create(mapper.odooModel, values); result.created += 1; }
-          result.pushed += 1;
+          try {
+            const employeeId = await this.findOdooEmployeeId(record.employee);
+            const values = mapLanaContractToOdoo(record, employeeId);
+            const existing = await this.findExternalBy(mapper.odooModel, mapper.externalKeyField, record.contractNumber, mapper.odooFields);
+            if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.odooModel, localId: record.id, externalId: existing?.id, values });
+            else if (existing?.id) { await this.client.write(mapper.odooModel, [existing.id], values); result.updated += 1; }
+            else { await this.client.create(mapper.odooModel, values); result.created += 1; }
+            result.pushed += 1;
+          } catch (err: unknown) {
+            result.skipped += 1;
+            result.errors.push({ id: record.id, message: err instanceof Error ? err.message : String(err), details: err });
+          }
         }
       }
       if (direction === "ODOO_TO_LANA" || direction === "BIDIRECTIONAL") {
         const rows = await this.client.search_read(mapper.odooModel, odooIncrementalDomain(since), mapper.odooFields, { limit: batchSize, order: "write_date asc" });
         result.cursor = maxCursor(rows, since);
         for (const row of rows) {
-          const localEmployeeId = await this.findLocalEmployeeId(row.employee_id);
-          if (!localEmployeeId) { result.skipped += 1; continue; }
-          const values = mapOdooContractToLana(row, localEmployeeId);
-          const existing = await delegate("employeeContract").findFirst({ where: { contractNumber: String(values.contractNumber) } });
-          if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.lanaModel, localId: objectId(existing?.id), externalId: row.id, values });
-          else if (existing) { await delegate("employeeContract").update({ where: { id: existing.id }, data: values }); result.updated += 1; }
-          else { await delegate("employeeContract").create({ data: values }); result.created += 1; }
-          result.pulled += 1;
+          try {
+            const localEmployeeId = await this.findLocalEmployeeId(row.employee_id);
+            if (!localEmployeeId) { result.skipped += 1; continue; }
+            const values = mapOdooContractToLana(row, localEmployeeId);
+            const existing = await delegate("employeeContract").findFirst({ where: { contractNumber: String(values.contractNumber) } });
+            if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.lanaModel, localId: objectId(existing?.id), externalId: row.id, values });
+            else if (existing) { await delegate("employeeContract").update({ where: { id: existing.id }, data: values }); result.updated += 1; }
+            else { await delegate("employeeContract").create({ data: values }); result.created += 1; }
+            result.pulled += 1;
+          } catch (err: unknown) {
+            result.skipped += 1;
+            result.errors.push({ id: String(row.id), message: err instanceof Error ? err.message : String(err), details: err });
+          }
         }
       }
       return this.finishHistory(history?.id, result);
@@ -893,16 +943,21 @@ export class OdooSyncService {
       if (direction === "LANA_TO_ODOO" || direction === "BIDIRECTIONAL") {
         const records = await delegate("branch").findMany({ where: updatedWhere(since), take: batchSize, orderBy: { updatedAt: "asc" } });
         for (const record of records as Array<{ id?: string; name: string; code?: string; city?: string | null; country?: string | null; updatedAt?: Date | string }>) {
-          const values = mapLanaCompanyToOdoo(record);
-          const existing = await this.findExternalBy(mapper.odooModel, "name", record.name, mapper.odooFields);
-          if (existing && this.hasWriteDateConflict(record.updatedAt, existing.write_date, record, existing, mapper.fieldMap)) {
-            await this.conflict(options.mappingId, "companies", record.id, String(existing.id), record, existing, result);
-            continue;
+          try {
+            const values = mapLanaCompanyToOdoo(record);
+            const existing = await this.findExternalBy(mapper.odooModel, "name", record.name, mapper.odooFields);
+            if (existing && this.hasWriteDateConflict(record.updatedAt, existing.write_date, record, existing, mapper.fieldMap)) {
+              await this.conflict(options.mappingId, "companies", record.id, String(existing.id), record, existing, result);
+              continue;
+            }
+            if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.odooModel, localId: record.id, externalId: existing?.id, values });
+            else if (existing?.id) { await this.client.write(mapper.odooModel, [existing.id], values); result.updated += 1; }
+            else { await this.client.create(mapper.odooModel, values); result.created += 1; }
+            result.pushed += 1;
+          } catch (err: unknown) {
+            result.skipped += 1;
+            result.errors.push({ id: record.id, message: err instanceof Error ? err.message : String(err), details: err });
           }
-          if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.odooModel, localId: record.id, externalId: existing?.id, values });
-          else if (existing?.id) { await this.client.write(mapper.odooModel, [existing.id], values); result.updated += 1; }
-          else { await this.client.create(mapper.odooModel, values); result.created += 1; }
-          result.pushed += 1;
         }
       }
 
@@ -910,16 +965,21 @@ export class OdooSyncService {
         const rows = await this.client.search_read(mapper.odooModel, odooIncrementalDomain(since), mapper.odooFields, { limit: batchSize, order: "write_date asc" });
         result.cursor = maxCursor(rows, since);
         for (const row of rows) {
-          const values = mapOdooCompanyToLana(row);
-          const existing = await delegate("branch").findFirst({ where: { code: String(values.code) } });
-          if (existing && this.hasWriteDateConflict(existing.updatedAt, row.write_date, existing, row, mapper.fieldMap)) {
-            await this.conflict(options.mappingId, "companies", objectId(existing.id), String(row.id), existing, row, result);
-            continue;
+          try {
+            const values = mapOdooCompanyToLana(row);
+            const existing = await delegate("branch").findFirst({ where: { code: String(values.code) } });
+            if (existing && this.hasWriteDateConflict(existing.updatedAt, row.write_date, existing, row, mapper.fieldMap)) {
+              await this.conflict(options.mappingId, "companies", objectId(existing.id), String(row.id), existing, row, result);
+              continue;
+            }
+            if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.lanaModel, localId: objectId(existing?.id), externalId: row.id, values });
+            else if (existing) { await delegate("branch").update({ where: { id: existing.id }, data: values }); result.updated += 1; }
+            else { await delegate("branch").create({ data: values }); result.created += 1; }
+            result.pulled += 1;
+          } catch (err: unknown) {
+            result.skipped += 1;
+            result.errors.push({ id: String(row.id), message: err instanceof Error ? err.message : String(err), details: err });
           }
-          if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.lanaModel, localId: objectId(existing?.id), externalId: row.id, values });
-          else if (existing) { await delegate("branch").update({ where: { id: existing.id }, data: values }); result.updated += 1; }
-          else { await delegate("branch").create({ data: values }); result.created += 1; }
-          result.pulled += 1;
         }
       }
       return this.finishHistory(history?.id, result);
@@ -938,11 +998,16 @@ export class OdooSyncService {
       if (direction === "LANA_TO_ODOO" || direction === "BIDIRECTIONAL") {
         const records = await delegate("payrollItem").findMany({ where: updatedWhere(since), take: batchSize, orderBy: { updatedAt: "asc" }, include: { employee: true, payrollRun: true } });
         for (const record of records as LanaPayrollItem[]) {
-          const employeeId = await this.findOdooEmployeeId(record.employee);
-          const values = mapLanaPayrollToOdoo(record, employeeId);
-          if (options.dryRun) result.operations.push({ operation: "create", model: mapper.odooModel, localId: record.id, values });
-          else { await this.client.create(mapper.odooModel, values); result.created += 1; }
-          result.pushed += 1;
+          try {
+            const employeeId = await this.findOdooEmployeeId(record.employee);
+            const values = mapLanaPayrollToOdoo(record, employeeId);
+            if (options.dryRun) result.operations.push({ operation: "create", model: mapper.odooModel, localId: record.id, values });
+            else { await this.client.create(mapper.odooModel, values); result.created += 1; }
+            result.pushed += 1;
+          } catch (err: unknown) {
+            result.skipped += 1;
+            result.errors.push({ id: record.id, message: err instanceof Error ? err.message : String(err), details: err });
+          }
         }
       }
       if (direction === "ODOO_TO_LANA" || direction === "BIDIRECTIONAL") {
