@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, IdCard, Loader2 } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { loginAction } from "@/lib/auth/actions";
@@ -44,6 +44,20 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
       <div className="space-y-2">
         <Label htmlFor="identifier" className="font-bold text-slate-800 dark:text-slate-200">اسم المستخدم أو رقم الهوية</Label>
         <p className="text-xs text-muted-foreground -mt-1">للموظفين: استخدم رقم الهوية وكلمة المرور (آخر 4 أرقام من الهوية)</p>
+        <div className="relative">
+          <Input
+            id="identifier"
+            type="text"
+            inputMode="numeric"
+            autoComplete="username"
+            className="h-11 px-9 text-base"
+            placeholder="أدخل رقم الهوية أو اسم المستخدم"
+            aria-invalid={Boolean(form.formState.errors.identifier)}
+            {...form.register("identifier")}
+          />
+          <IdCard className="pointer-events-none absolute right-3 top-3.5 h-4 w-4 text-muted-foreground" />
+        </div>
+        {form.formState.errors.identifier ? <p className="text-xs text-destructive" role="alert">{form.formState.errors.identifier.message}</p> : null}
       </div>
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-4">
