@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
@@ -56,10 +56,8 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
-  useEffect(() => {
-    navItems.forEach((item, index) => {
-      setTimeout(() => router.prefetch(item.href), index * 4);
-    });
+  const prefetchRoute = useCallback((href: string) => {
+    router.prefetch(href);
   }, [router]);
 
   const userRoles = useMemo(() => (session?.user?.roles as string[]) || [], [session?.user?.roles]);
@@ -240,6 +238,9 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
                       <Link
                         key={item.href}
                         href={item.href}
+                        prefetch={false}
+                        onMouseEnter={() => prefetchRoute(item.href)}
+                        onFocus={() => prefetchRoute(item.href)}
                         onClick={() => setMobileMenuOpen(false)}
                         className={cn(
                           "group flex items-center gap-3.5 rounded-2xl px-3.5 py-2.5 text-sm font-bold transition-all duration-200",
