@@ -13,10 +13,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const secureCookie = request.nextUrl.protocol === "https:";
   const token = await getToken({
     req: request, secret: AUTH_SECRET,
-    secureCookie: true,
-    cookieName: "__Secure-authjs.session-token",
+    secureCookie,
+    cookieName: `${secureCookie ? "__Secure-" : ""}authjs.session-token`,
   });
   const loggedIn = !!token;
   const roles: string[] = (token?.roles as string[]) ?? [];

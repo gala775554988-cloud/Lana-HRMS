@@ -22,9 +22,9 @@ async function getBranchOptions(query: Record<string, string | string[] | undefi
   const department = typeof query.department === "string" ? query.department : "";
   const hospital = typeof query.hospital === "string" ? query.hospital : "";
   const isActive = typeof query.isActive === "string" ? query.isActive : "";
+  const extra = await getEmployeeExtraSettings();
   let hospitalEmployeeIds: string[] | undefined;
   if (hospital) {
-    const extra = await getEmployeeExtraSettings();
     hospitalEmployeeIds = extra
       .filter((item) => String(item.value.hospital ?? "").toLowerCase().includes(hospital.toLowerCase()))
       .map((item) => item.employeeId);
@@ -36,7 +36,6 @@ async function getBranchOptions(query: Record<string, string | string[] | undefi
   if (department) branchAnd.push({ employees: { some: { department: { name: { contains: department, mode: "insensitive" as const } } } } });
   if (hospitalEmployeeIds) branchAnd.push({ employees: { some: { id: { in: hospitalEmployeeIds.length ? hospitalEmployeeIds : ["__NO_HOSPITAL_MATCH__"] } } } });
 
-  const extra = await getEmployeeExtraSettings();
   const hospitalByEmployeeId = new Map(extra.map((item) => [item.employeeId, String(item.value.hospital ?? "")]));
   const branches = await prisma.branch.findMany({
     where: branchAnd.length ? { AND: branchAnd } : {},

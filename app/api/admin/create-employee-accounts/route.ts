@@ -1,9 +1,19 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
 export const maxDuration = 60;
 
 export async function POST() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+  }
+  const roles = (session.user.roles as string[]) || [];
+  if (!roles.includes("SUPER_ADMIN")) {
+    return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+  }
+
   const employees = await prisma.employee.findMany({
     where: { userId: null },
     select: { id: true, employeeNumber: true, nationalId: true, firstName: true, lastName: true, email: true },

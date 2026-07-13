@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
 const DEFAULTS: Record<string, string[]> = {
@@ -9,6 +10,15 @@ const DEFAULTS: Record<string, string[]> = {
 };
 
 export async function POST() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+  }
+  const roles = (session.user.roles as string[]) || [];
+  if (!roles.includes("SUPER_ADMIN")) {
+    return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+  }
+
   const results: string[] = [];
   for (const [module, roles] of Object.entries(DEFAULTS)) {
     await prisma.hrApprovalChain.deleteMany({ where: { module } });
