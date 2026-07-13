@@ -17,6 +17,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const roles = (session.user as any).roles || [];
+  if (!roles.includes("SUPER_ADMIN") && !roles.includes("HR_MANAGER")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { userId, module, scope, branchId, departmentId } = await req.json();
   await setUserScope(userId, module, scope, branchId, departmentId, session.user.id);
   return NextResponse.json({ success: true });

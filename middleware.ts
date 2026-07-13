@@ -4,12 +4,36 @@ import { resolveRoleDashboard } from "@/config/auth";
 
 const AUTH_SECRET = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? "";
 
+// Defense-in-depth: every route.ts is still responsible for its own
+// session/role check, but any route NOT on this allow-list now also gets a
+// baseline "must be logged in" gate here, so a route that forgets to call
+// auth() no longer defaults to fully open. Keep this list to routes that
+// are genuinely meant to be public or that authenticate themselves
+// (NextAuth's own handler, a bearer-token hardware bridge, etc).
+const PUBLIC_API_PREFIXES = [
+  "/api/auth/", // NextAuth handler + change/force-change-password (session-checked internally)
+  "/api/health",
+  "/api/metrics/prometheus",
+  "/api/attendance/biometric/zkteco", // authenticates via its own bearer token
+  "/api/public/", // re-exports enterprise-erp, which enforces its own auth
+  "/api/integrations/webhooks/", // machine-to-machine, verified by request signature
+  "/api/integrations/oauth/token", // machine-to-machine, verified by client secret
+];
+
+function isPublicApiRoute(pathname: string) {
+  return PUBLIC_API_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
+
 export async function middleware(request: NextRequest) {
   const p = request.nextUrl.pathname;
   const isRoot = p === "/";
+  const isApi = p.startsWith("/api");
 
   // Skip getToken for public pages — no JWT verify needed
-  if (!isRoot && (p.startsWith("/login") || p.startsWith("/forgot-password") || p.startsWith("/reset-password") || p.startsWith("/verify-email"))) {
+  if (!isApi && !isRoot && (p.startsWith("/login") || p.startsWith("/forgot-password") || p.startsWith("/reset-password") || p.startsWith("/verify-email"))) {
+    return NextResponse.next();
+  }
+  if (isApi && isPublicApiRoute(p)) {
     return NextResponse.next();
   }
 
@@ -22,6 +46,11 @@ export async function middleware(request: NextRequest) {
   const loggedIn = !!token;
   const roles: string[] = (token?.roles as string[]) ?? [];
 
+  if (isApi) {
+    if (!loggedIn) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+    return NextResponse.next();
+  }
+
   if (loggedIn && (isRoot || p.startsWith("/login") || p.startsWith("/forgot-password") || p.startsWith("/reset-password") || p.startsWith("/verify-email"))) {
     return NextResponse.redirect(new URL(resolveRoleDashboard(roles), request.url));
   }
@@ -32,5 +61,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|manifest.webmanifest).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest).*)"],
 };
