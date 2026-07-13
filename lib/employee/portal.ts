@@ -1,5 +1,6 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
+import { memoryCache } from '@/lib/cache/memory-cache';
 
 function isPoolTimeout(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
@@ -69,6 +70,11 @@ export function fmtDate(value: unknown, locale = 'ar-SA') {
 }
 
 export async function getPortalDashboard(employeeId: string, userId?: string) {
+  const todayKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Riyadh' }).format(new Date());
+  return memoryCache(`employee-dashboard:${employeeId}:${userId ?? 'nouser'}:${todayKey}`, 20_000, () => getPortalDashboardUncached(employeeId, userId));
+}
+
+async function getPortalDashboardUncached(employeeId: string, userId?: string) {
   const today = new Date(); today.setHours(0,0,0,0);
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);

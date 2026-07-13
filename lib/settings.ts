@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { memoryCache, clearMemoryCache } from "@/lib/cache/memory-cache";
 
 export async function getAppSetting(key: string, defaultValue: unknown = null) {
   try {
@@ -15,6 +16,7 @@ export async function getAppSetting(key: string, defaultValue: unknown = null) {
 export async function setAppSetting(key: string, value: unknown, description?: string) {
   try {
     const jsonValue = typeof value === 'object' && value !== null ? value : { value };
+    clearMemoryCache(`setting:${key}`);
     
     return await prisma.appSetting.upsert({
       where: { key },
@@ -34,7 +36,7 @@ export async function setAppSetting(key: string, value: unknown, description?: s
   }
 }
 
-export async function getCompanyLogo(): Promise<string | null> {
+async function getCompanyLogoUncached(): Promise<string | null> {
   const setting = await getAppSetting("company.logo");
   if (setting && typeof setting === "object" && setting !== null) {
     const obj = setting as Record<string, unknown>;
@@ -44,6 +46,10 @@ export async function getCompanyLogo(): Promise<string | null> {
   }
   if (typeof setting === "string") return setting;
   return null;
+}
+
+export async function getCompanyLogo(): Promise<string | null> {
+  return memoryCache("setting:company.logo", 5 * 60 * 1000, getCompanyLogoUncached);
 }
 
 export async function setCompanyLogo(url: string) {
