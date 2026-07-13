@@ -146,8 +146,16 @@ for (const row of rows) {
 
 ### Testing
 
+#### Automated smoke tests (`tests/smoke/`, Playwright)
+- Copy `tests/smoke/.env.smoke.example` to `tests/smoke/.env.smoke` (gitignored) and fill in test-account credentials for at least one of each role you need to cover; tests requiring an unset account auto-skip.
+- Run with `npm run test:smoke`. Defaults to `http://localhost:3000` — start `npm run dev` first, or set `SMOKE_BASE_URL`.
+- Covers: login/logout, per-role dashboard load with no console errors, a full create→edit→delete cycle through the generic HR module CRUD (uses the `announcements` module — `departments` intentionally has no delete action in the UI), and the Odoo sync auth boundary (no live Odoo call).
+- **Required before merging any phase of the ongoing refactor**, in addition to the checks below.
+
 #### Before Commit
 - `npm run build` must pass
+- `npm run typecheck` must pass
+- `npm run test:smoke` must pass
 - No TypeScript errors
 - No console.log in production
 - Test with 10000 mock employees

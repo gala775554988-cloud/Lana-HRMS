@@ -5,6 +5,9 @@
 
 # testing
 /coverage
+/test-results
+/playwright-report
+tests/smoke/.env.smoke
 
 # next.js
 /.next/
