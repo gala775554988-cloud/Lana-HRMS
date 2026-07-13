@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Search, KeyRound, Users, AlertTriangle, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +28,7 @@ export default function PasswordManagementClient({ totalEmployees }: { totalEmpl
   const [showConfirm, setShowConfirm] = useState<"single" | "multiple" | "all" | null>(null);
   const [confirmEmployee, setConfirmEmployee] = useState<Employee | null>(null);
 
-  const fetchEmployees = async () => {
+  const fetchEmployees = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -42,11 +42,11 @@ export default function PasswordManagementClient({ totalEmployees }: { totalEmpl
     } finally {
       setLoading(false);
     }
-  };
+  }, [search]);
 
   useEffect(() => {
     fetchEmployees();
-  }, []);
+  }, [fetchEmployees]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

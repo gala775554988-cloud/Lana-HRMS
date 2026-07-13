@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Search, Download, Copy, AlertTriangle, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,7 +48,7 @@ export function DuplicateAccounts() {
   const [sortBy, setSortBy] = useState("count");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -65,11 +65,11 @@ export function DuplicateAccounts() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [search, typeFilter, sortBy, sortOrder]);
 
   useEffect(() => {
     fetchData();
-  }, [typeFilter, sortBy, sortOrder]);
+  }, [fetchData]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

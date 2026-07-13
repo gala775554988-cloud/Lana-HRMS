@@ -5,8 +5,8 @@ import { getApprovalChain, saveApprovalChain } from "@/lib/permissions/engine";
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const module = req.nextUrl.searchParams.get("module") || "leave";
-  return NextResponse.json(await getApprovalChain(module));
+  const moduleName = req.nextUrl.searchParams.get("module") || "leave";
+  return NextResponse.json(await getApprovalChain(moduleName));
 }
 
 export async function POST(req: NextRequest) {
