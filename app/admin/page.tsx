@@ -1,14 +1,5 @@
-import { auth } from "@/auth";
-import { redirect } from "next/navigation";
-import { resolveRoleDashboard } from "@/config/auth";
+import { redirectToRoleGatedDashboard } from "@/lib/auth/role-guard";
 
 export default async function AdminPage() {
-  const session = await auth();
-
-  if (!session?.user) {
-    redirect("/login");
-  }
-
-  const roles = (session.user.roles as string[]) || [];
-  redirect(resolveRoleDashboard(roles));
+  await redirectToRoleGatedDashboard();
 }
