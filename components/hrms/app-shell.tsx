@@ -33,6 +33,7 @@ const navItems = [
   { href: "/branches", label: "الفروع", icon: MapPin, group: "people", resource: "branches" },
   { href: "/hospitals", label: "المستشفيات", icon: Building2, group: "people", resource: "employees" },
   { href: "/attendance", label: "الحضور", icon: Clock, group: "ops", resource: "attendance" },
+  { href: "/attendance-sites", label: "مواقع الحضور", icon: MapPin, group: "ops", resource: "attendance" },
   { href: "/leave-requests", label: "الإجازات", icon: Calendar, group: "ops", resource: "leave" },
   { href: "/overtime", label: "الأوفر تايم", icon: Clock, group: "ops", resource: "overtime" },
   { href: "/payroll-runs", label: "الرواتب", icon: DollarSign, group: "ops", resource: "payroll" },
