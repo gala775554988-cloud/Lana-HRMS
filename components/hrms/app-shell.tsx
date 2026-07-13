@@ -9,7 +9,9 @@ import {
   LayoutDashboard, LogOut, ChevronLeft, ChevronRight, Search,
   Users, Building2, MapPin, Briefcase, FileText, Clock, Calendar,
   DollarSign, GraduationCap, Package, Megaphone, BarChart3, Settings,
-  Shield, GitPullRequest, Sparkles, Menu, X, PlugZap
+  Shield, GitPullRequest, Sparkles, Menu, X, PlugZap,
+  Inbox, Send, Network, Bell, Tag, Globe2, Wallet, PlusCircle, MinusCircle,
+  ClipboardCheck, UserPlus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/brand/brand-logo";
@@ -28,26 +30,54 @@ interface AppShellProps {
 }
 
 const navItems = [
+  { href: "/dashboard", label: "لوحة المعلومات", icon: LayoutDashboard, group: "overview", resource: "reports" },
+
   { href: "/employees", label: "الموظفون", icon: Users, group: "people", resource: "employees" },
   { href: "/departments", label: "الإدارات", icon: Building2, group: "people", resource: "departments" },
   { href: "/branches", label: "الفروع", icon: MapPin, group: "people", resource: "branches" },
   { href: "/hospitals", label: "المستشفيات", icon: Building2, group: "people", resource: "employees" },
+  { href: "/my-team", label: "فريقي", icon: Users, group: "people", resource: "employees" },
+  { href: "/positions", label: "المسميات الوظيفية", icon: Briefcase, group: "people", resource: "positions" },
+  { href: "/employment-types", label: "أنواع التوظيف", icon: Tag, group: "people", resource: "employment-types" },
+  { href: "/nationalities", label: "الجنسيات", icon: Globe2, group: "people", resource: "nationalities" },
+  { href: "/contracts", label: "العقود", icon: FileText, group: "people", resource: "contracts" },
+
   { href: "/attendance", label: "الحضور", icon: Clock, group: "ops", resource: "attendance" },
   { href: "/attendance-sites", label: "مواقع الحضور", icon: MapPin, group: "ops", resource: "attendance" },
   { href: "/leave-requests", label: "الإجازات", icon: Calendar, group: "ops", resource: "leave" },
+  { href: "/leave-types", label: "أنواع الإجازات", icon: Calendar, group: "ops", resource: "leave" },
   { href: "/overtime", label: "الأوفر تايم", icon: Clock, group: "ops", resource: "overtime" },
   { href: "/payroll-runs", label: "الرواتب", icon: DollarSign, group: "ops", resource: "payroll" },
+  { href: "/payroll-items", label: "بنود الرواتب", icon: DollarSign, group: "ops", resource: "payroll" },
+  { href: "/loans", label: "السلف", icon: Wallet, group: "ops", resource: "loans" },
+  { href: "/allowances", label: "البدلات", icon: PlusCircle, group: "ops", resource: "allowances" },
+  { href: "/deductions", label: "الاستقطاعات", icon: MinusCircle, group: "ops", resource: "deductions" },
   { href: "/documents", label: "المستندات", icon: FileText, group: "ops", resource: "documents" },
+
+  { href: "/performance", label: "تقييم الأداء", icon: ClipboardCheck, group: "talent", resource: "performance" },
+  { href: "/recruitment", label: "التوظيف", icon: Briefcase, group: "talent", resource: "recruitment" },
+  { href: "/candidates", label: "المتقدمون", icon: UserPlus, group: "talent", resource: "recruitment" },
+  { href: "/training", label: "التدريب", icon: GraduationCap, group: "talent", resource: "training" },
+  { href: "/training-enrollments", label: "تسجيلات التدريب", icon: GraduationCap, group: "talent", resource: "training" },
+  { href: "/assets", label: "الأصول", icon: Package, group: "talent", resource: "assets" },
+
   { href: "/reports", label: "التقارير", icon: BarChart3, group: "admin", resource: "reports" },
   { href: "/integrations/synchronization", label: "مزامنة Odoo", icon: PlugZap, group: "admin", resource: "settings" },
   { href: "/request-center", label: "استقبال الطلبات", icon: GitPullRequest, group: "admin", resource: "leave" },
+  { href: "/approvals-inbox", label: "الموافقات الواردة", icon: Inbox, group: "admin", resource: "leave" },
+  { href: "/approvals-outbox", label: "الموافقات الصادرة", icon: Send, group: "admin", resource: "leave" },
+  { href: "/organization-hierarchy", label: "الهيكل التنظيمي", icon: Network, group: "admin", resource: "employees" },
   { href: "/lana-ai", label: "Lana AI", icon: Sparkles, group: "admin", resource: "reports" },
+  { href: "/announcements", label: "الإعلانات", icon: Megaphone, group: "admin", resource: "announcements" },
+  { href: "/notification-center", label: "مركز الإشعارات", icon: Bell, group: "admin", resource: "notifications" },
   { href: "/audit-logs", label: "سجل التدقيق", icon: Shield, group: "admin", resource: "audit-logs" },
   { href: "/system-settings", label: "إعدادات النظام", icon: Settings, group: "admin", resource: "settings" },
+  { href: "/settings", label: "الإعدادات العامة", icon: Settings, group: "admin", resource: "settings" },
   { href: "/permissions-system", label: "نظام الصلاحيات", icon: Shield, group: "admin", resource: "permissions" },
+  { href: "/permissions-management", label: "إدارة الصلاحيات", icon: Shield, group: "admin", resource: "permissions" },
 ];
 
-const groups: Record<string, string> = { people: "الأفراد 👥", ops: "العمليات ⏰", admin: "الإدارة 🔧" };
+const groups: Record<string, string> = { overview: "نظرة عامة 📊", people: "الأفراد 👥", ops: "العمليات ⏰", talent: "تطوير الموظفين 🎓", admin: "الإدارة 🔧" };
 
 export function AppShell({ children, companyLogo }: AppShellProps) {
   const router = useRouter();
