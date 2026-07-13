@@ -1,17 +1,16 @@
 import { NextResponse } from "next/server";
-import { ensureOpenApiDocument } from "@/lib/enterprise-erp/actions";
+import { prisma } from "@/lib/prisma";
 
 const spec = {
   openapi: "3.1.0",
   info: { title: "Lana Enterprise Public API", version: "v1" },
   paths: {
-    "/api/public/v1/{suite}/{feature}": { get: { summary: "List enterprise records" }, post: { summary: "Create enterprise record" } },
-    "/api/graphql": { get: { summary: "Describe GraphQL endpoint" }, post: { summary: "Execute GraphQL operation" } },
-    "/api/health": { get: { summary: "Health check" } }
+    "/api/health": { get: { summary: "Health check" } },
+    "/api/global-search": { get: { summary: "Global search" }, post: { summary: "Index a search document" } }
   }
 };
 
 export async function GET() {
-  const document = await ensureOpenApiDocument().catch(() => null);
+  const document = await prisma.openApiDocument.findFirst({ where: { version: "v1", title: "Lana Enterprise Public API" } }).catch(() => null);
   return NextResponse.json(document?.spec || spec);
 }

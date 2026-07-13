@@ -9,7 +9,9 @@ import {
   LayoutDashboard, LogOut, ChevronLeft, ChevronRight, Search,
   Users, Building2, MapPin, Briefcase, FileText, Clock, Calendar,
   DollarSign, GraduationCap, Package, Megaphone, BarChart3, Settings,
-  Shield, GitPullRequest, Sparkles, Menu, X, PlugZap
+  Shield, GitPullRequest, Sparkles, Menu, X, PlugZap,
+  Inbox, Send, Network, Bell, Tag, Globe2, Wallet, PlusCircle, MinusCircle,
+  ClipboardCheck, UserPlus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/brand/brand-logo";
@@ -28,26 +30,54 @@ interface AppShellProps {
 }
 
 const navItems = [
+  { href: "/dashboard", label: "لوحة المعلومات", icon: LayoutDashboard, group: "overview", resource: "reports" },
+
   { href: "/employees", label: "الموظفون", icon: Users, group: "people", resource: "employees" },
   { href: "/departments", label: "الإدارات", icon: Building2, group: "people", resource: "departments" },
   { href: "/branches", label: "الفروع", icon: MapPin, group: "people", resource: "branches" },
   { href: "/hospitals", label: "المستشفيات", icon: Building2, group: "people", resource: "employees" },
+  { href: "/my-team", label: "فريقي", icon: Users, group: "people", resource: "employees" },
+  { href: "/positions", label: "المسميات الوظيفية", icon: Briefcase, group: "people", resource: "positions" },
+  { href: "/employment-types", label: "أنواع التوظيف", icon: Tag, group: "people", resource: "employment-types" },
+  { href: "/nationalities", label: "الجنسيات", icon: Globe2, group: "people", resource: "nationalities" },
+  { href: "/contracts", label: "العقود", icon: FileText, group: "people", resource: "contracts" },
+
   { href: "/attendance", label: "الحضور", icon: Clock, group: "ops", resource: "attendance" },
   { href: "/attendance-sites", label: "مواقع الحضور", icon: MapPin, group: "ops", resource: "attendance" },
   { href: "/leave-requests", label: "الإجازات", icon: Calendar, group: "ops", resource: "leave" },
+  { href: "/leave-types", label: "أنواع الإجازات", icon: Calendar, group: "ops", resource: "leave" },
   { href: "/overtime", label: "الأوفر تايم", icon: Clock, group: "ops", resource: "overtime" },
   { href: "/payroll-runs", label: "الرواتب", icon: DollarSign, group: "ops", resource: "payroll" },
+  { href: "/payroll-items", label: "بنود الرواتب", icon: DollarSign, group: "ops", resource: "payroll" },
+  { href: "/loans", label: "السلف", icon: Wallet, group: "ops", resource: "loans" },
+  { href: "/allowances", label: "البدلات", icon: PlusCircle, group: "ops", resource: "allowances" },
+  { href: "/deductions", label: "الاستقطاعات", icon: MinusCircle, group: "ops", resource: "deductions" },
   { href: "/documents", label: "المستندات", icon: FileText, group: "ops", resource: "documents" },
+
+  { href: "/performance", label: "تقييم الأداء", icon: ClipboardCheck, group: "talent", resource: "performance" },
+  { href: "/recruitment", label: "التوظيف", icon: Briefcase, group: "talent", resource: "recruitment" },
+  { href: "/candidates", label: "المتقدمون", icon: UserPlus, group: "talent", resource: "recruitment" },
+  { href: "/training", label: "التدريب", icon: GraduationCap, group: "talent", resource: "training" },
+  { href: "/training-enrollments", label: "تسجيلات التدريب", icon: GraduationCap, group: "talent", resource: "training" },
+  { href: "/assets", label: "الأصول", icon: Package, group: "talent", resource: "assets" },
+
   { href: "/reports", label: "التقارير", icon: BarChart3, group: "admin", resource: "reports" },
   { href: "/integrations/synchronization", label: "مزامنة Odoo", icon: PlugZap, group: "admin", resource: "settings" },
   { href: "/request-center", label: "استقبال الطلبات", icon: GitPullRequest, group: "admin", resource: "leave" },
+  { href: "/approvals-inbox", label: "الموافقات الواردة", icon: Inbox, group: "admin", resource: "leave" },
+  { href: "/approvals-outbox", label: "الموافقات الصادرة", icon: Send, group: "admin", resource: "leave" },
+  { href: "/organization-hierarchy", label: "الهيكل التنظيمي", icon: Network, group: "admin", resource: "employees" },
   { href: "/lana-ai", label: "Lana AI", icon: Sparkles, group: "admin", resource: "reports" },
+  { href: "/announcements", label: "الإعلانات", icon: Megaphone, group: "admin", resource: "announcements" },
+  { href: "/notification-center", label: "مركز الإشعارات", icon: Bell, group: "admin", resource: "notifications" },
   { href: "/audit-logs", label: "سجل التدقيق", icon: Shield, group: "admin", resource: "audit-logs" },
   { href: "/system-settings", label: "إعدادات النظام", icon: Settings, group: "admin", resource: "settings" },
+  { href: "/settings", label: "الإعدادات العامة", icon: Settings, group: "admin", resource: "settings" },
   { href: "/permissions-system", label: "نظام الصلاحيات", icon: Shield, group: "admin", resource: "permissions" },
+  { href: "/permissions-management", label: "إدارة الصلاحيات", icon: Shield, group: "admin", resource: "permissions" },
 ];
 
-const groups: Record<string, string> = { people: "الأفراد 👥", ops: "العمليات ⏰", admin: "الإدارة 🔧" };
+const groups: Record<string, string> = { overview: "نظرة عامة 📊", people: "الأفراد 👥", ops: "العمليات ⏰", talent: "تطوير الموظفين 🎓", admin: "الإدارة 🔧" };
 
 export function AppShell({ children, companyLogo }: AppShellProps) {
   const router = useRouter();
@@ -98,8 +128,8 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen bg-[#F5F7FB] text-[#111827] dark:bg-slate-950 dark:text-slate-100">
-        <div className="h-16 border-b border-[#E5E7EB]/80 bg-white/90 dark:border-slate-800/80 dark:bg-slate-950/90" />
+      <div className="min-h-screen bg-background text-foreground">
+        <div className="h-16 border-b border-border/80 bg-white/90 dark:bg-slate-950/90" />
         <div className="flex">
           <div className="hidden w-[280px] shrink-0 border-l border-slate-200/80 bg-white lg:block dark:border-slate-800 dark:bg-slate-950" />
           <main className="min-w-0 flex-1 p-4 lg:p-8">{children}</main>
@@ -113,8 +143,8 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F7FB] text-[#111827] dark:bg-slate-950 dark:text-slate-100 transition-colors duration-200">
-      <header className="sticky top-0 z-30 border-b border-[#E5E7EB]/80 bg-white/90 shadow-xs shadow-slate-200/60 backdrop-blur-xl dark:border-slate-800/80 dark:bg-slate-950/90 dark:shadow-slate-950/40">
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-200">
+      <header className="sticky top-0 z-30 border-b border-border/80 bg-white/90 shadow-xs shadow-slate-200/60 backdrop-blur-xl dark:bg-slate-950/90 dark:shadow-slate-950/40">
         <div className="flex h-16 items-center justify-between gap-4 px-4 lg:px-6">
           <div className="flex items-center gap-3">
             <button
@@ -146,11 +176,11 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
           <div className="hidden md:flex flex-1 max-w-md items-center mx-auto">
             <button
               onClick={() => setSearchOpen(true)}
-              className="group flex w-full items-center gap-3 rounded-2xl border border-[#E5E7EB] bg-[#F5F7FB] px-4 py-2.5 text-sm text-[#6B7280] shadow-inner shadow-white/80 transition-all duration-200 hover:border-[#6D6AF8]/60 hover:bg-white hover:text-[#2E2A8C] hover:shadow-md hover:shadow-[#2E2A8C]/5 dark:border-slate-800 dark:bg-slate-900/80 dark:shadow-none dark:hover:border-[#6D6AF8]/50 dark:hover:bg-slate-900 dark:hover:text-indigo-300"
+              className="group flex w-full items-center gap-3 rounded-2xl border border-border bg-muted px-4 py-2.5 text-sm text-muted-foreground shadow-inner shadow-white/80 transition-all duration-200 hover:border-primary/60 hover:bg-white hover:text-primary hover:shadow-md hover:shadow-primary/5 dark:border-slate-800 dark:bg-slate-900/80 dark:shadow-none dark:hover:border-primary/50 dark:hover:bg-slate-900 dark:hover:text-indigo-300"
             >
-              <Search className="h-4 w-4 text-[#6D6AF8] transition-transform group-hover:scale-110" />
+              <Search className="h-4 w-4 text-primary transition-transform group-hover:scale-110" />
               <span className="font-medium">البحث الذكي في النظام...</span>
-              <kbd className="mr-auto flex items-center gap-0.5 rounded-lg border border-[#E5E7EB] bg-white px-2 py-0.5 text-[10px] font-bold font-mono text-[#6B7280] shadow-2xs group-hover:border-indigo-200 group-hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400">
+              <kbd className="mr-auto flex items-center gap-0.5 rounded-lg border border-border bg-white px-2 py-0.5 text-[10px] font-bold font-mono text-muted-foreground shadow-2xs group-hover:border-indigo-200 group-hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400">
                 <span>⌘</span>K
               </kbd>
             </button>
@@ -169,7 +199,7 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
             <ThemeToggle />
             <div className="hidden sm:block h-6 w-px bg-border" />
             <div className="hidden sm:flex items-center gap-2.5 pl-1">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#2E2A8C] to-[#6D6AF8] text-white text-xs font-bold shadow-md shadow-indigo-500/20">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/60 text-white text-xs font-bold shadow-md shadow-indigo-500/20">
                 {session.user?.name?.charAt(0) || "U"}
               </div>
               <div className="flex flex-col min-w-0">
@@ -249,7 +279,7 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
                           "group flex items-center gap-3.5 rounded-2xl px-3.5 py-2.5 text-sm font-bold transition-all duration-200",
                           sidebarCollapsed ? "lg:justify-center lg:px-2" : "",
                           active
-                            ? "bg-[#2E2A8C] text-white shadow-md shadow-indigo-900/25 dark:bg-[#6D6AF8] dark:text-slate-950 dark:shadow-indigo-500/20"
+                            ? "bg-primary text-white shadow-md shadow-indigo-900/25 dark:text-slate-950 dark:shadow-indigo-500/20"
                             : "text-slate-600 hover:bg-slate-100/80 hover:text-indigo-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-slate-100"
                         )}
                         title={sidebarCollapsed ? item.label : undefined}
@@ -272,7 +302,7 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
           {(!sidebarCollapsed || mobileMenuOpen) && (
             <div className="m-3 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/80 to-purple-50/50 p-3.5 dark:border-indigo-900/40 dark:from-indigo-950/30 dark:to-purple-950/20">
               <div className="flex items-center gap-2.5 text-indigo-900 dark:text-indigo-200 font-bold text-xs">
-                <Sparkles className="h-4 w-4 text-[#6D6AF8] animate-pulse" />
+                <Sparkles className="h-4 w-4 text-primary animate-pulse" />
                 <span>Lana AI Assistant</span>
               </div>
               <p className="mt-1 text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
