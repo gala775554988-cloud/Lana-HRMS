@@ -8,7 +8,6 @@ import {
   Award, GraduationCap, MessageCircle, HandCoins, MessageSquareWarning 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useEffect } from 'react';
 
 const items = [
   { href: '/employee/dashboard', label: 'الرئيسية', icon: Home },
@@ -33,14 +32,7 @@ export function EmployeeDesktopSidebar() {
   const pathname = usePathname();
   const router = useRouter();
 
-  // Ultra fast menu navigation: warm all employee portal routes after layout mounts.
-  useEffect(() => {
-    items.forEach((item, index) => {
-      setTimeout(() => router.prefetch(item.href), index * 6);
-    });
-  }, [router]);
-
-  const handleMouseEnter = (href: string) => router.prefetch(href);
+  const handleIntent = (href: string) => router.prefetch(href);
 
   return (
     <div className="p-4">
@@ -54,8 +46,9 @@ export function EmployeeDesktopSidebar() {
             <Link 
               key={item.href} 
               href={item.href}
-              prefetch={true}
-              onMouseEnter={() => handleMouseEnter(item.href)}
+              prefetch={false}
+              onMouseEnter={() => handleIntent(item.href)}
+              onFocus={() => handleIntent(item.href)}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-2xl text-sm font-medium transition-all duration-200 will-change-transform hover:-translate-y-0.5 active:scale-[0.985]',
                 active 

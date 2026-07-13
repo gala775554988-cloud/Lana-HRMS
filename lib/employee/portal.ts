@@ -82,24 +82,20 @@ export async function getPortalDashboard(employeeId: string, userId?: string) {
   const documents = await dbQuery<number>('dashboard.documents', () => prisma.employeeDocument.count({ where: { employeeId } }), 0);
   const assets = await dbQuery<number>('dashboard.assets', () => prisma.asset.count({ where: { assignedEmployeeId: employeeId } }), 0);
   const notifications = await dbQuery<any[]>('dashboard.notifications', () => prisma.notification.findMany({ where: { OR: [{ userId }, { userId: null }], readAt: null }, select: { title: true, type: true, createdAt: true }, take: 10, orderBy: { createdAt: 'desc' } }), []);
-  const latestDoc = await dbQuery<any | null>('dashboard.latestDoc', () => prisma.employeeDocument.findFirst({ where: { employeeId }, select: { name: true, uploadedAt: true, status: true }, orderBy: { uploadedAt: 'desc' } }), null);
-  const latestAttendance = await dbQuery<any | null>('dashboard.latestAttendance', () => prisma.attendanceRecord.findFirst({ where: { employeeId }, select: { status: true, workDate: true, checkOut: true }, orderBy: { workDate: 'desc' } }), null);
-  const latestLeave = await dbQuery<any | null>('dashboard.latestLeave', () => prisma.leaveRequest.findFirst({ where: { employeeId }, select: { status: true, reason: true, createdAt: true, leaveType: { select: { name: true } } }, orderBy: { createdAt: 'desc' } }), null);
-  const latestAudit = await dbQuery<any | null>('dashboard.latestAudit', () => prisma.auditLog.findFirst({ where: { entityId: employeeId }, select: { action: true, entity: true, createdAt: true }, orderBy: { createdAt: 'desc' } }), null);
-  const portalTasks = await dbQuery<any[]>('dashboard.tasks', () => (prisma as any).employeePortalTask?.findMany?.({ where: { employeeId, status: { not: 'COMPLETED' } }, select: { id: true }, take: 20 }) ?? Promise.resolve([]), []);
+  const portalTaskCount = await dbQuery<number>('dashboard.tasks.count', () => (prisma as any).employeePortalTask?.count?.({ where: { employeeId, status: { not: 'COMPLETED' } } }) ?? Promise.resolve(0), 0);
 
   const leaveUsed = leaves.filter((l: any) => l.status === 'APPROVED').reduce((s: number,l: any)=>s+asNumber(l.days),0);
   const monthHours = attendanceMonth.reduce((sum: number, r: any) => r.checkIn && r.checkOut ? sum + Math.max(0, (r.checkOut.getTime() - r.checkIn.getTime()) / 36e5) : sum, 0);
   const presentDays = attendanceMonth.filter((r: any) => ['PRESENT','LATE','REMOTE'].includes(r.status)).length;
+  const latestAttendance = attendanceMonth.at(-1);
+  const latestLeave = leaves[0];
   const timeline = [
     latestLeave && { type: 'طلب', title: `آخر طلب إجازة: ${latestLeave.leaveType?.name ?? latestLeave.reason ?? 'إجازة'}`, date: latestLeave.createdAt, status: latestLeave.status },
     permissionRequests[0] && { type: 'استئذان', title: `آخر استئذان: ${permissionRequests[0].reason}`, date: permissionRequests[0].createdAt, status: permissionRequests[0].status },
-    latestAudit && { type: 'موافقة/نشاط', title: `${latestAudit.action} - ${latestAudit.entity}`, date: latestAudit.createdAt, status: 'مسجل' },
     notifications[0] && { type: 'إشعار', title: notifications[0].title, date: notifications[0].createdAt, status: notifications[0].type },
     latestAttendance && { type: 'حضور', title: `آخر حضور: ${latestAttendance.status}`, date: latestAttendance.workDate, status: latestAttendance.checkOut ? 'مكتمل' : 'مفتوح' },
-    latestDoc && { type: 'مستند', title: `تم رفع: ${latestDoc.name}`, date: latestDoc.uploadedAt, status: latestDoc.status },
   ].filter(Boolean) as Array<{type:string;title:string;date:Date;status:string}>;
-  return { attendanceToday, attendanceMonth, leaves, permissionRequests, payroll, documents, assets, notifications, leaveUsed, leaveRemaining: Math.max(30 - leaveUsed, 0), monthHours, presentDays, timeline, taskCount: portalTasks.length };
+  return { attendanceToday, attendanceMonth, leaves, permissionRequests, payroll, documents, assets, notifications, leaveUsed, leaveRemaining: Math.max(30 - leaveUsed, 0), monthHours, presentDays, timeline, taskCount: portalTaskCount };
 }
 
 export function profileCompletion(employee: any) {

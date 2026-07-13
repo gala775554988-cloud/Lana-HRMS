@@ -21,7 +21,7 @@ export function EmployeeMobileBottomNav() {
         const Icon = item.icon;
         const active = pathname === item.href || pathname.startsWith(item.href + '/');
         return (
-          <Link key={item.href} href={item.href} className={cn('flex flex-col items-center justify-center py-1 rounded-xl transition', active ? 'text-indigo-600' : 'text-slate-500')}>
+          <Link key={item.href} href={item.href} prefetch={false} className={cn('flex flex-col items-center justify-center py-1 rounded-xl transition', active ? 'text-indigo-600' : 'text-slate-500')}>
             <Icon className="h-5 w-5 mb-0.5" />
             <span className="text-[10px]">{item.label}</span>
           </Link>

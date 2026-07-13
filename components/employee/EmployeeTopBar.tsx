@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Search, Sun, Moon, LogOut, User } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useSession, signOut } from 'next-auth/react';
+import { signOut } from 'next-auth/react';
 import { BrandLogo } from '@/components/brand/brand-logo';
 import { ClientLanguageToggle } from '@/components/i18n/client-language-toggle';
 import { NotificationBell } from '@/components/enterprise/notification-bell';
@@ -15,14 +15,11 @@ interface Props {
 }
 
 export function EmployeeTopBar({ user, employee }: Props) {
-  const { data: session } = useSession();
   const [isDark, setIsDark] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const router = useRouter();
 
-  // Safe access to prevent crashes
-  const sessionUser = session?.user as any;
-  const avatarUrl = sessionUser?.image || employee?.profilePhotoUrl || null;
+  const avatarUrl = user?.image || employee?.profilePhotoUrl || null;
 
   const toggleTheme = () => {
     const newDark = !isDark;

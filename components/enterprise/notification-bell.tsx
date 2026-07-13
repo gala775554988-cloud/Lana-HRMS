@@ -10,15 +10,26 @@ export function NotificationBell() {
 
   useEffect(() => {
     let active = true;
+    let timer: number | undefined;
+    let interval: number | undefined;
     const load = () => {
       fetch("/api/enterprise/notifications?status=unread", { cache: "no-store" })
         .then((response) => response.json())
         .then((data) => { if (active) setCount(data.unreadCount ?? 0); })
         .catch(() => null);
     };
-    load();
-    const timer = window.setInterval(load, 60000);
-    return () => { active = false; window.clearInterval(timer); };
+    const start = () => {
+      load();
+      interval = window.setInterval(load, 120000);
+    };
+    const w = window as typeof window & { requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number };
+    if (w.requestIdleCallback) timer = w.requestIdleCallback(start, { timeout: 4000 });
+    else timer = window.setTimeout(start, 2500);
+    return () => {
+      active = false;
+      if (timer) window.clearTimeout(timer);
+      if (interval) window.clearInterval(interval);
+    };
   }, []);
 
   return (
