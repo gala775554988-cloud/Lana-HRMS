@@ -27,26 +27,54 @@ export async function GET(request: NextRequest) {
     const sortOrder = searchParams.get("sortOrder") === "asc" ? "asc" : "desc";
     const typeFilter = searchParams.get("type"); // nationalId, email, employeeNumber, barcode
 
-    // Get all employees with essential fields for duplicate checking
-    const allEmployees = await prisma.employee.findMany({
-      select: {
-        id: true,
-        employeeNumber: true,
-        nationalId: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phone: true,
-        status: true,
-        hireDate: true,
-        department: { select: { name: true } },
-        position: { select: { title: true } },
-        branch: { select: { name: true } },
-        createdAt: true,
-      },
-      orderBy: { createdAt: "desc" },
-      take: 10000, // Limit to 10000 for performance
-    });
+    // Find duplicate values first with a GROUP BY/HAVING query (same pattern as
+    // ai-system-manager/analyze), then bulk-fetch only the employees that are
+    // actually part of a duplicate group -- instead of loading up to 10000 full
+    // employee rows and grouping in JS on every request.
+    const [nationalIdDupes, emailDupes, employeeNumberDupes, totalEmployees] = await Promise.all([
+      prisma.$queryRawUnsafe<{ value: string; count: bigint }[]>(
+        `SELECT "nationalId" as value, COUNT(*) as count FROM "Employee" WHERE "nationalId" IS NOT NULL AND "nationalId" != '' AND UPPER("nationalId") != 'NA' GROUP BY "nationalId" HAVING COUNT(*) > 1`
+      ),
+      prisma.$queryRawUnsafe<{ value: string; count: bigint }[]>(
+        `SELECT "email" as value, COUNT(*) as count FROM "Employee" WHERE "email" IS NOT NULL AND "email" != '' GROUP BY "email" HAVING COUNT(*) > 1`
+      ),
+      prisma.$queryRawUnsafe<{ value: string; count: bigint }[]>(
+        `SELECT "employeeNumber" as value, COUNT(*) as count FROM "Employee" WHERE "employeeNumber" IS NOT NULL AND "employeeNumber" != '' GROUP BY "employeeNumber" HAVING COUNT(*) > 1`
+      ),
+      prisma.employee.count(),
+    ]);
+
+    const dupNationalIds = nationalIdDupes.map((r) => r.value);
+    const dupEmails = emailDupes.map((r) => r.value);
+    const dupEmployeeNumbers = employeeNumberDupes.map((r) => r.value);
+
+    const orConditions = [
+      dupNationalIds.length ? { nationalId: { in: dupNationalIds } } : null,
+      dupEmails.length ? { email: { in: dupEmails } } : null,
+      dupEmployeeNumbers.length ? { employeeNumber: { in: dupEmployeeNumbers } } : null,
+    ].filter((c): c is NonNullable<typeof c> => c !== null);
+
+    const allEmployees = orConditions.length
+      ? await prisma.employee.findMany({
+          select: {
+            id: true,
+            employeeNumber: true,
+            nationalId: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            status: true,
+            hireDate: true,
+            department: { select: { name: true } },
+            position: { select: { title: true } },
+            branch: { select: { name: true } },
+            createdAt: true,
+          },
+          where: { OR: orConditions },
+          orderBy: { createdAt: "desc" },
+        })
+      : [];
 
     // Group by different fields
     const groups = new Map<string, DuplicateGroup>();
@@ -151,7 +179,7 @@ export async function GET(request: NextRequest) {
       totalDuplicateGroups,
       uniqueDuplicateEmployees,
       byType,
-      totalEmployees: allEmployees.length,
+      totalEmployees,
       filters: { search, type: typeFilter, sortBy, sortOrder },
     });
   } catch (error) {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { hasAnyRole } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { getProductionArea } from "@/lib/enterprise-production/catalog";
 
@@ -18,8 +19,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ are
 export async function DELETE(_request: Request, { params }: { params: Promise<{ area: string; id: string }> }) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const roles = (session.user.roles as string[]) || [];
-  if (!roles.includes("SUPER_ADMIN")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!hasAnyRole(session, ["SUPER_ADMIN"])) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { area, id } = await params;
   const meta = getProductionArea(area);

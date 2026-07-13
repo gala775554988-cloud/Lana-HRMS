@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { hasAnyRole } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
@@ -14,8 +15,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const roles = (session.user.roles as string[]) || [];
-  if (!roles.includes("SUPER_ADMIN") && !roles.includes("HR_MANAGER")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!hasAnyRole(session, ["SUPER_ADMIN", "HR_MANAGER"])) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await request.json();
   let company = await prisma.digitalTwinCompany.findFirst({ where: { tenantId: null, code: String(body.companyCode || "default") } });

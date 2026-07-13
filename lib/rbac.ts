@@ -13,6 +13,13 @@ export function hasRole(userRoles: string[] | undefined, role: string) {
   return Boolean(userRoles?.includes(role));
 }
 
+/** True if the session belongs to a logged-in user with at least one of allowedRoles. */
+export function hasAnyRole(session: { user?: { roles?: unknown } } | null | undefined, allowedRoles: string[]) {
+  if (!session?.user) return false;
+  const roles = (session.user.roles as string[] | undefined) ?? [];
+  return roles.some((role) => allowedRoles.includes(role));
+}
+
 export function hasPermission(
   userPermissions: string[] | undefined,
   permission: PermissionCheck,
