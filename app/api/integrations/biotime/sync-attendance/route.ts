@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await requireOdooIntegrationAccess('manage');
     const body = await request.json().catch(() => ({}));
-    const baseUrl = clean(body.baseUrl || process.env.BIOTIME_URL);
+    const baseUrl = clean(body.baseUrl || process.env.BIOTIME_URL || 'https://handbook-latino-trout-settle.trycloudflare.com');
     if (!baseUrl) return NextResponse.json({ success: false, message: 'BioTime URL is required' }, { status: 400 });
 
     const username = clean(body.username || process.env.BIOTIME_USERNAME || 'HR');

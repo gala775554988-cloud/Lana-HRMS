@@ -5,6 +5,8 @@ import { Clock, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+const DEFAULT_BIOTIME_URL = "https://handbook-latino-trout-settle.trycloudflare.com";
+
 type Result = {
   success: boolean;
   message?: string;
@@ -20,14 +22,14 @@ type Result = {
 
 export function BioTimeAttendanceSyncButton() {
   const [pending, startTransition] = useTransition();
-  const [baseUrl, setBaseUrl] = useState("");
+  const [baseUrl, setBaseUrl] = useState(DEFAULT_BIOTIME_URL);
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [terminalAlias, setTerminalAlias] = useState("جهاز الحضور والأنصراف");
   const [result, setResult] = useState<Result | null>(null);
 
   useEffect(() => {
     const saved = window.localStorage.getItem("lana.biotime.url");
-    if (saved) setBaseUrl(saved);
+    setBaseUrl(saved || DEFAULT_BIOTIME_URL);
   }, []);
 
   function syncNow() {
@@ -60,7 +62,7 @@ export function BioTimeAttendanceSyncButton() {
           <Input value={terminalAlias} onChange={(event) => setTerminalAlias(event.target.value)} placeholder="terminal_alias" />
           <Button onClick={syncNow} disabled={pending || !baseUrl} className="gap-2 bg-emerald-600 text-white hover:bg-emerald-700">
             <RefreshCw className={pending ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
-            {pending ? "جاري المزامنة..." : "مزامنة BioTime الآن"}
+            {pending ? "جاري المزامنة..." : "مزامنة فقط"}
           </Button>
         </div>
         {result ? (

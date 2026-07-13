@@ -7,7 +7,7 @@ import { SessionProvider } from "next-auth/react";
 import { auth } from "@/auth";
 import { ThemeProvider } from "@/components/hrms/theme-provider";
 import { I18nRuntime } from "@/components/i18n/i18n-runtime";
-import { LanaAiAssistant } from "@/components/enterprise/lana-ai-assistant";
+import { LazyLanaAiAssistant } from "@/components/enterprise/lazy-lana-ai-assistant";
 import { PWAInstallPrompt } from "@/components/pwa/pwa-install-prompt";
 import { PWARegister } from "@/components/pwa/pwa-register";
 
@@ -68,7 +68,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             <PWARegister />
             <I18nRuntime initialLocale={locale} />
             {children}
-            <LanaAiAssistant />
+            <LazyLanaAiAssistant />
             <PWAInstallPrompt />
           </ThemeProvider>
         </SessionProvider>
