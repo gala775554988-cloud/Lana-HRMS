@@ -53,7 +53,8 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { data: session, status } = useSession();
-  const { sidebarCollapsed, toggleSidebar, _hasHydrated } = useThemeStore();
+  const { sidebarCollapsed: storedSidebarCollapsed, toggleSidebar, _hasHydrated } = useThemeStore();
+  const sidebarCollapsed = _hasHydrated ? storedSidebarCollapsed : false;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -95,12 +96,13 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
     return result;
   }, [userPermissions, userRoles]);
 
-  if (status === "loading" || !_hasHydrated) {
+  if (status === "loading") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent shadow-lg shadow-primary/20" />
-          <p className="text-sm font-semibold text-muted-foreground animate-pulse">جاري تحميل نظام Lana HRMS...</p>
+      <div className="min-h-screen bg-[#F5F7FB] text-[#111827] dark:bg-slate-950 dark:text-slate-100">
+        <div className="h-16 border-b border-[#E5E7EB]/80 bg-white/90 dark:border-slate-800/80 dark:bg-slate-950/90" />
+        <div className="flex">
+          <div className="hidden w-[280px] shrink-0 border-l border-slate-200/80 bg-white lg:block dark:border-slate-800 dark:bg-slate-950" />
+          <main className="min-w-0 flex-1 p-4 lg:p-8">{children}</main>
         </div>
       </div>
     );

@@ -4,6 +4,7 @@ import { siteConfig } from "@/config/site";
 import { getDirection, normalizeLocale } from "@/lib/i18n";
 import "./globals.css";
 import { SessionProvider } from "next-auth/react";
+import { auth } from "@/auth";
 import { ThemeProvider } from "@/components/hrms/theme-provider";
 import { I18nRuntime } from "@/components/i18n/i18n-runtime";
 import { LanaAiAssistant } from "@/components/enterprise/lana-ai-assistant";
@@ -57,11 +58,12 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const headerLocale = requestHeaders.get("x-lana-locale");
   const cookieLocale = cookieStore.get("lana-locale")?.value;
   const locale = normalizeLocale(headerLocale ?? cookieLocale);
+  const session = await auth().catch(() => null);
 
   return (
     <html lang={locale} dir={getDirection(locale)} suppressHydrationWarning>
       <body>
-        <SessionProvider>
+        <SessionProvider session={session} refetchOnWindowFocus={false} refetchWhenOffline={false}>
           <ThemeProvider>
             <PWARegister />
             <I18nRuntime initialLocale={locale} />
