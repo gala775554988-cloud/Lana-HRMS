@@ -16,7 +16,7 @@ export async function GET() {
   const [store, employees, branches, departments, positions] = await Promise.all([
     getHierarchyStore(),
     prisma.employee.findMany({
-      select: { id: true, employeeNumber: true, firstName: true, lastName: true, userId: true, branchId: true, departmentId: true, positionId: true, branch: { select: { name: true } }, department: { select: { name: true } }, position: { select: { title: true } } },
+      select: { id: true, employeeNumber: true, firstName: true, lastName: true, userId: true, branchId: true, departmentId: true, positionId: true, managerId: true, manager: { select: { firstName: true, lastName: true, employeeNumber: true } }, branch: { select: { name: true } }, department: { select: { name: true } }, position: { select: { title: true } } },
       orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
       take: 1000
     }),

@@ -5,7 +5,7 @@ import { Building2, GitBranch, Network, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-type Employee = { id: string; employeeNumber: string; firstName: string; lastName: string; branchId: string | null; departmentId: string | null; positionId: string | null; branch?: { name: string } | null; department?: { name: string } | null; position?: { title: string } | null };
+type Employee = { id: string; employeeNumber: string; firstName: string; lastName: string; branchId: string | null; departmentId: string | null; positionId: string | null; managerId?: string | null; manager?: { firstName: string; lastName: string; employeeNumber: string } | null; branch?: { name: string } | null; department?: { name: string } | null; position?: { title: string } | null };
 type Branch = { id: string; name: string; code: string };
 type Department = { id: string; name: string; code: string };
 type Position = { id: string; title: string; code: string; departmentId: string | null };
@@ -102,12 +102,19 @@ export function OrganizationHierarchyClient() {
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><Network className="h-5 w-5" /> المدير المباشر لكل موظف</CardTitle><CardDescription>Every employee remains linked to branch, department, and section through existing records.</CardDescription></CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Network className="h-5 w-5" /> المدير المباشر لكل موظف</CardTitle><CardDescription>Every employee remains linked to branch, department, and section through existing records. The Odoo-synced manager (if present) now drives the approval chain automatically -- the override below only applies to employees without one.</CardDescription></CardHeader>
         <CardContent className="grid gap-3 lg:grid-cols-2">
           {payload.employees.map((employee) => (
             <label key={employee.id} className="grid gap-1 rounded-xl border p-3 text-sm">
               <span>{employeeLabel(employee)}</span>
               <span className="text-xs text-muted-foreground">{employee.branch?.name ?? "No branch"} • {employee.department?.name ?? "No department"} • {employee.position?.title ?? "No section"}</span>
+              {employee.manager ? (
+                <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                  Odoo-synced manager: {employee.manager.firstName} {employee.manager.lastName} ({employee.manager.employeeNumber}) -- this drives approvals
+                </span>
+              ) : (
+                <span className="text-xs text-amber-600 dark:text-amber-400">No Odoo-synced manager -- override below is used instead</span>
+              )}
               <select value={store.directManagers[employee.id] ?? empty} onChange={(event) => updateStore((draft) => { if (event.target.value) draft.directManagers[employee.id] = event.target.value; else delete draft.directManagers[employee.id]; })} className="h-10 rounded-xl border bg-background px-3">
                 <option value="">Skip / Not assigned</option>
                 {employeeOptions.filter((manager) => manager.id !== employee.id).map((manager) => <option key={manager.id} value={manager.id}>{employeeLabel(manager)}</option>)}

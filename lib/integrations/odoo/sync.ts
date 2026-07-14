@@ -205,7 +205,7 @@ export class OdooSyncService {
 
     try {
       if (direction === "LANA_TO_ODOO" || direction === "BIDIRECTIONAL") {
-        const records = await delegate("employee").findMany({ where: updatedWhere(since), take: batchSize, orderBy: { updatedAt: "asc" }, include: { department: true, position: true, branch: true } });
+        const records = await delegate("employee").findMany({ where: updatedWhere(since), take: batchSize, orderBy: { updatedAt: "asc" }, include: { department: true, position: true, branch: true, manager: { select: { odooId: true } } } });
         for (const record of records as any[]) {
           try {
             const values: any = mapLanaEmployeeToOdoo(record);
@@ -226,6 +226,12 @@ export class OdooSyncService {
                 const comp = await this.findExternalBy("res.company", "name", record.branch.name, ["id"]);
                 if (comp?.id) values.company_id = comp.id;
               } catch {}
+            }
+            // Push the manager relationship back to Odoo's parent_id -- only
+            // possible when the manager was themselves synced from Odoo
+            // (has an odooId); this direction was previously Odoo->Lana only.
+            if (record.manager?.odooId) {
+              values.parent_id = record.manager.odooId;
             }
             const existing = await this.findExternalBy(mapper.odooModel, mapper.externalKeyField, record.employeeNumber, mapper.odooFields);
             if (existing && this.hasWriteDateConflict(record.updatedAt, existing.write_date, record, existing, mapper.fieldMap)) {
