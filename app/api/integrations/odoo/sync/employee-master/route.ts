@@ -10,6 +10,13 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const maxDuration = 300;
 
+function hasInternalSyncToken(request: NextRequest) {
+  const expected = process.env.ATTENDANCE_BRIDGE_TOKEN || process.env.INTERNAL_SYNC_TOKEN;
+  if (!expected) return false;
+  const header = request.headers.get('authorization') || request.headers.get('x-internal-sync-token') || '';
+  return header === `Bearer ${expected}` || header === expected;
+}
+
 type MasterRow = OdooRecord & {
   name?: string | false;
   barcode?: string | false;
@@ -125,7 +132,7 @@ async function ensureEmployeeUser(employeeId: string, values: { nationalId: stri
 export async function POST(request: NextRequest) {
   const startedAt = Date.now();
   try {
-    await requireOdooIntegrationAccess("manage");
+    if (!hasInternalSyncToken(request)) await requireOdooIntegrationAccess("manage");
     const body = await request.json().catch(() => ({}));
     const batchSize = Math.min(Math.max(Number(body.batchSize ?? 500), 50), 1000);
     const maxPages = body.maxPages ? Math.max(Number(body.maxPages), 1) : undefined;
