@@ -419,8 +419,16 @@ export async function listModuleRecords(input: QueryInput) {
       return { records: [] as Record<string, unknown>[], total: 0, page, pageSize, pageCount: 1, error: "MODEL_NOT_FOUND" };
     }
 
+    const findManyArgs: Record<string, unknown> = { where, skip: (page - 1) * pageSize, take: pageSize, orderBy: { createdAt: "desc" } };
+    if (resource.key === "leave-requests") {
+      findManyArgs.include = {
+        employee: { select: { firstName: true, lastName: true, employeeNumber: true } },
+        leaveType: { select: { name: true } }
+      };
+    }
+
     const [records, total] = await Promise.all([
-      delegate.findMany({ where, skip: (page - 1) * pageSize, take: pageSize, orderBy: { createdAt: "desc" } }),
+      delegate.findMany(findManyArgs),
       delegate.count({ where })
     ]);
 

@@ -8,6 +8,7 @@ import { LoanForm } from "@/components/hrms/loan-form";
 import { ModuleFormDialog } from "@/components/hrms/module-form-dialog";
 import { ModuleTable } from "@/components/hrms/module-table";
 import { EmployeeList } from "@/components/hrms/employee-list";
+import { LeaveRequestsTable } from "@/components/hrms/leave-requests-table";
 import { DepartmentSelector } from "@/components/hrms/department-selector";
 import { BranchSelector } from "@/components/hrms/branch-selector";
 import { FileUpload } from "@/components/hrms/file-upload";
@@ -119,6 +120,18 @@ export async function ModulePageBody({
   const branchOptions = resourceKey === "branches"
     ? await getBranchOptions(query)
     : [];
+  const leaveRequestStats = resourceKey === "leave-requests"
+    ? await (async () => {
+        const todayStart = new Date(new Date().setHours(0, 0, 0, 0));
+        const [pending, todayApprovals, approved, rejected] = await Promise.all([
+          prisma.leaveRequest.count({ where: { status: "PENDING" } }),
+          prisma.leaveRequest.count({ where: { status: "APPROVED", decidedAt: { gte: todayStart } } }),
+          prisma.leaveRequest.count({ where: { status: "APPROVED" } }),
+          prisma.leaveRequest.count({ where: { status: "REJECTED" } })
+        ]);
+        return { pending, todayApprovals, approved, rejected };
+      })()
+    : { pending: 0, todayApprovals: 0, approved: 0, rejected: 0 };
 
   const polishedResource = resourceKey === "departments" || resourceKey === "branches";
   const t = dictionary.module;
@@ -255,16 +268,27 @@ export async function ModulePageBody({
         </Card>
       ) : null}
       {resource.key === "documents" || resource.key === "candidates" ? <FileUpload /> : null}
-      <div className="space-y-4">
-        <ModuleTable resource={resource} records={data.records as (Record<string, unknown> & { id: string })[]} dictionary={dictionary} locale={locale} />
-        <div className="flex flex-col gap-3 rounded-lg border bg-card p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <span>{t.page} {data.page} {t.of} {data.pageCount} - {data.total} {t.records}</span>
-          <div className="flex gap-2">
-            <Button asChild variant="outline" size="sm"><Link href={buildQueryString(query, { [paramKey("page")]: String(Math.max(data.page - 1, 1)) })}>{t.previous}</Link></Button>
-            <Button asChild variant="outline" size="sm"><Link href={buildQueryString(query, { [paramKey("page")]: String(Math.min(data.page + 1, data.pageCount)) })}>{t.next}</Link></Button>
+      {resource.key === "leave-requests" ? (
+        <LeaveRequestsTable
+          records={data.records as any[]}
+          stats={leaveRequestStats}
+          page={data.page}
+          pageCount={data.pageCount}
+          total={data.total}
+          buildPageHref={(pageNum) => buildQueryString(query, { [paramKey("page")]: String(pageNum) })}
+        />
+      ) : (
+        <div className="space-y-4">
+          <ModuleTable resource={resource} records={data.records as (Record<string, unknown> & { id: string })[]} dictionary={dictionary} locale={locale} />
+          <div className="flex flex-col gap-3 rounded-lg border bg-card p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+            <span>{t.page} {data.page} {t.of} {data.pageCount} - {data.total} {t.records}</span>
+            <div className="flex gap-2">
+              <Button asChild variant="outline" size="sm"><Link href={buildQueryString(query, { [paramKey("page")]: String(Math.max(data.page - 1, 1)) })}>{t.previous}</Link></Button>
+              <Button asChild variant="outline" size="sm"><Link href={buildQueryString(query, { [paramKey("page")]: String(Math.min(data.page + 1, data.pageCount)) })}>{t.next}</Link></Button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </section>
   );
 }
