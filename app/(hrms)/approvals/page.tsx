@@ -13,19 +13,19 @@ export default function ApprovalsPage() {
         {
           value: "center",
           label: "استقبال الطلبات",
-          icon: GitPullRequest,
+          icon: <GitPullRequest className="h-4 w-4" />,
           content: <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">Loading requests...</div>}><RequestWorkbenchClient mode="center" /></Suspense>
         },
         {
           value: "inbox",
           label: "الموافقات الواردة",
-          icon: Inbox,
+          icon: <Inbox className="h-4 w-4" />,
           content: <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">Loading inbox...</div>}><RequestWorkbenchClient mode="inbox" /></Suspense>
         },
         {
           value: "outbox",
           label: "الموافقات الصادرة",
-          icon: Send,
+          icon: <Send className="h-4 w-4" />,
           content: <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">Loading outbox...</div>}><RequestWorkbenchClient mode="outbox" /></Suspense>
         }
       ]}

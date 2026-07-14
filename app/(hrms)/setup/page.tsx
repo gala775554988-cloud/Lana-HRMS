@@ -9,9 +9,9 @@ export default async function SetupPage({ searchParams }: { searchParams: Promis
     <MergedModuleTabs
       defaultValue="positions"
       items={[
-        { value: "positions", label: "المناصب", icon: Briefcase, content: activeTab === "positions" ? <ModulePageBody resourceKey="positions" query={query} showModuleTabs={false} tabValue="positions" /> : null },
-        { value: "employment-types", label: "أنواع التوظيف", icon: Tag, content: activeTab === "employment-types" ? <ModulePageBody resourceKey="employment-types" query={query} showModuleTabs={false} tabValue="employment-types" /> : null },
-        { value: "nationalities", label: "الجنسيات", icon: Globe2, content: activeTab === "nationalities" ? <ModulePageBody resourceKey="nationalities" query={query} showModuleTabs={false} tabValue="nationalities" /> : null }
+        { value: "positions", label: "المناصب", icon: <Briefcase className="h-4 w-4" />, content: activeTab === "positions" ? <ModulePageBody resourceKey="positions" query={query} showModuleTabs={false} tabValue="positions" /> : null },
+        { value: "employment-types", label: "أنواع التوظيف", icon: <Tag className="h-4 w-4" />, content: activeTab === "employment-types" ? <ModulePageBody resourceKey="employment-types" query={query} showModuleTabs={false} tabValue="employment-types" /> : null },
+        { value: "nationalities", label: "الجنسيات", icon: <Globe2 className="h-4 w-4" />, content: activeTab === "nationalities" ? <ModulePageBody resourceKey="nationalities" query={query} showModuleTabs={false} tabValue="nationalities" /> : null }
       ]}
     />
   );

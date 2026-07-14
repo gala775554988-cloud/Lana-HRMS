@@ -9,8 +9,8 @@ export default async function LeavesPage({ searchParams }: { searchParams: Promi
     <MergedModuleTabs
       defaultValue="leave-requests"
       items={[
-        { value: "leave-requests", label: "طلبات الإجازات", icon: Calendar, content: activeTab === "leave-requests" ? <ModulePageBody resourceKey="leave-requests" query={query} showModuleTabs={false} tabValue="leave-requests" /> : null },
-        { value: "leave-types", label: "أنواع الإجازات", icon: ListChecks, content: activeTab === "leave-types" ? <ModulePageBody resourceKey="leave-types" query={query} showModuleTabs={false} tabValue="leave-types" /> : null }
+        { value: "leave-requests", label: "طلبات الإجازات", icon: <Calendar className="h-4 w-4" />, content: activeTab === "leave-requests" ? <ModulePageBody resourceKey="leave-requests" query={query} showModuleTabs={false} tabValue="leave-requests" /> : null },
+        { value: "leave-types", label: "أنواع الإجازات", icon: <ListChecks className="h-4 w-4" />, content: activeTab === "leave-types" ? <ModulePageBody resourceKey="leave-types" query={query} showModuleTabs={false} tabValue="leave-types" /> : null }
       ]}
     />
   );

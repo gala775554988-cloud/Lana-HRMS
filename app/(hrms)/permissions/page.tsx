@@ -49,7 +49,7 @@ export default async function PermissionsPage({ searchParams }: { searchParams: 
         {
           value: "management",
           label: "إدارة الصلاحيات",
-          icon: Shield,
+          icon: <Shield className="h-4 w-4" />,
           content: activeTab === "management" ? (
             <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">Loading permissions...</div>}>
               <PermissionsManagementClient />
@@ -59,7 +59,7 @@ export default async function PermissionsPage({ searchParams }: { searchParams: 
         {
           value: "scopes",
           label: "نطاقات الصلاحيات",
-          icon: KeyRound,
+          icon: <KeyRound className="h-4 w-4" />,
           content: scopesContent
         }
       ]}

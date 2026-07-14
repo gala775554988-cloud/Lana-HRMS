@@ -9,8 +9,8 @@ export default async function BranchesPage({ searchParams }: { searchParams: Pro
     <MergedModuleTabs
       defaultValue="departments"
       items={[
-        { value: "departments", label: "الإدارات", icon: Building2, content: activeTab === "departments" ? <ModulePageBody resourceKey="departments" query={query} showModuleTabs={false} tabValue="departments" /> : null },
-        { value: "branches", label: "الفروع", icon: MapPin, content: activeTab === "branches" ? <ModulePageBody resourceKey="branches" query={query} showModuleTabs={false} tabValue="branches" /> : null }
+        { value: "departments", label: "الإدارات", icon: <Building2 className="h-4 w-4" />, content: activeTab === "departments" ? <ModulePageBody resourceKey="departments" query={query} showModuleTabs={false} tabValue="departments" /> : null },
+        { value: "branches", label: "الفروع", icon: <MapPin className="h-4 w-4" />, content: activeTab === "branches" ? <ModulePageBody resourceKey="branches" query={query} showModuleTabs={false} tabValue="branches" /> : null }
       ]}
     />
   );

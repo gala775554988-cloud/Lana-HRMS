@@ -214,11 +214,11 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
       <MergedModuleTabs
         defaultValue="directory"
         items={[
-          { value: "directory", label: "دليل الموظفين", icon: Users, content: directoryContent },
+          { value: "directory", label: "دليل الموظفين", icon: <Users className="h-4 w-4" />, content: directoryContent },
           {
             value: "hierarchy",
             label: "الهيكل التنظيمي",
-            icon: Network,
+            icon: <Network className="h-4 w-4" />,
             hidden: !isSuperAdmin,
             content: (
               <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">Loading hierarchy...</div>}>
@@ -229,7 +229,7 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
           {
             value: "my-team",
             label: "فريقي",
-            icon: UsersRound,
+            icon: <UsersRound className="h-4 w-4" />,
             content: activeTab === "my-team" ? (
               <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">جاري التحميل...</div>}>
                 <MyTeamTab />

@@ -13,11 +13,11 @@ export default async function AnnouncementsPage({ searchParams }: { searchParams
     <MergedModuleTabs
       defaultValue="announcements"
       items={[
-        { value: "announcements", label: "الإعلانات", icon: Megaphone, content: activeTab === "announcements" ? <ModulePageBody resourceKey="announcements" query={query} showModuleTabs={false} tabValue="announcements" /> : null },
+        { value: "announcements", label: "الإعلانات", icon: <Megaphone className="h-4 w-4" />, content: activeTab === "announcements" ? <ModulePageBody resourceKey="announcements" query={query} showModuleTabs={false} tabValue="announcements" /> : null },
         {
           value: "notifications",
           label: "الإشعارات",
-          icon: Bell,
+          icon: <Bell className="h-4 w-4" />,
           content: (
             <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">Loading notifications...</div>}>
               <NotificationCenterClient />
