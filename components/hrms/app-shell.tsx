@@ -113,12 +113,16 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
   const groupedNav = useMemo(() => {
     const result: Record<string, typeof navItems> = {};
     const roleSet = new Set(userRoles);
-    const isSuperAdminOrHR = roleSet.has("SUPER_ADMIN") || roleSet.has("HR_MANAGER");
+    const isSuperAdmin = roleSet.has("SUPER_ADMIN");
+    const isSuperAdminOrHR = isSuperAdmin || roleSet.has("HR_MANAGER");
 
     navItems
       .filter((item) => {
-        if (isSuperAdminOrHR) return true;
         const resources = Array.isArray(item.resource) ? item.resource : [item.resource];
+        // audit-logs is Super-Admin-only, deliberately excluded from the
+        // HR_MANAGER bypass below (unlike every other enterprise resource).
+        if (resources.includes("audit-logs")) return isSuperAdmin;
+        if (isSuperAdminOrHR) return true;
         return resources.some((resource) => {
           const hasResourceAccess = resource === "overtime"
             ? userPermissions.includes("manage:overtime")

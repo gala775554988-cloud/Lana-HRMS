@@ -78,7 +78,7 @@ export function ModuleTable({ resource, records, dictionary, locale = "en" }: { 
               <DropdownMenuItem asChild>
                 <Link href={openHref} className="flex items-center gap-2"><ExternalLink className="h-4 w-4" />{openLabel}</Link>
               </DropdownMenuItem>
-              {resource.key !== "departments" ? (
+              {resource.key !== "departments" && resource.key !== "audit-logs" ? (
                 <DropdownMenuItem variant="destructive" disabled={isPending} onSelect={() => handleDelete(row.original.id)}>
                   <Trash2 className="h-4 w-4" />{dictionary.table.delete}
                 </DropdownMenuItem>

@@ -482,6 +482,7 @@ export async function getModuleRecord(resourceKey: string, id: string) {
 export async function createModuleRecord(input: MutationInput) {
   const resource = getHrmsModule(input.resourceKey);
   if (!resource) return { success: false, message: "Unknown module." };
+  if (resource.key === "audit-logs") return { success: false, message: "Audit log entries are immutable and cannot be created manually." };
   const session = await requireModulePermission(resource, "manage");
   const salaryProfile = resource.key === "employees" ? extractSalaryProfile(input.values) : {};
   const parsed = buildModuleSchema(resource).safeParse(input.values);
@@ -574,7 +575,7 @@ export async function createModuleRecord(input: MutationInput) {
         action: "create",
         entity: resource.model,
         entityId: String(result.employee.id),
-        metadata: { ...employeeData, autoUserCreated: true, userId: result.user.id }
+        metadata: { before: null, after: serialize({ ...employeeData, autoUserCreated: true, userId: result.user.id }) }
       });
 
       await saveEmployeeSalaryProfile(String(result.employee.id), salaryProfile);
@@ -599,7 +600,7 @@ export async function createModuleRecord(input: MutationInput) {
   // Standard create for all other modules
   try {
     const record = await delegateFor(resource.model).create({ data });
-    await writeAuditLog({ actorUserId: session.user.id, action: "create", entity: resource.model, entityId: String(record.id), metadata: data });
+    await writeAuditLog({ actorUserId: session.user.id, action: "create", entity: resource.model, entityId: String(record.id), metadata: { before: null, after: serialize(data) } });
     revalidatePath("/" + resource.key);
     revalidatePath("/");
     return { success: true, message: resource.title + " record created.", id: String(record.id) };
@@ -614,6 +615,7 @@ export async function createModuleRecord(input: MutationInput) {
 export async function updateModuleRecord(input: MutationInput) {
   const resource = getHrmsModule(input.resourceKey);
   if (!resource || !input.id) return { success: false, message: "Unknown record." };
+  if (resource.key === "audit-logs") return { success: false, message: "Audit log entries are immutable and cannot be edited." };
   const session = await requireModulePermission(resource, "manage");
   const existingRecord = await delegateFor(resource.model).findUnique({ where: { id: input.id } });
   await assertRecordVisible(resource, existingRecord, session);
@@ -627,7 +629,7 @@ export async function updateModuleRecord(input: MutationInput) {
     const record = await delegateFor(resource.model).update({ where: { id: input.id }, data });
     await saveEmployeeSalaryProfile(input.id, salaryProfile);
 
-    await writeAuditLog({ actorUserId: session.user.id, action: "update", entity: resource.model, entityId: input.id, metadata: { ...data, salaryProfileUpdated: true } });
+    await writeAuditLog({ actorUserId: session.user.id, action: "update", entity: resource.model, entityId: input.id, metadata: { before: serialize(existingRecord), after: serialize({ ...data, salaryProfileUpdated: true }) } });
     await notifyRole(["SUPER_ADMIN", "HR_MANAGER"], "تعديل موظف", `Employee record ${input.id} was updated.`, "INFO").catch(() => null);
     revalidatePath("/" + resource.key);
     revalidatePath("/" + resource.key + "/" + input.id);
@@ -636,7 +638,7 @@ export async function updateModuleRecord(input: MutationInput) {
 
   const dataClean = data;
   const record = await delegateFor(resource.model).update({ where: { id: input.id }, data: dataClean });
-  await writeAuditLog({ actorUserId: session.user.id, action: "update", entity: resource.model, entityId: input.id, metadata: dataClean });
+  await writeAuditLog({ actorUserId: session.user.id, action: "update", entity: resource.model, entityId: input.id, metadata: { before: serialize(existingRecord), after: serialize(dataClean) } });
   revalidatePath("/" + resource.key);
   revalidatePath("/" + resource.key + "/" + input.id);
   return { success: true, message: resource.title + " record updated.", id: String(record.id) };
@@ -645,11 +647,12 @@ export async function updateModuleRecord(input: MutationInput) {
 export async function deleteModuleRecord(resourceKey: string, id: string) {
   const resource = getHrmsModule(resourceKey);
   if (!resource) return { success: false, message: "Unknown module." };
+  if (resource.key === "audit-logs") return { success: false, message: "Audit log entries are immutable and cannot be deleted." };
   const session = await requireModulePermission(resource, "manage");
   const existingRecord = await delegateFor(resource.model).findUnique({ where: { id } });
   await assertRecordVisible(resource, existingRecord, session);
   await delegateFor(resource.model).delete({ where: { id } });
-  await writeAuditLog({ actorUserId: session.user.id, action: "delete", entity: resource.model, entityId: id });
+  await writeAuditLog({ actorUserId: session.user.id, action: "delete", entity: resource.model, entityId: id, metadata: { before: serialize(existingRecord), after: null } });
   revalidatePath("/" + resource.key);
   return { success: true, message: resource.title + " record deleted." };
 }
