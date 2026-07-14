@@ -194,7 +194,8 @@ export const dictionaries = {
       approvals: "Approvals Center",
       payroll: "Payroll & Compensation",
       permissions: "Permissions",
-      "lana-ai": "AI System Manager"
+      "lana-ai": "AI System Manager",
+      "departments-branches": "Departments & Branches"
     },
     navGroups: {
       dashboardAnalytics: "Dashboard & Analytics",
@@ -550,7 +551,8 @@ export const dictionaries = {
       approvals: "مركز الموافقات والطلبات",
       payroll: "مسير الرواتب والبدلات",
       permissions: "إدارة الصلاحيات والأدوار",
-      "lana-ai": "مدير النظام الذكي"
+      "lana-ai": "مدير النظام الذكي",
+      "departments-branches": "الإدارات والفروع"
     },
     navGroups: {
       dashboardAnalytics: "لوحة المعلومات والتحليلات",

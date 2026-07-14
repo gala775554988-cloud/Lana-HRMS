@@ -54,7 +54,7 @@ export default async function HospitalDetailsPage({
           <h1 className="text-3xl font-semibold tracking-tight">{hospital.name}</h1>
           <p className="mt-2 text-muted-foreground">الموظفون التابعون لهذه المستشفى فقط.</p>
         </div>
-        <Button asChild variant="outline"><Link href="/branches?tab=hospitals">رجوع</Link></Button>
+        <Button asChild variant="outline"><Link href="/hospitals">رجوع</Link></Button>
       </div>
       <EmployeeList
         resource={employeeResource}
