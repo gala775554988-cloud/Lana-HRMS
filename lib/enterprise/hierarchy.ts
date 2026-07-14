@@ -149,12 +149,16 @@ export async function canAccessEmployeeId(employeeId: string, profile: AccessPro
 
 export async function resolveApprovalChain(employeeId: string) {
   const [employee, store] = await Promise.all([
-    prisma.employee.findUnique({ where: { id: employeeId }, select: { id: true, userId: true, departmentId: true, branchId: true } }),
+    prisma.employee.findUnique({ where: { id: employeeId }, select: { id: true, userId: true, departmentId: true, branchId: true, managerId: true } }),
     getHierarchyStore()
   ]);
   if (!employee) return [];
 
-  const directManagerId = store.directManagers[employee.id];
+  // Employee.managerId is kept in sync from Odoo automatically -- prefer it
+  // over the manually-admin-configured directManagers map, which requires
+  // re-entering the same relationship by hand and can drift out of sync.
+  // Fall back to the manual map only for employees not yet Odoo-synced.
+  const directManagerId = employee.managerId ?? store.directManagers[employee.id];
   const branchManagerId = employee.branchId ? store.branchManagers[employee.branchId] : undefined;
   const departmentManagerId = employee.departmentId ? store.departmentManagers[employee.departmentId] : undefined;
 

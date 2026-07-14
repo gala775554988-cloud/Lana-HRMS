@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Globe, Languages } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { normalizeLocale, type Locale } from "@/lib/i18n";
@@ -21,6 +22,7 @@ export function ClientLanguageToggle({
   icon?: "languages" | "globe";
 }) {
   const [locale, setLocale] = useState<Locale>("ar");
+  const router = useRouter();
 
   useEffect(() => {
     setLocale(readLocale());
@@ -36,6 +38,10 @@ export function ClientLanguageToggle({
     document.documentElement.dir = nextLocale === "ar" ? "rtl" : "ltr";
     setLocale(nextLocale);
     window.dispatchEvent(new CustomEvent("lana-locale-change", { detail: { locale: nextLocale } }));
+    // Re-render server components (app shell nav, dashboard) that now read
+    // the locale cookie directly via getRequestDictionary(), in addition to
+    // the DOM-rewrite runtime that still covers everything not yet converted.
+    router.refresh();
   }
 
   return (

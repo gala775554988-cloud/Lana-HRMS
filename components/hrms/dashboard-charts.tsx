@@ -12,25 +12,29 @@ function cardClass(extra = "") {
   return `rounded-3xl border border-slate-200/80 bg-white p-6 shadow-md shadow-slate-200/40 transition-all duration-300 hover:-translate-y-1 hover:border-indigo-500/40 hover:shadow-xl dark:border-slate-800 dark:bg-slate-900 dark:shadow-none ${extra}`;
 }
 
-export function DashboardCharts({ metrics }: { metrics: Record<string, unknown> }) {
+type Series = { months: string[]; employeeGrowth: number[]; requests: number[]; payroll: number[] };
+
+export function DashboardCharts({ metrics, series }: { metrics: Record<string, unknown>; series?: Series }) {
   const { mode } = useThemeStore();
   const isDark = mode === "dark";
 
-  const employees = Number(metrics.employees ?? 0);
   const departments = Number(metrics.departments ?? 0);
   const branches = Number(metrics.branches ?? 0);
   const hospitals = Number(metrics.hospitals ?? 0);
   const contracts = Number(metrics.contracts ?? 0);
   const attendance = Number(metrics.attendanceToday ?? 0);
   const leave = Number(metrics.pendingLeave ?? 0);
-  const payroll = Number(metrics.totalPayroll ?? 0);
   const requests = Number(metrics.requestsToday ?? 0);
   const overtime = Number(metrics.overtimePending ?? 0);
 
-  const growth = Array.from({ length: 8 }).map((_, index) => ({
-    month: ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس"][index],
-    الموظفون: Math.max(Math.round(employees * (0.72 + index * 0.045)), 0),
-    الطلبات: Math.max(requests + index * 3, 0)
+  // Real historical data computed server-side (see app/(hrms)/dashboard/page.tsx),
+  // not a fabricated growth formula. Falls back to a flat single point only if
+  // the series prop is somehow missing (defensive, shouldn't happen).
+  const months = series?.months ?? [new Date().toISOString().slice(0, 7)];
+  const growth = months.map((month, index) => ({
+    month,
+    الموظفون: series?.employeeGrowth[index] ?? 0,
+    الطلبات: series?.requests[index] ?? 0
   }));
 
   const operations = [
@@ -47,9 +51,9 @@ export function DashboardCharts({ metrics }: { metrics: Record<string, unknown> 
     { name: "العقود", value: contracts }
   ];
 
-  const payrollData = growth.map((item, index) => ({
-    month: item.month,
-    الرواتب: Math.max(Math.round(payroll / 1000) + index * 8, index * 8)
+  const payrollData = months.map((month, index) => ({
+    month,
+    الرواتب: Math.round((series?.payroll[index] ?? 0) / 1000)
   }));
 
   const gridColor = isDark ? "#1e293b" : "#e2e8f0";

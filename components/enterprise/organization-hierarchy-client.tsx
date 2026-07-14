@@ -5,7 +5,7 @@ import { Building2, GitBranch, Network, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-type Employee = { id: string; employeeNumber: string; firstName: string; lastName: string; branchId: string | null; departmentId: string | null; positionId: string | null; branch?: { name: string } | null; department?: { name: string } | null; position?: { title: string } | null };
+type Employee = { id: string; employeeNumber: string; firstName: string; lastName: string; branchId: string | null; departmentId: string | null; positionId: string | null; managerId?: string | null; manager?: { firstName: string; lastName: string; employeeNumber: string } | null; branch?: { name: string } | null; department?: { name: string } | null; position?: { title: string } | null };
 type Branch = { id: string; name: string; code: string };
 type Department = { id: string; name: string; code: string };
 type Position = { id: string; title: string; code: string; departmentId: string | null };
@@ -37,6 +37,41 @@ export function OrganizationHierarchyClient() {
     return `${employee.employeeNumber} - ${employee.firstName} ${employee.lastName}`;
   }
 
+  const tree = useMemo(() => {
+    const byManager = new Map<string, Employee[]>();
+    const roots: Employee[] = [];
+    for (const employee of employeeOptions) {
+      if (employee.managerId) {
+        const list = byManager.get(employee.managerId) ?? [];
+        list.push(employee);
+        byManager.set(employee.managerId, list);
+      } else {
+        roots.push(employee);
+      }
+    }
+    // Only show roots that actually manage someone -- with 1600+ employees and
+    // Odoo-synced manager data still being backfilled, most employees have no
+    // manager and no reports yet; listing every one of them as a bare "root"
+    // would bury the real hierarchy in noise rather than showing a useful tree.
+    const rootsWithReports = roots.filter((employee) => byManager.has(employee.id));
+    return { byManager, roots: rootsWithReports, unconnectedCount: roots.length - rootsWithReports.length };
+  }, [employeeOptions]);
+
+  function TreeNode({ employee }: { employee: Employee }) {
+    const reports = tree.byManager.get(employee.id) ?? [];
+    if (!reports.length) {
+      return <div className="rounded-lg border px-3 py-1.5 text-sm">{employeeLabel(employee)}</div>;
+    }
+    return (
+      <details className="rounded-lg border px-3 py-1.5 text-sm" open={reports.length <= 5}>
+        <summary className="cursor-pointer font-medium">{employeeLabel(employee)} <span className="text-xs text-muted-foreground">({reports.length} تقرير مباشر)</span></summary>
+        <div className="mt-2 ms-4 space-y-1.5 border-s ps-3">
+          {reports.map((report) => <TreeNode key={report.id} employee={report} />)}
+        </div>
+      </details>
+    );
+  }
+
   function updateStore(mutator: (draft: Store) => void) {
     setStore((current) => {
       if (!current) return current;
@@ -65,6 +100,17 @@ export function OrganizationHierarchyClient() {
           <CardDescription>Company, branches, departments, sections, projects, and approval managers.</CardDescription>
         </CardHeader>
         <CardContent className="rounded-xl border bg-muted/30 p-4 font-semibold">{payload.company.name}</CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Network className="h-5 w-5" /> شجرة الهيكل التنظيمي</CardTitle>
+          <CardDescription>Rendered from the Odoo-synced manager relationship (Employee.managerId) -- expand a manager to see their direct reports.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {tree.roots.length ? tree.roots.map((employee) => <TreeNode key={employee.id} employee={employee} />) : <div className="rounded-xl border border-dashed p-6 text-center text-muted-foreground">لا توجد بيانات مدراء متزامنة بعد.</div>}
+          {tree.unconnectedCount > 0 && <p className="text-xs text-muted-foreground">+{tree.unconnectedCount} موظف بدون مدير أو تقارير مباشرة (غير معروضين هنا).</p>}
+        </CardContent>
       </Card>
 
       {message ? <div className="rounded-xl border bg-background p-3 text-sm text-muted-foreground">{message}</div> : null}
@@ -102,12 +148,19 @@ export function OrganizationHierarchyClient() {
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><Network className="h-5 w-5" /> المدير المباشر لكل موظف</CardTitle><CardDescription>Every employee remains linked to branch, department, and section through existing records.</CardDescription></CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Network className="h-5 w-5" /> المدير المباشر لكل موظف</CardTitle><CardDescription>Every employee remains linked to branch, department, and section through existing records. The Odoo-synced manager (if present) now drives the approval chain automatically -- the override below only applies to employees without one.</CardDescription></CardHeader>
         <CardContent className="grid gap-3 lg:grid-cols-2">
           {payload.employees.map((employee) => (
             <label key={employee.id} className="grid gap-1 rounded-xl border p-3 text-sm">
               <span>{employeeLabel(employee)}</span>
               <span className="text-xs text-muted-foreground">{employee.branch?.name ?? "No branch"} • {employee.department?.name ?? "No department"} • {employee.position?.title ?? "No section"}</span>
+              {employee.manager ? (
+                <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                  Odoo-synced manager: {employee.manager.firstName} {employee.manager.lastName} ({employee.manager.employeeNumber}) -- this drives approvals
+                </span>
+              ) : (
+                <span className="text-xs text-amber-600 dark:text-amber-400">No Odoo-synced manager -- override below is used instead</span>
+              )}
               <select value={store.directManagers[employee.id] ?? empty} onChange={(event) => updateStore((draft) => { if (event.target.value) draft.directManagers[employee.id] = event.target.value; else delete draft.directManagers[employee.id]; })} className="h-10 rounded-xl border bg-background px-3">
                 <option value="">Skip / Not assigned</option>
                 {employeeOptions.filter((manager) => manager.id !== employee.id).map((manager) => <option key={manager.id} value={manager.id}>{employeeLabel(manager)}</option>)}

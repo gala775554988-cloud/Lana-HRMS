@@ -12,6 +12,8 @@ import {
   TrendingUp, Activity
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { getRequestDictionary } from "@/lib/i18n-server";
+import type { Dictionary, Locale } from "@/lib/i18n";
 
 // Removed force-dynamic for better caching and performance
 
@@ -21,6 +23,8 @@ export default async function HrmsDashboard() {
   if (!session?.user) {
     redirect("/login");
   }
+
+  const { locale, dictionary } = await getRequestDictionary();
 
   const roles = (session.user.roles as string[]) || [];
   const isAdmin = roles.some((role: string) =>
@@ -34,12 +38,12 @@ export default async function HrmsDashboard() {
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400 text-3xl">
             🔒
           </div>
-          <h1 className="mb-2 text-2xl font-black text-slate-900 dark:text-slate-100">غير مصرح لك</h1>
+          <h1 className="mb-2 text-2xl font-black text-slate-900 dark:text-slate-100">{dictionary.dashboard.unauthorizedTitle}</h1>
           <p className="mb-6 text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-            هذه الصفحة مخصصة للمسؤولين فقط.
+            {dictionary.dashboard.unauthorizedMessage}
           </p>
-          <a href="/employee/dashboard" className="inline-block rounded-2xl bg-[#2E2A8C] px-6 py-3.5 font-bold text-white">
-            الذهاب إلى بوابة الموظف
+          <a href="/employee/dashboard" className="inline-block rounded-2xl bg-primary px-6 py-3.5 font-bold text-white">
+            {dictionary.dashboard.goToEmployeePortal}
           </a>
         </div>
       </div>
@@ -52,22 +56,35 @@ export default async function HrmsDashboard() {
       <div className="relative overflow-hidden rounded-[2.5rem] border border-slate-200/80 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900 md:p-10">
         <div className="relative">
           <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-slate-100 sm:text-4xl md:text-5xl">
-            لوحة تحكم Lana HRMS التنفيذية
+            {dictionary.dashboard.heroTitle}
           </h1>
           <p className="mt-3 max-w-3xl text-sm sm:text-base text-slate-600 dark:text-slate-400">
-            مركز قيادة متكامل لمتابعة الموظفين، الإدارات، الرواتب، والحضور.
+            {dictionary.dashboard.heroDescription}
           </p>
         </div>
       </div>
 
       <Suspense fallback={<DashboardSkeleton />}>
-        <DashboardContent />
+        <DashboardContent locale={locale} dictionary={dictionary} />
       </Suspense>
     </div>
   );
 }
 
-async function DashboardContent() {
+function lastNMonthRanges(n: number) {
+  const now = new Date();
+  const ranges: Array<{ start: Date; end: Date; label: string }> = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+    ranges.push({ start, end, label: start.toISOString().slice(0, 7) });
+  }
+  return ranges;
+}
+
+async function DashboardContent({ locale, dictionary }: { locale: Locale; dictionary: Dictionary }) {
+  const monthRanges = lastNMonthRanges(8);
+
   // Optimized: Parallel queries with select where possible
   const [
     employees,
@@ -81,7 +98,10 @@ async function DashboardContent() {
     attendanceToday,
     lateToday,
     payrollSum,
-    overtimePending
+    overtimePending,
+    employeeGrowthByMonth,
+    requestsByMonth,
+    payrollByMonth
   ] = await Promise.all([
     prisma.employee.count({ where: { status: "ACTIVE" } }),
     prisma.department.count({ where: { isActive: true } }),
@@ -94,7 +114,13 @@ async function DashboardContent() {
     prisma.attendanceRecord.count({ where: { workDate: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } } }),
     prisma.attendanceRecord.count({ where: { status: "LATE", workDate: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } } }),
     prisma.payrollItem.aggregate({ _sum: { netPay: true }, where: { payrollRun: { status: "PAID" } } }).then(r => Number(r._sum.netPay || 0)),
-    prisma.overtimeRequest.count({ where: { status: "PENDING" } })
+    prisma.overtimeRequest.count({ where: { status: "PENDING" } }),
+    // Real cumulative headcount at the end of each of the last 8 months (by hireDate), replacing a fabricated growth formula.
+    Promise.all(monthRanges.map((range) => prisma.employee.count({ where: { hireDate: { lt: range.end } } }))),
+    // Real request volume submitted within each month, replacing a fabricated formula.
+    Promise.all(monthRanges.map((range) => prisma.workflowInstance.count({ where: { createdAt: { gte: range.start, lt: range.end } } }))),
+    // Real payroll paid within each month, replacing a fabricated formula.
+    Promise.all(monthRanges.map((range) => prisma.payrollItem.aggregate({ _sum: { netPay: true }, where: { payrollRun: { status: "PAID", paidAt: { gte: range.start, lt: range.end } } } }).then((r) => Number(r._sum.netPay || 0))))
   ]);
 
   const metrics = {
@@ -112,19 +138,28 @@ async function DashboardContent() {
     overtimePending
   };
 
+  const monthLabels = monthRanges.map((r) => r.label);
+  const series = {
+    months: monthLabels,
+    employeeGrowth: employeeGrowthByMonth,
+    requests: requestsByMonth,
+    payroll: payrollByMonth
+  };
+
+  const currencyLocale = { en: "en-US", ar: "ar-SA" } as const;
   const cards: Array<{ title: string; value: number | string; icon: LucideIcon; hint: string; tone: string; badgeText?: string }> = [
-    { title: "عدد الموظفين النشطين", value: employees, icon: Users, hint: "إجمالي القوى العاملة", tone: "from-indigo-600 to-purple-600", badgeText: "مباشر" },
-    { title: "عدد الإدارات", value: departments, icon: Building2, hint: "إدارات وأقسام مسجلة", tone: "from-blue-600 to-indigo-600" },
-    { title: "عدد الفروع", value: branches, icon: Building2, hint: "مكاتب ومقرات رئيسية", tone: "from-purple-600 to-pink-600" },
-    { title: "المستشفيات والمراكز", value: hospitals, icon: Hospital, hint: "مواقع الرعاية الصحية", tone: "from-emerald-600 to-teal-600", badgeText: "طبي" },
-    { title: "العقود الوظيفية", value: contracts, icon: FileText, hint: "عقود سارية المفعول", tone: "from-cyan-600 to-blue-600" },
-    { title: "طلبات اليوم", value: requestsToday, icon: GitPullRequest, hint: "تم تقديمها خلال 24 ساعة", tone: "from-violet-600 to-purple-600" },
-    { title: "بانتظار الاعتماد", value: pendingApprovals, icon: Clock3, hint: "دورة سير العمل (Workflow)", tone: "from-amber-500 to-orange-600", badgeText: pendingApprovals > 0 ? "عاجل" : undefined },
-    { title: "طلبات الإجازة المعلقة", value: pendingLeave, icon: Calendar, hint: "تنتظر مراجعة المدير", tone: "from-orange-500 to-red-600" },
-    { title: "حضور اليوم السريع", value: attendanceToday, icon: Clock3, hint: "سجلات تسجيل الدخول", tone: "from-teal-600 to-emerald-600" },
-    { title: "حالات التأخير اليوم", value: lateToday, icon: TimerReset, hint: "تجاوز وقت الحضور الرسمي", tone: "from-rose-600 to-red-600" },
-    { title: "إجمالي الرواتب المدفوعة", value: new Intl.NumberFormat("ar-SA", { style: "currency", currency: "SAR", maximumFractionDigits: 0 }).format(payrollSum), icon: WalletCards, hint: "مسيرات الرواتب المعتمدة", tone: "from-indigo-700 to-slate-900" },
-    { title: "طلبات الأوفر تايم", value: overtimePending, icon: TimerReset, hint: "بانتظار موافقة الموارد البشرية", tone: "from-fuchsia-600 to-purple-600" }
+    { title: dictionary.dashboard.kpiActiveEmployees, value: employees, icon: Users, hint: dictionary.dashboard.kpiActiveEmployeesHint, tone: "from-indigo-600 to-purple-600", badgeText: dictionary.dashboard.kpiLiveBadge },
+    { title: dictionary.dashboard.kpiDepartments, value: departments, icon: Building2, hint: dictionary.dashboard.kpiDepartmentsHint, tone: "from-blue-600 to-indigo-600" },
+    { title: dictionary.dashboard.kpiBranches, value: branches, icon: Building2, hint: dictionary.dashboard.kpiBranchesHint, tone: "from-purple-600 to-pink-600" },
+    { title: dictionary.dashboard.kpiHospitals, value: hospitals, icon: Hospital, hint: dictionary.dashboard.kpiHospitalsHint, tone: "from-emerald-600 to-teal-600", badgeText: dictionary.dashboard.kpiMedicalBadge },
+    { title: dictionary.dashboard.kpiContracts, value: contracts, icon: FileText, hint: dictionary.dashboard.kpiContractsHint, tone: "from-cyan-600 to-blue-600" },
+    { title: dictionary.dashboard.kpiRequestsToday, value: requestsToday, icon: GitPullRequest, hint: dictionary.dashboard.kpiRequestsTodayHint, tone: "from-violet-600 to-purple-600" },
+    { title: dictionary.dashboard.kpiPendingApprovals, value: pendingApprovals, icon: Clock3, hint: dictionary.dashboard.kpiPendingApprovalsHint, tone: "from-amber-500 to-orange-600", badgeText: pendingApprovals > 0 ? dictionary.dashboard.kpiUrgentBadge : undefined },
+    { title: dictionary.dashboard.kpiPendingLeave, value: pendingLeave, icon: Calendar, hint: dictionary.dashboard.kpiPendingLeaveHint, tone: "from-orange-500 to-red-600" },
+    { title: dictionary.dashboard.kpiAttendanceToday, value: attendanceToday, icon: Clock3, hint: dictionary.dashboard.kpiAttendanceTodayHint, tone: "from-teal-600 to-emerald-600" },
+    { title: dictionary.dashboard.kpiLateToday, value: lateToday, icon: TimerReset, hint: dictionary.dashboard.kpiLateTodayHint, tone: "from-rose-600 to-red-600" },
+    { title: dictionary.dashboard.kpiTotalPayroll, value: new Intl.NumberFormat(currencyLocale[locale], { style: "currency", currency: "SAR", maximumFractionDigits: 0 }).format(payrollSum), icon: WalletCards, hint: dictionary.dashboard.kpiTotalPayrollHint, tone: "from-indigo-700 to-slate-900" },
+    { title: dictionary.dashboard.kpiOvertimePending, value: overtimePending, icon: TimerReset, hint: dictionary.dashboard.kpiOvertimePendingHint, tone: "from-fuchsia-600 to-purple-600" }
   ];
 
   return (
@@ -135,36 +170,36 @@ async function DashboardContent() {
       </div>
 
       {/* Charts Section */}
-      <DashboardCharts metrics={metrics} />
+      <DashboardCharts metrics={metrics} series={series} />
 
       {/* Quick Access Modules */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-[#6D6AF8]" />
-            <span>الوصول السريع للوحدات الرئيسية</span>
+            <TrendingUp className="h-5 w-5 text-primary" />
+            <span>{dictionary.dashboard.quickAccessTitle}</span>
           </h2>
         </div>
-        
+
         <div className="grid gap-5 md:grid-cols-3">
           <QuickLinkCard
-            title="إدارة الموظفين والوثائق"
+            title={dictionary.dashboard.quickLinkEmployeesTitle}
             href="/employees"
-            description="عرض قائمة الموظفين، إضافة موظف جديد، مراجعة العقود والوثائق الرسمية للموظف."
+            description={dictionary.dashboard.quickLinkEmployeesDesc}
             icon={Users}
             tone="from-blue-500 to-indigo-600"
           />
           <QuickLinkCard
-            title="صندوق الاعتمادات وسير العمل"
+            title={dictionary.dashboard.quickLinkRequestsTitle}
             href="/request-center"
-            description="متابعة طلبات الموظفين المعلقة مثل الإجازات، السلف، المصاريف، والأوفر تايم."
+            description={dictionary.dashboard.quickLinkRequestsDesc}
             icon={GitPullRequest}
             tone="from-purple-500 to-pink-600"
           />
           <QuickLinkCard
-            title="ذكاء الأعمال والتقارير الشاملة"
+            title={dictionary.dashboard.quickLinkReportsTitle}
             href="/reports"
-            description="تصدير وتحليل بيانات القوى العاملة، مؤشرات الأداء، وتقارير الرواتب والميزانيات."
+            description={dictionary.dashboard.quickLinkReportsDesc}
             icon={Activity}
             tone="from-emerald-500 to-teal-600"
           />

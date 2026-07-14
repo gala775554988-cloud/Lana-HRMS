@@ -320,6 +320,11 @@ model Employee {
   nationalityId          String?
   // Odoo sync fields
   sponsor                String? // كفيل / Sponsor name synced from Odoo
+  hospitalId             String? // Real FK, replaces the old freeform employee.extra AppSetting hospital string
+  costCenter             String? // Freeform for now -- Odoo field mapping deferred pending real custom field name
+  analyticAccount        String? // Freeform for now -- Odoo field mapping deferred pending real custom field name
+  workLocationName       String? // Mirrors Odoo's work_location_id (fetched but previously unmapped)
+  odooWorkLocationId     Int?
   // Archived employees & last active date
   managerId              String?
   lastActiveDate         DateTime?
@@ -347,6 +352,8 @@ model Employee {
   nationality            Nationality?            @relation(fields: [nationalityId], references: [id], onDelete: SetNull)
   manager                Employee?               @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull)
   managedEmployees       Employee[]              @relation("EmployeeManager")
+  hospital               Hospital?               @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
+  shiftAssignments       ShiftAssignment[]
   documents              EmployeeDocument[]
   contracts              EmployeeContract[]
   assignedAssets         Asset[]
@@ -393,6 +400,7 @@ model Employee {
   @@index([createdAt])
   @@index([status, departmentId])
   @@index([status, branchId])
+  @@index([hospitalId])
 }
 
 model EmployeeDocument {
@@ -931,22 +939,55 @@ model WorkflowStep {
 // ====================== ENTERPRISE UPGRADE MODELS ======================
 
 model Hospital {
-  id           String   @id @default(cuid())
+  id           String     @id @default(cuid())
   name         String
-  code         String   @unique
+  code         String     @unique
   logoUrl      String?
   medicalDepts String?
-  bedsCount    Int      @default(0)
-  capacity     Int      @default(0)
+  bedsCount    Int        @default(0)
+  capacity     Int        @default(0)
   phone        String?
   email        String?
   address      String?
   city         String?
   branchId     String?
   managerId    String?
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  employees    Employee[]
+}
+
+model Shift {
+  id          String            @id @default(cuid())
+  name        String
+  code        String            @unique
+  startTime   String // 24h "HH:mm", e.g. "08:00"
+  endTime     String // 24h "HH:mm", e.g. "16:00"
+  daysOfWeek  String // comma-separated: "SUN,MON,TUE,WED,THU"
+  isActive    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  assignments ShiftAssignment[]
+
+  @@index([isActive])
+}
+
+model ShiftAssignment {
+  id            String    @id @default(cuid())
+  employeeId    String
+  shiftId       String
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  employee      Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  shift         Shift     @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([shiftId])
+  @@index([effectiveFrom])
 }
 
 model DynamicField {
