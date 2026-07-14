@@ -4,6 +4,7 @@ import { listModuleRecords } from "@/lib/hrms/actions";
 import { getRequestDictionary } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { ModuleForm } from "@/components/hrms/module-form";
+import { ModuleFormDialog } from "@/components/hrms/module-form-dialog";
 import { ModuleTable } from "@/components/hrms/module-table";
 import { EmployeeList } from "@/components/hrms/employee-list";
 import { DepartmentSelector } from "@/components/hrms/department-selector";
@@ -14,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getEmployeeExtraSettings } from "@/lib/enterprise/hospitals";
-import { AlertTriangle, BarChart3, Download, MoreHorizontal, Plus, Search, SlidersHorizontal, Upload } from "lucide-react";
+import { AlertTriangle, BarChart3, Download, MoreHorizontal, Search, SlidersHorizontal, Upload } from "lucide-react";
 import Link from "next/link";
 import { ModuleTabs } from "@/components/hrms/module-tabs";
 
@@ -189,6 +190,11 @@ export async function ModulePageBody({
           <h1 className="text-3xl font-semibold tracking-tight">{resourceTitle}</h1>
           <p className="max-w-2xl text-muted-foreground">{resourceDescription}</p>
         </div>
+        <div className="shrink-0">
+          <ModuleFormDialog triggerLabel={`${t.create} ${resourceTitle}`} title={`${t.create} ${resourceTitle}`} description={t.createDescription}>
+            <ModuleForm resource={resource} dictionary={dictionary} locale={locale} />
+          </ModuleFormDialog>
+        </div>
       </div>
 
       {/* Compact single-row toolbar: search + filters on one side, import/export/reports tucked into a menu */}
@@ -246,18 +252,15 @@ export async function ModulePageBody({
         </Card>
       ) : null}
       {resource.key === "documents" || resource.key === "candidates" ? <FileUpload /> : null}
-      <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
-        <div className="space-y-4">
-          <ModuleTable resource={resource} records={data.records as (Record<string, unknown> & { id: string })[]} dictionary={dictionary} locale={locale} />
-          <div className="flex flex-col gap-3 rounded-lg border bg-card p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-            <span>{t.page} {data.page} {t.of} {data.pageCount} - {data.total} {t.records}</span>
-            <div className="flex gap-2">
-              <Button asChild variant="outline" size="sm"><Link href={buildQueryString(query, { [paramKey("page")]: String(Math.max(data.page - 1, 1)) })}>{t.previous}</Link></Button>
-              <Button asChild variant="outline" size="sm"><Link href={buildQueryString(query, { [paramKey("page")]: String(Math.min(data.page + 1, data.pageCount)) })}>{t.next}</Link></Button>
-            </div>
+      <div className="space-y-4">
+        <ModuleTable resource={resource} records={data.records as (Record<string, unknown> & { id: string })[]} dictionary={dictionary} locale={locale} />
+        <div className="flex flex-col gap-3 rounded-lg border bg-card p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <span>{t.page} {data.page} {t.of} {data.pageCount} - {data.total} {t.records}</span>
+          <div className="flex gap-2">
+            <Button asChild variant="outline" size="sm"><Link href={buildQueryString(query, { [paramKey("page")]: String(Math.max(data.page - 1, 1)) })}>{t.previous}</Link></Button>
+            <Button asChild variant="outline" size="sm"><Link href={buildQueryString(query, { [paramKey("page")]: String(Math.min(data.page + 1, data.pageCount)) })}>{t.next}</Link></Button>
           </div>
         </div>
-        <Card className="shadow-sm"><CardHeader><CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />{t.create} {resourceTitle}</CardTitle><CardDescription>{t.createDescription}</CardDescription></CardHeader><CardContent><ModuleForm resource={resource} dictionary={dictionary} locale={locale} /></CardContent></Card>
       </div>
     </section>
   );
