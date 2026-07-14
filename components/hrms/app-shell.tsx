@@ -258,10 +258,16 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
       <div className="flex">
         <aside
           className={cn(
-            "fixed inset-y-0 start-0 z-50 flex flex-col border-e border-slate-200/80 bg-white shadow-xl transition-transform duration-300 ease-in-out lg:static lg:z-auto lg:shadow-none lg:translate-x-0 dark:border-slate-800 dark:bg-slate-950",
+            "fixed inset-y-0 start-0 z-50 flex flex-col border-e border-slate-200/80 bg-white shadow-xl transition-transform duration-300 ease-in-out lg:static lg:z-auto lg:shadow-none lg:!translate-x-0 dark:border-slate-800 dark:bg-slate-950",
             sidebarCollapsed ? "lg:w-[76px]" : "lg:w-[280px]",
             "w-[280px]",
-            mobileMenuOpen ? "translate-x-0" : "rtl:translate-x-full ltr:-translate-x-full lg:translate-x-0"
+            // !important on the lg override above is required: the bare (no
+            // breakpoint) rtl:/ltr: rules below land later in Tailwind's
+            // compiled stylesheet than the lg: media-query block, so without
+            // !important they'd win the cascade at desktop widths too and
+            // push the sidebar off-screen in RTL -- confirmed by inspecting
+            // the actual compiled CSS rule order, not just reasoning about it.
+            mobileMenuOpen ? "translate-x-0" : "rtl:translate-x-full ltr:-translate-x-full"
           )}
         >
           <div className="flex h-16 items-center justify-between border-b border-slate-100 px-4 lg:hidden dark:border-slate-800">
