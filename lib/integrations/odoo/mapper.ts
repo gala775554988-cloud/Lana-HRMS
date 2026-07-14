@@ -44,11 +44,6 @@ export const ODOO_MAPPERS: Record<string, MapperDefinition> = {
       "departure_description",
       "create_date",
       "write_date",
-      "sponsor",
-      "sponsor_name",
-      "sponsor_id",
-      "school",
-      "analytic_account"
     ],
     fieldMap: {
       employeeNumber: "barcode",
