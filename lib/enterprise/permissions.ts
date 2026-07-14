@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
 import { memoryCache, clearMemoryCache } from "@/lib/cache/memory-cache";
+import { withQueryTiming } from "@/lib/perf/query-timer";
 
 export type PermissionKey = `${string}:${string}`;
 export type PermissionEffect = "grant" | "deny";
@@ -94,16 +95,20 @@ function normalizeStore(value: unknown): UserPermissionStore {
 }
 
 export async function getPermissionStore(): Promise<UserPermissionStore> {
-  const setting = await prisma.appSetting.findUnique({ where: { key: STORE_KEY } }).catch(() => null);
+  const setting = await withQueryTiming("permissions.appSetting.findUnique(enterprise.userPermissions)", () =>
+    prisma.appSetting.findUnique({ where: { key: STORE_KEY } }).catch(() => null)
+  );
   return normalizeStore(setting?.value);
 }
 
 export async function savePermissionStore(store: UserPermissionStore) {
-  return prisma.appSetting.upsert({
-    where: { key: STORE_KEY },
-    update: { value: store },
-    create: { key: STORE_KEY, value: store, description: "Direct per-user enterprise permissions and overrides" }
-  });
+  return withQueryTiming("permissions.appSetting.upsert(enterprise.userPermissions)", () =>
+    prisma.appSetting.upsert({
+      where: { key: STORE_KEY },
+      update: { value: store },
+      create: { key: STORE_KEY, value: store, description: "Direct per-user enterprise permissions and overrides" }
+    })
+  );
 }
 
 export async function getDirectUserPermissions(userId: string, now = new Date()): Promise<PermissionKey[]> {
@@ -138,10 +143,12 @@ export async function mergeEffectivePermissions(rolePermissions: string[] | unde
 export async function getEffectivePermissionsForRoles(roles: string[], userId?: string): Promise<string[]> {
   if (roles.includes("SUPER_ADMIN")) return ["*:*"];
   const rows = roles.length
-    ? await prisma.rolePermission.findMany({
-        where: { role: { name: { in: roles } } },
-        select: { permission: { select: { action: true, resource: true } } }
-      })
+    ? await withQueryTiming(`permissions.rolePermission.findMany(roles=${roles.join(",")})`, () =>
+        prisma.rolePermission.findMany({
+          where: { role: { name: { in: roles } } },
+          select: { permission: { select: { action: true, resource: true } } }
+        })
+      )
     : [];
   const basePermissions = Array.from(new Set(rows.map((row) => `${row.permission.action}:${row.permission.resource}`)));
   return mergeEffectivePermissions(basePermissions, userId);

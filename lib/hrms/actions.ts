@@ -14,6 +14,7 @@ import { extractSalaryProfile, saveEmployeeSalaryProfile } from "@/lib/employee/
 import { requirePasswordChange } from "@/lib/auth/password-change-policy";
 import { isEnterpriseResourceAllowed } from "@/lib/enterprise/resource-access";
 import { getEmployeeIdsByHospital } from "@/lib/enterprise/hospitals";
+import { withQueryTiming } from "@/lib/perf/query-timer";
 
 type QueryInput = {
   resourceKey: string;
@@ -129,6 +130,10 @@ async function resolveEmployeePositionId(value: unknown) {
 }
 
 async function requireModulePermission(resource: HrmsModule, action: "read" | "manage") {
+  return withQueryTiming(`rbac.requireModulePermission(${resource.key}:${action})`, () => requireModulePermissionUntimed(resource, action));
+}
+
+async function requireModulePermissionUntimed(resource: HrmsModule, action: "read" | "manage") {
   const session = await auth();
   const requiredPermission = `${action}:${resource.permissionResource}`;
   if (!session?.user) {
@@ -146,7 +151,9 @@ async function requireModulePermission(resource: HrmsModule, action: "read" | "m
 
   const roles = (session.user.roles as string[] | undefined) ?? [];
   const permissions = (session.user.permissions as string[] | undefined) ?? [];
-  const username = await prisma.user.findUnique({ where: { id: session.user.id }, select: { username: true, email: true } }).catch(() => null);
+  const username = await withQueryTiming("rbac.user.findUnique(usernameForLog)", () =>
+    prisma.user.findUnique({ where: { id: session.user.id }, select: { username: true, email: true } }).catch(() => null)
+  );
 
   if (roles.includes("SUPER_ADMIN") || permissions.includes("*:*") || permissions.includes("SUPER_ADMIN")) {
     console.log("[RBAC][HRMS] allowed", {
