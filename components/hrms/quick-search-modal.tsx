@@ -187,7 +187,7 @@ export function QuickSearchModal({ isOpen, onClose }: QuickSearchModalProps) {
       >
         {/* Top Search Header */}
         <div className="flex items-center gap-3 border-b border-[#E5E7EB] bg-[#F9FAFB]/80 px-5 py-4 dark:border-slate-800 dark:bg-slate-950/60">
-          <Search className="h-5 w-5 text-[#6D6AF8] shrink-0" />
+          <Search className="h-5 w-5 text-primary shrink-0" />
           <input
             type="text"
             placeholder="ابحث عن وحدة، موظف، تقرير، أو إجراء سريع..."
@@ -247,7 +247,7 @@ export function QuickSearchModal({ isOpen, onClose }: QuickSearchModalProps) {
                           className={cn(
                             "group flex items-center justify-between gap-4 rounded-2xl px-4 py-3 cursor-pointer transition-all duration-150",
                             isSelected
-                              ? "bg-indigo-50/90 text-indigo-950 border border-indigo-200/80 shadow-sm dark:bg-indigo-950/50 dark:border-indigo-800/60 dark:text-indigo-100"
+                              ? "bg-primary/10 text-primary border border-primary/30 shadow-sm"
                               : "hover:bg-slate-50 dark:hover:bg-slate-800/50 border border-transparent"
                           )}
                         >
@@ -255,7 +255,7 @@ export function QuickSearchModal({ isOpen, onClose }: QuickSearchModalProps) {
                             <div className={cn(
                               "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-transform group-hover:scale-105",
                               isSelected
-                                ? "bg-[#2E2A8C] text-white shadow-md shadow-indigo-600/20 dark:bg-[#6D6AF8]"
+                                ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
                                 : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
                             )}>
                               <Icon className="h-5 w-5" />

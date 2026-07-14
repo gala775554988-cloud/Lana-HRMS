@@ -6,7 +6,7 @@ import {
   Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis 
 } from "recharts";
 
-const palette = ["#6D6AF8", "#4B46C6", "#22C55E", "#F59E0B", "#EF4444", "#06B6D4"];
+const palette = ["#00A896", "#028090", "#22C55E", "#F59E0B", "#EF4444", "#06B6D4"];
 
 function cardClass(extra = "") {
   return `rounded-3xl border border-slate-200/80 bg-white p-6 shadow-md shadow-slate-200/40 transition-all duration-300 hover:-translate-y-1 hover:border-indigo-500/40 hover:shadow-xl dark:border-slate-800 dark:bg-slate-900 dark:shadow-none ${extra}`;
@@ -68,15 +68,15 @@ export function DashboardCharts({ metrics, series }: { metrics: Record<string, u
             <h3 className="text-base font-black text-slate-900 dark:text-slate-100">نمو الكوادر الوظيفية والطلبات</h3>
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5">تتبع مؤشرات القوى العاملة على مدار الأشهر الثمانية الماضية</p>
           </div>
-          <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300">مباشر Live</span>
+          <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">مباشر Live</span>
         </div>
         <div className="flex-1 w-full min-h-0">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={growth} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="lanaEmployees" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6D6AF8" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="#6D6AF8" stopOpacity={0.0} />
+                  <stop offset="5%" stopColor="#00A896" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="#00A896" stopOpacity={0.0} />
                 </linearGradient>
               </defs>
               <CartesianGrid stroke={gridColor} strokeDasharray="3 3" vertical={false} />
@@ -93,7 +93,7 @@ export function DashboardCharts({ metrics, series }: { metrics: Record<string, u
                   fontWeight: "bold"
                 }}
               />
-              <Area type="monotone" dataKey="الموظفون" stroke="#6D6AF8" strokeWidth={3} fill="url(#lanaEmployees)" />
+              <Area type="monotone" dataKey="الموظفون" stroke="#00A896" strokeWidth={3} fill="url(#lanaEmployees)" />
               <Line type="monotone" dataKey="الطلبات" stroke="#38bdf8" strokeWidth={2.5} dot={false} />
             </AreaChart>
           </ResponsiveContainer>
