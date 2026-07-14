@@ -35,7 +35,6 @@ interface AppShellProps {
 type NavKey = keyof Dictionary["nav"];
 
 const navItems: Array<{ href: string; labelKey: NavKey; icon: typeof LayoutDashboard; group: string; resource: string | string[] }> = [
-  { href: "/dashboard", labelKey: "dashboard", icon: LayoutDashboard, group: "dashboardAnalytics", resource: "reports" },
   { href: "/analytics", labelKey: "branch-analytics", icon: BarChart4, group: "dashboardAnalytics", resource: "reports" },
 
   { href: "/employees", labelKey: "employees", icon: Users, group: "peopleContracts", resource: "employees" },
@@ -105,10 +104,7 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
     await signOut({ redirect: true, callbackUrl: "/login" });
   }, []);
 
-  const isActive = useCallback((href: string) => {
-    if (href === "/") return pathname === "/" || pathname === "/dashboard";
-    return pathname.startsWith(href);
-  }, [pathname]);
+  const isActive = useCallback((href: string) => pathname.startsWith(href), [pathname]);
 
   const groupedNav = useMemo(() => {
     const result: Record<string, typeof navItems> = {};

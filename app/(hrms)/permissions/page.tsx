@@ -17,7 +17,7 @@ export default async function PermissionsPage({ searchParams }: { searchParams: 
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   const roles = (session.user as any).roles || [];
-  if (!roles.includes("SUPER_ADMIN")) redirect("/dashboard");
+  if (!roles.includes("SUPER_ADMIN")) redirect("/analytics");
 
   let scopesContent: React.ReactNode = null;
   if (activeTab === "scopes") {

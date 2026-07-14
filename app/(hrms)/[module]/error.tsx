@@ -94,7 +94,7 @@ export default function ModuleError({ error, reset }: { error: Error & { digest?
               إعادة المحاولة
             </Button>
             <Button variant="outline" size="sm" asChild className="gap-1.5 text-xs">
-              <a href="/dashboard"><Home className="h-3.5 w-3.5" />الرئيسية</a>
+              <a href="/analytics"><Home className="h-3.5 w-3.5" />الرئيسية</a>
             </Button>
           </div>
         </div>
