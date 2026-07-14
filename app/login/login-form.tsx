@@ -39,42 +39,49 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
   }
 
   return (
-    <form className="space-y-5" onSubmit={form.handleSubmit(onSubmit)} noValidate>
+    <form className="space-y-7" onSubmit={form.handleSubmit(onSubmit)} noValidate>
       {message ? (<Alert variant="destructive"><AlertDescription>{message}</AlertDescription></Alert>) : null}
-      <div className="space-y-2">
-        <Label htmlFor="identifier" className="font-bold text-slate-800 dark:text-slate-200">اسم المستخدم أو رقم الهوية</Label>
-        <p className="text-xs text-muted-foreground -mt-1">للموظفين: استخدم رقم الهوية وكلمة المرور (آخر 4 أرقام من الهوية)</p>
+      <div className="space-y-1.5 border-b border-slate-200 pb-2 transition-colors duration-300 focus-within:border-primary dark:border-slate-700">
+        <Label htmlFor="identifier" className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">اسم المستخدم أو رقم الهوية</Label>
         <div className="relative">
           <Input
             id="identifier"
             type="text"
             inputMode="numeric"
             autoComplete="username"
-            className="h-11 px-9 text-base"
+            className="h-9 rounded-none border-0 bg-transparent px-0 pe-7 pt-1 text-sm shadow-none placeholder:text-slate-300 focus-visible:ring-0 dark:placeholder:text-slate-600"
             placeholder="أدخل رقم الهوية أو اسم المستخدم"
             aria-invalid={Boolean(form.formState.errors.identifier)}
             {...form.register("identifier")}
           />
-          <IdCard className="pointer-events-none absolute right-3 top-3.5 h-4 w-4 text-muted-foreground" />
+          <IdCard className="pointer-events-none absolute end-0 top-2.5 h-4 w-4 text-muted-foreground" />
         </div>
+        <p className="text-[10px] text-slate-400 dark:text-slate-500">للموظفين: استخدم رقم الهوية وكلمة المرور (آخر 4 أرقام من الهوية)</p>
         {form.formState.errors.identifier ? <p className="text-xs text-destructive" role="alert">{form.formState.errors.identifier.message}</p> : null}
       </div>
-      <div className="space-y-2">
+      <div className="space-y-1.5 border-b border-slate-200 pb-2 transition-colors duration-300 focus-within:border-primary dark:border-slate-700">
         <div className="flex items-center justify-between gap-4">
-          <Label htmlFor="password" className="font-bold text-slate-800 dark:text-slate-200">{dictionary.auth.password}</Label>
-          <span className="text-xs text-muted-foreground">إذا نسيت كلمة المرور يرجى مراجعة إدارة الموارد البشرية</span>
+          <Label htmlFor="password" className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{dictionary.auth.password}</Label>
+          <span className="text-xs font-medium text-primary">إذا نسيت كلمة المرور يرجى مراجعة إدارة الموارد البشرية</span>
         </div>
         <div className="relative">
-          <Input id="password" type={showPassword ? "text" : "password"} autoComplete="current-password" className="h-11 px-9 text-base" placeholder={dictionary.auth.passwordPlaceholder} {...form.register("password")} />
-          <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-3 top-3 rounded p-1 text-muted-foreground hover:text-foreground">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
+          <Input
+            id="password"
+            type={showPassword ? "text" : "password"}
+            autoComplete="current-password"
+            className="h-9 rounded-none border-0 bg-transparent px-0 pe-7 pt-1 text-sm shadow-none placeholder:text-slate-300 focus-visible:ring-0 dark:placeholder:text-slate-600"
+            placeholder={dictionary.auth.passwordPlaceholder}
+            {...form.register("password")}
+          />
+          <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute end-0 top-1.5 rounded p-1 text-muted-foreground hover:text-foreground">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
         </div>
       </div>
-      <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border bg-slate-50/80 p-3.5 text-sm dark:bg-slate-900/50">
-        <span><span className="block font-bold text-slate-800 dark:text-slate-200">{dictionary.auth.rememberTitle}</span><span className="block text-xs text-muted-foreground">{dictionary.auth.rememberDescription}</span></span>
-        <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} className="h-4 w-4 rounded border-input text-primary" />
+      <label className="flex cursor-pointer items-center gap-2.5 select-none">
+        <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} className="h-4 w-4 rounded border-input text-primary focus-visible:ring-primary" />
+        <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{dictionary.auth.rememberTitle}</span>
       </label>
-      <Button className="h-12 w-full text-base font-bold shadow-lg shadow-indigo-600/20 rounded-xl" type="submit" disabled={isPending}>
-        {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}{dictionary.auth.submit}
+      <Button className="h-12 w-full rounded-lg text-sm font-semibold shadow-lg shadow-primary/20" type="submit" disabled={isPending}>
+        {isPending ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : null}{dictionary.auth.submit}
       </Button>
     </form>
   );
