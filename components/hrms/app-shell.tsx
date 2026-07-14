@@ -11,7 +11,7 @@ import {
   DollarSign, GraduationCap, Package, Megaphone, BarChart3, Settings,
   Shield, GitPullRequest, Sparkles, Menu, X, PlugZap,
   Inbox, Send, Network, Bell, Tag, Globe2, Wallet, PlusCircle, MinusCircle,
-  ClipboardCheck, UserPlus
+  ClipboardCheck, UserPlus, CalendarClock, Fingerprint, BarChart4
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/brand/brand-logo";
@@ -23,63 +23,82 @@ import { ThemeToggle } from "@/components/hrms/theme-toggle";
 import { QuickSearchModal } from "@/components/hrms/quick-search-modal";
 import { useThemeStore } from "@/store/theme";
 import { cn } from "@/lib/utils";
+import type { Dictionary, Locale } from "@/lib/i18n";
 
 interface AppShellProps {
   children: ReactNode;
   companyLogo?: string | null;
+  locale: Locale;
+  dictionary: Dictionary;
 }
 
-const navItems = [
-  { href: "/dashboard", label: "لوحة المعلومات", icon: LayoutDashboard, group: "overview", resource: "reports" },
+type NavKey = keyof Dictionary["nav"];
 
-  { href: "/employees", label: "الموظفون", icon: Users, group: "people", resource: "employees" },
-  { href: "/departments", label: "الإدارات", icon: Building2, group: "people", resource: "departments" },
-  { href: "/branches", label: "الفروع", icon: MapPin, group: "people", resource: "branches" },
-  { href: "/hospitals", label: "المستشفيات", icon: Building2, group: "people", resource: "employees" },
-  { href: "/my-team", label: "فريقي", icon: Users, group: "people", resource: "employees" },
-  { href: "/positions", label: "المسميات الوظيفية", icon: Briefcase, group: "people", resource: "positions" },
-  { href: "/employment-types", label: "أنواع التوظيف", icon: Tag, group: "people", resource: "employment-types" },
-  { href: "/nationalities", label: "الجنسيات", icon: Globe2, group: "people", resource: "nationalities" },
-  { href: "/contracts", label: "العقود", icon: FileText, group: "people", resource: "contracts" },
+const navItems: Array<{ href: string; labelKey: NavKey; icon: typeof LayoutDashboard; group: string; resource: string }> = [
+  { href: "/dashboard", labelKey: "dashboard", icon: LayoutDashboard, group: "dashboardAnalytics", resource: "reports" },
+  { href: "/branch-analytics", labelKey: "branch-analytics", icon: BarChart4, group: "dashboardAnalytics", resource: "reports" },
 
-  { href: "/attendance", label: "الحضور", icon: Clock, group: "ops", resource: "attendance" },
-  { href: "/attendance-sites", label: "مواقع الحضور", icon: MapPin, group: "ops", resource: "attendance" },
-  { href: "/leave-requests", label: "الإجازات", icon: Calendar, group: "ops", resource: "leave" },
-  { href: "/leave-types", label: "أنواع الإجازات", icon: Calendar, group: "ops", resource: "leave" },
-  { href: "/overtime", label: "الأوفر تايم", icon: Clock, group: "ops", resource: "overtime" },
-  { href: "/payroll-runs", label: "الرواتب", icon: DollarSign, group: "ops", resource: "payroll" },
-  { href: "/payroll-items", label: "بنود الرواتب", icon: DollarSign, group: "ops", resource: "payroll" },
-  { href: "/loans", label: "السلف", icon: Wallet, group: "ops", resource: "loans" },
-  { href: "/allowances", label: "البدلات", icon: PlusCircle, group: "ops", resource: "allowances" },
-  { href: "/deductions", label: "الاستقطاعات", icon: MinusCircle, group: "ops", resource: "deductions" },
-  { href: "/documents", label: "المستندات", icon: FileText, group: "ops", resource: "documents" },
+  { href: "/employees", labelKey: "employees", icon: Users, group: "employeeDirectory", resource: "employees" },
+  { href: "/departments", labelKey: "departments", icon: Building2, group: "employeeDirectory", resource: "departments" },
+  { href: "/branches", labelKey: "branches", icon: MapPin, group: "employeeDirectory", resource: "branches" },
+  { href: "/hospitals", labelKey: "hospitals", icon: Building2, group: "employeeDirectory", resource: "employees" },
+  { href: "/my-team", labelKey: "my-team", icon: Users, group: "employeeDirectory", resource: "employees" },
+  { href: "/organization-hierarchy", labelKey: "organization-hierarchy", icon: Network, group: "employeeDirectory", resource: "employees" },
+  { href: "/positions", labelKey: "positions", icon: Briefcase, group: "employeeDirectory", resource: "positions" },
+  { href: "/employment-types", labelKey: "employment-types", icon: Tag, group: "employeeDirectory", resource: "employment-types" },
+  { href: "/nationalities", labelKey: "nationalities", icon: Globe2, group: "employeeDirectory", resource: "nationalities" },
+  { href: "/contracts", labelKey: "contracts", icon: FileText, group: "employeeDirectory", resource: "contracts" },
+  { href: "/documents", labelKey: "documents", icon: FileText, group: "employeeDirectory", resource: "documents" },
 
-  { href: "/performance", label: "تقييم الأداء", icon: ClipboardCheck, group: "talent", resource: "performance" },
-  { href: "/recruitment", label: "التوظيف", icon: Briefcase, group: "talent", resource: "recruitment" },
-  { href: "/candidates", label: "المتقدمون", icon: UserPlus, group: "talent", resource: "recruitment" },
-  { href: "/training", label: "التدريب", icon: GraduationCap, group: "talent", resource: "training" },
-  { href: "/training-enrollments", label: "تسجيلات التدريب", icon: GraduationCap, group: "talent", resource: "training" },
-  { href: "/assets", label: "الأصول", icon: Package, group: "talent", resource: "assets" },
+  { href: "/attendance", labelKey: "attendance", icon: Clock, group: "attendanceBiometrics", resource: "attendance" },
+  { href: "/attendance-sites", labelKey: "attendance-sites", icon: MapPin, group: "attendanceBiometrics", resource: "attendance" },
+  { href: "/biometric-logs", labelKey: "biometric-logs", icon: Fingerprint, group: "attendanceBiometrics", resource: "attendance" },
+  { href: "/shifts", labelKey: "shifts", icon: CalendarClock, group: "attendanceBiometrics", resource: "shifts" },
+  { href: "/shift-assignments", labelKey: "shift-assignments", icon: CalendarClock, group: "attendanceBiometrics", resource: "shifts" },
 
-  { href: "/reports", label: "التقارير", icon: BarChart3, group: "admin", resource: "reports" },
-  { href: "/integrations/synchronization", label: "مزامنة Odoo", icon: PlugZap, group: "admin", resource: "settings" },
-  { href: "/request-center", label: "استقبال الطلبات", icon: GitPullRequest, group: "admin", resource: "leave" },
-  { href: "/approvals-inbox", label: "الموافقات الواردة", icon: Inbox, group: "admin", resource: "leave" },
-  { href: "/approvals-outbox", label: "الموافقات الصادرة", icon: Send, group: "admin", resource: "leave" },
-  { href: "/organization-hierarchy", label: "الهيكل التنظيمي", icon: Network, group: "admin", resource: "employees" },
-  { href: "/lana-ai", label: "Lana AI", icon: Sparkles, group: "admin", resource: "reports" },
-  { href: "/announcements", label: "الإعلانات", icon: Megaphone, group: "admin", resource: "announcements" },
-  { href: "/notification-center", label: "مركز الإشعارات", icon: Bell, group: "admin", resource: "notifications" },
-  { href: "/audit-logs", label: "سجل التدقيق", icon: Shield, group: "admin", resource: "audit-logs" },
-  { href: "/system-settings", label: "إعدادات النظام", icon: Settings, group: "admin", resource: "settings" },
-  { href: "/settings", label: "الإعدادات العامة", icon: Settings, group: "admin", resource: "settings" },
-  { href: "/permissions-system", label: "نظام الصلاحيات", icon: Shield, group: "admin", resource: "permissions" },
-  { href: "/permissions-management", label: "إدارة الصلاحيات", icon: Shield, group: "admin", resource: "permissions" },
+  { href: "/leave-requests", labelKey: "leave-requests", icon: Calendar, group: "leaveRequests", resource: "leave" },
+  { href: "/leave-types", labelKey: "leave-types", icon: Calendar, group: "leaveRequests", resource: "leave" },
+  { href: "/overtime", labelKey: "overtime", icon: Clock, group: "leaveRequests", resource: "overtime" },
+  { href: "/request-center", labelKey: "request-center", icon: GitPullRequest, group: "leaveRequests", resource: "leave" },
+  { href: "/approvals-inbox", labelKey: "approvals-inbox", icon: Inbox, group: "leaveRequests", resource: "leave" },
+  { href: "/approvals-outbox", labelKey: "approvals-outbox", icon: Send, group: "leaveRequests", resource: "leave" },
+  { href: "/payroll-runs", labelKey: "payroll-runs", icon: DollarSign, group: "leaveRequests", resource: "payroll" },
+  { href: "/payroll-items", labelKey: "payroll-items", icon: DollarSign, group: "leaveRequests", resource: "payroll" },
+  { href: "/loans", labelKey: "loans", icon: Wallet, group: "leaveRequests", resource: "loans" },
+  { href: "/allowances", labelKey: "allowances", icon: PlusCircle, group: "leaveRequests", resource: "allowances" },
+  { href: "/deductions", labelKey: "deductions", icon: MinusCircle, group: "leaveRequests", resource: "deductions" },
+
+  { href: "/permissions-system", labelKey: "permissions-system", icon: Shield, group: "systemSettings", resource: "permissions" },
+  { href: "/permissions-management", labelKey: "permissions-management", icon: Shield, group: "systemSettings", resource: "permissions" },
+  { href: "/integrations/synchronization", labelKey: "integrations-sync", icon: PlugZap, group: "systemSettings", resource: "settings" },
+  { href: "/audit-logs", labelKey: "audit-logs", icon: Shield, group: "systemSettings", resource: "audit-logs" },
+  { href: "/system-settings", labelKey: "settings", icon: Settings, group: "systemSettings", resource: "settings" },
+  { href: "/settings", labelKey: "settings", icon: Settings, group: "systemSettings", resource: "settings" },
+
+  { href: "/performance", labelKey: "performance", icon: ClipboardCheck, group: "workforce", resource: "performance" },
+  { href: "/recruitment", labelKey: "recruitment", icon: Briefcase, group: "workforce", resource: "recruitment" },
+  { href: "/candidates", labelKey: "candidates", icon: UserPlus, group: "workforce", resource: "recruitment" },
+  { href: "/training", labelKey: "training", icon: GraduationCap, group: "workforce", resource: "training" },
+  { href: "/training-enrollments", labelKey: "training-enrollments", icon: GraduationCap, group: "workforce", resource: "training" },
+  { href: "/assets", labelKey: "assets", icon: Package, group: "workforce", resource: "assets" },
+  { href: "/reports", labelKey: "reports", icon: BarChart3, group: "workforce", resource: "reports" },
+  { href: "/lana-ai", labelKey: "reports", icon: Sparkles, group: "workforce", resource: "reports" },
+  { href: "/announcements", labelKey: "announcements", icon: Megaphone, group: "workforce", resource: "announcements" },
+  { href: "/notification-center", labelKey: "notification-center", icon: Bell, group: "workforce", resource: "notifications" },
 ];
 
-const groups: Record<string, string> = { overview: "نظرة عامة 📊", people: "الأفراد 👥", ops: "العمليات ⏰", talent: "تطوير الموظفين 🎓", admin: "الإدارة 🔧" };
+const groupOrder = ["dashboardAnalytics", "employeeDirectory", "attendanceBiometrics", "leaveRequests", "systemSettings", "workforce"] as const;
+type GroupKey = (typeof groupOrder)[number];
+const groupEmoji: Record<GroupKey, string> = {
+  dashboardAnalytics: "📊",
+  employeeDirectory: "👥",
+  attendanceBiometrics: "⏱️",
+  leaveRequests: "📅",
+  systemSettings: "⚙️",
+  workforce: "🎓"
+};
 
-export function AppShell({ children, companyLogo }: AppShellProps) {
+export function AppShell({ children, companyLogo, locale, dictionary }: AppShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { data: session, status } = useSession();
@@ -131,7 +150,7 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
       <div className="min-h-screen bg-background text-foreground">
         <div className="h-16 border-b border-border/80 bg-white/90 dark:bg-slate-950/90" />
         <div className="flex">
-          <div className="hidden w-[280px] shrink-0 border-l border-slate-200/80 bg-white lg:block dark:border-slate-800 dark:bg-slate-950" />
+          <div className="hidden w-[280px] shrink-0 border-e border-slate-200/80 bg-white lg:block dark:border-slate-800 dark:bg-slate-950" />
           <main className="min-w-0 flex-1 p-4 lg:p-8">{children}</main>
         </div>
       </div>
@@ -179,7 +198,7 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
               className="group flex w-full items-center gap-3 rounded-2xl border border-border bg-muted px-4 py-2.5 text-sm text-muted-foreground shadow-inner shadow-white/80 transition-all duration-200 hover:border-primary/60 hover:bg-white hover:text-primary hover:shadow-md hover:shadow-primary/5 dark:border-slate-800 dark:bg-slate-900/80 dark:shadow-none dark:hover:border-primary/50 dark:hover:bg-slate-900 dark:hover:text-indigo-300"
             >
               <Search className="h-4 w-4 text-primary transition-transform group-hover:scale-110" />
-              <span className="font-medium">البحث الذكي في النظام...</span>
+              <span className="font-medium">{dictionary.common.smartSearchPlaceholder}</span>
               <kbd className="mr-auto flex items-center gap-0.5 rounded-lg border border-border bg-white px-2 py-0.5 text-[10px] font-bold font-mono text-muted-foreground shadow-2xs group-hover:border-indigo-200 group-hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400">
                 <span>⌘</span>K
               </kbd>
@@ -190,7 +209,7 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
             <button
               onClick={() => setSearchOpen(true)}
               className="md:hidden flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
-              aria-label="بحث"
+              aria-label={dictionary.common.search}
             >
               <Search className="h-4 w-4" />
             </button>
@@ -220,8 +239,8 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
               variant="ghost"
               size="icon"
               className="hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 rounded-xl"
-              aria-label="تسجيل الخروج"
-              title="تسجيل الخروج"
+              aria-label={dictionary.common.signOut}
+              title={dictionary.common.signOut}
             >
               <LogOut className="h-4.5 w-4.5" />
             </Button>
@@ -239,10 +258,10 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
       <div className="flex">
         <aside
           className={cn(
-            "fixed inset-y-0 right-0 z-50 flex flex-col border-l border-slate-200/80 bg-white shadow-xl transition-transform duration-300 ease-in-out lg:static lg:z-auto lg:shadow-none lg:translate-x-0 dark:border-slate-800 dark:bg-slate-950",
+            "fixed inset-y-0 start-0 z-50 flex flex-col border-e border-slate-200/80 bg-white shadow-xl transition-transform duration-300 ease-in-out lg:static lg:z-auto lg:shadow-none lg:translate-x-0 dark:border-slate-800 dark:bg-slate-950",
             sidebarCollapsed ? "lg:w-[76px]" : "lg:w-[280px]",
             "w-[280px]",
-            mobileMenuOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
+            mobileMenuOpen ? "translate-x-0" : "rtl:translate-x-full ltr:-translate-x-full lg:translate-x-0"
           )}
         >
           <div className="flex h-16 items-center justify-between border-b border-slate-100 px-4 lg:hidden dark:border-slate-800">
@@ -256,17 +275,20 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
           </div>
 
           <div className="flex-1 py-4 overflow-y-auto overflow-x-hidden space-y-4">
-            {Object.entries(groupedNav).map(([groupKey, items]) => (
+            {groupOrder.filter((groupKey) => groupedNav[groupKey]?.length).map((groupKey) => {
+              const items = groupedNav[groupKey]!;
+              return (
               <div key={groupKey} className="px-2">
                 {!sidebarCollapsed && (
                   <p className="px-3 mb-1.5 text-[11px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                    {groups[groupKey]}
+                    {dictionary.navGroups[groupKey]} {groupEmoji[groupKey]}
                   </p>
                 )}
                 <div className="space-y-1">
                   {items.map((item) => {
                     const Icon = item.icon;
                     const active = isActive(item.href);
+                    const label = dictionary.nav[item.labelKey];
                     return (
                       <Link
                         key={item.href}
@@ -282,21 +304,22 @@ export function AppShell({ children, companyLogo }: AppShellProps) {
                             ? "bg-primary text-white shadow-md shadow-indigo-900/25 dark:text-slate-950 dark:shadow-indigo-500/20"
                             : "text-slate-600 hover:bg-slate-100/80 hover:text-indigo-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-slate-100"
                         )}
-                        title={sidebarCollapsed ? item.label : undefined}
+                        title={sidebarCollapsed ? label : undefined}
                       >
                         <Icon className={cn(
                           "h-5 w-5 shrink-0 transition-transform group-hover:scale-110",
                           active ? "text-white dark:text-slate-950" : "text-slate-400 group-hover:text-indigo-600 dark:text-slate-500 dark:group-hover:text-indigo-400"
                         )} />
                         {(!sidebarCollapsed || mobileMenuOpen) && (
-                          <span className="truncate">{item.label}</span>
+                          <span className="truncate">{label}</span>
                         )}
                       </Link>
                     );
                   })}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
 
           {(!sidebarCollapsed || mobileMenuOpen) && (
