@@ -15,6 +15,7 @@ const PUBLIC_API_PREFIXES = [
   "/api/health",
   "/api/metrics/prometheus",
   "/api/attendance/biometric/zkteco", // authenticates via its own bearer token
+  "/api/integrations/odoo/sync/employee-master", // authenticates via internal sync token
   "/api/internal/odoo-employee-sync", // authenticates via internal sync token
   "/api/internal/odoo-one-time-ce1bf82bdaf46ba6", // authenticates via internal sync token
   "/api/attendance/odoo-sync", // authenticates via internal sync token
