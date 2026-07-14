@@ -1,17 +1,5 @@
-import { ModulePageBody } from "@/components/hrms/module-page-body";
-import { MergedModuleTabs } from "@/components/hrms/merged-module-tabs";
-import { CalendarClock, CalendarRange } from "lucide-react";
+import { redirect } from "next/navigation";
 
-export default async function ShiftsManagementPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const query = await searchParams;
-  const activeTab = typeof query.tab === "string" ? query.tab : "shifts";
-  return (
-    <MergedModuleTabs
-      defaultValue="shifts"
-      items={[
-        { value: "shifts", label: "الورديات", icon: CalendarClock, content: activeTab === "shifts" ? <ModulePageBody resourceKey="shifts" query={query} showModuleTabs={false} tabValue="shifts" /> : null },
-        { value: "shift-assignments", label: "جدول المناوبات", icon: CalendarRange, content: activeTab === "shift-assignments" ? <ModulePageBody resourceKey="shift-assignments" query={query} showModuleTabs={false} tabValue="shift-assignments" /> : null }
-      ]}
-    />
-  );
+export default function ShiftsManagementRedirect() {
+  redirect("/shifts?tab=shifts");
 }

@@ -43,7 +43,7 @@ export function QuickSearchModal({ isOpen, onClose }: QuickSearchModalProps) {
       title: "نظام الإجازات والمغادرات",
       description: "تقديم وطلب الإجازات ومراجعة أرصدة الإجازات السنوية والمرضية",
       category: "الوحدات والنظم",
-      href: "/leave?tab=leave-requests",
+      href: "/leaves?tab=leave-requests",
       icon: Calendar,
     },
     {
@@ -67,7 +67,7 @@ export function QuickSearchModal({ isOpen, onClose }: QuickSearchModalProps) {
       title: "إدارة المستشفيات والمراكز",
       description: "توزيع الموظفين والممارسين الصحيين على مواقع الرعاية والمستشفيات",
       category: "الوحدات والنظم",
-      href: "/branches?tab=hospitals",
+      href: "/hospitals",
       icon: Building2,
     },
     {

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function LeaveRequestsRedirect() {
-  redirect("/leave?tab=leave-requests");
+  redirect("/leaves?tab=leave-requests");
 }
