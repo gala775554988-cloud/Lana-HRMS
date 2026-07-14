@@ -5,12 +5,13 @@ import { Settings, SlidersHorizontal } from "lucide-react";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const query = await searchParams;
+  const activeTab = typeof query.tab === "string" ? query.tab : "general";
   return (
     <MergedModuleTabs
       defaultValue="general"
       items={[
-        { value: "general", label: "الإعدادات العامة", icon: Settings, content: <SystemSettingsBody /> },
-        { value: "all-settings", label: "كل الإعدادات", icon: SlidersHorizontal, content: <ModulePageBody resourceKey="settings" query={query} showModuleTabs={false} tabValue="all-settings" /> }
+        { value: "general", label: "الإعدادات العامة", icon: Settings, content: activeTab === "general" ? <SystemSettingsBody /> : null },
+        { value: "all-settings", label: "كل الإعدادات", icon: SlidersHorizontal, content: activeTab === "all-settings" ? <ModulePageBody resourceKey="settings" query={query} showModuleTabs={false} tabValue="all-settings" /> : null }
       ]}
     />
   );
