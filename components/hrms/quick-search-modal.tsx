@@ -18,16 +18,55 @@ interface SearchItem {
   id: string;
   title: string;
   description: string;
-  category: "الوحدات والنظم" | "إجراءات سريعة" | "الذكاء الاصطناعي والتقارير";
+  category: "الموظفون" | "الوحدات والنظم" | "إجراءات سريعة" | "الذكاء الاصطناعي والتقارير";
   href: string;
   icon: any;
   badge?: string;
 }
 
+type EmployeeSearchResult = {
+  id: string;
+  employeeNumber: string;
+  firstName: string;
+  lastName: string;
+  nationalId: string;
+  department?: { name: string } | null;
+  position?: { title: string } | null;
+};
+
 export function QuickSearchModal({ isOpen, onClose }: QuickSearchModalProps) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [employeeResults, setEmployeeResults] = useState<EmployeeSearchResult[]>([]);
+
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      setEmployeeResults([]);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      fetch(`/api/employees/search?q=${encodeURIComponent(trimmed)}`, { signal: controller.signal })
+        .then((response) => response.json())
+        .then((data) => setEmployeeResults(data.success ? data.employees ?? [] : []))
+        .catch(() => {});
+    }, 250);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query]);
+
+  const employeeItems: SearchItem[] = useMemo(() => employeeResults.map((employee) => ({
+    id: `employee-${employee.id}`,
+    title: `${employee.firstName} ${employee.lastName}`,
+    description: [employee.employeeNumber, employee.department?.name, employee.position?.title].filter(Boolean).join(" · "),
+    category: "الموظفون" as const,
+    href: `/employees/${employee.id}`,
+    icon: Users
+  })), [employeeResults]);
 
   const allItems: SearchItem[] = useMemo(() => [
     {
@@ -142,13 +181,14 @@ export function QuickSearchModal({ isOpen, onClose }: QuickSearchModalProps) {
   const filteredItems = useMemo(() => {
     if (!query.trim()) return allItems;
     const q = query.toLowerCase();
-    return allItems.filter(
+    const staticMatches = allItems.filter(
       item =>
         item.title.toLowerCase().includes(q) ||
         item.description.toLowerCase().includes(q) ||
         item.category.toLowerCase().includes(q)
     );
-  }, [query, allItems]);
+    return [...employeeItems, ...staticMatches];
+  }, [query, allItems, employeeItems]);
 
   useEffect(() => {
     setSelectedIndex(0);
@@ -221,7 +261,7 @@ export function QuickSearchModal({ isOpen, onClose }: QuickSearchModalProps) {
               <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">جرب البحث بكلمات مفتاحية أخرى مثل: الموظفون، الرواتب، أو لانا</p>
             </div>
           ) : (
-            ["الوحدات والنظم", "إجراءات سريعة", "الذكاء الاصطناعي والتقارير"].map((cat) => {
+            ["الموظفون", "الوحدات والنظم", "إجراءات سريعة", "الذكاء الاصطناعي والتقارير"].map((cat) => {
               const itemsInCat = filteredItems.filter(i => i.category === cat);
               if (itemsInCat.length === 0) return null;
 
