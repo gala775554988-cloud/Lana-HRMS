@@ -54,6 +54,10 @@ export const hrmsModules = [
       { name: "branchId", label: "Branch ID", type: "text" },
       { name: "employmentTypeId", label: "Employment type ID", type: "text" },
       { name: "nationalityId", label: "Nationality ID", type: "text" },
+      { name: "hospitalId", label: "Hospital ID", type: "text" },
+      { name: "costCenter", label: "Cost Center", type: "text" },
+      { name: "analyticAccount", label: "Analytic Account", type: "text" },
+      { name: "workLocationName", label: "Work Location", type: "text" },
       { name: "address", label: "Address", type: "textarea" },
     ]
   },
@@ -137,6 +141,12 @@ export const hrmsModules = [
   },
   {
     key: "audit-logs", title: "Audit Logs", description: "Immutable trail of sensitive HRMS changes.", model: "auditLog", permissionResource: "audit-logs", searchFields: ["action", "entity", "entityId"], filterFields: ["entity", "actorUserId"], tableFields: ["action", "entity", "entityId", "actorUserId", "createdAt"], fields: [{ name: "action", label: "Action", type: "text", required: true }, { name: "entity", label: "Entity", type: "text", required: true }, { name: "entityId", label: "Entity ID", type: "text" }, { name: "metadata", label: "JSON metadata", type: "textarea" }]
+  },
+  {
+    key: "shifts", title: "Shifts", description: "Define work shifts and their hours.", model: "shift", permissionResource: "shifts", searchFields: ["name", "code"], filterFields: ["isActive"], tableFields: ["code", "name", "startTime", "endTime", "daysOfWeek", "isActive"], fields: [{ name: "name", label: "Name", type: "text", required: true }, codeField, { name: "startTime", label: "Start time (HH:mm)", type: "text", required: true, placeholder: "08:00" }, { name: "endTime", label: "End time (HH:mm)", type: "text", required: true, placeholder: "16:00" }, { name: "daysOfWeek", label: "Days (comma-separated)", type: "text", required: true, placeholder: "SUN,MON,TUE,WED,THU" }, activeField]
+  },
+  {
+    key: "shift-assignments", title: "Shift Roster", description: "Assign employees to shifts.", model: "shiftAssignment", permissionResource: "shifts", searchFields: [], filterFields: ["employeeId", "shiftId", "isActive"], tableFields: ["employeeId", "shiftId", "effectiveFrom", "effectiveTo", "isActive"], fields: [employeeIdField, { name: "shiftId", label: "Shift ID", type: "text", required: true }, { name: "effectiveFrom", label: "Effective from", type: "date", required: true }, { name: "effectiveTo", label: "Effective to", type: "date" }, activeField]
   }
 ] as const satisfies HrmsModule[];
 
