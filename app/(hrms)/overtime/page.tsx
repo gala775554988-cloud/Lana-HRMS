@@ -11,7 +11,7 @@ export default async function OvertimePage() {
   const permissions = (session.user.permissions as string[]) ?? [];
   const roles = (session.user.roles as string[]) ?? [];
   const allowed = roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER") || hasPermission(permissions, { action: "manage", resource: "overtime" });
-  if (!allowed) redirect("/dashboard");
+  if (!allowed) redirect("/analytics");
 
   return (
     <section className="space-y-6">
