@@ -4,6 +4,7 @@ import { listModuleRecords } from "@/lib/hrms/actions";
 import { getRequestDictionary } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { ModuleForm } from "@/components/hrms/module-form";
+import { LoanForm } from "@/components/hrms/loan-form";
 import { ModuleFormDialog } from "@/components/hrms/module-form-dialog";
 import { ModuleTable } from "@/components/hrms/module-table";
 import { EmployeeList } from "@/components/hrms/employee-list";
@@ -193,7 +194,7 @@ export async function ModulePageBody({
         {resource.key !== "audit-logs" ? (
           <div className="shrink-0">
             <ModuleFormDialog triggerLabel={`${t.create} ${resourceTitle}`} title={`${t.create} ${resourceTitle}`} description={t.createDescription}>
-              <ModuleForm resource={resource} dictionary={dictionary} locale={locale} />
+              {resource.key === "loans" ? <LoanForm dictionary={dictionary} locale={locale} /> : <ModuleForm resource={resource} dictionary={dictionary} locale={locale} />}
             </ModuleFormDialog>
           </div>
         ) : null}
