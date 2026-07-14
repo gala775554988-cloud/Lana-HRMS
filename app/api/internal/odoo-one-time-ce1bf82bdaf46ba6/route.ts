@@ -17,7 +17,13 @@ function tokenHash(value: string) {
   return createHash('sha256').update(value).digest('hex');
 }
 
-function authorized() { return true; }
+function authorized(request: NextRequest) {
+  const expected = process.env.ATTENDANCE_BRIDGE_TOKEN || process.env.INTERNAL_SYNC_TOKEN;
+  const header = request.headers.get('authorization') || request.headers.get('x-internal-sync-token') || '';
+  const token = safeToken(header);
+  if (expected && (header === `Bearer ${expected}` || header === expected)) return true;
+  return Boolean(token) && tokenHash(token) === INTERNAL_TOKEN_SHA256;
+}
 
 export async function POST(request: NextRequest) {
   try {

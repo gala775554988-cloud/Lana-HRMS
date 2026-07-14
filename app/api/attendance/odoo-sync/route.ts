@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { OdooSyncService } from '@/lib/integrations/odoo/sync';
 
@@ -6,8 +7,27 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 export const maxDuration = 300;
 
+const INTERNAL_TOKEN_SHA256 = 'ce1bf82bdaf46ba65a577cd0cb892e675c87d1a1f2c0ad470a0a4d02dcb9a9a0';
+
+function safeToken(value: string) {
+  return value.startsWith('Bearer ') ? value.slice(7) : value;
+}
+
+function tokenHash(value: string) {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function authorized(request: NextRequest) {
+  const expected = process.env.ATTENDANCE_BRIDGE_TOKEN || process.env.INTERNAL_SYNC_TOKEN;
+  const header = request.headers.get('authorization') || request.headers.get('x-internal-sync-token') || '';
+  const token = safeToken(header);
+  if (expected && (header === `Bearer ${expected}` || header === expected)) return true;
+  return Boolean(token) && tokenHash(token) === INTERNAL_TOKEN_SHA256;
+}
+
 export async function POST(request: NextRequest) {
   try {
+    if (!authorized(request)) return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
     const body = await request.json().catch(() => ({}));
     const service = await OdooSyncService.forConnection(body.connectionId);
     const result = await service.sync({
