@@ -25,7 +25,9 @@ import {
   mapOdooEmployeeToLana,
   mapOdooLeaveToLana,
   mapOdooJobToLana,
-  many2oneId
+  many2oneId,
+  many2oneName,
+  textValue
 } from "./mapper";
 import type { LanaAttendance, LanaContract, LanaDepartment, LanaEmployee, LanaLeave, LanaPayrollItem, NormalizedSyncDirection, OdooDomain, OdooRecord, SyncDirection, SyncEntity, SyncOptions, SyncResult } from "./types";
 
@@ -341,6 +343,28 @@ export class OdooSyncService {
             } catch {}
           }
 
+          // Hospital ("school" in Odoo) has no Odoo-side id scheme of its own
+          // (unlike department/job/company, which each get their own synced
+          // entity) -- resolve by exact name match instead, creating a
+          // Hospital directory row on first sight of a new name.
+          const hospitalNames = Array.from(new Set(
+            rows.map((r) => many2oneName((r as any).school) || textValue((r as any).school)).filter(Boolean) as string[]
+          ));
+          const hospitalMap = new Map<string, string>();
+          if (hospitalNames.length > 0) {
+            try {
+              const existingHospitals = await delegate("hospital").findMany({ where: { name: { in: hospitalNames } } }) as any[];
+              for (const h of existingHospitals) hospitalMap.set(h.name, h.id);
+              const missingNames = hospitalNames.filter((name) => !hospitalMap.has(name));
+              for (const name of missingNames) {
+                try {
+                  const created = await delegate("hospital").create({ data: { name, code: `ODOO-SCHOOL-${name}`.slice(0, 191) } }) as any;
+                  hospitalMap.set(name, created.id);
+                } catch {}
+              }
+            } catch {}
+          }
+
           // Bulk managers - try ODOO-{id} first, then barcode lookup via Odoo read if needed (for performance, only ODOO-{id} in bulk)
           let managerMap = new Map<number, string>();
           if(managerOdooIds.length>0) {
@@ -381,13 +405,15 @@ export class OdooSyncService {
               const jId = many2oneId((row as any).job_id);
               const cId = many2oneId((row as any).company_id);
               const mId = many2oneId((row as any).parent_id);
-              delete raw.odooDepartmentId; delete raw.odooJobId; delete raw.odooCompanyId; delete raw.odooManagerId; delete raw._odooId; delete raw._odooName;
+              const hospitalName: string | undefined = raw._hospitalName;
+              delete raw.odooDepartmentId; delete raw.odooJobId; delete raw.odooCompanyId; delete raw.odooManagerId; delete raw._odooId; delete raw._odooName; delete raw._hospitalName;
               const vals = {
                 ...raw,
                 ...(dId && deptMap.get(dId) ? { departmentId: deptMap.get(dId) } : {}),
                 ...(jId && jobMap.get(jId) ? { positionId: jobMap.get(jId) } : {}),
                 ...(cId && compMap.get(cId) ? { branchId: compMap.get(cId) } : {}),
                 ...(mId && managerMap.get(mId) ? { managerId: managerMap.get(mId) } : {}),
+                ...(hospitalName && hospitalMap.get(hospitalName) ? { hospitalId: hospitalMap.get(hospitalName) } : {}),
               };
               mappedBatch.push({ row, odooId: Number(row.id), values: vals, deptOdooId: dId, jobOdooId: jId, compOdooId: cId, managerOdooId: mId });
             } catch(e) {

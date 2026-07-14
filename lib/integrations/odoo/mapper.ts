@@ -43,7 +43,12 @@ export const ODOO_MAPPERS: Record<string, MapperDefinition> = {
       "departure_date",
       "departure_description",
       "create_date",
-      "write_date"
+      "write_date",
+      "sponsor",
+      "sponsor_name",
+      "sponsor_id",
+      "school",
+      "analytic_account"
     ],
     fieldMap: {
       employeeNumber: "barcode",
@@ -155,7 +160,7 @@ export function asDate(value: unknown) {
   return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
-function textValue(value: unknown) {
+export function textValue(value: unknown) {
   return typeof value === "string" && value.trim() ? value : undefined;
 }
 
@@ -250,7 +255,12 @@ export function mapOdooEmployeeToLana(record: OdooRecord): Record<string, unknow
     emergencyContact,
     profilePhotoUrl,
     address: undefined,
-    sponsor: textValue(record.sponsor),
+    // Real Odoo field names confirmed by the client: sponsor, sponsor_name,
+    // sponsor_id can each independently hold the sponsor display value
+    // depending on how their instance is configured -- prefer the most
+    // specific/readable one available.
+    sponsor: textValue(record.sponsor_name) || textValue(record.sponsor) || many2oneName(record.sponsor_id) || textValue(record.sponsor_id),
+    analyticAccount: many2oneName(record.analytic_account) || textValue(record.analytic_account),
     status: record.active === false ? "INACTIVE" : "ACTIVE",
     lastActiveDate,
     lastActiveSource: record.active === false ? "ODOO_DEPARTURE" : "ODOO_WRITE_DATE",
@@ -261,6 +271,10 @@ export function mapOdooEmployeeToLana(record: OdooRecord): Record<string, unknow
     odooJobId: jobOdooId,
     odooCompanyId: companyOdooId,
     odooManagerId: managerOdooId,
+    // "school" (real Odoo field name confirmed by the client) maps to our
+    // Hospital directory. Resolved by name in the sync service since Hospital
+    // has no Odoo-side id scheme of its own (unlike department/job/company).
+    _hospitalName: many2oneName(record.school) || textValue(record.school),
     _odooId: record.id,
     _odooName: record.name
   });
