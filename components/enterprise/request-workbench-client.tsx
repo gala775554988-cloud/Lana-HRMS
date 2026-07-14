@@ -106,30 +106,41 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
 
   function decide(id: string, decision: "APPROVE" | "REJECT" | "RETURN" | "TRANSFER" | "DEFER" | "NOTE" | "PRIORITY", extra: Record<string, unknown> = {}) {
     startTransition(async () => {
-      const response = await fetch(`/api/enterprise/workflows/${id}/decision`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision, ...extra })
-      });
-      const data = await response.json();
-      if (!data.success) {
-        setMessage(data.message || "Failed to update request");
-        return;
+      try {
+        const response = await fetch(`/api/enterprise/workflows/${id}/decision`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ decision, ...extra })
+        });
+        const data = await response.json().catch(() => ({ success: false, message: "استجابة غير صالحة من الخادم" }));
+        if (!data.success) {
+          setMessage(data.message || "فشل تحديث الطلب");
+          return;
+        }
+        setMessage("تم تحديث الطلب بنجاح");
+        load();
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "فشل تحديث الطلب");
       }
-      setMessage("تم تحديث الطلب بنجاح");
-      load();
     });
   }
 
   function bulk(decision: "APPROVE" | "REJECT" | "TRANSFER" | "DEFER" | "PRIORITY") {
     if (!selectedIds.length) return;
     startTransition(async () => {
-      for (const id of selectedIds) {
-        const extra = decision === "TRANSFER" ? { targetUserId } : decision === "DEFER" ? { deferPreset } : decision === "PRIORITY" ? { priority: "High" } : {};
-        await fetch(`/api/enterprise/workflows/${id}/decision`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision, ...extra }) });
+      try {
+        const failures: string[] = [];
+        for (const id of selectedIds) {
+          const extra = decision === "TRANSFER" ? { targetUserId } : decision === "DEFER" ? { deferPreset } : decision === "PRIORITY" ? { priority: "High" } : {};
+          const response = await fetch(`/api/enterprise/workflows/${id}/decision`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision, ...extra }) });
+          const data = await response.json().catch(() => ({ success: false }));
+          if (!data.success) failures.push(id);
+        }
+        setMessage(failures.length ? `تم التنفيذ مع فشل ${failures.length} من ${selectedIds.length} طلب` : "تم تنفيذ العملية الجماعية");
+        load();
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "فشل تنفيذ العملية الجماعية");
       }
-      setMessage("تم تنفيذ العملية الجماعية");
-      load();
     });
   }
 
