@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-const SW_CACHE_VERSION = "v4";
+const SW_CACHE_VERSION = "v5";
 const SW_CACHE_STORAGE_KEY = "lana.hrms.sw-cache-version";
 
 async function clearLegacyPwaCaches() {

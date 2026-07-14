@@ -30,6 +30,7 @@ export function PWAInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [showIOSHelp, setShowIOSHelp] = useState(false);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
   const iosDevice = useMemo(() => isIOS(), []);
 
   useEffect(() => {
@@ -55,10 +56,14 @@ export function PWAInstallPrompt() {
   }, [iosDevice]);
 
   useEffect(() => {
-    const onUpdateReady = () => setIsVisible(true);
+    const onUpdateReady = () => setUpdateAvailable(true);
     window.addEventListener("lana-pwa-update-ready", onUpdateReady);
     return () => window.removeEventListener("lana-pwa-update-ready", onUpdateReady);
   }, []);
+
+  const applyUpdate = () => {
+    window.location.reload();
+  };
 
   const installApp = async () => {
     if (!deferredPrompt) return;
@@ -75,6 +80,40 @@ export function PWAInstallPrompt() {
     window.localStorage.setItem(DISMISSED_KEY, "true");
     setIsVisible(false);
   };
+
+  if (updateAvailable) {
+    return (
+      <div className="fixed inset-x-3 bottom-3 z-[60] mx-auto max-w-md rounded-2xl border border-primary/30 bg-white/95 p-4 text-slate-900 shadow-2xl backdrop-blur dark:border-primary/40 dark:bg-slate-950/95 dark:text-slate-50">
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg shadow-primary/15">
+            <img src="/brand/lana-logo.png" alt="شعار Lana HRMS" className="h-full w-full object-contain p-1" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold">تحديث جديد متاح</p>
+            <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+              يوجد إصدار أحدث من النظام. اضغط "تحديث الآن" لإعادة تحميل الصفحة والحصول على آخر الإصلاحات.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={applyUpdate}
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90"
+              >
+                تحديث الآن
+              </button>
+              <button
+                type="button"
+                onClick={() => setUpdateAvailable(false)}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-900"
+              >
+                لاحقًا
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!isVisible || isStandaloneDisplayMode()) return null;
 
