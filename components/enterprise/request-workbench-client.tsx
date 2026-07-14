@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { Check, ChevronsUpDown, RotateCcw, Search, Send, X } from "lucide-react";
+import { Check, ChevronsUpDown, History, RotateCcw, Search, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { ApprovalTimeline } from "@/components/enterprise/approval-timeline";
 
 const typeLabels: Record<string, string> = {
   ALL: "كل الأنواع",
@@ -81,6 +82,7 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
   const [deferPreset, setDeferPreset] = useState("tomorrow");
   const [message, setMessage] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [timelineWorkflowId, setTimelineWorkflowId] = useState<string | null>(null);
 
   const selectedIds = useMemo(() => Array.from(selected), [selected]);
 
@@ -226,6 +228,7 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
                   <td className="px-3 py-3">{request.currentApprover}</td>
                   <td className="px-3 py-3">
                     <div className="flex flex-wrap gap-1">
+                      <Button type="button" size="sm" variant="outline" onClick={() => setTimelineWorkflowId(request.id)}><History className="h-3.5 w-3.5" />السجل</Button>
                       <Button type="button" size="sm" onClick={() => decide(request.id, "APPROVE")} disabled={isPending}><Check className="h-3.5 w-3.5" />موافقة</Button>
                       <Button type="button" size="sm" variant="destructive" onClick={() => decide(request.id, "REJECT")} disabled={isPending}><X className="h-3.5 w-3.5" />رفض</Button>
                       <Button type="button" size="sm" variant="outline" onClick={() => decide(request.id, "RETURN")} disabled={isPending}><RotateCcw className="h-3.5 w-3.5" />إرجاع</Button>
@@ -249,6 +252,8 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
           <Button type="button" variant="outline" size="sm" disabled={page >= pageCount} onClick={() => setPage((value) => Math.min(value + 1, pageCount))}>التالي</Button>
         </div>
       </div>
+
+      <ApprovalTimeline workflowId={timelineWorkflowId} onClose={() => setTimelineWorkflowId(null)} />
     </div>
   );
 }
