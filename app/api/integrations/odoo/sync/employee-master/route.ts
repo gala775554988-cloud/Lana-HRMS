@@ -178,7 +178,8 @@ export async function POST(request: NextRequest) {
     ];
 
     const rows: MasterRow[] = [];
-    let lastOdooId = 0;
+    let lastOdooId = Math.max(Number(body.afterId ?? 0), 0);
+    const startedAfterId = lastOdooId;
     let pages = 0;
     while (true) {
       const page = await client.search_read<MasterRow>(
@@ -251,6 +252,14 @@ export async function POST(request: NextRequest) {
       };
     });
 
+    for (const item of plan) {
+      const email = item.data.email;
+      if (email && item.existing?.id) {
+        const owner = byEmail.get(email);
+        if (owner && owner.id !== item.existing.id) item.data.email = null;
+      }
+    }
+
     const desiredCodeToEmployeeId = new Map<string, string>();
     const duplicateDesiredCodes: Array<Record<string, unknown>> = [];
     for (const item of plan) {
@@ -281,6 +290,8 @@ export async function POST(request: NextRequest) {
         dryRun: true,
         pages,
         totalFetched: rows.length,
+        startedAfterId,
+        lastOdooId,
         sponsorFields,
         plannedCreates: plan.filter((item) => !item.existing).length,
         plannedUpdates: plan.filter((item) => item.existing).length,
@@ -312,8 +323,10 @@ export async function POST(request: NextRequest) {
           created += 1;
         }
         localByOdooId.set(item.odooId, employeeId);
-        const userResult = await ensureEmployeeUser(employeeId, item.data).catch((error) => ({ created: false, reason: error instanceof Error ? error.message : String(error) }));
-        if (userResult.created) usersCreated += 1;
+        if (!body.skipUserProvisioning) {
+          const userResult = await ensureEmployeeUser(employeeId, item.data).catch((error) => ({ created: false, reason: error instanceof Error ? error.message : String(error) }));
+          if (userResult.created) usersCreated += 1;
+        }
       } catch (error) {
         errors.push({ odooId: item.odooId, employeeNumber: item.data.employeeNumber, nationalId: item.data.nationalId, message: error instanceof Error ? error.message : String(error) });
       }
@@ -343,6 +356,8 @@ export async function POST(request: NextRequest) {
       forcedCodeDisplacements: staged.length,
       skipped: errors.length,
       sponsorFields,
+      startedAfterId,
+      lastOdooId,
       durationMs: Date.now() - startedAt,
       errors: errors.slice(0, 100),
     };
