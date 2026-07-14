@@ -1,9 +1,10 @@
 import { revalidatePath } from "next/cache";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getAppSetting, setAppSetting } from "@/lib/settings";
 import { LogoUploadField } from "@/components/hrms/logo-upload-field";
+import { SettingsFormClient } from "@/components/hrms/settings-form-client";
+import type { ToastState } from "@/components/ui/toast-message";
 
 function scalarSetting(value: unknown, fallback = "") {
   if (typeof value === "string") return value;
@@ -20,7 +21,7 @@ function boolSetting(value: unknown, fallback: boolean) {
   return fallback;
 }
 
-async function saveSystemSettings(formData: FormData) {
+async function saveSystemSettings(_prevState: ToastState, formData: FormData): Promise<ToastState> {
   "use server";
   const entries = [
     ["company.name", formData.get("companyName"), "Company name"],
@@ -40,12 +41,17 @@ async function saveSystemSettings(formData: FormData) {
     ["integration.whatsapp.enabled", formData.get("whatsappEnabled") === "on", "WhatsApp sending enabled"],
   ] as const;
 
-  for (const [key, rawValue, description] of entries) {
-    const value = typeof rawValue === "string" ? rawValue.trim() : rawValue;
-    await setAppSetting(key, value, description);
+  try {
+    for (const [key, rawValue, description] of entries) {
+      const value = typeof rawValue === "string" ? rawValue.trim() : rawValue;
+      await setAppSetting(key, value, description);
+    }
+    revalidatePath("/");
+    revalidatePath("/settings");
+    return { success: true, message: "تم حفظ الإعدادات بنجاح" };
+  } catch (error) {
+    return { success: false, message: error instanceof Error ? error.message : "فشل حفظ الإعدادات" };
   }
-  revalidatePath("/");
-  revalidatePath("/settings");
 }
 
 export async function SystemSettingsBody() {
@@ -70,7 +76,7 @@ export async function SystemSettingsBody() {
 
   return (
     <div className="space-y-6">
-      <form action={saveSystemSettings} className="grid gap-6 lg:grid-cols-3">
+      <SettingsFormClient action={saveSystemSettings}>
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>بيانات الشركة</CardTitle>
@@ -165,11 +171,10 @@ export async function SystemSettingsBody() {
               <span className="font-medium">API Keys</span>
               <textarea name="apiKeys" defaultValue={scalarSetting(apiKeys)} className="min-h-20 w-full rounded-md border bg-background px-3 py-2 text-sm" />
             </label>
-            <Button type="submit" className="w-full">حفظ الإعدادات</Button>
           </CardContent>
         </Card>
         </div>
-      </form>
+      </SettingsFormClient>
     </div>
   );
 }
