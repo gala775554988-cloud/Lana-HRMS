@@ -8,11 +8,12 @@ const NotificationCenterClient = dynamicImport(() => import("@/components/enterp
 
 export default async function AnnouncementsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const query = await searchParams;
+  const activeTab = typeof query.tab === "string" ? query.tab : "announcements";
   return (
     <MergedModuleTabs
       defaultValue="announcements"
       items={[
-        { value: "announcements", label: "الإعلانات", icon: Megaphone, content: <ModulePageBody resourceKey="announcements" query={query} showModuleTabs={false} tabValue="announcements" /> },
+        { value: "announcements", label: "الإعلانات", icon: Megaphone, content: activeTab === "announcements" ? <ModulePageBody resourceKey="announcements" query={query} showModuleTabs={false} tabValue="announcements" /> : null },
         {
           value: "notifications",
           label: "الإشعارات",

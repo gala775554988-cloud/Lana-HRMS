@@ -187,22 +187,25 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
   const roles = (session.user.roles as string[] | undefined) ?? [];
   const canUseFastPath = roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER");
   const isSuperAdmin = roles.includes("SUPER_ADMIN");
+  const activeTab = one(query.tab) ?? "directory";
 
-  let directoryContent: React.ReactNode;
-  if (!canUseFastPath) {
-    const page = positiveNumber(query.page, 1);
-    const pageSize = Math.min(Math.max(positiveNumber(query.pageSize, 24), 12), 50);
-    const search = one(query.search) ?? "";
-    const filters = Object.fromEntries(["department", "hospital", "branch", "project", "section", "position", "nationality", "employmentType", "manager", "hireDate", "status"].map((field) => [field, one(query[field])])) as Record<string, string | undefined>;
-    const data = await listModuleRecords({ resourceKey: "employees", page, pageSize, search, filters });
-    directoryContent = <EmployeeList resource={resource} records={data.records as any[]} totalCount={data.total} page={data.page} pageCount={data.pageCount} search={search} filters={filters} pageSize={pageSize} dictionary={dictionary} locale={locale} />;
-  } else {
-    const data = await getFastEmployees(query);
-    if (data.shouldFallback) {
-      const dataFallback = await listModuleRecords({ resourceKey: "employees", page: data.page, pageSize: data.pageSize, search: data.search, filters: data.filters });
-      directoryContent = <EmployeeList resource={resource} records={dataFallback.records as any[]} totalCount={dataFallback.total} page={dataFallback.page} pageCount={dataFallback.pageCount} search={data.search} filters={data.filters} pageSize={data.pageSize} dictionary={dictionary} locale={locale} />;
+  let directoryContent: React.ReactNode = null;
+  if (activeTab === "directory") {
+    if (!canUseFastPath) {
+      const page = positiveNumber(query.page, 1);
+      const pageSize = Math.min(Math.max(positiveNumber(query.pageSize, 24), 12), 50);
+      const search = one(query.search) ?? "";
+      const filters = Object.fromEntries(["department", "hospital", "branch", "project", "section", "position", "nationality", "employmentType", "manager", "hireDate", "status"].map((field) => [field, one(query[field])])) as Record<string, string | undefined>;
+      const data = await listModuleRecords({ resourceKey: "employees", page, pageSize, search, filters });
+      directoryContent = <EmployeeList resource={resource} records={data.records as any[]} totalCount={data.total} page={data.page} pageCount={data.pageCount} search={search} filters={filters} pageSize={pageSize} dictionary={dictionary} locale={locale} />;
     } else {
-      directoryContent = <EmployeeList resource={resource} records={data.records as any[]} totalCount={data.total} page={data.page} pageCount={data.pageCount} search={data.search} filters={data.filters} pageSize={data.pageSize} dictionary={dictionary} locale={locale} />;
+      const data = await getFastEmployees(query);
+      if (data.shouldFallback) {
+        const dataFallback = await listModuleRecords({ resourceKey: "employees", page: data.page, pageSize: data.pageSize, search: data.search, filters: data.filters });
+        directoryContent = <EmployeeList resource={resource} records={dataFallback.records as any[]} totalCount={dataFallback.total} page={dataFallback.page} pageCount={dataFallback.pageCount} search={data.search} filters={data.filters} pageSize={data.pageSize} dictionary={dictionary} locale={locale} />;
+      } else {
+        directoryContent = <EmployeeList resource={resource} records={data.records as any[]} totalCount={data.total} page={data.page} pageCount={data.pageCount} search={data.search} filters={data.filters} pageSize={data.pageSize} dictionary={dictionary} locale={locale} />;
+      }
     }
   }
 
@@ -227,11 +230,11 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
             value: "my-team",
             label: "فريقي",
             icon: UsersRound,
-            content: (
+            content: activeTab === "my-team" ? (
               <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">جاري التحميل...</div>}>
                 <MyTeamTab />
               </Suspense>
-            )
+            ) : null
           }
         ]}
       />

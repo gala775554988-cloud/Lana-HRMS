@@ -7,8 +7,10 @@ import { Fingerprint, MapPin } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-export default async function BiometricsPage() {
-  const sites = await listAttendanceSites();
+export default async function BiometricsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const query = await searchParams;
+  const activeTab = typeof query.tab === "string" ? query.tab : "biometric-logs";
+  const sites = activeTab === "attendance-sites" ? await listAttendanceSites() : [];
   return (
     <MergedModuleTabs
       defaultValue="biometric-logs"
@@ -17,13 +19,13 @@ export default async function BiometricsPage() {
           value: "biometric-logs",
           label: "سجلات البصمة",
           icon: Fingerprint,
-          content: (
+          content: activeTab === "biometric-logs" ? (
             <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">جاري التحميل...</div>}>
               <BiometricLogsBody />
             </Suspense>
-          )
+          ) : null
         },
-        { value: "attendance-sites", label: "مواقع الحضور", icon: MapPin, content: <AttendanceSitesClient initialSites={sites} /> }
+        { value: "attendance-sites", label: "مواقع الحضور", icon: MapPin, content: activeTab === "attendance-sites" ? <AttendanceSitesClient initialSites={sites} /> : null }
       ]}
     />
   );
