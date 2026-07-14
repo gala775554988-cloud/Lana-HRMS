@@ -6,6 +6,7 @@ import { getRequestDictionary } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeSalaryProfile, salaryProfileFields, salaryProfileLabels } from "@/lib/employee/salary-profile";
 import { ModuleForm } from "@/components/hrms/module-form";
+import { LoanForm } from "@/components/hrms/loan-form";
 import { EmployeeList } from "@/components/hrms/employee-list";
 import { EmployeeArchiveButton } from "@/components/hrms/employee-archive-button";
 import { Button } from "@/components/ui/button";
@@ -218,7 +219,11 @@ export default async function RecordPage({ params, searchParams }: { params: Pro
         <CardDescription>{rec.editDesc}</CardDescription>
       </CardHeader>
       <CardContent>
-        <ModuleForm resource={resource} dictionary={dictionary} initialValues={record} recordId={id} />
+        {resource.key === "loans" ? (
+          <LoanForm dictionary={dictionary} locale={locale} initialValues={record} recordId={id} />
+        ) : (
+          <ModuleForm resource={resource} dictionary={dictionary} initialValues={record} recordId={id} />
+        )}
       </CardContent>
     </Card>
   );
