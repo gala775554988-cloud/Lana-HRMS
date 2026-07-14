@@ -3,6 +3,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { decryptSecret } from "@/lib/integrations/security";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/rbac";
+import { isOdooIntegrationEnabled } from "@/lib/settings";
 import { getOdooEnvConfig } from "./config";
 import { OdooClient } from "./client";
 import { OdooConfigurationError } from "./auth";
@@ -114,6 +115,7 @@ function endOfDay(value: Date | string) {
 }
 
 export async function requireOdooIntegrationAccess(action: "read" | "manage" = "read") {
+  if (!(await isOdooIntegrationEnabled())) throw new Error("Odoo integration is disabled");
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
   const roles = session.user.roles as string[] | undefined;
@@ -168,6 +170,7 @@ export class OdooSyncService {
   }
 
   async sync(options: SyncOptions = {}) {
+    if (!(await isOdooIntegrationEnabled())) throw new Error("Odoo integration is disabled");
     const direction = normalizeDirection(options.direction);
     const entity = options.entity ?? "all";
     if (entity === "all") {
