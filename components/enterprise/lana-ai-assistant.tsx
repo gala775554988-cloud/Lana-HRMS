@@ -54,8 +54,8 @@ export function LanaAiAssistant() {
   return (
     <div className="fixed bottom-5 left-5 z-[70] print:hidden" dir="rtl">
       {open ? (
-        <div className="mb-3 w-[min(92vw,420px)] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-[#2E2A8C]/20 dark:border-slate-800 dark:bg-slate-950">
-          <div className="flex items-center justify-between border-b bg-gradient-to-l from-[#2E2A8C] to-[#6D6AF8] p-4 text-white">
+        <div className="mb-3 w-[min(92vw,420px)] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-primary/20 dark:border-slate-800 dark:bg-slate-950">
+          <div className="flex items-center justify-between border-b bg-gradient-to-l from-primary to-primary/60 p-4 text-primary-foreground">
             <div className="flex items-center gap-3">
               <div className="grid h-10 w-10 place-items-center rounded-2xl bg-white/15"><Bot className="h-5 w-5" /></div>
               <div>
@@ -65,10 +65,10 @@ export function LanaAiAssistant() {
             </div>
             <button type="button" onClick={() => setOpen(false)} className="rounded-xl p-2 hover:bg-white/10" aria-label="Close Lana AI"><X className="h-4 w-4" /></button>
           </div>
-          <div ref={listRef} className="max-h-[420px] space-y-3 overflow-y-auto bg-[#F5F7FB] p-4 dark:bg-slate-900">
+          <div ref={listRef} className="max-h-[420px] space-y-3 overflow-y-auto bg-muted p-4">
             {messages.map((message, index) => (
               <div key={index} className={message.role === "user" ? "text-left" : "text-right"}>
-                <div className={`inline-block max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-6 ${message.role === "user" ? "bg-[#2E2A8C] text-white" : "border bg-white text-slate-800 dark:bg-slate-950 dark:text-slate-100"}`}>
+                <div className={`inline-block max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-6 ${message.role === "user" ? "bg-primary text-primary-foreground" : "border bg-white text-slate-800 dark:bg-slate-950 dark:text-slate-100"}`}>
                   {message.content}
                   {message.results?.length ? (
                     <div className="mt-3 space-y-2">
@@ -89,16 +89,16 @@ export function LanaAiAssistant() {
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={(event) => { if (event.key === "Enter") send(); }}
               placeholder="اسأل Lana AI..."
-              className="h-11 flex-1 rounded-2xl border bg-background px-4 text-sm outline-none focus:border-[#6D6AF8]"
+              className="h-11 flex-1 rounded-2xl border bg-background px-4 text-sm outline-none focus:border-primary"
             />
-            <Button type="button" onClick={send} disabled={isPending} className="rounded-2xl bg-[#2E2A8C] hover:bg-[#24206f]"><Send className="h-4 w-4" /></Button>
+            <Button type="button" onClick={send} disabled={isPending} className="rounded-2xl bg-primary hover:bg-primary/90"><Send className="h-4 w-4" /></Button>
           </div>
         </div>
       ) : null}
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#2E2A8C] to-[#6D6AF8] text-white shadow-2xl shadow-[#2E2A8C]/30 transition hover:scale-105"
+        className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/60 text-primary-foreground shadow-2xl shadow-primary/30 transition hover:scale-105"
         aria-label="Open Lana AI"
       >
         <Sparkles className="h-6 w-6" />

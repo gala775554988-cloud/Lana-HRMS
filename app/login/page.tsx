@@ -21,7 +21,7 @@ function MarketingPanel() {
     <section className="relative hidden min-h-screen overflow-hidden bg-[linear-gradient(135deg,#081B46_0%,#182B72_45%,#1E4F78_70%,#274F86_100%)] p-8 text-white lg:flex lg:flex-col lg:justify-center" dir="rtl">
       <div className="absolute inset-0 opacity-[0.10] [background-image:linear-gradient(rgba(255,255,255,.35)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.35)_1px,transparent_1px)] [background-size:44px_44px]" />
       <div className="absolute -right-24 top-16 h-72 w-72 rounded-full bg-[#3F46E8]/30 blur-3xl" />
-      <div className="absolute -bottom-28 left-16 h-80 w-80 rounded-full bg-[#6D6AF8]/20 blur-3xl" />
+      <div className="absolute -bottom-28 left-16 h-80 w-80 rounded-full bg-primary/20 blur-3xl" />
       <div className="relative z-10 mx-auto w-full max-w-5xl space-y-8">
         <div className="flex items-center justify-between gap-6">
           <BrandLogo href="/login" size="md" subtitle="Enterprise Human Resource Platform" textClassName="text-white" subtitleClassName="text-white/65" logoClassName="border-white/25 shadow-xl shadow-[#081B46]/30" />
