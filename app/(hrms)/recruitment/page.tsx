@@ -9,8 +9,8 @@ export default async function RecruitmentPage({ searchParams }: { searchParams: 
     <MergedModuleTabs
       defaultValue="recruitment"
       items={[
-        { value: "recruitment", label: "الوظائف الشاغرة", icon: Briefcase, content: activeTab === "recruitment" ? <ModulePageBody resourceKey="recruitment" query={query} showModuleTabs={false} tabValue="recruitment" /> : null },
-        { value: "candidates", label: "المرشحون", icon: UserPlus, content: activeTab === "candidates" ? <ModulePageBody resourceKey="candidates" query={query} showModuleTabs={false} tabValue="candidates" /> : null }
+        { value: "recruitment", label: "الوظائف الشاغرة", icon: <Briefcase className="h-4 w-4" />, content: activeTab === "recruitment" ? <ModulePageBody resourceKey="recruitment" query={query} showModuleTabs={false} tabValue="recruitment" /> : null },
+        { value: "candidates", label: "المرشحون", icon: <UserPlus className="h-4 w-4" />, content: activeTab === "candidates" ? <ModulePageBody resourceKey="candidates" query={query} showModuleTabs={false} tabValue="candidates" /> : null }
       ]}
     />
   );

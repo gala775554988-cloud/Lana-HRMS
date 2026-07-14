@@ -9,8 +9,8 @@ export default async function ContractsPage({ searchParams }: { searchParams: Pr
     <MergedModuleTabs
       defaultValue="contracts"
       items={[
-        { value: "contracts", label: "العقود", icon: FileText, content: activeTab === "contracts" ? <ModulePageBody resourceKey="contracts" query={query} showModuleTabs={false} tabValue="contracts" /> : null },
-        { value: "documents", label: "المستندات", icon: FolderOpen, content: activeTab === "documents" ? <ModulePageBody resourceKey="documents" query={query} showModuleTabs={false} tabValue="documents" /> : null }
+        { value: "contracts", label: "العقود", icon: <FileText className="h-4 w-4" />, content: activeTab === "contracts" ? <ModulePageBody resourceKey="contracts" query={query} showModuleTabs={false} tabValue="contracts" /> : null },
+        { value: "documents", label: "المستندات", icon: <FolderOpen className="h-4 w-4" />, content: activeTab === "documents" ? <ModulePageBody resourceKey="documents" query={query} showModuleTabs={false} tabValue="documents" /> : null }
       ]}
     />
   );

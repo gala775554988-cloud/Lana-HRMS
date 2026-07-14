@@ -10,8 +10,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     <MergedModuleTabs
       defaultValue="general"
       items={[
-        { value: "general", label: "الإعدادات العامة", icon: Settings, content: activeTab === "general" ? <SystemSettingsBody /> : null },
-        { value: "all-settings", label: "كل الإعدادات", icon: SlidersHorizontal, content: activeTab === "all-settings" ? <ModulePageBody resourceKey="settings" query={query} showModuleTabs={false} tabValue="all-settings" /> : null }
+        { value: "general", label: "الإعدادات العامة", icon: <Settings className="h-4 w-4" />, content: activeTab === "general" ? <SystemSettingsBody /> : null },
+        { value: "all-settings", label: "كل الإعدادات", icon: <SlidersHorizontal className="h-4 w-4" />, content: activeTab === "all-settings" ? <ModulePageBody resourceKey="settings" query={query} showModuleTabs={false} tabValue="all-settings" /> : null }
       ]}
     />
   );

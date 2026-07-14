@@ -9,10 +9,10 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
     <MergedModuleTabs
       defaultValue="payroll-runs"
       items={[
-        { value: "payroll-runs", label: "مسيرات الرواتب", icon: DollarSign, content: activeTab === "payroll-runs" ? <ModulePageBody resourceKey="payroll-runs" query={query} showModuleTabs={false} tabValue="payroll-runs" /> : null },
-        { value: "payroll-items", label: "بنود الرواتب", icon: Receipt, content: activeTab === "payroll-items" ? <ModulePageBody resourceKey="payroll-items" query={query} showModuleTabs={false} tabValue="payroll-items" /> : null },
-        { value: "allowances", label: "البدلات", icon: PlusCircle, content: activeTab === "allowances" ? <ModulePageBody resourceKey="allowances" query={query} showModuleTabs={false} tabValue="allowances" /> : null },
-        { value: "deductions", label: "الاستقطاعات", icon: MinusCircle, content: activeTab === "deductions" ? <ModulePageBody resourceKey="deductions" query={query} showModuleTabs={false} tabValue="deductions" /> : null }
+        { value: "payroll-runs", label: "مسيرات الرواتب", icon: <DollarSign className="h-4 w-4" />, content: activeTab === "payroll-runs" ? <ModulePageBody resourceKey="payroll-runs" query={query} showModuleTabs={false} tabValue="payroll-runs" /> : null },
+        { value: "payroll-items", label: "بنود الرواتب", icon: <Receipt className="h-4 w-4" />, content: activeTab === "payroll-items" ? <ModulePageBody resourceKey="payroll-items" query={query} showModuleTabs={false} tabValue="payroll-items" /> : null },
+        { value: "allowances", label: "البدلات", icon: <PlusCircle className="h-4 w-4" />, content: activeTab === "allowances" ? <ModulePageBody resourceKey="allowances" query={query} showModuleTabs={false} tabValue="allowances" /> : null },
+        { value: "deductions", label: "الاستقطاعات", icon: <MinusCircle className="h-4 w-4" />, content: activeTab === "deductions" ? <ModulePageBody resourceKey="deductions" query={query} showModuleTabs={false} tabValue="deductions" /> : null }
       ]}
     />
   );

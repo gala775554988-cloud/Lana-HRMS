@@ -2,7 +2,6 @@
 
 import { Suspense, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { LucideIcon } from "lucide-react";
 import { Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
@@ -10,7 +9,14 @@ import { cn } from "@/lib/utils";
 export type MergedModuleTabItem = {
   value: string;
   label: string;
-  icon?: LucideIcon;
+  /**
+   * Pass an already-rendered icon element (e.g. `<Users className="h-4 w-4" />`),
+   * never a bare component reference -- a raw component/function type cannot
+   * cross the server/client boundary as a prop (only rendered JSX or a Server
+   * Action can), and passing one throws at request time in production even
+   * though it type-checks and builds cleanly locally.
+   */
+  icon?: React.ReactNode;
   hidden?: boolean;
   /**
    * Server-rendered content for this tab. Callers compute this server-side
@@ -52,7 +58,7 @@ function MergedModuleTabsInner({ items, defaultValue }: { items: MergedModuleTab
               "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
             )}
           >
-            {item.icon ? <item.icon className="h-4 w-4" /> : null}
+            {item.icon}
             {item.label}
           </TabsTrigger>
         ))}

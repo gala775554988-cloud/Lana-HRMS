@@ -9,8 +9,8 @@ export default async function TrainingPage({ searchParams }: { searchParams: Pro
     <MergedModuleTabs
       defaultValue="training"
       items={[
-        { value: "training", label: "البرامج التدريبية", icon: GraduationCap, content: activeTab === "training" ? <ModulePageBody resourceKey="training" query={query} showModuleTabs={false} tabValue="training" /> : null },
-        { value: "training-enrollments", label: "سجلات الالتحاق", icon: ListChecks, content: activeTab === "training-enrollments" ? <ModulePageBody resourceKey="training-enrollments" query={query} showModuleTabs={false} tabValue="training-enrollments" /> : null }
+        { value: "training", label: "البرامج التدريبية", icon: <GraduationCap className="h-4 w-4" />, content: activeTab === "training" ? <ModulePageBody resourceKey="training" query={query} showModuleTabs={false} tabValue="training" /> : null },
+        { value: "training-enrollments", label: "سجلات الالتحاق", icon: <ListChecks className="h-4 w-4" />, content: activeTab === "training-enrollments" ? <ModulePageBody resourceKey="training-enrollments" query={query} showModuleTabs={false} tabValue="training-enrollments" /> : null }
       ]}
     />
   );

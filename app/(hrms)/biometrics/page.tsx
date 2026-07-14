@@ -18,14 +18,14 @@ export default async function BiometricsPage({ searchParams }: { searchParams: P
         {
           value: "biometric-logs",
           label: "سجلات البصمة",
-          icon: Fingerprint,
+          icon: <Fingerprint className="h-4 w-4" />,
           content: activeTab === "biometric-logs" ? (
             <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">جاري التحميل...</div>}>
               <BiometricLogsBody />
             </Suspense>
           ) : null
         },
-        { value: "attendance-sites", label: "مواقع الحضور", icon: MapPin, content: activeTab === "attendance-sites" ? <AttendanceSitesClient initialSites={sites} /> : null }
+        { value: "attendance-sites", label: "مواقع الحضور", icon: <MapPin className="h-4 w-4" />, content: activeTab === "attendance-sites" ? <AttendanceSitesClient initialSites={sites} /> : null }
       ]}
     />
   );
