@@ -291,7 +291,7 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
       </Dialog>
 
       <EmployeeBulkImportDialog open={bulkImportOpen} onOpenChange={setBulkImportOpen} locale={locale} />
-      <EmployeeDrawer employee={selectedEmployee} open={drawerOpen} onClose={handleCloseDrawer} locale={locale} onEdit={handleEdit} />
+      <EmployeeDrawer employee={selectedEmployee} open={drawerOpen} onClose={handleCloseDrawer} locale={locale} />
     </section>
   );
 }

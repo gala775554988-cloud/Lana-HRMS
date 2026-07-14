@@ -4,7 +4,7 @@ import { memo } from "react";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
-import { Eye, Pencil, FileText, MoreHorizontal, Building2, Briefcase, Calendar, Clock, Archive, ArchiveRestore } from "lucide-react";
+import { Eye, FileText, MoreHorizontal, Building2, Briefcase, Calendar, Clock, Archive, ArchiveRestore } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { EmployeeStatus } from "@/lib/design-system/tokens";
 
@@ -51,7 +51,7 @@ export const EmployeeCard = memo(function EmployeeCard({ employee, locale = "ar"
 
   return (
     <div className="employee-card group border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/70 transition-all duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-lg hover:shadow-indigo-100/70 dark:border-slate-800 dark:bg-slate-900/85 dark:shadow-slate-950/30 dark:hover:border-indigo-500/40 dark:hover:shadow-indigo-950/30">
-      <div className="p-5 pb-3">
+      <button type="button" className="block w-full p-5 pb-3 text-start" onClick={() => onView(employee.id)}>
         <div className="flex items-start gap-4">
           {employee.profilePhotoUrl ? (
             <img src={employee.profilePhotoUrl} alt={fullName} className="h-16 w-16 rounded-2xl object-cover ring-2 ring-white shadow-md shadow-slate-200/80 transition-transform duration-200 group-hover:scale-[1.03] dark:ring-slate-900 dark:shadow-slate-950/40" />
@@ -69,7 +69,7 @@ export const EmployeeCard = memo(function EmployeeCard({ employee, locale = "ar"
             {employee.position && <p className="text-sm text-muted-foreground mt-1 truncate">{employee.position.title}</p>}
           </div>
         </div>
-      </div>
+      </button>
 
       <div className="px-5 pb-3 space-y-1.5">
         <InfoRow icon={Building2} value={employee.department?.name} />
@@ -81,11 +81,8 @@ export const EmployeeCard = memo(function EmployeeCard({ employee, locale = "ar"
 
       <div className="border-t border-slate-100 bg-slate-50/50 px-3 py-2.5 flex items-center justify-between dark:border-slate-800 dark:bg-slate-900/50">
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 dark:text-slate-300 dark:hover:bg-indigo-950/40 dark:hover:text-indigo-300" onClick={() => onView(employee.id)}>
-            <Eye className="h-3.5 w-3.5" />{locale === "ar" ? "عرض" : "View"}
-          </Button>
           <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 dark:text-slate-300 dark:hover:bg-indigo-950/40 dark:hover:text-indigo-300" onClick={() => onEdit(employee.id)}>
-            <Pencil className="h-3.5 w-3.5" />{locale === "ar" ? "تعديل" : "Edit"}
+            <Eye className="h-3.5 w-3.5" />{locale === "ar" ? "الملف الكامل" : "Full Profile"}
           </Button>
           <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 dark:text-slate-300 dark:hover:bg-indigo-950/40 dark:hover:text-indigo-300" onClick={() => onDocuments(employee.id)}>
             <FileText className="h-3.5 w-3.5" />{locale === "ar" ? "مستندات" : "Docs"}

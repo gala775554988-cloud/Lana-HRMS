@@ -98,10 +98,9 @@ interface EmployeeDrawerProps {
   open: boolean;
   onClose: () => void;
   locale?: "en" | "ar";
-  onEdit?: (id: string) => void;
 }
 
-export function EmployeeDrawer({ employee, open, onClose, locale = "ar", onEdit }: EmployeeDrawerProps) {
+export function EmployeeDrawer({ employee, open, onClose, locale = "ar" }: EmployeeDrawerProps) {
   const [activeTab, setActiveTab] = useState<TabId>("overview");
 
   useEffect(() => {
@@ -175,12 +174,6 @@ export function EmployeeDrawer({ employee, open, onClose, locale = "ar", onEdit 
           </nav>
         </div>
         <div className="flex-1 overflow-y-auto p-6">{renderTabContent()}</div>
-        {onEdit && (
-          <div className="border-t px-6 py-4 flex items-center justify-end gap-3">
-            <Button variant="outline" onClick={onClose}>{locale === "ar" ? "إغلاق" : "Close"}</Button>
-            <Button onClick={() => onEdit(employee.id)}>{locale === "ar" ? "تعديل الموظف" : "Edit Employee"}</Button>
-          </div>
-        )}
       </div>
     </>
   );
