@@ -190,11 +190,13 @@ export async function ModulePageBody({
           <h1 className="text-3xl font-semibold tracking-tight">{resourceTitle}</h1>
           <p className="max-w-2xl text-muted-foreground">{resourceDescription}</p>
         </div>
-        <div className="shrink-0">
-          <ModuleFormDialog triggerLabel={`${t.create} ${resourceTitle}`} title={`${t.create} ${resourceTitle}`} description={t.createDescription}>
-            <ModuleForm resource={resource} dictionary={dictionary} locale={locale} />
-          </ModuleFormDialog>
-        </div>
+        {resource.key !== "audit-logs" ? (
+          <div className="shrink-0">
+            <ModuleFormDialog triggerLabel={`${t.create} ${resourceTitle}`} title={`${t.create} ${resourceTitle}`} description={t.createDescription}>
+              <ModuleForm resource={resource} dictionary={dictionary} locale={locale} />
+            </ModuleFormDialog>
+          </div>
+        ) : null}
       </div>
 
       {/* Compact single-row toolbar: search + filters on one side, import/export/reports tucked into a menu */}
@@ -225,7 +227,7 @@ export async function ModulePageBody({
               ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
-          <ImportPopover resourceKey={resourceKey} fieldNames={resource.fields.map((field) => field.name).join(", ")} />
+          {resource.key !== "audit-logs" ? <ImportPopover resourceKey={resourceKey} fieldNames={resource.fields.map((field) => field.name).join(", ")} /> : null}
         </div>
       </div>
 
