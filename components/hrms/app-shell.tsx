@@ -199,7 +199,7 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
             >
               <Search className="h-4 w-4 text-primary transition-transform group-hover:scale-110" />
               <span className="font-medium">{dictionary.common.smartSearchPlaceholder}</span>
-              <kbd className="mr-auto flex items-center gap-0.5 rounded-lg border border-border bg-white px-2 py-0.5 text-[10px] font-bold font-mono text-muted-foreground shadow-2xs group-hover:border-indigo-200 group-hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400">
+              <kbd className="ms-auto flex items-center gap-0.5 rounded-lg border border-border bg-white px-2 py-0.5 text-[10px] font-bold font-mono text-muted-foreground shadow-2xs group-hover:border-indigo-200 group-hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400">
                 <span>⌘</span>K
               </kbd>
             </button>
