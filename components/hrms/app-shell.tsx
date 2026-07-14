@@ -10,7 +10,7 @@ import {
   Users, Building2, MapPin, Briefcase, FileText, Clock, Calendar,
   DollarSign, GraduationCap, Package, Megaphone, BarChart3, Settings,
   Shield, GitPullRequest, Sparkles, Menu, X, PlugZap,
-  Inbox, Send, Network, Bell, Tag, Globe2, Wallet, PlusCircle, MinusCircle,
+  Wallet,
   ClipboardCheck, UserPlus, CalendarClock, Fingerprint, BarChart4
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,68 +34,51 @@ interface AppShellProps {
 
 type NavKey = keyof Dictionary["nav"];
 
-const navItems: Array<{ href: string; labelKey: NavKey; icon: typeof LayoutDashboard; group: string; resource: string }> = [
+const navItems: Array<{ href: string; labelKey: NavKey; icon: typeof LayoutDashboard; group: string; resource: string | string[] }> = [
   { href: "/dashboard", labelKey: "dashboard", icon: LayoutDashboard, group: "dashboardAnalytics", resource: "reports" },
   { href: "/branch-analytics", labelKey: "branch-analytics", icon: BarChart4, group: "dashboardAnalytics", resource: "reports" },
 
-  { href: "/employees", labelKey: "employees", icon: Users, group: "employeeDirectory", resource: "employees" },
-  { href: "/departments", labelKey: "departments", icon: Building2, group: "employeeDirectory", resource: "departments" },
-  { href: "/branches", labelKey: "branches", icon: MapPin, group: "employeeDirectory", resource: "branches" },
-  { href: "/hospitals", labelKey: "hospitals", icon: Building2, group: "employeeDirectory", resource: "employees" },
-  { href: "/my-team", labelKey: "my-team", icon: Users, group: "employeeDirectory", resource: "employees" },
-  { href: "/organization-hierarchy", labelKey: "organization-hierarchy", icon: Network, group: "employeeDirectory", resource: "employees" },
-  { href: "/positions", labelKey: "positions", icon: Briefcase, group: "employeeDirectory", resource: "positions" },
-  { href: "/employment-types", labelKey: "employment-types", icon: Tag, group: "employeeDirectory", resource: "employment-types" },
-  { href: "/nationalities", labelKey: "nationalities", icon: Globe2, group: "employeeDirectory", resource: "nationalities" },
-  { href: "/contracts", labelKey: "contracts", icon: FileText, group: "employeeDirectory", resource: "contracts" },
-  { href: "/documents", labelKey: "documents", icon: FileText, group: "employeeDirectory", resource: "documents" },
+  { href: "/employees", labelKey: "employees", icon: Users, group: "peopleContracts", resource: "employees" },
+  { href: "/departments", labelKey: "departments", icon: Building2, group: "peopleContracts", resource: "departments" },
+  { href: "/branches", labelKey: "branches", icon: MapPin, group: "peopleContracts", resource: ["branches", "employees"] },
+  { href: "/contracts", labelKey: "contracts", icon: FileText, group: "peopleContracts", resource: ["contracts", "documents"] },
+  { href: "/setup", labelKey: "setup", icon: Briefcase, group: "peopleContracts", resource: ["positions", "employment-types", "nationalities"] },
 
-  { href: "/attendance", labelKey: "attendance", icon: Clock, group: "attendanceBiometrics", resource: "attendance" },
-  { href: "/attendance-sites", labelKey: "attendance-sites", icon: MapPin, group: "attendanceBiometrics", resource: "attendance" },
-  { href: "/biometric-logs", labelKey: "biometric-logs", icon: Fingerprint, group: "attendanceBiometrics", resource: "attendance" },
-  { href: "/shifts", labelKey: "shifts", icon: CalendarClock, group: "attendanceBiometrics", resource: "shifts" },
-  { href: "/shift-assignments", labelKey: "shift-assignments", icon: CalendarClock, group: "attendanceBiometrics", resource: "shifts" },
+  { href: "/attendance", labelKey: "attendance", icon: Clock, group: "attendanceShifts", resource: "attendance" },
+  { href: "/biometrics", labelKey: "biometrics", icon: Fingerprint, group: "attendanceShifts", resource: "attendance" },
+  { href: "/shifts-management", labelKey: "shifts-management", icon: CalendarClock, group: "attendanceShifts", resource: "shifts" },
 
-  { href: "/leave-requests", labelKey: "leave-requests", icon: Calendar, group: "leaveRequests", resource: "leave" },
-  { href: "/leave-types", labelKey: "leave-types", icon: Calendar, group: "leaveRequests", resource: "leave" },
-  { href: "/overtime", labelKey: "overtime", icon: Clock, group: "leaveRequests", resource: "overtime" },
-  { href: "/request-center", labelKey: "request-center", icon: GitPullRequest, group: "leaveRequests", resource: "leave" },
-  { href: "/approvals-inbox", labelKey: "approvals-inbox", icon: Inbox, group: "leaveRequests", resource: "leave" },
-  { href: "/approvals-outbox", labelKey: "approvals-outbox", icon: Send, group: "leaveRequests", resource: "leave" },
-  { href: "/payroll-runs", labelKey: "payroll-runs", icon: DollarSign, group: "leaveRequests", resource: "payroll" },
-  { href: "/payroll-items", labelKey: "payroll-items", icon: DollarSign, group: "leaveRequests", resource: "payroll" },
-  { href: "/loans", labelKey: "loans", icon: Wallet, group: "leaveRequests", resource: "loans" },
-  { href: "/allowances", labelKey: "allowances", icon: PlusCircle, group: "leaveRequests", resource: "allowances" },
-  { href: "/deductions", labelKey: "deductions", icon: MinusCircle, group: "leaveRequests", resource: "deductions" },
+  { href: "/leave", labelKey: "leave", icon: Calendar, group: "requestsLeave", resource: "leave" },
+  { href: "/overtime", labelKey: "overtime", icon: Clock, group: "requestsLeave", resource: "overtime" },
+  { href: "/approvals", labelKey: "approvals", icon: GitPullRequest, group: "requestsLeave", resource: "leave" },
 
-  { href: "/permissions-system", labelKey: "permissions-system", icon: Shield, group: "systemSettings", resource: "permissions" },
-  { href: "/permissions-management", labelKey: "permissions-management", icon: Shield, group: "systemSettings", resource: "permissions" },
+  { href: "/payroll", labelKey: "payroll", icon: DollarSign, group: "financePayroll", resource: ["payroll", "allowances", "deductions"] },
+  { href: "/loans", labelKey: "loans", icon: Wallet, group: "financePayroll", resource: "loans" },
+
+  { href: "/performance", labelKey: "performance", icon: ClipboardCheck, group: "talentAssets", resource: "performance" },
+  { href: "/recruitment", labelKey: "recruitment", icon: UserPlus, group: "talentAssets", resource: "recruitment" },
+  { href: "/training", labelKey: "training", icon: GraduationCap, group: "talentAssets", resource: "training" },
+  { href: "/assets", labelKey: "assets", icon: Package, group: "talentAssets", resource: "assets" },
+
+  { href: "/permissions", labelKey: "permissions", icon: Shield, group: "systemSettings", resource: "permissions" },
   { href: "/integrations/synchronization", labelKey: "integrations-sync", icon: PlugZap, group: "systemSettings", resource: "settings" },
+  { href: "/reports", labelKey: "reports", icon: BarChart3, group: "systemSettings", resource: "reports" },
+  { href: "/announcements", labelKey: "announcements", icon: Megaphone, group: "systemSettings", resource: ["announcements", "notifications"] },
   { href: "/audit-logs", labelKey: "audit-logs", icon: Shield, group: "systemSettings", resource: "audit-logs" },
-  { href: "/system-settings", labelKey: "settings", icon: Settings, group: "systemSettings", resource: "settings" },
   { href: "/settings", labelKey: "settings", icon: Settings, group: "systemSettings", resource: "settings" },
-
-  { href: "/performance", labelKey: "performance", icon: ClipboardCheck, group: "workforce", resource: "performance" },
-  { href: "/recruitment", labelKey: "recruitment", icon: Briefcase, group: "workforce", resource: "recruitment" },
-  { href: "/candidates", labelKey: "candidates", icon: UserPlus, group: "workforce", resource: "recruitment" },
-  { href: "/training", labelKey: "training", icon: GraduationCap, group: "workforce", resource: "training" },
-  { href: "/training-enrollments", labelKey: "training-enrollments", icon: GraduationCap, group: "workforce", resource: "training" },
-  { href: "/assets", labelKey: "assets", icon: Package, group: "workforce", resource: "assets" },
-  { href: "/reports", labelKey: "reports", icon: BarChart3, group: "workforce", resource: "reports" },
-  { href: "/lana-ai", labelKey: "reports", icon: Sparkles, group: "workforce", resource: "reports" },
-  { href: "/announcements", labelKey: "announcements", icon: Megaphone, group: "workforce", resource: "announcements" },
-  { href: "/notification-center", labelKey: "notification-center", icon: Bell, group: "workforce", resource: "notifications" },
+  { href: "/lana-ai", labelKey: "lana-ai", icon: Sparkles, group: "systemSettings", resource: "reports" },
 ];
 
-const groupOrder = ["dashboardAnalytics", "employeeDirectory", "attendanceBiometrics", "leaveRequests", "systemSettings", "workforce"] as const;
+const groupOrder = ["dashboardAnalytics", "peopleContracts", "attendanceShifts", "requestsLeave", "financePayroll", "talentAssets", "systemSettings"] as const;
 type GroupKey = (typeof groupOrder)[number];
 const groupEmoji: Record<GroupKey, string> = {
   dashboardAnalytics: "📊",
-  employeeDirectory: "👥",
-  attendanceBiometrics: "⏱️",
-  leaveRequests: "📅",
-  systemSettings: "⚙️",
-  workforce: "🎓"
+  peopleContracts: "👥",
+  attendanceShifts: "⏱️",
+  requestsLeave: "📅",
+  financePayroll: "💰",
+  talentAssets: "🎓",
+  systemSettings: "⚙️"
 };
 
 export function AppShell({ children, companyLogo, locale, dictionary }: AppShellProps) {
@@ -136,10 +119,13 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
     navItems
       .filter((item) => {
         if (isSuperAdminOrHR) return true;
-        const hasResourceAccess = item.resource === "overtime"
-          ? userPermissions.includes("manage:overtime")
-          : (userPermissions.includes(`read:${item.resource}`) || userPermissions.includes(`manage:${item.resource}`));
-        return hasResourceAccess && isEnterpriseResourceAllowed(userRoles, item.resource);
+        const resources = Array.isArray(item.resource) ? item.resource : [item.resource];
+        return resources.some((resource) => {
+          const hasResourceAccess = resource === "overtime"
+            ? userPermissions.includes("manage:overtime")
+            : (userPermissions.includes(`read:${resource}`) || userPermissions.includes(`manage:${resource}`));
+          return hasResourceAccess && isEnterpriseResourceAllowed(userRoles, resource);
+        });
       })
       .forEach((item) => { if (!result[item.group]) result[item.group] = []; result[item.group].push(item); });
     return result;

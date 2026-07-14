@@ -191,7 +191,7 @@ async function DashboardContent({ locale, dictionary }: { locale: Locale; dictio
           />
           <QuickLinkCard
             title={dictionary.dashboard.quickLinkRequestsTitle}
-            href="/request-center"
+            href="/approvals"
             description={dictionary.dashboard.quickLinkRequestsDesc}
             icon={GitPullRequest}
             tone="from-purple-500 to-pink-600"

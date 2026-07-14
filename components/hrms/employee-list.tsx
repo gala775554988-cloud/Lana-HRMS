@@ -111,10 +111,10 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
     });
   }, [router]);
   
-  const handleDocuments = useCallback((id: string) => { 
-    router.prefetch(`/documents?employeeId=${id}`);
+  const handleDocuments = useCallback((id: string) => {
+    router.prefetch(`/contracts?tab=documents&documents__employeeId=${id}`);
     startTransition(() => {
-      router.push(`/documents?employeeId=${id}`); 
+      router.push(`/contracts?tab=documents&documents__employeeId=${id}`);
     });
   }, [router]);
 

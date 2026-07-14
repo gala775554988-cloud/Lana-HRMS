@@ -76,10 +76,10 @@ const JobTab = memo(function JobTab({ employee, locale }: { employee: EmployeeCa
 
 const RelatedDataTab = memo(function RelatedDataTab({ tabId, employee, locale }: { tabId: string; employee: EmployeeCardData; locale: "en" | "ar" }) {
   const config: Record<string, { en: string; ar: string; href: string; description: { en: string; ar: string } }> = {
-    salary: { en: "Salary Information", ar: "معلومات الراتب", href: `/payroll-items?employeeId=${employee.id}`, description: { en: "Open payroll items filtered for this employee.", ar: "فتح بنود الرواتب المصفّاة لهذا الموظف." } },
+    salary: { en: "Salary Information", ar: "معلومات الراتب", href: `/payroll?tab=payroll-items&payroll-items__employeeId=${employee.id}`, description: { en: "Open payroll items filtered for this employee.", ar: "فتح بنود الرواتب المصفّاة لهذا الموظف." } },
     attendance: { en: "Attendance Records", ar: "سجلات الحضور", href: `/attendance?employeeId=${employee.id}`, description: { en: "Open attendance records filtered for this employee.", ar: "فتح سجلات الحضور المصفّاة لهذا الموظف." } },
-    leave: { en: "Leave History", ar: "سجل الإجازات", href: `/leave-requests?employeeId=${employee.id}`, description: { en: "Open leave requests filtered for this employee.", ar: "فتح طلبات الإجازة المصفّاة لهذا الموظف." } },
-    documents: { en: "Employee Documents", ar: "مستندات الموظف", href: `/documents?employeeId=${employee.id}`, description: { en: "Open documents filtered for this employee.", ar: "فتح مستندات الموظف." } },
+    leave: { en: "Leave History", ar: "سجل الإجازات", href: `/leave?tab=leave-requests&leave-requests__employeeId=${employee.id}`, description: { en: "Open leave requests filtered for this employee.", ar: "فتح طلبات الإجازة المصفّاة لهذا الموظف." } },
+    documents: { en: "Employee Documents", ar: "مستندات الموظف", href: `/contracts?tab=documents&documents__employeeId=${employee.id}`, description: { en: "Open documents filtered for this employee.", ar: "فتح مستندات الموظف." } },
     performance: { en: "Performance Reviews", ar: "تقييمات الأداء", href: `/performance?employeeId=${employee.id}`, description: { en: "Open performance reviews filtered for this employee.", ar: "فتح تقييمات الأداء المصفّاة لهذا الموظف." } },
     assets: { en: "Assigned Assets", ar: "الأصول المخصصة", href: `/assets?assignedEmployeeId=${employee.id}`, description: { en: "Open assigned assets for this employee.", ar: "فتح الأصول المسندة لهذا الموظف." } },
     activity: { en: "Activity Timeline", ar: "سجل النشاط", href: `/audit-logs?entityId=${employee.id}`, description: { en: "Open audit records related to this employee.", ar: "فتح سجلات التدقيق المرتبطة بهذا الموظف." } },

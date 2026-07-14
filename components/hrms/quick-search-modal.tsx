@@ -43,7 +43,7 @@ export function QuickSearchModal({ isOpen, onClose }: QuickSearchModalProps) {
       title: "نظام الإجازات والمغادرات",
       description: "تقديم وطلب الإجازات ومراجعة أرصدة الإجازات السنوية والمرضية",
       category: "الوحدات والنظم",
-      href: "/leave-requests",
+      href: "/leave?tab=leave-requests",
       icon: Calendar,
     },
     {
@@ -59,7 +59,7 @@ export function QuickSearchModal({ isOpen, onClose }: QuickSearchModalProps) {
       title: "مسيرات الرواتب والمستحقات",
       description: "إصدار مسيرات الرواتب، البدلات، والاستقطاعات الشهرية",
       category: "الوحدات والنظم",
-      href: "/payroll-runs",
+      href: "/payroll?tab=payroll-runs",
       icon: DollarSign,
     },
     {
@@ -67,7 +67,7 @@ export function QuickSearchModal({ isOpen, onClose }: QuickSearchModalProps) {
       title: "إدارة المستشفيات والمراكز",
       description: "توزيع الموظفين والممارسين الصحيين على مواقع الرعاية والمستشفيات",
       category: "الوحدات والنظم",
-      href: "/hospitals",
+      href: "/branches?tab=hospitals",
       icon: Building2,
     },
     {
@@ -101,7 +101,7 @@ export function QuickSearchModal({ isOpen, onClose }: QuickSearchModalProps) {
       title: "صندوق الاعتمادات والموافقات",
       description: "مراجعة الطلبات المعلقة واتخاذ قرار الموافقة أو الرفض",
       category: "إجراءات سريعة",
-      href: "/request-center",
+      href: "/approvals",
       icon: GitPullRequest,
     },
     {
