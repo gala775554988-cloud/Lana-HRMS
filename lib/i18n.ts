@@ -186,15 +186,24 @@ export const dictionaries = {
       shifts: "Shifts",
       "shift-assignments": "Shift Roster",
       "branch-analytics": "Branch & Hospital Analytics",
-      "biometric-logs": "Biometric Logs"
+      "biometric-logs": "Biometric Logs",
+      setup: "Job Setup",
+      biometrics: "Biometrics & Geofencing",
+      "shifts-management": "Shifts & Rosters",
+      leave: "Leave",
+      approvals: "Approvals Center",
+      payroll: "Payroll & Compensation",
+      permissions: "Permissions",
+      "lana-ai": "AI System Manager"
     },
     navGroups: {
       dashboardAnalytics: "Dashboard & Analytics",
-      employeeDirectory: "Employee Directory (Odoo Synced)",
-      attendanceBiometrics: "Attendance & Biometrics",
-      leaveRequests: "Leave & Request Management",
-      systemSettings: "System Settings & Permissions",
-      workforce: "Workforce & More"
+      peopleContracts: "Employees & Contracts",
+      attendanceShifts: "Attendance & Shifts",
+      requestsLeave: "Requests & Leave",
+      financePayroll: "Finance & Payroll",
+      talentAssets: "Talent Development & Assets",
+      systemSettings: "System & Settings"
     },
     table: {
       actions: "Actions",
@@ -533,15 +542,24 @@ export const dictionaries = {
       shifts: "الورديات",
       "shift-assignments": "جدول المناوبات",
       "branch-analytics": "تحليلات الفروع والمستشفيات",
-      "biometric-logs": "سجلات البصمة"
+      "biometric-logs": "سجلات البصمة",
+      setup: "تهيئة الوظائف",
+      biometrics: "مراقبة البصمة والمواقع",
+      "shifts-management": "المناوبات والورديات",
+      leave: "طلبات وأنواع الإجازات",
+      approvals: "مركز الموافقات والطلبات",
+      payroll: "مسير الرواتب والبدلات",
+      permissions: "إدارة الصلاحيات والأدوار",
+      "lana-ai": "مدير النظام الذكي"
     },
     navGroups: {
       dashboardAnalytics: "لوحة المعلومات والتحليلات",
-      employeeDirectory: "دليل الموظفين (متزامن مع Odoo)",
-      attendanceBiometrics: "الحضور والبصمة",
-      leaveRequests: "الإجازات وإدارة الطلبات",
-      systemSettings: "إعدادات النظام والصلاحيات",
-      workforce: "تطوير الموظفين والمزيد"
+      peopleContracts: "إدارة الموظفين والعقود",
+      attendanceShifts: "الحضور والورديات",
+      requestsLeave: "الطلبات والإجازات",
+      financePayroll: "الشؤون المالية والرواتب",
+      talentAssets: "التطوير الإداري والأصول",
+      systemSettings: "النظام والإعدادات"
     },
     table: {
       actions: "الإجراءات",

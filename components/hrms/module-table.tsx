@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useTransition, useCallback } from "react";
-import { Check, FileSearch, RotateCcw, X } from "lucide-react";
+import { Check, ExternalLink, FileSearch, MoreVertical, RotateCcw, Trash2, X } from "lucide-react";
 import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import type { HrmsModule } from "@/config/hrms";
 import { deleteModuleRecord } from "@/lib/hrms/actions";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/hrms/empty-state";
 import type { Dictionary } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
@@ -58,17 +59,32 @@ export function ModuleTable({ resource, records, dictionary, locale = "en" }: { 
     helper.display({ id: "actions", header: dictionary.table.actions, cell: ({ row }) => {
       const workflowId = typeof row.original._workflowId === "string" ? row.original._workflowId : "";
       const canAct = Boolean(row.original._canAct && workflowId);
+      const openHref = resource.key === "departments" ? `/employees?department=${encodeURIComponent(String(row.original.name ?? ""))}` : "/" + resource.key + "/" + row.original.id;
+      const openLabel = resource.key === "departments" ? "عرض" : dictionary.table.open;
       return (
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button asChild size="sm" variant="outline"><Link href={resource.key === "departments" ? `/employees?department=${encodeURIComponent(String(row.original.name ?? ""))}` : "/" + resource.key + "/" + row.original.id}>{resource.key === "departments" ? "عرض" : dictionary.table.open}</Link></Button>
+        <div className="flex flex-wrap justify-end gap-1.5">
           {canAct ? (
             <>
-              <Button size="sm" disabled={isPending} onClick={() => handleDecision(workflowId, "APPROVE")}><Check className="me-1 h-3.5 w-3.5" />Approve</Button>
-              <Button size="sm" variant="destructive" disabled={isPending} onClick={() => handleDecision(workflowId, "REJECT")}><X className="me-1 h-3.5 w-3.5" />Reject</Button>
-              <Button size="sm" variant="outline" disabled={isPending} onClick={() => handleDecision(workflowId, "RETURN")}><RotateCcw className="me-1 h-3.5 w-3.5" />Return</Button>
+              <Button size="sm" variant="ghost" className="text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-600 dark:text-emerald-400" disabled={isPending} onClick={() => handleDecision(workflowId, "APPROVE")}><Check className="me-1 h-3.5 w-3.5" />Approve</Button>
+              <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10 hover:text-destructive" disabled={isPending} onClick={() => handleDecision(workflowId, "REJECT")}><X className="me-1 h-3.5 w-3.5" />Reject</Button>
+              <Button size="sm" variant="ghost" disabled={isPending} onClick={() => handleDecision(workflowId, "RETURN")}><RotateCcw className="me-1 h-3.5 w-3.5" />Return</Button>
             </>
           ) : null}
-          {resource.key !== "departments" ? <Button size="sm" variant="destructive" disabled={isPending} onClick={() => handleDelete(row.original.id)}>{dictionary.table.delete}</Button> : null}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon" variant="ghost" className="h-8 w-8" aria-label={dictionary.table.actions}><MoreVertical className="h-4 w-4" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href={openHref} className="flex items-center gap-2"><ExternalLink className="h-4 w-4" />{openLabel}</Link>
+              </DropdownMenuItem>
+              {resource.key !== "departments" ? (
+                <DropdownMenuItem variant="destructive" disabled={isPending} onSelect={() => handleDelete(row.original.id)}>
+                  <Trash2 className="h-4 w-4" />{dictionary.table.delete}
+                </DropdownMenuItem>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       );
     }})

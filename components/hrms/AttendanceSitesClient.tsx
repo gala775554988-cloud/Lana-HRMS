@@ -49,7 +49,7 @@ export function AttendanceSitesClient({ initialSites }: { initialSites: Site[] }
   }
 
   return (
-    <main className="space-y-6" dir="rtl">
+    <div className="space-y-6" dir="rtl">
       <div>
         <h1 className="text-3xl font-black">مواقع حضور المشاريع والمستشفيات</h1>
         <p className="text-muted-foreground">اربط الموظفين بالموقع بمجرد كتابة اسم المستشفى/الفرع/الإدارة/الكفيل، بدون إضافة حقول جديدة في قاعدة البيانات.</p>
@@ -94,6 +94,6 @@ export function AttendanceSitesClient({ initialSites }: { initialSites: Site[] }
         ))}
         {!sites.length && <div className="rounded-2xl border border-dashed p-8 text-muted-foreground">لا توجد مواقع حضور حتى الآن.</div>}
       </div>
-    </main>
+    </div>
   );
 }

@@ -1,3 +1,6 @@
+import dynamicImport from "next/dynamic";
+import Link from "next/link";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { unstable_cache } from "next/cache";
 import { auth } from "@/auth";
@@ -6,7 +9,11 @@ import { listModuleRecords } from "@/lib/hrms/actions";
 import { getRequestDictionary } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { EmployeeList } from "@/components/hrms/employee-list";
-import { ModuleTabs } from "@/components/hrms/module-tabs";
+import { MergedModuleTabs } from "@/components/hrms/merged-module-tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Network, Users, UsersRound } from "lucide-react";
+
+const OrganizationHierarchyClient = dynamicImport(() => import("@/components/enterprise/organization-hierarchy-client").then((mod) => mod.OrganizationHierarchyClient));
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "default-no-store";
@@ -151,6 +158,24 @@ async function getFastEmployees(query: Query) {
   };
 }
 
+async function MyTeamTab() {
+  const data = await listModuleRecords({ resourceKey: "employees", page: 1, pageSize: 100 });
+  const employees = data.records as Array<{ id: string; employeeNumber?: string; firstName?: string; lastName?: string; department?: { name?: string }; branch?: { name?: string }; status?: string }>;
+  return (
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {employees.length === 0 ? <div className="rounded-xl border bg-card p-8 text-center text-muted-foreground md:col-span-2 xl:col-span-3">No team members found.</div> : null}
+      {employees.map((employee) => (
+        <Link key={employee.id} href={`/employees/${employee.id}`}>
+          <Card className="h-full transition hover:bg-muted/40">
+            <CardHeader><CardTitle className="text-base">{employee.employeeNumber} - {employee.firstName} {employee.lastName}</CardTitle></CardHeader>
+            <CardContent className="text-sm text-muted-foreground">{employee.department?.name ?? "No department"} • {employee.branch?.name ?? "No branch"} • {employee.status}</CardContent>
+          </Card>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
 export default async function EmployeesPage({ searchParams }: { searchParams: Promise<Query> }) {
   const query = await searchParams;
   const session = await auth();
@@ -161,36 +186,55 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
   const { dictionary, locale } = await getRequestDictionary();
   const roles = (session.user.roles as string[] | undefined) ?? [];
   const canUseFastPath = roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER");
+  const isSuperAdmin = roles.includes("SUPER_ADMIN");
 
+  let directoryContent: React.ReactNode;
   if (!canUseFastPath) {
     const page = positiveNumber(query.page, 1);
     const pageSize = Math.min(Math.max(positiveNumber(query.pageSize, 24), 12), 50);
     const search = one(query.search) ?? "";
     const filters = Object.fromEntries(["department", "hospital", "branch", "project", "section", "position", "nationality", "employmentType", "manager", "hireDate", "status"].map((field) => [field, one(query[field])])) as Record<string, string | undefined>;
     const data = await listModuleRecords({ resourceKey: "employees", page, pageSize, search, filters });
-    return (
-      <div className="space-y-6">
-        <ModuleTabs module="employees" />
-        <EmployeeList resource={resource} records={data.records as any[]} totalCount={data.total} page={data.page} pageCount={data.pageCount} search={search} filters={filters} pageSize={pageSize} dictionary={dictionary} locale={locale} />
-      </div>
-    );
-  }
-
-  const data = await getFastEmployees(query);
-  if (data.shouldFallback) {
-    const dataFallback = await listModuleRecords({ resourceKey: "employees", page: data.page, pageSize: data.pageSize, search: data.search, filters: data.filters });
-    return (
-      <div className="space-y-6">
-        <ModuleTabs module="employees" />
-        <EmployeeList resource={resource} records={dataFallback.records as any[]} totalCount={dataFallback.total} page={dataFallback.page} pageCount={dataFallback.pageCount} search={data.search} filters={data.filters} pageSize={data.pageSize} dictionary={dictionary} locale={locale} />
-      </div>
-    );
+    directoryContent = <EmployeeList resource={resource} records={data.records as any[]} totalCount={data.total} page={data.page} pageCount={data.pageCount} search={search} filters={filters} pageSize={pageSize} dictionary={dictionary} locale={locale} />;
+  } else {
+    const data = await getFastEmployees(query);
+    if (data.shouldFallback) {
+      const dataFallback = await listModuleRecords({ resourceKey: "employees", page: data.page, pageSize: data.pageSize, search: data.search, filters: data.filters });
+      directoryContent = <EmployeeList resource={resource} records={dataFallback.records as any[]} totalCount={dataFallback.total} page={dataFallback.page} pageCount={dataFallback.pageCount} search={data.search} filters={data.filters} pageSize={data.pageSize} dictionary={dictionary} locale={locale} />;
+    } else {
+      directoryContent = <EmployeeList resource={resource} records={data.records as any[]} totalCount={data.total} page={data.page} pageCount={data.pageCount} search={data.search} filters={data.filters} pageSize={data.pageSize} dictionary={dictionary} locale={locale} />;
+    }
   }
 
   return (
     <div className="space-y-6">
-      <ModuleTabs module="employees" />
-      <EmployeeList resource={resource} records={data.records as any[]} totalCount={data.total} page={data.page} pageCount={data.pageCount} search={data.search} filters={data.filters} pageSize={data.pageSize} dictionary={dictionary} locale={locale} />
+      <MergedModuleTabs
+        defaultValue="directory"
+        items={[
+          { value: "directory", label: "دليل الموظفين", icon: Users, content: directoryContent },
+          {
+            value: "hierarchy",
+            label: "الهيكل التنظيمي",
+            icon: Network,
+            hidden: !isSuperAdmin,
+            content: (
+              <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">Loading hierarchy...</div>}>
+                <OrganizationHierarchyClient />
+              </Suspense>
+            )
+          },
+          {
+            value: "my-team",
+            label: "فريقي",
+            icon: UsersRound,
+            content: (
+              <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">جاري التحميل...</div>}>
+                <MyTeamTab />
+              </Suspense>
+            )
+          }
+        ]}
+      />
     </div>
   );
 }
