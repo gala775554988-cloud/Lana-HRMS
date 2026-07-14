@@ -5,6 +5,7 @@ import { hashPassword } from "@/lib/password";
 import { OdooSyncService, requireOdooIntegrationAccess } from "@/lib/integrations/odoo/sync";
 import { many2oneId, many2oneName } from "@/lib/integrations/odoo/mapper";
 import type { OdooRecord } from "@/lib/integrations/odoo/types";
+import { isOdooIntegrationEnabled } from "@/lib/settings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -144,6 +145,9 @@ async function ensureEmployeeUser(employeeId: string, values: { nationalId: stri
 export async function POST(request: NextRequest) {
   const startedAt = Date.now();
   try {
+    if (!(await isOdooIntegrationEnabled())) {
+      return NextResponse.json({ success: false, message: "Odoo integration is disabled" }, { status: 403 });
+    }
     if (!hasInternalSyncToken(request)) await requireOdooIntegrationAccess("manage");
     const body = await request.json().catch(() => ({}));
     const batchSize = Math.min(Math.max(Number(body.batchSize ?? 500), 50), 1000);

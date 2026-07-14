@@ -55,3 +55,21 @@ export async function getCompanyLogo(): Promise<string | null> {
 export async function setCompanyLogo(url: string) {
   return setAppSetting("company.logo", { url }, "Company logo URL");
 }
+
+function boolSetting(value: unknown, fallback: boolean): boolean {
+  if (typeof value === "boolean") return value;
+  if (value && typeof value === "object" && "value" in value) {
+    const inner = (value as Record<string, unknown>).value;
+    if (typeof inner === "boolean") return inner;
+  }
+  return fallback;
+}
+
+async function isOdooIntegrationEnabledUncached(): Promise<boolean> {
+  const setting = await getAppSetting("integration.odoo.enabled");
+  return boolSetting(setting, true);
+}
+
+export async function isOdooIntegrationEnabled(): Promise<boolean> {
+  return memoryCache("setting:integration.odoo.enabled", 60 * 1000, isOdooIntegrationEnabledUncached);
+}

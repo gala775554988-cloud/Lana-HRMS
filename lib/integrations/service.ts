@@ -7,6 +7,7 @@ import { hasPermission } from "@/lib/rbac";
 import { decryptSecret, encryptSecret, createApiKey, hashApiKey, createOAuthClientSecret, verifyWebhookSignature } from "@/lib/integrations/security";
 import { OdooJsonRpcClient } from "@/lib/integrations/odoo";
 import { odooModuleMappings } from "@/lib/integrations/catalog";
+import { isOdooIntegrationEnabled } from "@/lib/settings";
 
 type Delegate = {
   findMany(args?: Record<string, unknown>): Promise<Record<string, unknown>[]>;
@@ -110,10 +111,18 @@ function mapToLocal(record: Record<string, unknown>, fieldMap: Record<string, st
   return Object.fromEntries(Object.entries(fieldMap).map(([local, external]) => [local, record[external]]).filter(([, value]) => value !== undefined && value !== null));
 }
 
+async function assertOdooProviderEnabled(providerId: string) {
+  const provider = await prisma.integrationProvider.findUnique({ where: { id: providerId } });
+  if (provider?.code === "odoo" && !(await isOdooIntegrationEnabled())) {
+    throw new Error("Odoo integration is disabled");
+  }
+}
+
 export async function enqueueSync(input: { connectionId: string; mappingId?: string; direction: "HRMS_TO_ODOO" | "ODOO_TO_HRMS" | "BIDIRECTIONAL"; operation?: string; entity?: string; payload?: Record<string, unknown> }) {
   await requireIntegrationAccess("manage");
   const connection = await prisma.integrationConnection.findUnique({ where: { id: input.connectionId } });
   if (!connection) throw new Error("Connection not found");
+  await assertOdooProviderEnabled(connection.providerId);
   const mapping = input.mappingId ? await prisma.integrationMapping.findUnique({ where: { id: input.mappingId } }) : null;
   return prisma.integrationQueue.create({
     data: {
@@ -131,6 +140,7 @@ export async function enqueueSync(input: { connectionId: string; mappingId?: str
 export async function syncMapping(connectionId: string, mappingId: string, direction: "HRMS_TO_ODOO" | "ODOO_TO_HRMS" | "BIDIRECTIONAL") {
   await requireIntegrationAccess("manage");
   const { connection, client } = await getOdooClient(connectionId);
+  await assertOdooProviderEnabled(connection.providerId);
   if (!connection.uid) await testOdooConnection(connectionId);
   const mapping = await prisma.integrationMapping.findUnique({ where: { id: mappingId } });
   if (!mapping) throw new Error("Mapping not found");
