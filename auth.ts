@@ -4,6 +4,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations/auth";
 import { verifyPassword, hashPassword } from "@/lib/password";
+import { getCachedEffectivePermissions } from "@/lib/enterprise/permissions";
 
 async function getAuthorization(userId: string) {
   const assignments = await prisma.userRole.findMany({
@@ -130,9 +131,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         (session.user as any).roles = token.roles ?? [];
         (session.user as any).mustChangePassword = (token as any).mustChangePassword ?? false;
         (session.user as any).passwordChanged = (token as any).passwordChanged ?? false;
-        // SUPER_ADMIN gets wildcard permission
         const roles: string[] = token.roles ?? [];
-        (session.user as any).permissions = roles.includes("SUPER_ADMIN") ? ["*:*"] : [];
+        // Computed fresh (short-lived cache) rather than baked into the JWT --
+        // keeps the cookie small and lets permission edits take effect quickly.
+        (session.user as any).permissions = await getCachedEffectivePermissions(token.sub, roles);
       }
       return session;
     },

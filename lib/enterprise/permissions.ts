@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
+import { memoryCache, clearMemoryCache } from "@/lib/cache/memory-cache";
 
 export type PermissionKey = `${string}:${string}`;
 export type PermissionEffect = "grant" | "deny";
@@ -132,6 +133,28 @@ export async function mergeEffectivePermissions(rolePermissions: string[] | unde
   return Array.from(base).sort();
 }
 
+/** Union of every read/manage permission key granted to `roles` via the DB
+ * RolePermission table, merged with the per-user grant/deny overlay. */
+export async function getEffectivePermissionsForRoles(roles: string[], userId?: string): Promise<string[]> {
+  if (roles.includes("SUPER_ADMIN")) return ["*:*"];
+  const rows = roles.length
+    ? await prisma.rolePermission.findMany({
+        where: { role: { name: { in: roles } } },
+        select: { permission: { select: { action: true, resource: true } } }
+      })
+    : [];
+  const basePermissions = Array.from(new Set(rows.map((row) => `${row.permission.action}:${row.permission.resource}`)));
+  return mergeEffectivePermissions(basePermissions, userId);
+}
+
+export async function getCachedEffectivePermissions(userId: string, roles: string[]): Promise<string[]> {
+  return memoryCache(`effective-permissions:${userId}`, 30 * 1000, () => getEffectivePermissionsForRoles(roles, userId));
+}
+
+export function invalidateEffectivePermissions(userId: string) {
+  clearMemoryCache(`effective-permissions:${userId}`);
+}
+
 export async function setUserPermissions({
   actorUserId,
   targetUserId,
@@ -158,6 +181,7 @@ export async function setUserPermissions({
   };
   store.users[targetUserId] = next;
   await savePermissionStore(store);
+  invalidateEffectivePermissions(targetUserId);
   await writeAuditLog({
     actorUserId,
     action: "permissions:update",
