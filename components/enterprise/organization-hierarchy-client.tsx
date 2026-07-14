@@ -37,6 +37,41 @@ export function OrganizationHierarchyClient() {
     return `${employee.employeeNumber} - ${employee.firstName} ${employee.lastName}`;
   }
 
+  const tree = useMemo(() => {
+    const byManager = new Map<string, Employee[]>();
+    const roots: Employee[] = [];
+    for (const employee of employeeOptions) {
+      if (employee.managerId) {
+        const list = byManager.get(employee.managerId) ?? [];
+        list.push(employee);
+        byManager.set(employee.managerId, list);
+      } else {
+        roots.push(employee);
+      }
+    }
+    // Only show roots that actually manage someone -- with 1600+ employees and
+    // Odoo-synced manager data still being backfilled, most employees have no
+    // manager and no reports yet; listing every one of them as a bare "root"
+    // would bury the real hierarchy in noise rather than showing a useful tree.
+    const rootsWithReports = roots.filter((employee) => byManager.has(employee.id));
+    return { byManager, roots: rootsWithReports, unconnectedCount: roots.length - rootsWithReports.length };
+  }, [employeeOptions]);
+
+  function TreeNode({ employee }: { employee: Employee }) {
+    const reports = tree.byManager.get(employee.id) ?? [];
+    if (!reports.length) {
+      return <div className="rounded-lg border px-3 py-1.5 text-sm">{employeeLabel(employee)}</div>;
+    }
+    return (
+      <details className="rounded-lg border px-3 py-1.5 text-sm" open={reports.length <= 5}>
+        <summary className="cursor-pointer font-medium">{employeeLabel(employee)} <span className="text-xs text-muted-foreground">({reports.length} تقرير مباشر)</span></summary>
+        <div className="mt-2 ms-4 space-y-1.5 border-s ps-3">
+          {reports.map((report) => <TreeNode key={report.id} employee={report} />)}
+        </div>
+      </details>
+    );
+  }
+
   function updateStore(mutator: (draft: Store) => void) {
     setStore((current) => {
       if (!current) return current;
@@ -65,6 +100,17 @@ export function OrganizationHierarchyClient() {
           <CardDescription>Company, branches, departments, sections, projects, and approval managers.</CardDescription>
         </CardHeader>
         <CardContent className="rounded-xl border bg-muted/30 p-4 font-semibold">{payload.company.name}</CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Network className="h-5 w-5" /> شجرة الهيكل التنظيمي</CardTitle>
+          <CardDescription>Rendered from the Odoo-synced manager relationship (Employee.managerId) -- expand a manager to see their direct reports.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {tree.roots.length ? tree.roots.map((employee) => <TreeNode key={employee.id} employee={employee} />) : <div className="rounded-xl border border-dashed p-6 text-center text-muted-foreground">لا توجد بيانات مدراء متزامنة بعد.</div>}
+          {tree.unconnectedCount > 0 && <p className="text-xs text-muted-foreground">+{tree.unconnectedCount} موظف بدون مدير أو تقارير مباشرة (غير معروضين هنا).</p>}
+        </CardContent>
       </Card>
 
       {message ? <div className="rounded-xl border bg-background p-3 text-sm text-muted-foreground">{message}</div> : null}

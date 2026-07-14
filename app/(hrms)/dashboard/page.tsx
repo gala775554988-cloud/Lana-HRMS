@@ -71,7 +71,20 @@ export default async function HrmsDashboard() {
   );
 }
 
+function lastNMonthRanges(n: number) {
+  const now = new Date();
+  const ranges: Array<{ start: Date; end: Date; label: string }> = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+    ranges.push({ start, end, label: start.toISOString().slice(0, 7) });
+  }
+  return ranges;
+}
+
 async function DashboardContent({ locale, dictionary }: { locale: Locale; dictionary: Dictionary }) {
+  const monthRanges = lastNMonthRanges(8);
+
   // Optimized: Parallel queries with select where possible
   const [
     employees,
@@ -85,7 +98,10 @@ async function DashboardContent({ locale, dictionary }: { locale: Locale; dictio
     attendanceToday,
     lateToday,
     payrollSum,
-    overtimePending
+    overtimePending,
+    employeeGrowthByMonth,
+    requestsByMonth,
+    payrollByMonth
   ] = await Promise.all([
     prisma.employee.count({ where: { status: "ACTIVE" } }),
     prisma.department.count({ where: { isActive: true } }),
@@ -98,7 +114,13 @@ async function DashboardContent({ locale, dictionary }: { locale: Locale; dictio
     prisma.attendanceRecord.count({ where: { workDate: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } } }),
     prisma.attendanceRecord.count({ where: { status: "LATE", workDate: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } } }),
     prisma.payrollItem.aggregate({ _sum: { netPay: true }, where: { payrollRun: { status: "PAID" } } }).then(r => Number(r._sum.netPay || 0)),
-    prisma.overtimeRequest.count({ where: { status: "PENDING" } })
+    prisma.overtimeRequest.count({ where: { status: "PENDING" } }),
+    // Real cumulative headcount at the end of each of the last 8 months (by hireDate), replacing a fabricated growth formula.
+    Promise.all(monthRanges.map((range) => prisma.employee.count({ where: { hireDate: { lt: range.end } } }))),
+    // Real request volume submitted within each month, replacing a fabricated formula.
+    Promise.all(monthRanges.map((range) => prisma.workflowInstance.count({ where: { createdAt: { gte: range.start, lt: range.end } } }))),
+    // Real payroll paid within each month, replacing a fabricated formula.
+    Promise.all(monthRanges.map((range) => prisma.payrollItem.aggregate({ _sum: { netPay: true }, where: { payrollRun: { status: "PAID", paidAt: { gte: range.start, lt: range.end } } } }).then((r) => Number(r._sum.netPay || 0))))
   ]);
 
   const metrics = {
@@ -114,6 +136,14 @@ async function DashboardContent({ locale, dictionary }: { locale: Locale; dictio
     lateToday,
     totalPayroll: payrollSum,
     overtimePending
+  };
+
+  const monthLabels = monthRanges.map((r) => r.label);
+  const series = {
+    months: monthLabels,
+    employeeGrowth: employeeGrowthByMonth,
+    requests: requestsByMonth,
+    payroll: payrollByMonth
   };
 
   const currencyLocale = { en: "en-US", ar: "ar-SA" } as const;
@@ -140,7 +170,7 @@ async function DashboardContent({ locale, dictionary }: { locale: Locale; dictio
       </div>
 
       {/* Charts Section */}
-      <DashboardCharts metrics={metrics} />
+      <DashboardCharts metrics={metrics} series={series} />
 
       {/* Quick Access Modules */}
       <div className="space-y-4">
