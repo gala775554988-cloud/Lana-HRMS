@@ -2,31 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { 
-  Home, Clock, Calendar, FileText, DollarSign, Bell, User, 
-  FolderOpen, Settings, ShieldCheck, CheckSquare, Package, 
-  Award, GraduationCap, MessageCircle, HandCoins, MessageSquareWarning 
-} from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const items = [
-  { href: '/employee/dashboard', label: 'الرئيسية', icon: Home },
-  { href: '/employee/profile', label: 'ملفي الشخصي', icon: User },
-  { href: '/employee/attendance', label: 'الحضور والانصراف', icon: Clock },
-  { href: '/employee/leave', label: 'الإجازات', icon: Calendar },
-  { href: '/employee/permissions', label: 'الاستئذانات', icon: ShieldCheck },
-  { href: '/employee/tasks', label: 'المهام', icon: CheckSquare },
-  { href: '/employee/salary', label: 'الرواتب', icon: DollarSign },
-  { href: '/employee/advances', label: 'طلبات السلف', icon: HandCoins },
-  { href: '/employee/complaints', label: 'الشكاوى والاقتراحات', icon: MessageSquareWarning },
-  { href: '/employee/assets', label: 'العهد', icon: Package },
-  { href: '/employee/documents', label: 'المستندات', icon: FolderOpen },
-  { href: '/employee/performance', label: 'التقييم', icon: Award },
-  { href: '/employee/training', label: 'التدريب', icon: GraduationCap },
-  { href: '/employee/notifications', label: 'الإشعارات', icon: Bell },
-  { href: '/employee/chat', label: 'المحادثات', icon: MessageCircle },
-  { href: '/employee/settings', label: 'الإعدادات', icon: Settings },
-];
+import { EMPLOYEE_NAV_ITEMS } from '@/lib/employee/nav-items';
 
 export function EmployeeDesktopSidebar() {
   const pathname = usePathname();
@@ -38,7 +15,7 @@ export function EmployeeDesktopSidebar() {
     <div className="p-4">
       <div className="px-3 mb-4 text-xs font-semibold text-slate-500 tracking-wider">بوابة الموظف</div>
       <nav className="space-y-0.5">
-        {items.map((item) => {
+        {EMPLOYEE_NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const active = pathname === item.href || pathname.startsWith(item.href + '/');
           

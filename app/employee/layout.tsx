@@ -5,7 +5,7 @@ import { getCurrentEmployeeCached } from "@/lib/employee/employee-cache";
 import { resolveRoleDashboard } from "@/config/auth";
 import { EmployeeTopBar } from "@/components/employee/EmployeeTopBar";
 import { EmployeeDesktopSidebar } from "@/components/employee/EmployeeDesktopSidebar";
-import { EmployeeMobileBottomNav } from "@/components/employee/EmployeeMobileBottomNav";
+import { EmployeeMobileSidebar } from "@/components/employee/EmployeeMobileSidebar";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 const NON_EMPLOYEE_ROLES = [
@@ -84,7 +84,7 @@ export default async function EmployeeLayout({ children }: { children: ReactNode
         </div>
       </div>
 
-      <EmployeeMobileBottomNav />
+      <EmployeeMobileSidebar />
     </div>
   );
 }

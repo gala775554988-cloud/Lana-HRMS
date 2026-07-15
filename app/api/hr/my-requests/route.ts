@@ -233,6 +233,38 @@ export async function POST(request: Request) {
         });
         break;
 
+      case "overtime": {
+        if (!data.workDate || !data.hours || Number(data.hours) <= 0) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                id: `VAL-${Date.now().toString(36)}`,
+                category: "validation",
+                name: "Missing Required Fields",
+                message: "يرجى تحديد تاريخ العمل وعدد الساعات",
+                fields: [
+                  ...(data.workDate ? [] : [{ field: "workDate", message: "تاريخ العمل مطلوب" }]),
+                  ...(data.hours && Number(data.hours) > 0 ? [] : [{ field: "hours", message: "عدد الساعات مطلوب ويجب أن يكون أكبر من صفر" }]),
+                ],
+                suggestion: "أدخل تاريخ العمل وعدد الساعات وحاول مرة أخرى",
+              },
+            },
+            { status: 400 }
+          );
+        }
+        result = await prisma.overtimeRequest.create({
+          data: {
+            employeeId,
+            workDate: new Date(data.workDate),
+            hours: Number(data.hours),
+            reason: data.reason || data.notes || "",
+            status: "PENDING",
+          },
+        });
+        break;
+      }
+
       case "residency":
       case "delegation":
       case "custody":
