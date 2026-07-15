@@ -35,7 +35,8 @@ interface AppShellProps {
 type NavKey = keyof Dictionary["nav"];
 
 const navItems: Array<{ href: string; labelKey: NavKey; icon: typeof LayoutDashboard; group: string; resource: string | string[] }> = [
-  { href: "/analytics", labelKey: "branch-analytics", icon: BarChart4, group: "dashboardAnalytics", resource: "reports" },
+  // "/analytics" is intentionally not linked here — its KPI overview (without charts)
+  // now lives inside the Reports page instead of a dedicated sidebar entry.
 
   { href: "/employees", labelKey: "employees", icon: Users, group: "peopleContracts", resource: "employees" },
   { href: "/branches", labelKey: "departments-branches", icon: MapPin, group: "peopleContracts", resource: ["departments", "branches"] },
