@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations/auth";
 import { verifyPassword, hashPassword } from "@/lib/password";
@@ -16,23 +17,55 @@ async function getAuthorization(userId: string) {
   return { roles };
 }
 
+async function findUserByUsernameOrEmail(value: string, lower: string) {
+  // Two independent reads, run in parallel — cheap enough to always pay for,
+  // unlike adding a third concurrent query on every login (see below).
+  const [byUsername, byEmail] = await Promise.all([
+    prisma.user.findFirst({
+      where: { username: value, passwordHash: { not: null }, isActive: true },
+    }),
+    prisma.user.findFirst({
+      where: { OR: [{ email: lower }, { email: { startsWith: `${lower}@` } }], passwordHash: { not: null }, isActive: true },
+    }),
+  ]);
+  return byUsername ?? byEmail;
+}
+
 async function findUser(identifier: string) {
   const value = identifier.trim();
   const lower = value.toLowerCase();
-  // Try username first (exact), then email fallback
-  const byUsername = await prisma.user.findFirst({
-    where: { username: value, passwordHash: { not: null }, isActive: true },
-  });
-  if (byUsername) return byUsername;
+  // The login form's own placeholder tells employees to sign in with their
+  // national ID (all-digit), which never matches a username or email — so a
+  // purely numeric identifier goes straight to the employee lookup instead of
+  // wastefully checking username/email first. This is deliberately NOT a
+  // 3-way Promise.all of every lookup: with connection_limit=5 (see
+  // lib/prisma.ts), having every login concurrently hold 3 connections would
+  // risk exhausting the pool during a login rush. One query for the common
+  // case, two only as a fallback, never three at once.
+  const looksNumeric = /^\d+$/.test(value);
 
-  const byEmail = await prisma.user.findFirst({
-    where: { OR: [{ email: lower }, { email: { startsWith: `${lower}@` } }], passwordHash: { not: null }, isActive: true },
-  });
-  if (byEmail) return byEmail;
+  if (looksNumeric) {
+    const emp = await prisma.employee.findFirst({
+      where: { OR: [{ nationalId: value }, { employeeNumber: value }] },
+      include: { user: true },
+    });
+    if (emp) return finishFindUser(emp);
+    return findUserByUsernameOrEmail(value, lower);
+  }
+
+  const byUsernameOrEmail = await findUserByUsernameOrEmail(value, lower);
+  if (byUsernameOrEmail) return byUsernameOrEmail;
+
   const emp = await prisma.employee.findFirst({
     where: { OR: [{ nationalId: value }, { employeeNumber: value }] },
     include: { user: true },
   });
+  return finishFindUser(emp);
+}
+
+type EmployeeWithUser = Prisma.EmployeeGetPayload<{ include: { user: true } }>;
+
+async function finishFindUser(emp: EmployeeWithUser | null) {
   // Employee found but no user account — auto-create one
   if (emp) {
     const last4 = emp.nationalId.slice(-4);
