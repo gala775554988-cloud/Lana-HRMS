@@ -3,6 +3,7 @@ import { Bell, Briefcase, Calendar, CheckCircle2, Clock, FileText, IdCard, Lapto
 import { requireEmployee, getPortalDashboard, profileCompletion, fmtDate, asNumber } from '@/lib/employee/portal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { EmployeeRequestCategories } from '@/components/employee/EmployeeRequestCategories';
 
 
 function Stat({ title, value, icon: Icon, tone }: { title: string; value: string | number; icon: any; tone: string }) {
@@ -64,6 +65,8 @@ export default async function EmployeeDashboard() {
         <Card className="rounded-3xl"><CardHeader><CardTitle>Timeline آخر الأحداث</CardTitle></CardHeader><CardContent className="space-y-3">{data.timeline.length ? data.timeline.map((item, i) => <div key={i} className="flex gap-3 rounded-2xl border p-4"><div className="mt-1 h-3 w-3 rounded-full bg-indigo-600" /><div><p className="font-bold">{item.title}</p><p className="text-xs text-muted-foreground">{item.type} · {fmtDate(item.date)} · {item.status}</p></div></div>) : <div className="rounded-2xl border border-dashed p-6 text-muted-foreground">لا توجد أحداث حديثة مرتبطة بحسابك.</div>}</CardContent></Card>
         <Card className="rounded-3xl"><CardHeader><CardTitle>إجراءات سريعة</CardTitle></CardHeader><CardContent className="grid grid-cols-2 gap-3"><Link className="flex items-center justify-center rounded-2xl bg-indigo-600 px-3 py-4 text-center text-sm font-bold text-white transition-colors hover:bg-indigo-700" href="/employee/leave/new">طلب إجازة</Link><Link className="flex items-center justify-center rounded-2xl border px-3 py-4 text-center text-sm font-bold transition-colors hover:bg-muted" href="/employee/documents">مستنداتي</Link><Link className="col-span-2 flex items-center justify-center rounded-2xl border px-3 py-4 text-center text-sm font-bold transition-colors hover:bg-muted" href="/employee/salary">الرواتب</Link></CardContent></Card>
       </section>
+
+      <EmployeeRequestCategories />
     </main>
   );
 }

@@ -945,6 +945,7 @@ model WorkflowStep {
   approvedAt         DateTime?
   comments           String?
   createdAt          DateTime         @default(now())
+  viewedAt           DateTime?
   workflowInstance   WorkflowInstance @relation(fields: [workflowInstanceId], references: [id], onDelete: Cascade)
 }
 
