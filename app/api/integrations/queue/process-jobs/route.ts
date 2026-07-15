@@ -7,10 +7,26 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const maxDuration = 300;
 
+function statusFor(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message === "Unauthorized") return 401;
+  if (message === "Forbidden") return 403;
+  return 500;
+}
+
+function isAuthorizedCronRequest(request: NextRequest) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return false;
+  return request.headers.get("authorization") === `Bearer ${secret}`;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    if (request.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
-      await requireOdooIntegrationAccess("manage").catch(() => {});
+    // Must reject on failure, not swallow it -- a caught-and-ignored auth
+    // check here left this route fully open whenever CRON_SECRET didn't
+    // match (including when it's simply unset).
+    if (!isAuthorizedCronRequest(request)) {
+      await requireOdooIntegrationAccess("manage");
     }
     const body = await request.json().catch(() => ({}));
     const limit = Math.min(Math.max(Number(body.limit || 15), 1), 100);
@@ -84,7 +100,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, processedCount: results.length, results });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ success: false, message }, { status: 500 });
+    return NextResponse.json({ success: false, message: error instanceof Error ? error.message : String(error) }, { status: statusFor(error) });
   }
 }
