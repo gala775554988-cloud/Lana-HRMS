@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
     const connectionId = request.nextUrl.searchParams.get("connectionId") || undefined;
     const testIdParam = request.nextUrl.searchParams.get("testId") || "3300";
 
-    if (!hasInternalSyncToken(request)) { await requireOdooIntegrationAccess("manage"); }
+    if (!hasInternalSyncToken(request)) {
       await requireOdooIntegrationAccess("manage").catch(() => {});
     }
 
