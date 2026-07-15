@@ -1,7 +1,7 @@
 import { Suspense } from "react";
+import dynamic from "next/dynamic";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { DashboardCharts } from "@/components/hrms/dashboard-charts";
 import { listHospitals } from "@/lib/enterprise/hospitals";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -12,38 +12,60 @@ import type { LucideIcon } from "lucide-react";
 import { getRequestDictionary } from "@/lib/i18n-server";
 import type { Dictionary, Locale } from "@/lib/i18n";
 
+const DashboardCharts = dynamic(() => import("@/components/hrms/dashboard-charts").then((mod) => mod.DashboardCharts), {
+  loading: () => <div className="h-64 animate-pulse rounded-2xl bg-muted" />,
+});
+
 async function getBranchStats() {
   const branches = await prisma.branch.findMany({ where: { isActive: true }, select: { id: true, name: true, code: true } });
+  const branchIds = branches.map((branch) => branch.id);
   const todayStart = new Date(new Date().setHours(0, 0, 0, 0));
 
-  const stats = await Promise.all(
-    branches.map(async (branch) => {
-      const [headcount, pendingLeave, attendanceToday] = await Promise.all([
-        prisma.employee.count({ where: { branchId: branch.id, status: "ACTIVE" } }),
-        prisma.leaveRequest.count({ where: { status: "PENDING", employee: { branchId: branch.id } } }),
-        prisma.attendanceRecord.count({ where: { workDate: { gte: todayStart }, employee: { branchId: branch.id } } })
-      ]);
-      return { ...branch, headcount, pendingLeave, attendanceToday };
-    })
-  );
+  const [headcounts, pendingLeaves, attendanceToday] = await Promise.all([
+    prisma.employee.groupBy({ by: ["branchId"], where: { branchId: { in: branchIds }, status: "ACTIVE" }, _count: { _all: true } }),
+    prisma.leaveRequest.findMany({ where: { status: "PENDING", employee: { branchId: { in: branchIds } } }, select: { employee: { select: { branchId: true } } } }),
+    prisma.attendanceRecord.findMany({ where: { workDate: { gte: todayStart }, employee: { branchId: { in: branchIds } } }, select: { employee: { select: { branchId: true } } } }),
+  ]);
+
+  const headcountMap = new Map(headcounts.map((row) => [row.branchId, row._count._all]));
+  const pendingLeaveMap = new Map<string, number>();
+  for (const row of pendingLeaves) { const id = row.employee?.branchId; if (id) pendingLeaveMap.set(id, (pendingLeaveMap.get(id) ?? 0) + 1); }
+  const attendanceMap = new Map<string, number>();
+  for (const row of attendanceToday) { const id = row.employee?.branchId; if (id) attendanceMap.set(id, (attendanceMap.get(id) ?? 0) + 1); }
+
+  const stats = branches.map((branch) => ({
+    ...branch,
+    headcount: headcountMap.get(branch.id) ?? 0,
+    pendingLeave: pendingLeaveMap.get(branch.id) ?? 0,
+    attendanceToday: attendanceMap.get(branch.id) ?? 0,
+  }));
 
   return stats.sort((a, b) => b.headcount - a.headcount);
 }
 
 async function getHospitalStats() {
   const hospitals = await prisma.hospital.findMany({ where: { isActive: true }, select: { id: true, name: true, code: true } });
+  const hospitalIds = hospitals.map((hospital) => hospital.id);
   const todayStart = new Date(new Date().setHours(0, 0, 0, 0));
 
-  const stats = await Promise.all(
-    hospitals.map(async (hospital) => {
-      const [headcount, pendingLeave, attendanceToday] = await Promise.all([
-        prisma.employee.count({ where: { hospitalId: hospital.id, status: "ACTIVE" } }),
-        prisma.leaveRequest.count({ where: { status: "PENDING", employee: { hospitalId: hospital.id } } }),
-        prisma.attendanceRecord.count({ where: { workDate: { gte: todayStart }, employee: { hospitalId: hospital.id } } })
-      ]);
-      return { ...hospital, headcount, pendingLeave, attendanceToday };
-    })
-  );
+  const [headcounts, pendingLeaves, attendanceToday] = await Promise.all([
+    prisma.employee.groupBy({ by: ["hospitalId"], where: { hospitalId: { in: hospitalIds }, status: "ACTIVE" }, _count: { _all: true } }),
+    prisma.leaveRequest.findMany({ where: { status: "PENDING", employee: { hospitalId: { in: hospitalIds } } }, select: { employee: { select: { hospitalId: true } } } }),
+    prisma.attendanceRecord.findMany({ where: { workDate: { gte: todayStart }, employee: { hospitalId: { in: hospitalIds } } }, select: { employee: { select: { hospitalId: true } } } }),
+  ]);
+
+  const headcountMap = new Map(headcounts.map((row) => [row.hospitalId, row._count._all]));
+  const pendingLeaveMap = new Map<string, number>();
+  for (const row of pendingLeaves) { const id = row.employee?.hospitalId; if (id) pendingLeaveMap.set(id, (pendingLeaveMap.get(id) ?? 0) + 1); }
+  const attendanceMap = new Map<string, number>();
+  for (const row of attendanceToday) { const id = row.employee?.hospitalId; if (id) attendanceMap.set(id, (attendanceMap.get(id) ?? 0) + 1); }
+
+  const stats = hospitals.map((hospital) => ({
+    ...hospital,
+    headcount: headcountMap.get(hospital.id) ?? 0,
+    pendingLeave: pendingLeaveMap.get(hospital.id) ?? 0,
+    attendanceToday: attendanceMap.get(hospital.id) ?? 0,
+  }));
 
   return stats.sort((a, b) => b.headcount - a.headcount);
 }

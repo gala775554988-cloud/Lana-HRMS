@@ -35,6 +35,21 @@ const nextConfig: NextConfig = {
           { key: "X-XSS-Protection", value: "0" },
           { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
         ]
+      },
+      {
+        // Content-hashed build output — safe to cache forever; overrides the
+        // no-store rule above so repeat page loads/navigations don't re-fetch
+        // unchanged JS/CSS chunks.
+        source: "/_next/static/(.*)",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ]
+      },
+      {
+        source: "/_next/image(.*)",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ]
       }
     ];
   }

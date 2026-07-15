@@ -56,7 +56,10 @@ export function HospitalsClient() {
       .catch((error) => setMessage(error.message));
   };
 
-  useEffect(load, [query]);
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(load, 300);
+    return () => clearTimeout(delayDebounceFn);
+  }, [query]);
 
   function startEdit(hospital?: Hospital) {
     setEditing(hospital ?? null);
