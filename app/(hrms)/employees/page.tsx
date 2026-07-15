@@ -100,7 +100,10 @@ function serializeEmployee(row: any) {
     lastName: row.lastName,
     email: row.email,
     phone: row.phone,
-    profilePhotoUrl: row.profilePhotoUrl,
+    // Serve a URL to the dedicated photo endpoint instead of embedding the
+    // raw base64 data URI -- keeps this list payload text-only so the
+    // browser can fetch/lazy-load avatars as separate small requests.
+    profilePhotoUrl: row.profilePhotoUrl ? `/api/employees/${row.id}/photo` : null,
     status: row.status,
     hireDate: row.hireDate ? row.hireDate.toISOString().slice(0, 10) : null,
     department: row.department,

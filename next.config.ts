@@ -7,6 +7,12 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: process.cwd(),
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: true },
+  // lucide-react is imported broadly across components as named imports;
+  // without this Next.js bundles the whole icon set into shared chunks
+  // instead of tree-shaking to just the icons actually used per route.
+  experimental: {
+    optimizePackageImports: ["lucide-react"]
+  },
   webpack(config) {
     config.ignoreWarnings = [
       ...(config.ignoreWarnings ?? []),

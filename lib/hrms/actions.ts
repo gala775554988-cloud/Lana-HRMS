@@ -69,6 +69,20 @@ function delegateFor(modelName: string) {
   return (prisma as unknown as Record<string, CrudDelegate>)[modelName];
 }
 
+// Generic module list/edit views only ever read+write the columns declared in
+// config/hrms.ts (tableFields for the list, fields for the create/edit form).
+// Every other scalar column -- Odoo bookkeeping (odooId, odooRawData, ...),
+// timestamps, etc. -- was still being fetched in full for every row because
+// the generic delegate.findMany() call had no `select` at all. Building the
+// select from that same config keeps it in sync automatically per module and
+// can't blank the edit form the way a hand-picked tableFields-only select
+// would (the edit form is pre-filled straight from this same list response).
+function buildGenericModuleSelect(resource: HrmsModule): Record<string, true> | undefined {
+  const names = new Set<string>(["id", ...resource.tableFields, ...resource.fields.map((field) => field.name)]);
+  if (names.size === 0) return undefined;
+  return Object.fromEntries(Array.from(names).map((name) => [name, true as const]));
+}
+
 function serialize(value: unknown): unknown {
   if (value instanceof Date) return value.toISOString();
   if (typeof value === "bigint") return value.toString();
@@ -386,7 +400,9 @@ export async function listModuleRecords(input: QueryInput) {
         lastName: r.lastName,
         email: r.email,
         phone: r.phone,
-        profilePhotoUrl: r.profilePhotoUrl,
+        // URL to the dedicated photo endpoint, not the raw base64 data URI --
+        // see app/api/employees/[id]/photo/route.ts for why.
+        profilePhotoUrl: r.profilePhotoUrl ? `/api/employees/${r.id}/photo` : null,
         status: r.status,
         hireDate: r.hireDate ? new Date(r.hireDate).toISOString().slice(0, 10) : null,
         department: r.department,
@@ -425,6 +441,9 @@ export async function listModuleRecords(input: QueryInput) {
         employee: { select: { firstName: true, lastName: true, employeeNumber: true } },
         leaveType: { select: { name: true } }
       };
+    } else {
+      const select = buildGenericModuleSelect(resource);
+      if (select) findManyArgs.select = select;
     }
 
     const [records, total] = await Promise.all([

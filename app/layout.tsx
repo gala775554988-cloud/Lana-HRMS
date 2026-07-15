@@ -6,6 +6,7 @@ import "./globals.css";
 import { SessionProvider } from "next-auth/react";
 import { auth } from "@/auth";
 import { ThemeProvider } from "@/components/hrms/theme-provider";
+import { QueryProvider } from "@/components/providers/query-provider";
 import { I18nRuntime } from "@/components/i18n/i18n-runtime";
 import { LazyLanaAiAssistant } from "@/components/enterprise/lazy-lana-ai-assistant";
 import { PWAInstallPrompt } from "@/components/pwa/pwa-install-prompt";
@@ -64,13 +65,15 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     <html lang={locale} dir={getDirection(locale)} suppressHydrationWarning>
       <body>
         <SessionProvider session={session} refetchOnWindowFocus={false} refetchWhenOffline={false}>
-          <ThemeProvider>
-            <PWARegister />
-            <I18nRuntime initialLocale={locale} />
-            {children}
-            <LazyLanaAiAssistant />
-            <PWAInstallPrompt />
-          </ThemeProvider>
+          <QueryProvider>
+            <ThemeProvider>
+              <PWARegister />
+              <I18nRuntime initialLocale={locale} />
+              {children}
+              <LazyLanaAiAssistant />
+              <PWAInstallPrompt />
+            </ThemeProvider>
+          </QueryProvider>
         </SessionProvider>
       </body>
     </html>

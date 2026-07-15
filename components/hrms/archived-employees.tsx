@@ -64,7 +64,7 @@ export function ArchivedEmployees() {
             <div className="flex items-center gap-3 mb-3">
               <div className="h-12 w-12 overflow-hidden rounded-xl bg-gradient-to-br from-slate-300 to-slate-500 flex items-center justify-center text-white font-bold text-lg shrink-0">
                 {emp.profilePhotoUrl ? (
-                  <img src={emp.profilePhotoUrl} alt="" className="h-full w-full object-cover" />
+                  <img src={emp.profilePhotoUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
                 ) : (
                   `${emp.firstName?.[0] || ""}${emp.lastName?.[0] || ""}`.toUpperCase()
                 )}

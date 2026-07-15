@@ -54,7 +54,7 @@ export const EmployeeCard = memo(function EmployeeCard({ employee, locale = "ar"
       <button type="button" className="block w-full p-5 pb-3 text-start" onClick={() => onView(employee.id)}>
         <div className="flex items-start gap-4">
           {employee.profilePhotoUrl ? (
-            <img src={employee.profilePhotoUrl} alt={fullName} className="h-16 w-16 rounded-2xl object-cover ring-2 ring-white shadow-md shadow-slate-200/80 transition-transform duration-200 group-hover:scale-[1.03] dark:ring-slate-900 dark:shadow-slate-950/40" />
+            <img src={employee.profilePhotoUrl} alt={fullName} loading="lazy" className="h-16 w-16 rounded-2xl object-cover ring-2 ring-white shadow-md shadow-slate-200/80 transition-transform duration-200 group-hover:scale-[1.03] dark:ring-slate-900 dark:shadow-slate-950/40" />
           ) : (
             <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-50 to-violet-50 text-primary font-semibold text-lg ring-2 ring-white shadow-md shadow-slate-200/80 transition-transform duration-200 group-hover:scale-[1.03] dark:from-indigo-950/50 dark:to-violet-950/40 dark:ring-slate-900 dark:shadow-slate-950/40">{initials}</div>
           )}

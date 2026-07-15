@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { Check, ChevronsUpDown, History, RotateCcw, Search, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -65,92 +66,159 @@ type RequestRecord = {
 
 type Approver = { userId: string; label: string; position: string };
 type Stats = { total: number; waiting: number; highPriority: number; deferred: number; completed: number; rejected: number };
+type WorkbenchData = {
+  requests: RequestRecord[];
+  types: string[];
+  stats: Stats;
+  approvers: Approver[];
+  pageCount: number;
+};
+
+const emptyStats: Stats = { total: 0, waiting: 0, highPriority: 0, deferred: 0, completed: 0, rejected: 0 };
+// Approve/reject are the decisions that take a request out of "waiting for
+// me" -- these get the row removed from the UI immediately; other decisions
+// (transfer/defer/note/priority) wait for the server response as before.
+const REMOVING_DECISIONS = new Set(["APPROVE", "REJECT"]);
 
 export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | "inbox" | "outbox" }) {
   const [type, setType] = useState("ALL");
   const [scope, setScope] = useState(mode === "inbox" ? "waiting" : "all");
   const [sort, setSort] = useState("newest");
   const [search, setSearch] = useState("");
-  const [requests, setRequests] = useState<RequestRecord[]>([]);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [pageCount, setPageCount] = useState(1);
-  const [types, setTypes] = useState<string[]>(["ALL"]);
-  const [stats, setStats] = useState<Stats>({ total: 0, waiting: 0, highPriority: 0, deferred: 0, completed: 0, rejected: 0 });
-  const [approvers, setApprovers] = useState<Approver[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [targetUserId, setTargetUserId] = useState("");
   const [deferPreset, setDeferPreset] = useState("tomorrow");
   const [message, setMessage] = useState("");
-  const [isPending, startTransition] = useTransition();
   const [timelineWorkflowId, setTimelineWorkflowId] = useState<string | null>(null);
 
   const selectedIds = useMemo(() => Array.from(selected), [selected]);
-
-  const load = useCallback(() => {
-    const params = new URLSearchParams({ type, scope, sort, search, mode, page: String(page), pageSize: "30" });
-    fetch(`/api/enterprise/requests?${params.toString()}`, { cache: "no-store" })
-      .then((response) => response.json())
-      .then((data) => {
-        if (!data.success) throw new Error(data.message || "Failed to load requests");
-        setRequests(data.requests ?? []);
-        setTypes(["ALL", ...(data.types ?? [])].filter((value, index, array) => array.indexOf(value) === index));
-        setStats(data.stats ?? { total: 0, waiting: 0, highPriority: 0, deferred: 0, completed: 0, rejected: 0 });
-        setApprovers((data.approvers ?? []).filter((approver: Approver) => approver.userId));
-        setPageCount(data.pageCount ?? 1);
-        setSelected(new Set());
-      })
-      .catch((error) => setMessage(error.message));
-  }, [mode, page, scope, search, sort, type]);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
-    const delayDebounceFn = setTimeout(() => { load(); }, 300);
+    const delayDebounceFn = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(delayDebounceFn);
-  }, [load]);
+  }, [search]);
 
-  function decide(id: string, decision: "APPROVE" | "REJECT" | "RETURN" | "TRANSFER" | "DEFER" | "NOTE" | "PRIORITY", extra: Record<string, unknown> = {}) {
-    startTransition(async () => {
-      try {
+  // Reset row selection whenever the visible set of requests changes
+  // underneath it (new filters, new page).
+  useEffect(() => { setSelected(new Set()); }, [type, scope, sort, debouncedSearch, mode, page]);
+
+  const queryKey = useMemo(
+    () => ["enterprise-requests", type, scope, sort, debouncedSearch, mode, page] as const,
+    [type, scope, sort, debouncedSearch, mode, page]
+  );
+
+  const { data, isFetching, refetch } = useQuery<WorkbenchData>({
+    queryKey,
+    queryFn: async () => {
+      const params = new URLSearchParams({ type, scope, sort, search: debouncedSearch, mode, page: String(page), pageSize: "30" });
+      const response = await fetch(`/api/enterprise/requests?${params.toString()}`, { cache: "no-store" });
+      const json = await response.json();
+      if (!json.success) throw new Error(json.message || "Failed to load requests");
+      return {
+        requests: json.requests ?? [],
+        types: ["ALL", ...(json.types ?? [])].filter((value: string, index: number, array: string[]) => array.indexOf(value) === index),
+        stats: json.stats ?? emptyStats,
+        approvers: (json.approvers ?? []).filter((approver: Approver) => approver.userId),
+        pageCount: json.pageCount ?? 1
+      };
+    },
+    placeholderData: keepPreviousData
+  });
+
+  const requests = data?.requests ?? [];
+  const types = data?.types ?? ["ALL"];
+  const stats = data?.stats ?? emptyStats;
+  const approvers = data?.approvers ?? [];
+  const pageCount = data?.pageCount ?? 1;
+
+  const decideMutation = useMutation({
+    mutationFn: async (vars: { id: string; decision: string; extra?: Record<string, unknown> }) => {
+      const response = await fetch(`/api/enterprise/workflows/${vars.id}/decision`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision: vars.decision, ...(vars.extra ?? {}) })
+      });
+      const json = await response.json().catch(() => ({ success: false, message: "استجابة غير صالحة من الخادم" }));
+      if (!json.success) throw new Error(json.message || "فشل تحديث الطلب");
+      return json;
+    },
+    onMutate: async (vars) => {
+      if (!REMOVING_DECISIONS.has(vars.decision)) return undefined;
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<WorkbenchData>(queryKey);
+      queryClient.setQueryData<WorkbenchData>(queryKey, (current) =>
+        current ? { ...current, requests: current.requests.filter((request) => request.id !== vars.id) } : current
+      );
+      return { previous };
+    },
+    onError: (error, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(queryKey, context.previous);
+      setMessage(error instanceof Error ? error.message : "فشل تحديث الطلب");
+    },
+    onSuccess: () => setMessage("تم تحديث الطلب بنجاح"),
+    onSettled: () => {
+      // Reconcile stats/counts with the server in the background regardless
+      // of whether this decision optimistically touched the row list.
+      queryClient.invalidateQueries({ queryKey: ["enterprise-requests"] });
+    }
+  });
+
+  const bulkMutation = useMutation({
+    mutationFn: async (vars: { ids: string[]; decision: string; extra?: Record<string, unknown> }) => {
+      const failures: string[] = [];
+      for (const id of vars.ids) {
         const response = await fetch(`/api/enterprise/workflows/${id}/decision`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ decision, ...extra })
+          body: JSON.stringify({ decision: vars.decision, ...(vars.extra ?? {}) })
         });
-        const data = await response.json().catch(() => ({ success: false, message: "استجابة غير صالحة من الخادم" }));
-        if (!data.success) {
-          setMessage(data.message || "فشل تحديث الطلب");
-          return;
-        }
-        setMessage("تم تحديث الطلب بنجاح");
-        load();
-      } catch (error) {
-        setMessage(error instanceof Error ? error.message : "فشل تحديث الطلب");
+        const json = await response.json().catch(() => ({ success: false }));
+        if (!json.success) failures.push(id);
       }
-    });
+      return { failures, total: vars.ids.length };
+    },
+    onMutate: async (vars) => {
+      if (!REMOVING_DECISIONS.has(vars.decision)) return undefined;
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<WorkbenchData>(queryKey);
+      const idSet = new Set(vars.ids);
+      queryClient.setQueryData<WorkbenchData>(queryKey, (current) =>
+        current ? { ...current, requests: current.requests.filter((request) => !idSet.has(request.id)) } : current
+      );
+      return { previous };
+    },
+    onError: (error, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(queryKey, context.previous);
+      setMessage(error instanceof Error ? error.message : "فشل تنفيذ العملية الجماعية");
+    },
+    onSuccess: (result) => {
+      setSelected(new Set());
+      setMessage(result.failures.length ? `تم التنفيذ مع فشل ${result.failures.length} من ${result.total} طلب` : "تم تنفيذ العملية الجماعية");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["enterprise-requests"] });
+    }
+  });
+
+  function decide(id: string, decision: "APPROVE" | "REJECT" | "RETURN" | "TRANSFER" | "DEFER" | "NOTE" | "PRIORITY", extra: Record<string, unknown> = {}) {
+    decideMutation.mutate({ id, decision, extra });
   }
 
   function bulk(decision: "APPROVE" | "REJECT" | "TRANSFER" | "DEFER" | "PRIORITY") {
     if (!selectedIds.length) return;
-    startTransition(async () => {
-      try {
-        const failures: string[] = [];
-        for (const id of selectedIds) {
-          const extra = decision === "TRANSFER" ? { targetUserId } : decision === "DEFER" ? { deferPreset } : decision === "PRIORITY" ? { priority: "High" } : {};
-          const response = await fetch(`/api/enterprise/workflows/${id}/decision`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision, ...extra }) });
-          const data = await response.json().catch(() => ({ success: false }));
-          if (!data.success) failures.push(id);
-        }
-        setMessage(failures.length ? `تم التنفيذ مع فشل ${failures.length} من ${selectedIds.length} طلب` : "تم تنفيذ العملية الجماعية");
-        load();
-      } catch (error) {
-        setMessage(error instanceof Error ? error.message : "فشل تنفيذ العملية الجماعية");
-      }
-    });
+    const extra = decision === "TRANSFER" ? { targetUserId } : decision === "DEFER" ? { deferPreset } : decision === "PRIORITY" ? { priority: "High" } : {};
+    bulkMutation.mutate({ ids: selectedIds, decision, extra });
   }
 
   function note(id: string) {
     const comments = window.prompt("إضافة ملاحظة");
     if (comments !== null) decide(id, "NOTE", { comments });
   }
+
+  const isPending = decideMutation.isPending || bulkMutation.isPending;
 
   return (
     <div className="space-y-5">
@@ -174,7 +242,7 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
         <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_220px_160px]">
           <div className="relative">
             <Search className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") load(); }} placeholder="بحث سريع: الاسم، الرقم، الهوية، القسم، الفرع، المشروع، نوع الطلب" className="pr-9" />
+            <Input value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") refetch(); }} placeholder="بحث سريع: الاسم، الرقم، الهوية، القسم، الفرع، المشروع، نوع الطلب" className="pr-9" />
           </div>
           <select value={scope} onChange={(event) => setScope(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
             {scopeOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -182,7 +250,7 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
           <select value={sort} onChange={(event) => setSort(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
             {sortOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
-          <Button type="button" onClick={load}>بحث</Button>
+          <Button type="button" onClick={() => refetch()}>بحث</Button>
         </div>
       </div>
 
@@ -253,7 +321,7 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
                   </td>
                 </tr>
               ))}
-              {requests.length === 0 ? <tr><td colSpan={12} className="px-3 py-12 text-center text-muted-foreground">لا توجد طلبات</td></tr> : null}
+              {requests.length === 0 ? <tr><td colSpan={12} className="px-3 py-12 text-center text-muted-foreground">{isFetching ? "جارِ التحميل..." : "لا توجد طلبات"}</td></tr> : null}
             </tbody>
           </table>
         </div>
