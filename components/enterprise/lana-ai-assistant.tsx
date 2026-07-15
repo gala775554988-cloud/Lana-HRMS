@@ -72,11 +72,19 @@ export function LanaAiAssistant() {
                   {message.content}
                   {message.results?.length ? (
                     <div className="mt-3 space-y-2">
-                      {message.results.map((result, itemIndex) => (
-                        <div key={itemIndex} className="rounded-xl border bg-slate-50 p-2 text-xs text-slate-600 dark:bg-slate-900 dark:text-slate-300">
-                          {Object.entries(result).slice(0, 5).map(([key, value]) => <div key={key}><strong>{key}:</strong> {String(value ?? "-")}</div>)}
-                        </div>
-                      ))}
+                      {message.results.map((result, itemIndex) => {
+                        const isProfile = result.type === "employee-profile";
+                        const photoUrl = typeof result.photoUrl === "string" ? result.photoUrl : null;
+                        const entries = Object.entries(result).filter(([key]) => !["type", "photoUrl", "id"].includes(key));
+                        return (
+                          <div key={itemIndex} className="rounded-xl border bg-slate-50 p-2 text-xs text-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                            {photoUrl ? (
+                              <img src={photoUrl} alt={String(result.name ?? "")} className="mb-2 h-16 w-16 rounded-lg object-cover" />
+                            ) : null}
+                            {(isProfile ? entries : entries.slice(0, 5)).map(([key, value]) => <div key={key}><strong>{key}:</strong> {String(value ?? "-")}</div>)}
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : null}
                 </div>
