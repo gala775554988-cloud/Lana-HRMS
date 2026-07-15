@@ -38,6 +38,33 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
 
   if (!employee) notFound();
 
+  // Lazy Load Details on Demand (ID-First Optimization)
+  // If linked to Odoo (odooId exists), check if detailed profile (photo, birthday, custom fields) is stale (>1 hr) or missing.
+  if (typeof employee.odooId === "number" && employee.odooId > 0) {
+    const isStale = !employee.odooRawDataSyncedAt || (Date.now() - new Date(employee.odooRawDataSyncedAt).getTime() > 3600_000);
+    if (isStale) {
+      try {
+        const { OdooSyncService } = await import("@/lib/integrations/odoo/sync");
+        const service = await OdooSyncService.forConnection();
+        await service.syncSingleEmployeeDetails(employee.odooId, employee.id);
+        const refreshed = await prisma.employee.findUnique({
+          where: { id },
+          select: { profilePhotoUrl: true, sponsor: true, dateOfBirth: true, odooRawDataSyncedAt: true, firstName: true, lastName: true }
+        });
+        if (refreshed) {
+          employee.profilePhotoUrl = refreshed.profilePhotoUrl;
+          employee.sponsor = refreshed.sponsor;
+          employee.dateOfBirth = refreshed.dateOfBirth;
+          employee.odooRawDataSyncedAt = refreshed.odooRawDataSyncedAt;
+          employee.firstName = refreshed.firstName;
+          employee.lastName = refreshed.lastName;
+        }
+      } catch (err) {
+        console.log(`[EmployeeProfilePage] Lazy detail load notice for odooId ${employee.odooId}:`, err instanceof Error ? err.message : String(err));
+      }
+    }
+  }
+
   // Salary profile
   let salaryProfile: any = null;
   try {

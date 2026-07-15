@@ -106,6 +106,9 @@ export type SyncOptions = {
   since?: Date | string;
   limit?: number;
   tenantId?: string;
+  mode?: "ID_FIRST" | "FULL" | "SINGLE_DETAIL";
+  queueDetails?: boolean;
+  employeeIds?: number[];
 };
 
 export type SyncOperation = "create" | "update" | "delete" | "skip" | "conflict";

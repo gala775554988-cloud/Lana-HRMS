@@ -197,6 +197,123 @@ export class OdooSyncService {
     }
   }
 
+  async queueEmployeeDetailSync(odooId: number, localEmployeeId: string, priority = "LOW") {
+    try {
+      const existingJob = await prisma.integrationJob.findFirst({
+        where: {
+          type: "ODOO_EMPLOYEE_DETAIL_SYNC",
+          status: "PENDING",
+          payload: { path: ["odooId"], equals: odooId }
+        }
+      });
+      if (existingJob) return existingJob;
+
+      return await prisma.integrationJob.create({
+        data: {
+          connectionId: this.connection?.id,
+          name: `Lazy detail sync for Odoo employee #${odooId}`,
+          type: "ODOO_EMPLOYEE_DETAIL_SYNC",
+          status: "PENDING",
+          direction: "ODOO_TO_LANA",
+          payload: { odooId, employeeId: localEmployeeId, priority, queuedAt: new Date().toISOString() }
+        }
+      });
+    } catch (err) {
+      console.log(`[queueEmployeeDetailSync] Notice:`, err instanceof Error ? err.message : String(err));
+      return null;
+    }
+  }
+
+  async syncSingleEmployeeDetails(odooId: number, localEmployeeId?: string) {
+    if (!odooId || odooId <= 0) return { success: false, reason: "Invalid odooId" };
+    const mapper = getMapper("employees");
+    await this.client.connect();
+
+    let dynamicFieldNames: string[] = [];
+    let excludedBankFields: string[] = [];
+    try {
+      const discovery = await discoverSyncableFields(this.client, mapper.odooModel);
+      dynamicFieldNames = discovery.fieldNames;
+      excludedBankFields = discovery.excludedBankFields;
+    } catch {}
+    const fetchFields = Array.from(new Set([...mapper.odooFields, ...dynamicFieldNames]));
+
+    const [row] = await this.client.read<OdooRecord>(mapper.odooModel, [odooId], fetchFields);
+    if (!row) return { success: false, reason: `Odoo record #${odooId} not found` };
+
+    let empId = localEmployeeId;
+    if (!empId) {
+      const existing = await delegate("employee").findFirst({ where: { odooId } });
+      empId = existing ? objectId(existing.id) : undefined;
+    }
+    if (!empId) {
+      const empNum = String(row.barcode || row.id || `ODOO-${row.id}`).trim();
+      const existing = await delegate("employee").findFirst({ where: { employeeNumber: empNum } });
+      empId = existing ? objectId(existing.id) : undefined;
+    }
+    if (!empId) return { success: false, reason: `Local employee not found for Odoo #${odooId}` };
+
+    const raw: any = mapOdooEmployeeToLana(row);
+    const dId = many2oneId((row as any).department_id);
+    const jId = many2oneId((row as any).job_id);
+    const cId = many2oneId((row as any).company_id);
+    const mId = many2oneId((row as any).parent_id);
+    const hospitalName: string | undefined = raw._hospitalName;
+    delete raw.odooDepartmentId; delete raw.odooJobId; delete raw.odooCompanyId; delete raw.odooManagerId; delete raw._odooId; delete raw._odooName; delete raw._hospitalName;
+
+    let hospitalId: string | undefined;
+    if (hospitalName) {
+      const existingH = await delegate("hospital").findFirst({ where: { name: hospitalName } }) as any;
+      if (existingH) hospitalId = existingH.id;
+      else {
+        try {
+          const createdH = await delegate("hospital").create({ data: { name: hospitalName, code: `ODOO-SCHOOL-${hospitalName}`.slice(0, 191) } }) as any;
+          hospitalId = createdH.id;
+        } catch {}
+      }
+    }
+
+    const vals = {
+      ...raw,
+      odooId: Number(row.id),
+      odooWriteDate: asDate(row.write_date),
+      odooCreateDate: asDate(row.create_date),
+      odooActive: row.active !== false,
+      odooDepartmentId: dId || null,
+      odooJobId: jId || null,
+      odooCompanyId: cId || null,
+      odooParentId: mId || null,
+      ...(hospitalId ? { hospitalId } : {}),
+      odooRawData: sanitizeRawRecord(row as Record<string, unknown>, excludedBankFields),
+      odooRawDataSyncedAt: new Date(),
+    };
+
+    const updatedEmployee = await delegate("employee").update({ where: { id: empId }, data: vals });
+
+    try {
+      await syncEmployeeDocuments(this.client, odooId, empId);
+    } catch {}
+
+    try {
+      const contracts = await this.client.search_read("hr.contract", [["employee_id", "=", odooId]], ["id", "name", "date_start", "date_end", "wage", "state"], { limit: 5, order: "date_start desc" }) as any[];
+      const openContract = contracts.find(c => c.state === "open") || contracts[0];
+      if (openContract) {
+        const contractNumber = openContract.name ? String(openContract.name) : `ODOO-${openContract.id}`;
+        const startDate = openContract.date_start ? new Date(String(openContract.date_start)) : new Date();
+        const endDate = openContract.date_end ? new Date(String(openContract.date_end)) : null;
+        const salaryAmount = Number(openContract.wage) || 0;
+        const statusMap: Record<string, string> = { open: "ACTIVE", close: "EXPIRED", cancel: "TERMINATED", draft: "DRAFT" };
+        const status = statusMap[String(openContract.state)] || "DRAFT";
+        const existingC = await delegate("employeeContract").findFirst({ where: { contractNumber } }).catch(() => null) as any;
+        const cData = { employeeId: empId, contractNumber, title: contractNumber, startDate, endDate, salaryAmount, currency: "SAR", status };
+        if (existingC) await delegate("employeeContract").update({ where: { id: existingC.id }, data: cData });
+        else await delegate("employeeContract").create({ data: cData });
+      }
+    } catch {}
+
+    return { success: true, odooId, employeeId: empId, employee: updatedEmployee };
+  }
+
   async syncEmployees(options: SyncOptions = {}) {
     const direction = normalizeDirection(options.direction);
     const result = emptyResult("employees", direction, Boolean(options.dryRun), options.tenantId);
@@ -274,25 +391,33 @@ export class OdooSyncService {
         let hasMore = true;
 
         const baseDomain = odooIncrementalDomain(since) as any[];
-        console.log(`[OdooSync] Starting EMPLOYEES optimized bulk - batchSize=${batchSize} since=${since || "none"}`);
+        const isIdFirst = options.mode === "ID_FIRST" || (!options.mode && !options.employeeIds?.length);
+        console.log(`[OdooSync] Starting EMPLOYEES bulk sync (mode=${isIdFirst ? "ID_FIRST" : "FULL"}) - batchSize=${batchSize} since=${since || "none"}`);
 
-        // Discover every field currently defined on hr.employee (standard + custom/Studio fields),
-        // excluding anything bank/IBAN-related, so newly added Odoo fields are captured automatically
-        // without any code change. Falls back to the known typed field list if discovery fails.
         let dynamicFieldNames: string[] = [];
         let excludedBankFields: string[] = [];
-        try {
-          const discovery = await discoverSyncableFields(this.client, mapper.odooModel);
-          dynamicFieldNames = discovery.fieldNames;
-          excludedBankFields = discovery.excludedBankFields;
-          if (excludedBankFields.length > 0) {
-            console.log(`[OdooSync] Excluding ${excludedBankFields.length} bank/IBAN-related field(s) from employee sync: ${excludedBankFields.join(", ")}`);
+        if (!isIdFirst) {
+          try {
+            const discovery = await discoverSyncableFields(this.client, mapper.odooModel);
+            dynamicFieldNames = discovery.fieldNames;
+            excludedBankFields = discovery.excludedBankFields;
+            if (excludedBankFields.length > 0) {
+              console.log(`[OdooSync] Excluding ${excludedBankFields.length} bank/IBAN-related field(s) from employee sync: ${excludedBankFields.join(", ")}`);
+            }
+          } catch (discoverErr) {
+            const msg = discoverErr instanceof Error ? discoverErr.message : String(discoverErr);
+            console.log(`[OdooSync] Field discovery failed, falling back to known field list only: ${msg}`);
           }
-        } catch (discoverErr) {
-          const msg = discoverErr instanceof Error ? discoverErr.message : String(discoverErr);
-          console.log(`[OdooSync] Field discovery failed, falling back to known field list only: ${msg}`);
         }
-        const fetchFields = Array.from(new Set([...mapper.odooFields, ...dynamicFieldNames]));
+
+        const idFirstFields = [
+          "id", "barcode", "identification_id", "name", "active", "write_date", "create_date",
+          "work_email", "private_email", "work_phone", "mobile_phone", "private_phone",
+          "department_id", "job_id", "company_id", "parent_id"
+        ];
+        const fetchFields = isIdFirst
+          ? idFirstFields
+          : Array.from(new Set([...mapper.odooFields, ...dynamicFieldNames]));
 
         while (hasMore) {
           const domain: any[] = [...baseDomain];
@@ -529,29 +654,30 @@ export class OdooSyncService {
 
           // Bulk fetch contracts for this batch (one Odoo call)
           let contractMap = new Map<number, any>();
-          try {
-            if(empOdooIds.length>0) {
-              const contracts = await this.client.search_read(
-                "hr.contract",
-                [["employee_id","in",empOdooIds]],
-                ["id","name","date_start","date_end","wage","state","employee_id","write_date"],
-                { limit: 5000, order: "date_start desc" }
-              ) as any[];
-              // group by employee_id, prefer open
-              const grouped = new Map<number, any[]>();
-              for(const c of contracts) {
-                const eid = many2oneId(c.employee_id);
-                if(!eid) continue;
-                if(!grouped.has(eid)) grouped.set(eid, []);
-                grouped.get(eid)!.push(c);
+          if (!isIdFirst) {
+            try {
+              if(empOdooIds.length>0) {
+                const contracts = await this.client.search_read(
+                  "hr.contract",
+                  [["employee_id","in",empOdooIds]],
+                  ["id","name","date_start","date_end","wage","state","employee_id","write_date"],
+                  { limit: 5000, order: "date_start desc" }
+                ) as any[];
+                const grouped = new Map<number, any[]>();
+                for(const c of contracts) {
+                  const eid = many2oneId(c.employee_id);
+                  if(!eid) continue;
+                  if(!grouped.has(eid)) grouped.set(eid, []);
+                  grouped.get(eid)!.push(c);
+                }
+                for(const [eid, clist] of grouped.entries()) {
+                  const open = clist.find((c:any)=> c.state==="open") || clist[0];
+                  contractMap.set(eid, open);
+                }
               }
-              for(const [eid, clist] of grouped.entries()) {
-                const open = clist.find((c:any)=> c.state==="open") || clist[0];
-                contractMap.set(eid, open);
-              }
+            } catch(e) {
+              console.log(`[OdooSync] Contract bulk fetch failed:`, e);
             }
-          } catch(e) {
-            console.log(`[OdooSync] Contract bulk fetch failed:`, e);
           }
 
           // Now process each employee with maps (no extra DB/Odoo calls)
@@ -717,16 +843,21 @@ export class OdooSyncService {
                     }
                   }
 
-                  // Mirror non-banking attachments Odoo has on file for this employee (ContinueOnError)
-                  try {
-                    const docResult = await syncEmployeeDocuments(this.client, odooId, localEmployeeId);
-                    if (docResult.imported > 0) result.operations.push({ operation: "create", model: "employeeDocument", localId: localEmployeeId, externalId: odooId, values: { imported: docResult.imported } });
-                    for (const docErr of docResult.errors) {
-                      result.operations.push({ operation: "skip", model: "employeeDocument", localId: localEmployeeId, externalId: odooId, reason: docErr.message });
+                  // Mirror non-banking attachments Odoo has on file for this employee only during FULL mode
+                  if (!isIdFirst) {
+                    try {
+                      const docResult = await syncEmployeeDocuments(this.client, odooId, localEmployeeId);
+                      if (docResult.imported > 0) result.operations.push({ operation: "create", model: "employeeDocument", localId: localEmployeeId, externalId: odooId, values: { imported: docResult.imported } });
+                      for (const docErr of docResult.errors) {
+                        result.operations.push({ operation: "skip", model: "employeeDocument", localId: localEmployeeId, externalId: odooId, reason: docErr.message });
+                      }
+                    } catch (docErr) {
+                      const dMsg = docErr instanceof Error ? docErr.message : String(docErr);
+                      result.operations.push({ operation: "skip", model: "employeeDocument", localId: localEmployeeId, externalId: odooId, reason: dMsg });
                     }
-                  } catch (docErr) {
-                    const dMsg = docErr instanceof Error ? docErr.message : String(docErr);
-                    result.operations.push({ operation: "skip", model: "employeeDocument", localId: localEmployeeId, externalId: odooId, reason: dMsg });
+                  } else if (options.queueDetails !== false) {
+                    // ID-First optimization: enqueue full details (name, photo, etc.) as low-priority background task
+                    this.queueEmployeeDetailSync(odooId, localEmployeeId, "LOW").catch(() => {});
                   }
                 }
               } catch(dbErr) {
