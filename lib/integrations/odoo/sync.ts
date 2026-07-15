@@ -9,6 +9,7 @@ import { OdooClient } from "./client";
 import { OdooConfigurationError } from "./auth";
 import { discoverSyncableFields, sanitizeRawRecord } from "./dynamic-fields";
 import { syncEmployeeDocuments } from "./documents";
+import { syncEmployeeIdentitiesOnly, type IdentitySyncOutcome, type OdooIdentityRecord } from "./identity-sync";
 import {
   asDate,
   asDateString,
@@ -924,7 +925,72 @@ export class OdooSyncService {
     }
   }
 
+  /**
+   * "Clean Slate" identity-only re-verification pass. Deliberately isolated
+   * from syncEmployees: fetches ONLY id/barcode/identification_id from Odoo
+   * for employees already linked here (matched by odooId), then hands off to
+   * the pure syncEmployeeIdentitiesOnly() validator/writer in identity-sync.ts,
+   * which never touches any other field and never creates/deletes an Employee
+   * row. Uses the same ID-First (id > lastLocalOdooId, order asc) pagination
+   * convention as syncEmployees to stay safe against 8000+ employee datasets.
+   */
+  async syncEmployeeIdentities(options: { batchSize?: number } = {}) {
+    if (!(await isOdooIntegrationEnabled())) throw new Error("Odoo integration is disabled");
+    await this.client.connect();
 
+    const batchSize = options.batchSize ?? 500;
+    const aggregate: IdentitySyncOutcome = { processed: 0, updated: 0, unchanged: 0, skipped: 0, errors: [] };
+
+    let lastLocalOdooId = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      const localBatch = (await delegate("employee").findMany({
+        where: { odooId: { not: null, gt: lastLocalOdooId } },
+        select: { odooId: true },
+        orderBy: { odooId: "asc" },
+        take: batchSize
+      })) as Array<{ odooId: number | null }>;
+
+      if (!localBatch.length) { hasMore = false; break; }
+      if (localBatch.length < batchSize) hasMore = false;
+
+      const odooIds = localBatch.map((row) => row.odooId).filter((id): id is number => typeof id === "number");
+      if (odooIds.length) lastLocalOdooId = odooIds[odooIds.length - 1];
+      if (!odooIds.length) continue;
+
+      let rows: OdooIdentityRecord[] = [];
+      try {
+        rows = (await this.client.search_read(
+          "hr.employee",
+          [["id", "in", odooIds]],
+          ["id", "barcode", "identification_id"],
+          { context: { active_test: false } } as any
+        )) as OdooIdentityRecord[];
+      } catch (fetchErr) {
+        // ContinueOnError -- one bad page must never abort the rest of the pass
+        const msg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
+        aggregate.skipped += odooIds.length;
+        aggregate.errors.push({ odooId: -1, reason: `BATCH_FETCH_FAILED: ${msg}` });
+        continue;
+      }
+
+      const batchOutcome = await syncEmployeeIdentitiesOnly(rows);
+      aggregate.processed += batchOutcome.processed;
+      aggregate.updated += batchOutcome.updated;
+      aggregate.unchanged += batchOutcome.unchanged;
+      aggregate.skipped += batchOutcome.skipped;
+      aggregate.errors.push(...batchOutcome.errors);
+    }
+
+    await this.log(
+      "ODOO_IDENTITY_SYNC",
+      `Identity-only sync: processed=${aggregate.processed} updated=${aggregate.updated} unchanged=${aggregate.unchanged} skipped=${aggregate.skipped} errors=${aggregate.errors.length}`,
+      { errors: aggregate.errors.slice(0, 200) }
+    );
+
+    return aggregate;
+  }
 
   async syncDepartments(options: SyncOptions = {}) {
     const direction = normalizeDirection(options.direction);

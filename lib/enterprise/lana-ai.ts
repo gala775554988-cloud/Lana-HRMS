@@ -7,6 +7,11 @@ export type LanaAiAnswer = {
   answer: string;
   suggestions: string[];
   results?: Array<Record<string, unknown>>;
+  // Populated only when a response exposed sensitive fields (national ID,
+  // photo, contact info) for a specific employee -- lets the API route audit
+  // log WHICH fields were exposed and to WHOM without ever writing the actual
+  // sensitive values into AuditLog.
+  sensitiveAccess?: { employeeIds: string[]; fields: string[] };
 };
 
 function can(permissions: string[] | undefined, action: string, resource: string) {
@@ -86,27 +91,114 @@ export async function answerLanaAi({
 
   if (/موظف|employee|staff|عامل/.test(lowered)) {
     const profile = await getAccessProfile(userId, roles);
+    // canReadEmployees mirrors the same SUPER_ADMIN/HR_MANAGER/permission gate
+    // used everywhere else in the app; applyScopedWhere then still narrows
+    // even these roles down to whatever hierarchy scope they're entitled to
+    // (SUPER_ADMIN/HR_MANAGER get the unrestricted baseWhere -- everyone else
+    // stays scoped to their branch/department). Non-privileged callers never
+    // get past `{ userId }`, so no query below can ever resolve to a row that
+    // isn't the caller's own, regardless of which fields are selected.
     const canReadEmployees = roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER") || can(permissions, "read", "employees");
     const where = canReadEmployees
       ? await applyScopedWhere("employees", {}, profile)
       : { userId };
-    const searchTerm = message
-      .replace(/ابحث|بحث|عن|الموظفين|الموظف|موظف|employees|employee|staff/gi, "")
-      .trim();
+    // Strips both the generic "search employee" filler words AND the detail/
+    // photo request words (with common Arabic verb/pronoun/conjunction forms)
+    // so a natural request like "جيب لي بيانات الموظف أحمد وصورته" reduces
+    // cleanly down to just the name/code being asked about.
+    const FILLER_PATTERN = new RegExp([
+      "ابحث", "بحث", "عن", "الموظفين", "الموظف", "موظف", "employees", "employee", "staff",
+      "جيب", "لي", "اعطني", "أعطني", "اعطيني", "أعطيني", "هات", "احضر", "ورني", "أرني", "ارني",
+      "وبياناته", "وبياناتها", "وبياناتي", "وبيانات", "بياناته", "بياناتها", "بياناتي", "بيانات",
+      "وملفه", "وملفها", "وملفي", "وملف", "ملفه", "ملفها", "ملفي", "ملف",
+      "وصورته", "وصورتها", "وصورتي", "وصورة", "صورته", "صورتها", "صورتي", "صورة",
+      "وهويته", "وهويتها", "وهويتي", "وهوية", "هويته", "هويتها", "هويتي", "هوية",
+      "رقم\\s*الهوية",
+      "وتفاصيله", "وتفاصيلها", "وتفاصيلي", "وتفاصيل", "تفاصيله", "تفاصيلها", "تفاصيلي", "تفاصيل",
+      "profile", "photo", "picture", "details", "full\\s*info", "info",
+      "\\bو\\b"
+    ].join("|"), "gi");
+    const searchTerm = message.replace(FILLER_PATTERN, "").replace(/\s+/g, " ").trim();
+    const searchWords = searchTerm.split(" ").filter(Boolean);
+    // Two-word names (common for "First Last") don't match a single `contains`
+    // against one field, since firstName/lastName are stored separately --
+    // try both orderings in addition to the whole-string match below.
+    const nameOrderConditions = searchWords.length >= 2 ? [
+      { AND: [{ firstName: { contains: searchWords[0], mode: "insensitive" } }, { lastName: { contains: searchWords.slice(1).join(" "), mode: "insensitive" } }] },
+      { AND: [{ lastName: { contains: searchWords[0], mode: "insensitive" } }, { firstName: { contains: searchWords.slice(1).join(" "), mode: "insensitive" } }] }
+    ] : [];
+    const searchWhere = {
+      AND: [
+        where as any,
+        searchTerm ? {
+          OR: [
+            { firstName: { contains: searchTerm, mode: "insensitive" } },
+            { lastName: { contains: searchTerm, mode: "insensitive" } },
+            { employeeNumber: { contains: searchTerm, mode: "insensitive" } },
+            { nationalId: { contains: searchTerm, mode: "insensitive" } },
+            ...nameOrderConditions
+          ]
+        } : {}
+      ]
+    };
+
+    // "Give me employee X's data/photo/national id" -- only kicks in when the
+    // search term narrows to exactly ONE employee within the caller's scope.
+    // Ambiguous or empty matches fall through to the plain list below rather
+    // than guessing which employee was meant.
+    const wantsDetail = /بيانات|ملف|صورة|هوية|رقم\s*الهوية|تفاصيل|صورته|صورتي|profile|photo|picture|details|full\s*info/i.test(lowered);
+    if (wantsDetail && searchTerm) {
+      const matches = await prisma.employee.findMany({
+        where: searchWhere,
+        select: {
+          id: true, employeeNumber: true, nationalId: true, firstName: true, lastName: true,
+          email: true, phone: true, profilePhotoUrl: true, status: true, hireDate: true,
+          department: { select: { name: true } }, branch: { select: { name: true } }, position: { select: { title: true } },
+          manager: { select: { firstName: true, lastName: true } },
+          documents: { select: { name: true, type: true, status: true, expiresAt: true }, orderBy: { uploadedAt: "desc" }, take: 5 }
+        },
+        take: 2
+      });
+      if (matches.length === 1) {
+        const employee = matches[0];
+        return {
+          answer: ar
+            ? `بيانات الموظف ${employee.firstName} ${employee.lastName}:`
+            : `Details for ${employee.firstName} ${employee.lastName}:`,
+          suggestions,
+          results: [{
+            type: "employee-profile",
+            id: employee.id,
+            employeeNumber: employee.employeeNumber,
+            nationalId: employee.nationalId,
+            name: `${employee.firstName} ${employee.lastName}`,
+            email: employee.email,
+            phone: employee.phone,
+            photoUrl: employee.profilePhotoUrl,
+            status: employee.status,
+            hireDate: employee.hireDate,
+            department: employee.department?.name,
+            branch: employee.branch?.name,
+            position: employee.position?.title,
+            manager: employee.manager ? `${employee.manager.firstName} ${employee.manager.lastName}` : undefined,
+            documents: employee.documents.map((doc) => `${doc.name} (${doc.type}/${doc.status})`).join(", ") || (ar ? "لا توجد مستندات" : "No documents")
+          }],
+          sensitiveAccess: { employeeIds: [employee.id], fields: ["nationalId", "profilePhotoUrl", "email", "phone"] }
+        };
+      }
+      if (matches.length > 1) {
+        return {
+          answer: ar ? "وجدت أكثر من موظف مطابق، يرجى تحديد الاسم أو الكود بدقة أكبر." : "More than one matching employee found -- please narrow down the name or employee number.",
+          suggestions
+        };
+      }
+      // 0 matches within scope -- fall through to the plain list message below,
+      // which will also report 0 results without revealing whether the
+      // employee exists outside the caller's authorized scope.
+    }
+
     const employees = await prisma.employee.findMany({
-      where: {
-        AND: [
-          where as any,
-          searchTerm ? {
-            OR: [
-              { firstName: { contains: searchTerm, mode: "insensitive" } },
-              { lastName: { contains: searchTerm, mode: "insensitive" } },
-              { employeeNumber: { contains: searchTerm, mode: "insensitive" } },
-              { nationalId: { contains: searchTerm, mode: "insensitive" } }
-            ]
-          } : {}
-        ]
-      },
+      where: searchWhere,
       select: { id: true, employeeNumber: true, firstName: true, lastName: true, status: true, department: { select: { name: true } }, branch: { select: { name: true } } },
       take: 8
     });

@@ -39,6 +39,16 @@ export async function POST(request: NextRequest) {
     });
 
     await writeAuditLog({ actorUserId: session.user.id, action: "lana-ai:chat", entity: "lanaAi", metadata: { message } }).catch(() => null);
+    // Sensitive fields (national ID, photo, contact info) are never written to
+    // AuditLog -- only which employee(s) and which field NAMES were exposed.
+    if (answer.sensitiveAccess?.employeeIds.length) {
+      await writeAuditLog({
+        actorUserId: session.user.id,
+        action: "lana-ai:sensitive-data-access",
+        entity: "employee",
+        metadata: { employeeIds: answer.sensitiveAccess.employeeIds, fields: answer.sensitiveAccess.fields }
+      }).catch(() => null);
+    }
     return NextResponse.json({ success: true, ...answer });
   } catch (error) {
     return errorJson(error);

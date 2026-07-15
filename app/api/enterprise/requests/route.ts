@@ -120,6 +120,7 @@ export async function GET(request: NextRequest) {
   if (scope === "deferred") where.steps = { some: { status: "DEFERRED" } };
   if (scope === "completed") where.status = { in: ["COMPLETED", "APPROVED"] };
   if (scope === "rejected") where.status = "REJECTED";
+  if (scope === "decided") where.status = { in: ["COMPLETED", "APPROVED", "REJECTED"] };
 
   const [allScoped, raw, approvers] = await Promise.all([
     prisma.workflowInstance.findMany({

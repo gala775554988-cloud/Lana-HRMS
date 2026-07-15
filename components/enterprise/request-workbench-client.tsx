@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import { Check, ChevronsUpDown, History, RotateCcw, Search, Send, X } from "lucide-react";
+import { Check, ChevronsUpDown, History, Loader2, RotateCcw, Search, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ApprovalTimeline } from "@/components/enterprise/approval-timeline";
@@ -27,9 +28,26 @@ const scopeOptions = [
   ["mine", "طلباتي"],
   ["transferred", "تم تحويلها"],
   ["deferred", "المؤجلة"],
-  ["completed", "المكتملة"],
+  ["decided", "طلبات مكتملة"],
+  ["completed", "المكتملة (معتمدة فقط)"],
   ["rejected", "المرفوضة"]
 ] as const;
+
+const STATUS_BADGE: Record<string, string> = {
+  APPROVED: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400",
+  COMPLETED: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400",
+  REJECTED: "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400",
+  PENDING: "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400",
+  RETURNED: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  APPROVED: "تمت الموافقة",
+  COMPLETED: "مكتملة",
+  REJECTED: "مرفوض",
+  PENDING: "قيد الانتظار",
+  RETURNED: "أُرجع"
+};
 
 const sortOptions = [
   ["newest", "الأحدث"],
@@ -220,6 +238,11 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
   }
 
   const isPending = decideMutation.isPending || bulkMutation.isPending;
+  // Which exact row+decision is in flight, so only that button shows a
+  // spinner instead of every action on every row looking identically
+  // "stuck" while any one mutation is pending.
+  const isRowPending = (id: string) => decideMutation.isPending && decideMutation.variables?.id === id;
+  const isActionPending = (id: string, decision: string) => isRowPending(id) && decideMutation.variables?.decision === decision;
 
   return (
     <div className="space-y-5">
@@ -307,17 +330,37 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
                   <td className="px-3 py-3">{request.priority}</td>
                   <td className="px-3 py-3">{new Date(request.createdAt).toLocaleString("ar-SA")}</td>
                   <td className="px-3 py-3">{new Date(request.updatedAt).toLocaleString("ar-SA")}</td>
-                  <td className="px-3 py-3">{request.status}</td>
+                  <td className="px-3 py-3">
+                    <Badge className={STATUS_BADGE[request.status] ?? "bg-slate-100 text-slate-700"}>
+                      {STATUS_LABEL[request.status] ?? request.status}
+                    </Badge>
+                  </td>
                   <td className="px-3 py-3">{request.currentApprover}</td>
                   <td className="px-3 py-3">
                     <div className="flex flex-wrap gap-1">
-                      <Button type="button" size="sm" variant="outline" onClick={() => setTimelineWorkflowId(request.id)}><History className="h-3.5 w-3.5" />السجل</Button>
-                      <Button type="button" size="sm" onClick={() => decide(request.id, "APPROVE")} disabled={isPending}><Check className="h-3.5 w-3.5" />موافقة</Button>
-                      <Button type="button" size="sm" variant="destructive" onClick={() => decide(request.id, "REJECT")} disabled={isPending}><X className="h-3.5 w-3.5" />رفض</Button>
-                      <Button type="button" size="sm" variant="outline" onClick={() => decide(request.id, "RETURN")} disabled={isPending}><RotateCcw className="h-3.5 w-3.5" />إرجاع</Button>
-                      <Button type="button" size="sm" variant="outline" onClick={() => targetUserId && decide(request.id, "TRANSFER", { targetUserId })} disabled={isPending || !targetUserId}><Send className="h-3.5 w-3.5" />تحويل</Button>
-                      <Button type="button" size="sm" variant="outline" onClick={() => decide(request.id, "DEFER", { deferPreset })} disabled={isPending}>تأجيل</Button>
-                      <Button type="button" size="sm" variant="outline" onClick={() => note(request.id)} disabled={isPending}>ملاحظة</Button>
+                      <Button type="button" size="sm" variant="outline" onClick={() => setTimelineWorkflowId(request.id)} disabled={isRowPending(request.id)}><History className="h-3.5 w-3.5" />السجل</Button>
+                      <Button type="button" size="sm" onClick={() => decide(request.id, "APPROVE")} disabled={isPending}>
+                        {isActionPending(request.id, "APPROVE") ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                        {isActionPending(request.id, "APPROVE") ? "جارٍ..." : "موافقة"}
+                      </Button>
+                      <Button type="button" size="sm" variant="destructive" onClick={() => decide(request.id, "REJECT")} disabled={isPending}>
+                        {isActionPending(request.id, "REJECT") ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+                        {isActionPending(request.id, "REJECT") ? "جارٍ..." : "رفض"}
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" onClick={() => decide(request.id, "RETURN")} disabled={isPending}>
+                        {isActionPending(request.id, "RETURN") ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                        {isActionPending(request.id, "RETURN") ? "جارٍ..." : "إرجاع"}
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" onClick={() => targetUserId && decide(request.id, "TRANSFER", { targetUserId })} disabled={isPending || !targetUserId}>
+                        {isActionPending(request.id, "TRANSFER") ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                        {isActionPending(request.id, "TRANSFER") ? "جارٍ..." : "تحويل"}
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" onClick={() => decide(request.id, "DEFER", { deferPreset })} disabled={isPending}>
+                        {isActionPending(request.id, "DEFER") ? <Loader2 className="me-1 h-3.5 w-3.5 animate-spin" /> : null}{isActionPending(request.id, "DEFER") ? "جارٍ..." : "تأجيل"}
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" onClick={() => note(request.id)} disabled={isPending}>
+                        {isActionPending(request.id, "NOTE") ? <Loader2 className="me-1 h-3.5 w-3.5 animate-spin" /> : null}{isActionPending(request.id, "NOTE") ? "جارٍ..." : "ملاحظة"}
+                      </Button>
                     </div>
                   </td>
                 </tr>
