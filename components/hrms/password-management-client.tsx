@@ -45,7 +45,8 @@ export default function PasswordManagementClient({ totalEmployees }: { totalEmpl
   }, [search]);
 
   useEffect(() => {
-    fetchEmployees();
+    const delayDebounceFn = setTimeout(() => { fetchEmployees(); }, 300);
+    return () => clearTimeout(delayDebounceFn);
   }, [fetchEmployees]);
 
   const handleSearch = (e: React.FormEvent) => {

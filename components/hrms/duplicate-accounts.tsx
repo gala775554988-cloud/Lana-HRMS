@@ -68,7 +68,8 @@ export function DuplicateAccounts() {
   }, [search, typeFilter, sortBy, sortOrder]);
 
   useEffect(() => {
-    fetchData();
+    const delayDebounceFn = setTimeout(() => { fetchData(); }, 300);
+    return () => clearTimeout(delayDebounceFn);
   }, [fetchData]);
 
   const handleSearch = (e: React.FormEvent) => {

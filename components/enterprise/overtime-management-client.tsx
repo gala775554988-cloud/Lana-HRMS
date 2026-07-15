@@ -60,7 +60,10 @@ export function OvertimeManagementClient() {
       .catch((error) => setMessage(error.message));
   };
 
-  useEffect(load, [query]);
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(load, 300);
+    return () => clearTimeout(delayDebounceFn);
+  }, [query]);
   useEffect(() => {
     if (selectedEmployee) setForm((current) => ({ ...current, departmentId: selectedEmployee.departmentId ?? "", branchId: selectedEmployee.branchId ?? "" }));
   }, [selectedEmployee]);

@@ -102,7 +102,10 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
       .catch((error) => setMessage(error.message));
   }, [mode, page, scope, search, sort, type]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => { load(); }, 300);
+    return () => clearTimeout(delayDebounceFn);
+  }, [load]);
 
   function decide(id: string, decision: "APPROVE" | "REJECT" | "RETURN" | "TRANSFER" | "DEFER" | "NOTE" | "PRIORITY", extra: Record<string, unknown> = {}) {
     startTransition(async () => {
