@@ -342,6 +342,9 @@ model Employee {
   odooJobId              Int?
   odooCompanyId          Int?
   odooParentId           Int?
+  // Full dynamic snapshot of all non-bank hr.employee fields (standard + custom) as returned by Odoo
+  odooRawData            Json?
+  odooRawDataSyncedAt    DateTime?
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
   user                   User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -404,19 +407,21 @@ model Employee {
 }
 
 model EmployeeDocument {
-  id         String         @id @default(cuid())
-  employeeId String
-  type       String
-  name       String
-  fileUrl    String
-  fileName   String?
-  mimeType   String?
-  sizeBytes  Int?
-  status     DocumentStatus @default(PENDING)
-  expiresAt  DateTime?
-  uploadedAt DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
-  employee   Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  id               String         @id @default(cuid())
+  employeeId       String
+  type             String
+  name             String
+  fileUrl          String
+  fileName         String?
+  mimeType         String?
+  sizeBytes        Int?
+  status           DocumentStatus @default(PENDING)
+  expiresAt        DateTime?
+  uploadedAt       DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  employee         Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  source           String         @default("MANUAL")
+  odooAttachmentId Int?           @unique
 
   @@index([employeeId])
   @@index([status])
@@ -441,6 +446,7 @@ model EmployeeContract {
   odooEmployeeId Int?
   odooWriteDate  DateTime?
   odooState      String?
+  odooRawData    Json?
 
   @@index([employeeId])
   @@index([status])
@@ -649,6 +655,8 @@ model PayrollItem {
   updatedAt      DateTime   @updatedAt
   payrollRun     PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
   employee       Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  odooPayslipId  Int?       @unique
+  odooRawData    Json?
 
   @@unique([payrollRunId, employeeId])
   @@index([employeeId])
@@ -690,33 +698,37 @@ model OvertimeRequest {
 }
 
 model Allowance {
-  id            String    @id @default(cuid())
-  employeeId    String
-  name          String
-  amount        Decimal   @db.Decimal(12, 2)
-  currency      String    @default("USD")
-  effectiveFrom DateTime
-  effectiveTo   DateTime?
-  isRecurring   Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  employee      Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  id               String    @id @default(cuid())
+  employeeId       String
+  name             String
+  amount           Decimal   @db.Decimal(12, 2)
+  currency         String    @default("USD")
+  effectiveFrom    DateTime
+  effectiveTo      DateTime?
+  isRecurring      Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  employee         Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  source           String    @default("MANUAL")
+  odooPayslipLineId Int?     @unique
 
   @@index([employeeId])
 }
 
 model Deduction {
-  id            String    @id @default(cuid())
-  employeeId    String
-  name          String
-  amount        Decimal   @db.Decimal(12, 2)
-  currency      String    @default("USD")
-  effectiveFrom DateTime
-  effectiveTo   DateTime?
-  isRecurring   Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  employee      Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  id               String    @id @default(cuid())
+  employeeId       String
+  name             String
+  amount           Decimal   @db.Decimal(12, 2)
+  currency         String    @default("USD")
+  effectiveFrom    DateTime
+  effectiveTo      DateTime?
+  isRecurring      Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  employee         Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  source           String    @default("MANUAL")
+  odooPayslipLineId Int?     @unique
 
   @@index([employeeId])
 }

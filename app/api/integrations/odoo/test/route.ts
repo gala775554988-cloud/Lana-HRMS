@@ -137,12 +137,33 @@ async function runRpcAuthDiagnostics() {
   }
 }
 
+async function listFields(connectionId: string | undefined, model: string, search: string) {
+  const service = await OdooSyncService.forConnection(connectionId);
+  const fields = await service.client.fieldsGet(model, [], ["string", "type", "required", "readonly", "relation", "help"]);
+  const entries: Array<{ technicalName: string; string?: unknown; help?: unknown; [key: string]: unknown }> =
+    Object.entries(fields).map(([technicalName, meta]) => ({ technicalName, ...meta }));
+  const needle = search.trim().toLowerCase();
+  const filtered = needle
+    ? entries.filter((entry) =>
+        entry.technicalName.toLowerCase().includes(needle) ||
+        String(entry.string ?? "").toLowerCase().includes(needle) ||
+        String(entry.help ?? "").toLowerCase().includes(needle)
+      )
+    : entries;
+  return { success: true, model, count: filtered.length, totalFields: entries.length, fields: filtered };
+}
+
 export async function GET(request: NextRequest) {
   try {
     await requireOdooIntegrationAccess("manage");
     const connectionId = request.nextUrl.searchParams.get("connectionId") || undefined;
     const debugRpc = request.nextUrl.searchParams.get("debugRpc") === "true";
     if (debugRpc && !connectionId) return NextResponse.json(await runRpcAuthDiagnostics());
+    const model = request.nextUrl.searchParams.get("fieldsModel");
+    if (model) {
+      const search = request.nextUrl.searchParams.get("search") || "";
+      return NextResponse.json(await listFields(connectionId, model, search));
+    }
     const service = await OdooSyncService.forConnection(connectionId);
     return NextResponse.json(await service.testConnection());
   } catch (error) {

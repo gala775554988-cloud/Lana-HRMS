@@ -7,6 +7,8 @@ import { isOdooIntegrationEnabled } from "@/lib/settings";
 import { getOdooEnvConfig } from "./config";
 import { OdooClient } from "./client";
 import { OdooConfigurationError } from "./auth";
+import { discoverSyncableFields, sanitizeRawRecord } from "./dynamic-fields";
+import { syncEmployeeDocuments } from "./documents";
 import {
   asDateString,
   detectConflicts,
@@ -273,13 +275,31 @@ export class OdooSyncService {
         const baseDomain = odooIncrementalDomain(since) as any[];
         console.log(`[OdooSync] Starting EMPLOYEES optimized bulk - batchSize=${batchSize} since=${since || "none"}`);
 
+        // Discover every field currently defined on hr.employee (standard + custom/Studio fields),
+        // excluding anything bank/IBAN-related, so newly added Odoo fields are captured automatically
+        // without any code change. Falls back to the known typed field list if discovery fails.
+        let dynamicFieldNames: string[] = [];
+        let excludedBankFields: string[] = [];
+        try {
+          const discovery = await discoverSyncableFields(this.client, mapper.odooModel);
+          dynamicFieldNames = discovery.fieldNames;
+          excludedBankFields = discovery.excludedBankFields;
+          if (excludedBankFields.length > 0) {
+            console.log(`[OdooSync] Excluding ${excludedBankFields.length} bank/IBAN-related field(s) from employee sync: ${excludedBankFields.join(", ")}`);
+          }
+        } catch (discoverErr) {
+          const msg = discoverErr instanceof Error ? discoverErr.message : String(discoverErr);
+          console.log(`[OdooSync] Field discovery failed, falling back to known field list only: ${msg}`);
+        }
+        const fetchFields = Array.from(new Set([...mapper.odooFields, ...dynamicFieldNames]));
+
         while (hasMore) {
           const domain: any[] = [...baseDomain];
           if (lastOdooId > 0) domain.push(["id", ">", lastOdooId]);
 
           let rows: OdooRecord[] = [];
           try {
-            rows = await this.client.search_read(mapper.odooModel, domain, mapper.odooFields, {
+            rows = await this.client.search_read(mapper.odooModel, domain, fetchFields, {
               limit: batchSize,
               order: "id asc",
               context: { active_test: false },
@@ -417,6 +437,8 @@ export class OdooSyncService {
                 ...(cId && compMap.get(cId) ? { branchId: compMap.get(cId) } : {}),
                 ...(mId && managerMap.get(mId) ? { managerId: managerMap.get(mId) } : {}),
                 ...(hospitalName && hospitalMap.get(hospitalName) ? { hospitalId: hospitalMap.get(hospitalName) } : {}),
+                odooRawData: sanitizeRawRecord(row as Record<string, unknown>, excludedBankFields),
+                odooRawDataSyncedAt: new Date(),
               };
               mappedBatch.push({ row, odooId: Number(row.id), values: vals, deptOdooId: dId, jobOdooId: jId, compOdooId: cId, managerOdooId: mId });
             } catch(e) {
@@ -633,6 +655,18 @@ export class OdooSyncService {
                       const cMsg = contractErr instanceof Error ? contractErr.message : String(contractErr);
                       result.operations.push({ operation:"skip", model:"employeeContract", localId: localEmployeeId, externalId: row.id, reason: cMsg });
                     }
+                  }
+
+                  // Mirror non-banking attachments Odoo has on file for this employee (ContinueOnError)
+                  try {
+                    const docResult = await syncEmployeeDocuments(this.client, odooId, localEmployeeId);
+                    if (docResult.imported > 0) result.operations.push({ operation: "create", model: "employeeDocument", localId: localEmployeeId, externalId: odooId, values: { imported: docResult.imported } });
+                    for (const docErr of docResult.errors) {
+                      result.operations.push({ operation: "skip", model: "employeeDocument", localId: localEmployeeId, externalId: odooId, reason: docErr.message });
+                    }
+                  } catch (docErr) {
+                    const dMsg = docErr instanceof Error ? docErr.message : String(docErr);
+                    result.operations.push({ operation: "skip", model: "employeeDocument", localId: localEmployeeId, externalId: odooId, reason: dMsg });
                   }
                 }
               } catch(dbErr) {
@@ -1046,8 +1080,94 @@ export class OdooSyncService {
         }
       }
       if (direction === "ODOO_TO_LANA" || direction === "BIDIRECTIONAL") {
-        result.skipped += 1;
-        result.operations.push({ operation: "skip", model: mapper.lanaModel, reason: "Payroll import requires project-specific payslip line salary rules; endpoint is enabled for Lana to Odoo export and dry-run validation." });
+        const domain: any[] = [...(odooIncrementalDomain(since) as any[]), ["state", "in", ["done", "paid"]]];
+        const rows = await this.client.search_read(
+          mapper.odooModel,
+          domain,
+          ["id", "number", "name", "employee_id", "date_from", "date_to", "state", "basic_wage", "net_wage", "write_date"],
+          { limit: batchSize, order: "date_from desc" }
+        );
+        result.cursor = maxCursor(rows, since);
+
+        // Line-level categories that already feed baseSalary/netPay above — skip to avoid double counting
+        const skipLineCodes = new Set(["BASIC", "GROSS", "NET", "COMP"]);
+
+        for (const row of rows) {
+          try {
+            const localEmployeeId = await this.findLocalEmployeeId(row.employee_id);
+            if (!localEmployeeId) { result.skipped += 1; result.operations.push({ operation: "skip", model: mapper.lanaModel, externalId: row.id, reason: "Missing matching Lana employee" }); continue; }
+
+            const dateFrom = row.date_from ? new Date(String(row.date_from)) : new Date();
+            const period = dateFrom.toISOString().slice(0, 7);
+            let run = await delegate("payrollRun").findFirst({ where: { period } }) as any;
+            if (!run) run = await delegate("payrollRun").create({ data: { name: `Odoo Payroll ${period}`, period, status: "APPROVED" } });
+
+            const baseSalary = Number(row.basic_wage) || 0;
+            const netPay = Number(row.net_wage) || baseSalary;
+            let allowanceTotal = 0;
+            let deductionTotal = 0;
+
+            let lines: OdooRecord[] = [];
+            try {
+              lines = await this.client.search_read("hr.payslip.line", [["slip_id", "=", row.id]], ["id", "name", "code", "amount"], { limit: 200 });
+            } catch (lineFetchErr) {
+              result.operations.push({ operation: "skip", model: "payslip.line", externalId: row.id, reason: lineFetchErr instanceof Error ? lineFetchErr.message : String(lineFetchErr) });
+            }
+
+            for (const line of lines) {
+              const code = String(line.code || "").toUpperCase();
+              const amount = Number(line.amount) || 0;
+              if (skipLineCodes.has(code) || amount === 0) continue;
+              try {
+                const lineData = {
+                  employeeId: localEmployeeId,
+                  name: String(line.name || code || `Odoo line ${line.id}`),
+                  amount: Math.abs(amount),
+                  currency: "SAR",
+                  effectiveFrom: dateFrom,
+                  effectiveTo: row.date_to ? new Date(String(row.date_to)) : null,
+                  isRecurring: false,
+                  source: "ODOO",
+                  odooPayslipLineId: Number(line.id),
+                };
+                if (amount < 0) {
+                  deductionTotal += Math.abs(amount);
+                  const existingLine = await delegate("deduction").findFirst({ where: { odooPayslipLineId: Number(line.id) } });
+                  if (existingLine) await delegate("deduction").update({ where: { id: existingLine.id }, data: lineData });
+                  else await delegate("deduction").create({ data: lineData });
+                } else {
+                  allowanceTotal += amount;
+                  const existingLine = await delegate("allowance").findFirst({ where: { odooPayslipLineId: Number(line.id) } });
+                  if (existingLine) await delegate("allowance").update({ where: { id: existingLine.id }, data: lineData });
+                  else await delegate("allowance").create({ data: lineData });
+                }
+              } catch (lineErr) {
+                result.operations.push({ operation: "skip", model: "payslip.line", localId: localEmployeeId, externalId: Number(line.id), reason: lineErr instanceof Error ? lineErr.message : String(lineErr) });
+              }
+            }
+
+            const itemData = {
+              payrollRunId: run.id,
+              employeeId: localEmployeeId,
+              baseSalary,
+              allowanceTotal,
+              deductionTotal,
+              overtimeTotal: 0,
+              netPay,
+              currency: "SAR",
+              odooPayslipId: Number(row.id),
+              odooRawData: row as unknown as object,
+            };
+            const existingItem = await delegate("payrollItem").findFirst({ where: { odooPayslipId: Number(row.id) } });
+            if (options.dryRun) result.operations.push({ operation: existingItem ? "update" : "create", model: mapper.lanaModel, localId: existingItem?.id as string | undefined, externalId: row.id, values: itemData });
+            else if (existingItem) { await delegate("payrollItem").update({ where: { id: existingItem.id }, data: itemData }); result.updated += 1; }
+            else { await delegate("payrollItem").create({ data: itemData }); result.created += 1; }
+            result.pulled += 1;
+          } catch (err: unknown) {
+            result.skipped += 1;
+            result.errors.push({ id: String(row.id), message: err instanceof Error ? err.message : String(err), details: err });
+          }
+        }
       }
       return this.finishHistory(history?.id, result);
     } catch (error) { return this.failHistory(history?.id, result, error); }
