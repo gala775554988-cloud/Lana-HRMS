@@ -114,7 +114,7 @@ export default async function AnalyticsPage() {
 
       {isAdmin ? (
         <Suspense fallback={<OverviewSkeleton />}>
-          <CompanyOverview locale={locale} dictionary={dictionary} />
+          <CompanyOverview locale={locale} dictionary={dictionary} showCharts />
         </Suspense>
       ) : null}
 
@@ -167,7 +167,7 @@ async function BranchHospitalBreakdown() {
   );
 }
 
-async function CompanyOverview({ locale, dictionary }: { locale: Locale; dictionary: Dictionary }) {
+export async function CompanyOverview({ locale, dictionary, showCharts = true }: { locale: Locale; dictionary: Dictionary; showCharts?: boolean }) {
   const monthRanges = lastNMonthRanges(8);
 
   const [
@@ -182,10 +182,7 @@ async function CompanyOverview({ locale, dictionary }: { locale: Locale; diction
     attendanceToday,
     lateToday,
     payrollSum,
-    overtimePending,
-    employeeGrowthByMonth,
-    requestsByMonth,
-    payrollByMonth
+    overtimePending
   ] = await Promise.all([
     prisma.employee.count({ where: { status: "ACTIVE" } }),
     prisma.department.count({ where: { isActive: true } }),
@@ -198,10 +195,7 @@ async function CompanyOverview({ locale, dictionary }: { locale: Locale; diction
     prisma.attendanceRecord.count({ where: { workDate: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } } }),
     prisma.attendanceRecord.count({ where: { status: "LATE", workDate: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } } }),
     prisma.payrollItem.aggregate({ _sum: { netPay: true }, where: { payrollRun: { status: "PAID" } } }).then(r => Number(r._sum.netPay || 0)),
-    prisma.overtimeRequest.count({ where: { status: "PENDING" } }),
-    Promise.all(monthRanges.map((range) => prisma.employee.count({ where: { hireDate: { lt: range.end } } }))),
-    Promise.all(monthRanges.map((range) => prisma.workflowInstance.count({ where: { createdAt: { gte: range.start, lt: range.end } } }))),
-    Promise.all(monthRanges.map((range) => prisma.payrollItem.aggregate({ _sum: { netPay: true }, where: { payrollRun: { status: "PAID", paidAt: { gte: range.start, lt: range.end } } } }).then((r) => Number(r._sum.netPay || 0))))
+    prisma.overtimeRequest.count({ where: { status: "PENDING" } })
   ]);
 
   const metrics = {
@@ -210,8 +204,17 @@ async function CompanyOverview({ locale, dictionary }: { locale: Locale; diction
     totalPayroll: payrollSum, overtimePending
   };
 
-  const monthLabels = monthRanges.map((r) => r.label);
-  const series = { months: monthLabels, employeeGrowth: employeeGrowthByMonth, requests: requestsByMonth, payroll: payrollByMonth };
+  // Month-by-month series only feeds the charts — skip the extra ~24 queries entirely when they won't render.
+  let series: { months: string[]; employeeGrowth: number[]; requests: number[]; payroll: number[] } | null = null;
+  if (showCharts) {
+    const [employeeGrowthByMonth, requestsByMonth, payrollByMonth] = await Promise.all([
+      Promise.all(monthRanges.map((range) => prisma.employee.count({ where: { hireDate: { lt: range.end } } }))),
+      Promise.all(monthRanges.map((range) => prisma.workflowInstance.count({ where: { createdAt: { gte: range.start, lt: range.end } } }))),
+      Promise.all(monthRanges.map((range) => prisma.payrollItem.aggregate({ _sum: { netPay: true }, where: { payrollRun: { status: "PAID", paidAt: { gte: range.start, lt: range.end } } } }).then((r) => Number(r._sum.netPay || 0))))
+    ]);
+    const monthLabels = monthRanges.map((r) => r.label);
+    series = { months: monthLabels, employeeGrowth: employeeGrowthByMonth, requests: requestsByMonth, payroll: payrollByMonth };
+  }
 
   const currencyLocale = { en: "en-US", ar: "ar-SA" } as const;
   const cards: Array<{ title: string; value: number | string; icon: LucideIcon; hint: string; tone: string; badgeText?: string }> = [
@@ -234,7 +237,7 @@ async function CompanyOverview({ locale, dictionary }: { locale: Locale; diction
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((card, index) => <KpiCard key={card.title} {...card} index={index} />)}
       </div>
-      <DashboardCharts metrics={metrics} series={series} />
+      {showCharts && series ? <DashboardCharts metrics={metrics} series={series} /> : null}
     </div>
   );
 }
@@ -270,7 +273,7 @@ function KpiCard({
   );
 }
 
-function OverviewSkeleton() {
+export function OverviewSkeleton({ showCharts = true }: { showCharts?: boolean } = {}) {
   return (
     <div className="space-y-8 animate-pulse">
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
@@ -278,7 +281,7 @@ function OverviewSkeleton() {
           <div key={i} className="h-36 rounded-3xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-900" />
         ))}
       </div>
-      <div className="h-96 rounded-3xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-900" />
+      {showCharts ? <div className="h-96 rounded-3xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-900" /> : null}
     </div>
   );
 }
