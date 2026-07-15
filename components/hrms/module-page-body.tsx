@@ -26,28 +26,33 @@ async function getBranchOptions(query: Record<string, string | string[] | undefi
   const department = typeof query.department === "string" ? query.department : "";
   const hospital = typeof query.hospital === "string" ? query.hospital : "";
   const isActive = typeof query.isActive === "string" ? query.isActive : "";
-  const extra = await getEmployeeExtraSettings();
-  let hospitalEmployeeIds: string[] | undefined;
-  if (hospital) {
-    hospitalEmployeeIds = extra
-      .filter((item) => String(item.value.hospital ?? "").toLowerCase().includes(hospital.toLowerCase()))
-      .map((item) => item.employeeId);
-  }
 
+  // The hospital filter used to require `extra` (from getEmployeeExtraSettings)
+  // before the branch query could even be built, forcing a sequential
+  // extra -> branches chain on every load of this page, hospital filter or
+  // not. Applying it as an in-memory filter afterward instead (branches
+  // already include their employees, so no extra query is needed either way)
+  // lets extra and branches load in parallel unconditionally.
   const branchAnd: Record<string, unknown>[] = [];
   if (search) branchAnd.push({ OR: [{ name: { contains: search, mode: "insensitive" as const } }, { code: { contains: search, mode: "insensitive" as const } }, { city: { contains: search, mode: "insensitive" as const } }] });
   if (isActive) branchAnd.push({ isActive: isActive === "true" });
   if (department) branchAnd.push({ employees: { some: { department: { name: { contains: department, mode: "insensitive" as const } } } } });
-  if (hospitalEmployeeIds) branchAnd.push({ employees: { some: { id: { in: hospitalEmployeeIds.length ? hospitalEmployeeIds : ["__NO_HOSPITAL_MATCH__"] } } } });
+
+  const [extra, branches] = await Promise.all([
+    getEmployeeExtraSettings(),
+    prisma.branch.findMany({
+      where: branchAnd.length ? { AND: branchAnd } : {},
+      include: { employees: { select: { id: true, employeeNumber: true, nationalId: true, firstName: true, lastName: true, department: { select: { name: true, code: true } } } } },
+      orderBy: { name: "asc" }
+    })
+  ]);
 
   const hospitalByEmployeeId = new Map(extra.map((item) => [item.employeeId, String(item.value.hospital ?? "")]));
-  const branches = await prisma.branch.findMany({
-    where: branchAnd.length ? { AND: branchAnd } : {},
-    include: { employees: { select: { id: true, employeeNumber: true, nationalId: true, firstName: true, lastName: true, department: { select: { name: true, code: true } } } } },
-    orderBy: { name: "asc" }
-  });
+  const filteredBranches = hospital
+    ? branches.filter((branch) => branch.employees.some((employee) => hospitalByEmployeeId.get(employee.id)?.toLowerCase().includes(hospital.toLowerCase())))
+    : branches;
 
-  return branches.map((branch) => ({
+  return filteredBranches.map((branch) => ({
     id: branch.id,
     name: branch.name,
     code: branch.code,
@@ -110,28 +115,36 @@ export async function ModulePageBody({
   const page = Number(getParam("page") ?? 1);
   const pageSize = Number(getParam("pageSize") ?? (resourceKey === "employees" ? 30 : 10));
   const search = typeof getParam("search") === "string" ? getParam("search") as string : "";
-  const data = await listModuleRecords({ resourceKey, page, pageSize, search, filters });
-  const departmentOptions = resourceKey === "departments" || resourceKey === "branches"
-    ? await prisma.department.findMany({ where: { isActive: true }, select: { id: true, name: true, code: true }, orderBy: { name: "asc" } })
-    : [];
-  const departmentEmployeeOptions = resourceKey === "departments"
-    ? await prisma.employee.findMany({ select: { id: true, employeeNumber: true, nationalId: true, firstName: true, lastName: true, departmentId: true }, take: 10000 })
-    : [];
-  const branchOptions = resourceKey === "branches"
-    ? await getBranchOptions(query)
-    : [];
-  const leaveRequestStats = resourceKey === "leave-requests"
-    ? await (async () => {
-        const todayStart = new Date(new Date().setHours(0, 0, 0, 0));
-        const [pending, todayApprovals, approved, rejected] = await Promise.all([
-          prisma.leaveRequest.count({ where: { status: "PENDING" } }),
-          prisma.leaveRequest.count({ where: { status: "APPROVED", decidedAt: { gte: todayStart } } }),
-          prisma.leaveRequest.count({ where: { status: "APPROVED" } }),
-          prisma.leaveRequest.count({ where: { status: "REJECTED" } })
-        ]);
-        return { pending, todayApprovals, approved, rejected };
-      })()
-    : { pending: 0, todayApprovals: 0, approved: 0, rejected: 0 };
+  // These five are all independent of each other -- only one of the last four
+  // ever does real work for a given resourceKey, but they used to run as a
+  // strict sequential chain regardless (each `await`ed in turn before the
+  // next started), adding up their latencies instead of overlapping them.
+  // Promise.all lets whichever one(s) apply for this page load run alongside
+  // the main list query instead of after it.
+  const [data, departmentOptions, departmentEmployeeOptions, branchOptions, leaveRequestStats] = await Promise.all([
+    listModuleRecords({ resourceKey, page, pageSize, search, filters }),
+    resourceKey === "departments" || resourceKey === "branches"
+      ? prisma.department.findMany({ where: { isActive: true }, select: { id: true, name: true, code: true }, orderBy: { name: "asc" } })
+      : Promise.resolve([]),
+    resourceKey === "departments"
+      ? prisma.employee.findMany({ select: { id: true, employeeNumber: true, nationalId: true, firstName: true, lastName: true, departmentId: true }, take: 10000 })
+      : Promise.resolve([]),
+    resourceKey === "branches"
+      ? getBranchOptions(query)
+      : Promise.resolve([]),
+    resourceKey === "leave-requests"
+      ? (async () => {
+          const todayStart = new Date(new Date().setHours(0, 0, 0, 0));
+          const [pending, todayApprovals, approved, rejected] = await Promise.all([
+            prisma.leaveRequest.count({ where: { status: "PENDING" } }),
+            prisma.leaveRequest.count({ where: { status: "APPROVED", decidedAt: { gte: todayStart } } }),
+            prisma.leaveRequest.count({ where: { status: "APPROVED" } }),
+            prisma.leaveRequest.count({ where: { status: "REJECTED" } })
+          ]);
+          return { pending, todayApprovals, approved, rejected };
+        })()
+      : Promise.resolve({ pending: 0, todayApprovals: 0, approved: 0, rejected: 0 })
+  ]);
 
   const polishedResource = resourceKey === "departments" || resourceKey === "branches";
   const t = dictionary.module;
