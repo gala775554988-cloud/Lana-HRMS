@@ -66,8 +66,17 @@ async function findUser(identifier: string) {
 type EmployeeWithUser = Prisma.EmployeeGetPayload<{ include: { user: true } }>;
 
 async function finishFindUser(emp: EmployeeWithUser | null) {
-  // Employee found but no user account — auto-create one
   if (emp) {
+    // Employee already has a linked account -- use it. Without this check,
+    // every login for an already-linked employee hit prisma.user.create()
+    // unconditionally below and failed with a unique constraint violation on
+    // email (the employee's own email/user already existed). This never
+    // showed up under the old sequential findUser(), which checked username
+    // (== nationalId) first and returned early before ever reaching here;
+    // the numeric-identifier fast path above skips straight past that.
+    if (emp.user) return emp.user;
+
+    // Employee found but no user account — auto-create one
     const last4 = emp.nationalId.slice(-4);
     const pwHash = await hashPassword(last4);
     const name = `${emp.firstName} ${emp.lastName}`.trim();
