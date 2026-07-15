@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { getRequestDictionary } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { getModuleRecord } from "@/lib/hrms/actions";
-import { getEmployeeSalaryProfile } from "@/lib/employee/salary-profile";
+import { getEmployeeSalaryProfile } from "@/lib/employee/salary-profile-store";
 import { EmployeeProfileDashboard } from "@/components/hrms/employee-profile-dashboard";
 
 export default async function EmployeeProfilePage({ params }: { params: Promise<{ id: string }> }) {

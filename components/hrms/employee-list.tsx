@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useTransition, useDeferredValue } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, LayoutGrid, List, Plus, SlidersHorizontal, Upload, Download, Archive, UsersRound, Users, UserCheck, Clock, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,14 +9,22 @@ import { Input } from "@/components/ui/input";
 import { StatCard } from "@/components/ui/stat-card";
 import { EmployeeCard, type EmployeeCardData } from "@/components/hrms/employee-card";
 import { EmployeeDrawer } from "@/components/hrms/employee-drawer";
-import { ModuleTable } from "@/components/hrms/module-table";
-import { ModuleForm } from "@/components/hrms/module-form";
-import { EmployeeBulkImportDialog } from "@/components/hrms/employee-bulk-import-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import type { HrmsModule } from "@/config/hrms";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { ArchivedEmployees } from "@/components/hrms/archived-employees";
 import { DuplicateAccounts } from "@/components/hrms/duplicate-accounts";
+
+// Table view (pulls in @tanstack/react-table, ~135KB) and the Add Employee /
+// bulk import dialogs are only ever needed after a specific user action
+// (switching to table view, opening a dialog) -- code-split them instead of
+// shipping their JS on every /employees load regardless of which view or
+// dialog, if any, actually gets used.
+const ModuleTable = dynamic(() => import("@/components/hrms/module-table").then((mod) => mod.ModuleTable), {
+  loading: () => <div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">جاري التحميل...</div>
+});
+const ModuleForm = dynamic(() => import("@/components/hrms/module-form").then((mod) => mod.ModuleForm));
+const EmployeeBulkImportDialog = dynamic(() => import("@/components/hrms/employee-bulk-import-dialog").then((mod) => mod.EmployeeBulkImportDialog));
 
 type ViewMode = "card" | "table";
 type TabType = "all" | "active" | "archived" | "duplicates";
@@ -290,7 +299,12 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
         </DialogContent>
       </Dialog>
 
-      <EmployeeBulkImportDialog open={bulkImportOpen} onOpenChange={setBulkImportOpen} locale={locale} />
+      {/* Unlike the Add Employee <Dialog>, this component's own open-gating
+          lives inside itself, so it must also be gated here at the call site
+          -- otherwise React attempts to render (and next/dynamic loads the
+          chunk for) it immediately on every /employees visit regardless of
+          whether bulkImportOpen is ever true. */}
+      {bulkImportOpen ? <EmployeeBulkImportDialog open={bulkImportOpen} onOpenChange={setBulkImportOpen} locale={locale} /> : null}
       <EmployeeDrawer employee={selectedEmployee} open={drawerOpen} onClose={handleCloseDrawer} locale={locale} />
     </section>
   );

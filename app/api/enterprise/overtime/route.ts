@@ -6,7 +6,8 @@ import { hasPermission } from "@/lib/rbac";
 import { applyScopedWhere, canAccessEmployeeId, getAccessProfile, resolveRoleEmployeeIds } from "@/lib/enterprise/hierarchy";
 import { createEnterpriseNotification } from "@/lib/enterprise/notifications";
 import { getEmployeeExtraSettings } from "@/lib/enterprise/hospitals";
-import { getEmployeeSalaryProfile, calculateNetSalary } from "@/lib/employee/salary-profile";
+import { calculateNetSalary } from "@/lib/employee/salary-profile";
+import { getEmployeeSalaryProfile } from "@/lib/employee/salary-profile-store";
 import { writeAuditLog } from "@/lib/audit";
 
 function canManageOvertime(session: any) {

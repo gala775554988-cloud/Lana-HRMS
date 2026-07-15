@@ -1,4 +1,10 @@
-import { prisma } from "@/lib/prisma";
+// Pure, client-safe salary calculation helpers -- no Prisma import here on
+// purpose. This file gets imported directly by a client component
+// (module-form.tsx) for the calculation functions; server-only reads/writes
+// (getEmployeeSalaryProfile/saveEmployeeSalaryProfile) live in
+// ./salary-profile-store.ts instead, so importing them can't drag the
+// Prisma client's browser runtime into the client bundle again the way it
+// did when they were all one file.
 
 export const SOCIAL_INSURANCE_RATE = 0.09;
 
@@ -75,30 +81,4 @@ export function calculateTotalSalary(salary: SalaryProfile) {
 
 export function hasSalaryProfile(salary: SalaryProfile) {
   return salaryProfileFields.some((field) => salary[field] !== undefined && salary[field] !== null) || Boolean(salary.salaryDeductInsurance) || Boolean(salary.salaryCosts?.length);
-}
-
-function keyForEmployee(employeeId: string) {
-  return `employee.salary.${employeeId}`;
-}
-
-export async function getEmployeeSalaryProfile(employeeId: string): Promise<SalaryProfile> {
-  const setting = await prisma.appSetting.findUnique({ where: { key: keyForEmployee(employeeId) } }).catch(() => null);
-  if (!setting?.value || typeof setting.value !== "object") return {};
-  return extractSalaryProfile(setting.value as Record<string, unknown>);
-}
-
-export async function saveEmployeeSalaryProfile(employeeId: string, salary: SalaryProfile) {
-  if (!hasSalaryProfile(salary)) return null;
-  const insuranceDeduction = calculateInsuranceDeduction(salary);
-  const withTotals: SalaryProfile = {
-    ...salary,
-    salaryNet: salary.salaryNet ?? calculateNetSalary(salary),
-    salaryInsuranceDeduction: insuranceDeduction,
-    salaryTotal: calculateTotalSalary({ ...salary, salaryInsuranceDeduction: insuranceDeduction })
-  };
-  return prisma.appSetting.upsert({
-    where: { key: keyForEmployee(employeeId) },
-    update: { value: withTotals },
-    create: { key: keyForEmployee(employeeId), value: withTotals, description: "Employee salary profile" }
-  });
 }

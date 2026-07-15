@@ -1,7 +1,8 @@
 import * as XLSX from "xlsx";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
-import { extractSalaryProfile, saveEmployeeSalaryProfile } from "@/lib/employee/salary-profile";
+import { extractSalaryProfile } from "@/lib/employee/salary-profile";
+import { saveEmployeeSalaryProfile } from "@/lib/employee/salary-profile-store";
 import { requirePasswordChange } from "@/lib/auth/password-change-policy";
 import { getHierarchyStore, type HierarchyStore } from "@/lib/enterprise/hierarchy";
 import { writeAuditLog } from "@/lib/audit";

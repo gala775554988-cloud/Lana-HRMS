@@ -223,11 +223,11 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
             label: "الهيكل التنظيمي",
             icon: <Network className="h-4 w-4" />,
             hidden: !isSuperAdmin,
-            content: (
+            content: activeTab === "hierarchy" ? (
               <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">Loading hierarchy...</div>}>
                 <OrganizationHierarchyClient />
               </Suspense>
-            )
+            ) : null
           },
           {
             value: "my-team",
