@@ -8,14 +8,13 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const maxDuration = 300;
 
-const INTERNAL_TOKEN_SHA256 = "ce1bf82bdaf46ba65a577cd0cb892e675c87d1a1f2c0ad470a0a4d02dcb9a9a0";
-import { createHash } from "crypto";
-function hasInternalSyncToken(request: NextRequest) {
-  const header = request.headers.get("authorization") || request.headers.get("x-internal-sync-token") || "";
-  const token = header.startsWith("Bearer ") ? header.slice(7) : header;
-  if (header === "Bearer test-internal-sync" || token === "test-internal-sync") return true;
-  return Boolean(token) && createHash("sha256").update(token).digest("hex") === INTERNAL_TOKEN_SHA256;
+function statusFor(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message === "Unauthorized") return 401;
+  if (message === "Forbidden") return 403;
+  return 500;
 }
+
 async function getEmployee3300Snapshot() {
   const emp = await prisma.employee.findFirst({
     where: {
@@ -64,45 +63,21 @@ async function getEmployee3300Snapshot() {
   };
 }
 
-async function ensureOdooColumnsExist() {
-  const sqlStatements = [
-    `ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "odooRawData" JSONB;`,
-    `ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "odooRawDataSyncedAt" TIMESTAMP(3);`,
-    `ALTER TABLE "EmployeeDocument" ADD COLUMN IF NOT EXISTS "source" TEXT NOT NULL DEFAULT 'MANUAL';`,
-    `ALTER TABLE "EmployeeDocument" ADD COLUMN IF NOT EXISTS "odooAttachmentId" INTEGER;`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS "EmployeeDocument_odooAttachmentId_key" ON "EmployeeDocument"("odooAttachmentId");`,
-    `ALTER TABLE "EmployeeContract" ADD COLUMN IF NOT EXISTS "odooRawData" JSONB;`,
-    `ALTER TABLE "PayrollItem" ADD COLUMN IF NOT EXISTS "odooPayslipId" INTEGER;`,
-    `ALTER TABLE "PayrollItem" ADD COLUMN IF NOT EXISTS "odooRawData" JSONB;`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS "PayrollItem_odooPayslipId_key" ON "PayrollItem"("odooPayslipId");`,
-    `ALTER TABLE "Allowance" ADD COLUMN IF NOT EXISTS "source" TEXT NOT NULL DEFAULT 'MANUAL';`,
-    `ALTER TABLE "Allowance" ADD COLUMN IF NOT EXISTS "odooPayslipLineId" INTEGER;`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS "Allowance_odooPayslipLineId_key" ON "Allowance"("odooPayslipLineId");`,
-    `ALTER TABLE "Deduction" ADD COLUMN IF NOT EXISTS "source" TEXT NOT NULL DEFAULT 'MANUAL';`,
-    `ALTER TABLE "Deduction" ADD COLUMN IF NOT EXISTS "odooPayslipLineId" INTEGER;`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS "Deduction_odooPayslipLineId_key" ON "Deduction"("odooPayslipLineId");`,
-  ];
-  for (const sql of sqlStatements) {
-    try {
-      await prisma.$executeRawUnsafe(sql);
-    } catch (err) {
-      console.log(`[ensureOdooColumnsExist] notice:`, err instanceof Error ? err.message : String(err));
-    }
-  }
-}
-
 export async function GET(request: NextRequest) {
   const startedAt = Date.now();
   try {
-    await ensureOdooColumnsExist();
+    // This is an interactive admin diagnostic/force-resync tool, not a
+    // machine-to-machine bridge (that's what cron-sync's CRON_SECRET is
+    // for) -- it must always require a real authenticated admin session.
+    // A prior version accepted a hardcoded bypass token and silently
+    // continued even when this check failed, leaving the route fully
+    // unauthenticated despite being reachable without a login; do not
+    // reintroduce a token bypass here.
+    await requireOdooIntegrationAccess("manage");
 
     const action = request.nextUrl.searchParams.get("action") || "diagnostic";
     const connectionId = request.nextUrl.searchParams.get("connectionId") || undefined;
     const testIdParam = request.nextUrl.searchParams.get("testId") || "3300";
-
-    if (!hasInternalSyncToken(request)) {
-      await requireOdooIntegrationAccess("manage").catch(() => {});
-    }
 
     const totalEmployees = await prisma.employee.count();
     const activeEmployees = await prisma.employee.count({ where: { status: "ACTIVE" } });
@@ -199,7 +174,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: false, message: `Unknown action: ${action}` }, { status: 400 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ success: false, message }, { status: 500 });
+    return NextResponse.json({ success: false, message: error instanceof Error ? error.message : String(error) }, { status: statusFor(error) });
   }
 }
