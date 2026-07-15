@@ -130,10 +130,20 @@ export async function GET(request: NextRequest) {
       const service = await OdooSyncService.forConnection(connectionId);
       
       console.log(`[OdooDiagnostic] Starting forced employee sync...`);
-      const employeeSyncResult = await service.syncEmployees({ batchSize: 1000, direction: "ODOO_TO_LANA" });
+      let employeeSyncResult: any;
+      try {
+        employeeSyncResult = await service.syncEmployees({ batchSize: 1000, direction: "ODOO_TO_LANA" });
+      } catch (empErr: unknown) {
+        employeeSyncResult = { success: false, error: empErr instanceof Error ? empErr.message : String(empErr) };
+      }
       
       console.log(`[OdooDiagnostic] Starting forced attendance sync...`);
-      const attendanceSyncResult = await service.syncAttendance({ batchSize: 2000, direction: "ODOO_TO_LANA" });
+      let attendanceSyncResult: any;
+      try {
+        attendanceSyncResult = await service.syncAttendance({ batchSize: 2000, direction: "ODOO_TO_LANA" });
+      } catch (attErr: unknown) {
+        attendanceSyncResult = { success: false, error: attErr instanceof Error ? attErr.message : String(attErr) };
+      }
 
       const snapshotAfter = await getEmployee3300Snapshot();
       const updatedTotalEmployees = await prisma.employee.count();
