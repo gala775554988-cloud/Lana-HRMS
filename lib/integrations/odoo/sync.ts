@@ -10,6 +10,7 @@ import { OdooConfigurationError } from "./auth";
 import { discoverSyncableFields, sanitizeRawRecord } from "./dynamic-fields";
 import { syncEmployeeDocuments } from "./documents";
 import {
+  asDate,
   asDateString,
   detectConflicts,
   getMapper,
