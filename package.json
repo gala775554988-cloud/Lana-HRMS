@@ -14,7 +14,7 @@
     "prisma:seed": "tsx prisma/seed.ts",
     "verify": "node scripts/verify-project.mjs",
     "test:smoke": "playwright test -c tests/smoke/playwright.config.ts",
-    "vercel-build": "prisma generate && NODE_OPTIONS=--max-old-space-size=2048 next build",
+    "vercel-build": "prisma generate && node scripts/ensure-db-schema.mjs && NODE_OPTIONS=--max-old-space-size=2048 next build",
     "prisma:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "production:setup": "prisma generate && prisma migrate deploy && tsx prisma/seed.ts",

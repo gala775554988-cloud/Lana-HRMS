@@ -3,10 +3,49 @@ import { PrismaClient } from "@prisma/client";
 let schemaChecked = false;
 
 async function ensureSchemaReady(client: PrismaClient) {
-  if (schemaChecked) return;
+  if (schemaChecked || process.env.NEXT_PHASE === "phase-production-build" || process.env.SKIP_AUTO_DDL === "true") return;
   schemaChecked = true;
   try {
     const sqlStatements = [
+      `CREATE TABLE IF NOT EXISTS "HrPermissionScope" (
+        "id" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "module" TEXT NOT NULL,
+        "scope" TEXT NOT NULL DEFAULT 'ALL',
+        "branchId" TEXT,
+        "departmentId" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL,
+        CONSTRAINT "HrPermissionScope_pkey" PRIMARY KEY ("id")
+      );`,
+      `CREATE TABLE IF NOT EXISTS "HrApprovalChain" (
+        "id" TEXT NOT NULL,
+        "module" TEXT NOT NULL,
+        "level" INTEGER NOT NULL DEFAULT 1,
+        "approverRole" TEXT NOT NULL DEFAULT 'DIRECT_MANAGER',
+        "isActive" BOOLEAN NOT NULL DEFAULT true,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL,
+        CONSTRAINT "HrApprovalChain_pkey" PRIMARY KEY ("id")
+      );`,
+      `CREATE TABLE IF NOT EXISTS "HrPermissionAudit" (
+        "id" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "action" TEXT NOT NULL,
+        "module" TEXT,
+        "oldValue" TEXT,
+        "newValue" TEXT,
+        "byUserId" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "HrPermissionAudit_pkey" PRIMARY KEY ("id")
+      );`,
+      `CREATE INDEX IF NOT EXISTS "HrPermissionScope_userId_idx" ON "HrPermissionScope"("userId");`,
+      `CREATE INDEX IF NOT EXISTS "HrPermissionScope_module_idx" ON "HrPermissionScope"("module");`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS "HrPermissionScope_userId_module_key" ON "HrPermissionScope"("userId", "module");`,
+      `CREATE INDEX IF NOT EXISTS "HrApprovalChain_module_idx" ON "HrApprovalChain"("module");`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS "HrApprovalChain_module_level_key" ON "HrApprovalChain"("module", "level");`,
+      `CREATE INDEX IF NOT EXISTS "HrPermissionAudit_userId_idx" ON "HrPermissionAudit"("userId");`,
+      `CREATE INDEX IF NOT EXISTS "HrPermissionAudit_createdAt_idx" ON "HrPermissionAudit"("createdAt");`,
       `ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "sponsor" TEXT;`,
       `ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "odooRawData" JSONB;`,
       `ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "odooRawDataSyncedAt" TIMESTAMP(3);`,
@@ -50,7 +89,9 @@ const prismaClientSingleton = () => {
   const client = new PrismaClient({
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
-  setTimeout(() => ensureSchemaReady(client).catch(() => {}), 100);
+  if (process.env.NEXT_PHASE !== "phase-production-build" && process.env.SKIP_AUTO_DDL !== "true") {
+    setTimeout(() => ensureSchemaReady(client).catch(() => {}), 100);
+  }
   return client;
 };
 
