@@ -307,9 +307,53 @@ export class OdooSyncService {
             } as any);
           } catch (fetchErr) {
             const msg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
-            result.errors.push({ message: `Batch fetch failed at lastOdooId=${lastOdooId}: ${msg}`, details: fetchErr });
-            await this.log("ODOO_FETCH_ERROR", `Failed fetch lastOdooId=${lastOdooId}: ${msg}`, { lastOdooId, error: msg }).catch(() => {});
-            break;
+            // A single page failing here (most commonly a request/response size or
+            // timeout issue caused by bulk-fetching full-size base64 image_1920
+            // payloads across `batchSize` employees at once) must never abort the
+            // rest of the sync -- per ContinueOnError, retry progressively lighter
+            // before giving up on this page alone and skipping past it. Previously
+            // this `break` silently stopped the ENTIRE remaining sync at whatever
+            // page first failed, which is why total counts could freeze partway
+            // through a large Odoo instance and never recover on later runs.
+            console.log(`[OdooSync] Batch fetch failed at lastOdooId=${lastOdooId}: ${msg}. Retrying without profile photos...`);
+            const lightFields = fetchFields.filter((f) => f !== "image_1920");
+            try {
+              rows = await this.client.search_read(mapper.odooModel, domain, lightFields, {
+                limit: batchSize,
+                order: "id asc",
+                context: { active_test: false },
+              } as any);
+              result.errors.push({ message: `Batch at lastOdooId=${lastOdooId} synced without profile photos (image_1920) after initial fetch failure: ${msg}` });
+              await this.log("ODOO_FETCH_DEGRADED", `Batch fetched without image_1920 after failure: ${msg}`, { lastOdooId, error: msg }).catch(() => {});
+            } catch (lightErr) {
+              const lightMsg = lightErr instanceof Error ? lightErr.message : String(lightErr);
+              const smallBatch = Math.max(25, Math.floor(batchSize / 10));
+              try {
+                rows = await this.client.search_read(mapper.odooModel, domain, lightFields, {
+                  limit: smallBatch,
+                  order: "id asc",
+                  context: { active_test: false },
+                } as any);
+                result.errors.push({ message: `Batch at lastOdooId=${lastOdooId} recovered with reduced page size ${smallBatch} (no photos): ${lightMsg}` });
+              } catch (smallErr) {
+                const smallMsg = smallErr instanceof Error ? smallErr.message : String(smallErr);
+                result.errors.push({ message: `Batch permanently failed at lastOdooId=${lastOdooId}, skipping past this range: ${smallMsg}`, details: smallErr });
+                await this.log("ODOO_FETCH_ERROR", `Failed fetch lastOdooId=${lastOdooId}: ${smallMsg}`, { lastOdooId, error: smallMsg }).catch(() => {});
+                // Advance the cursor past the poisoned id range with a minimal
+                // id-only query so subsequent employees still get synced instead
+                // of the whole sync stopping dead at this page forever.
+                try {
+                  const idRows = await this.client.search_read(mapper.odooModel, domain, ["id"], { limit: batchSize, order: "id asc", context: { active_test: false } } as any);
+                  if (idRows.length > 0) {
+                    lastOdooId = Number(idRows[idRows.length - 1]?.id || lastOdooId);
+                    pages++;
+                    continue;
+                  }
+                } catch {}
+                hasMore = false;
+                break;
+              }
+            }
           }
 
           if (!rows || rows.length === 0) { hasMore=false; break; }
