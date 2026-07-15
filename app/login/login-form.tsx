@@ -38,10 +38,16 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
     startTransition(async () => {
       const result = await loginAction(values);
       if (result.success) {
-        // Soft client-side navigation instead of a full page reload — middleware
-        // still runs and redirects to the right role dashboard, just without
-        // re-downloading/re-parsing the whole document from scratch.
-        router.push("/");
+        // A hard navigation here, not router.push(). A soft/transition-based
+        // push landed users on a permanently blank page whenever the
+        // destination route hit a (separately real, since-fixed) hydration
+        // mismatch: React can abandon a transition's pending render on error
+        // without falling back to anything, leaving the URL updated but the
+        // DOM never actually replaced. A full navigation re-does the whole
+        // request/hydration cycle from scratch the same way a fresh page
+        // load does, which the same mismatch only ever produced a
+        // recoverable console warning for, not a blank screen.
+        window.location.href = "/";
       } else {
         setMessage(result.message);
       }
