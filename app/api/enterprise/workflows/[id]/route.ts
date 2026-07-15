@@ -16,6 +16,17 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   });
   if (!instance) return NextResponse.json({ success: false, message: "Workflow not found" }, { status: 404 });
 
+  // Mark the pending step as "seen" the moment its assigned approver actually opens this
+  // request's detail — not when the requesting employee views their own request.
+  const pendingStepForViewer = instance.steps.find(
+    (step) => step.step === instance.currentStep && step.status === "PENDING" && step.approverUserId === session.user.id && !step.viewedAt
+  );
+  if (pendingStepForViewer) {
+    const viewedAt = new Date();
+    await prisma.workflowStep.update({ where: { id: pendingStepForViewer.id }, data: { viewedAt } });
+    pendingStepForViewer.viewedAt = viewedAt;
+  }
+
   const approverUserIds = instance.steps.map((step) => step.approverUserId).filter((value): value is string => Boolean(value));
   const approvers = approverUserIds.length
     ? await prisma.user.findMany({ where: { id: { in: approverUserIds } }, select: { id: true, name: true, email: true } })
@@ -40,6 +51,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         approvedAt: step.approvedAt,
         comments: step.comments,
         createdAt: step.createdAt,
+        viewedAt: step.viewedAt,
         approver: step.approverUserId ? approverById.get(step.approverUserId) ?? { id: step.approverUserId, name: null, email: null } : null
       }))
     }
