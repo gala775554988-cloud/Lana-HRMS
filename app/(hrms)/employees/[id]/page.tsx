@@ -40,13 +40,24 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
 
   // Lazy Load Details on Demand (ID-First Optimization)
   // If linked to Odoo (odooId exists), check if detailed profile (photo, birthday, custom fields) is stale (>1 hr) or missing.
+  // Bounded with a timeout: this is a live external call, and an unreachable/slow Odoo
+  // instance must never be able to stall the whole profile page — worst case, the
+  // page renders with the last-synced data and the sync simply completes in the
+  // background (or gets picked up by the ODOO_EMPLOYEE_DETAIL_SYNC queue instead).
   if (typeof employee.odooId === "number" && employee.odooId > 0) {
+    const odooId = employee.odooId;
     const isStale = !employee.odooRawDataSyncedAt || (Date.now() - new Date(employee.odooRawDataSyncedAt).getTime() > 3600_000);
     if (isStale) {
       try {
-        const { OdooSyncService } = await import("@/lib/integrations/odoo/sync");
-        const service = await OdooSyncService.forConnection();
-        await service.syncSingleEmployeeDetails(employee.odooId, employee.id);
+        const syncWithTimeout = (async () => {
+          const { OdooSyncService } = await import("@/lib/integrations/odoo/sync");
+          const service = await OdooSyncService.forConnection();
+          await service.syncSingleEmployeeDetails(odooId, employee.id);
+        })();
+        await Promise.race([
+          syncWithTimeout,
+          new Promise((_, reject) => setTimeout(() => reject(new Error("odoo-sync-timeout")), 1500)),
+        ]);
         const refreshed = await prisma.employee.findUnique({
           where: { id },
           select: { profilePhotoUrl: true, sponsor: true, dateOfBirth: true, odooRawDataSyncedAt: true, firstName: true, lastName: true }
@@ -65,12 +76,6 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
     }
   }
 
-  // Salary profile
-  let salaryProfile: any = null;
-  try {
-    salaryProfile = await getEmployeeSalaryProfile(id);
-  } catch {}
-
   // Calculate years of service
   const hireDate = employee.hireDate ? new Date(employee.hireDate) : null;
   const now = new Date();
@@ -88,58 +93,69 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
   // Attendance stats (last 30 days)
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  
-  const attendanceStats = await prisma.attendanceRecord.groupBy({
-    by: ['status'],
-    where: { employeeId: id, workDate: { gte: thirtyDaysAgo } },
-    _count: true,
-  }).catch(() => []);
 
-  const attendanceCount = await prisma.attendanceRecord.count({ where: { employeeId: id } }).catch(() => 0);
-  const leaveBalance = await prisma.leaveType.findMany({ select: { id: true, name: true, annualLimit: true } }).catch(() => []);
-  const leaveRequests = await prisma.leaveRequest.findMany({ 
-    where: { employeeId: id }, 
-    take: 5, 
-    orderBy: { createdAt: 'desc' },
-    include: { leaveType: { select: { name: true } } }
-  }).catch(() => []);
-
-  const contracts = await prisma.employeeContract.findMany({
-    where: { employeeId: id },
-    orderBy: { startDate: 'desc' },
-    take: 10,
-  }).catch(() => []);
-
-  const documents = await prisma.employeeDocument.findMany({
-    where: { employeeId: id },
-    orderBy: { uploadedAt: 'desc' },
-    take: 10,
-  }).catch(() => []);
-
-  const assets = await prisma.asset.findMany({
-    where: { assignedEmployeeId: id },
-    orderBy: { assignedAt: 'desc' },
-    take: 10,
-  }).catch(() => []);
-
-  const evaluations = await prisma.performanceEvaluation.findMany({
-    where: { employeeId: id },
-    orderBy: { createdAt: 'desc' },
-    take: 5,
-  }).catch(() => []);
-
-  const payrollItems = await prisma.payrollItem.findMany({
-    where: { employeeId: id },
-    orderBy: { createdAt: 'desc' },
-    take: 10,
-    include: { payrollRun: { select: { name: true, period: true } } }
-  }).catch(() => []);
-
-  const auditLogs = await prisma.auditLog.findMany({
-    where: { entityId: id },
-    orderBy: { createdAt: 'desc' },
-    take: 20,
-  }).catch(() => []);
+  // All of these are independent reads — run them in parallel instead of a
+  // 10-deep sequential await chain, which was adding up to several times the
+  // latency of the slowest single query.
+  const [
+    salaryProfile,
+    attendanceStats,
+    attendanceCount,
+    leaveBalance,
+    leaveRequests,
+    contracts,
+    documents,
+    assets,
+    evaluations,
+    payrollItems,
+    auditLogs,
+  ] = await Promise.all([
+    getEmployeeSalaryProfile(id).catch(() => null),
+    prisma.attendanceRecord.groupBy({
+      by: ['status'],
+      where: { employeeId: id, workDate: { gte: thirtyDaysAgo } },
+      _count: true,
+    }).catch(() => []),
+    prisma.attendanceRecord.count({ where: { employeeId: id } }).catch(() => 0),
+    prisma.leaveType.findMany({ select: { id: true, name: true, annualLimit: true } }).catch(() => []),
+    prisma.leaveRequest.findMany({
+      where: { employeeId: id },
+      take: 5,
+      orderBy: { createdAt: 'desc' },
+      include: { leaveType: { select: { name: true } } }
+    }).catch(() => []),
+    prisma.employeeContract.findMany({
+      where: { employeeId: id },
+      orderBy: { startDate: 'desc' },
+      take: 10,
+    }).catch(() => []),
+    prisma.employeeDocument.findMany({
+      where: { employeeId: id },
+      orderBy: { uploadedAt: 'desc' },
+      take: 10,
+    }).catch(() => []),
+    prisma.asset.findMany({
+      where: { assignedEmployeeId: id },
+      orderBy: { assignedAt: 'desc' },
+      take: 10,
+    }).catch(() => []),
+    prisma.performanceEvaluation.findMany({
+      where: { employeeId: id },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+    }).catch(() => []),
+    prisma.payrollItem.findMany({
+      where: { employeeId: id },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      include: { payrollRun: { select: { name: true, period: true } } }
+    }).catch(() => []),
+    prisma.auditLog.findMany({
+      where: { entityId: id },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    }).catch(() => []),
+  ]);
 
   return (
     <EmployeeProfileDashboard
