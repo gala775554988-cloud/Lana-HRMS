@@ -6,11 +6,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { UserSearchSelect } from "@/components/hrms/user-search-select";
 
-const MODULES = ["employees","attendance","payroll","leaves","loans","overtime","documents","contracts","reports","settings","permissions","audit-logs","integrations"];
-const SCOPES = ["ALL","BRANCH","DEPARTMENT","TEAM","SELF"];
-const APPROVAL_MODULES = ["leave","overtime","loan","expense"];
-const APPROVER_ROLES = ["DIRECT_MANAGER","DEPARTMENT_MANAGER","BRANCH_MANAGER","HR_MANAGER","SUPER_ADMIN"];
+const MODULES = [
+  ["employees", "الموظفون"], ["attendance", "الحضور"], ["payroll", "الرواتب"], ["leaves", "الإجازات"],
+  ["loans", "السلف"], ["overtime", "الأوفر تايم"], ["documents", "المستندات"], ["contracts", "العقود"],
+  ["reports", "التقارير"], ["settings", "الإعدادات"], ["permissions", "الصلاحيات"], ["audit-logs", "سجل التدقيق"],
+  ["integrations", "التكاملات"]
+] as const;
+const SCOPES = [["ALL", "الكل"], ["BRANCH", "الفرع"], ["DEPARTMENT", "الإدارة"], ["TEAM", "الفريق"], ["SELF", "ذاتي"]] as const;
+const APPROVAL_MODULES = [["leave", "الإجازات"], ["overtime", "الأوفر تايم"], ["loan", "السلف"], ["expense", "المصروفات"]] as const;
+const APPROVER_ROLES = [
+  ["DIRECT_MANAGER", "المدير المباشر"], ["DEPARTMENT_MANAGER", "مدير الإدارة"], ["BRANCH_MANAGER", "مدير الفرع"],
+  ["HR_MANAGER", "مدير الموارد البشرية"], ["SUPER_ADMIN", "المدير العام"]
+] as const;
 
 type RoleRecord = {
   id: string;
@@ -23,7 +32,7 @@ type RoleRecord = {
 
 type PermissionCategory = { key: string; title: string; permissions: string[] };
 
-function RolesTab({ allUsers, initialRoles }: { allUsers: any[]; initialRoles: any[] }) {
+function RolesTab({ initialRoles }: { initialRoles: any[] }) {
   const [roles, setRoles] = useState<RoleRecord[]>(
     (initialRoles || []).map((r: any) => ({ id: r.id, name: r.name, description: r.description ?? null, isSystem: Boolean(r.isSystem), userCount: 0, permissionKeys: [] }))
   );
@@ -185,10 +194,9 @@ function RolesTab({ allUsers, initialRoles }: { allUsers: any[]; initialRoles: a
               <div className="border-t pt-4">
                 <p className="mb-2 text-sm font-medium">تعيين هذا الدور لمستخدم</p>
                 <div className="flex gap-2">
-                  <select className="flex-1 rounded-lg border p-2 text-sm" value={assignUserId} onChange={(e) => setAssignUserId(e.target.value)}>
-                    <option value="">اختر المستخدم</option>
-                    {allUsers.map((u: any) => <option key={u.id} value={u.id}>{u.name || u.username || u.email}</option>)}
-                  </select>
+                  <div className="flex-1">
+                    <UserSearchSelect value={assignUserId} onChange={(userId) => setAssignUserId(userId)} />
+                  </div>
                   <Button onClick={assignToUser} disabled={!assignUserId}><UserPlus className="h-4 w-4 ml-1" />تعيين</Button>
                 </div>
               </div>
@@ -202,7 +210,7 @@ function RolesTab({ allUsers, initialRoles }: { allUsers: any[]; initialRoles: a
   );
 }
 
-export function PermissionsAdmin({ allRoles, allUsers, branches, departments, approvalChains: initialChains }: any) {
+export function PermissionsAdmin({ allRoles, branches, departments, approvalChains: initialChains }: any) {
   const [tab, setTab] = useState<"roles"|"scopes"|"approval">("roles");
   const [scopes, setScopes] = useState<any[]>([]);
   const [approvalChains, setApprovalChains] = useState(initialChains);
@@ -257,20 +265,17 @@ export function PermissionsAdmin({ allRoles, allUsers, branches, departments, ap
         <Button variant={tab==="approval"?"default":"outline"} onClick={()=>setTab("approval")}>سلسلة الموافقات</Button>
       </div>
 
-      {tab === "roles" && <RolesTab allUsers={allUsers} initialRoles={allRoles} />}
+      {tab === "roles" && <RolesTab initialRoles={allRoles} />}
 
       {tab === "scopes" && (
         <div className="grid gap-6 lg:grid-cols-2">
           <Card><CardHeader><CardTitle>إضافة صلاحية لمستخدم</CardTitle></CardHeader><CardContent className="space-y-3">
-            <select className="w-full border rounded-lg p-2" value={selectedUserId} onChange={e=>setSelectedUserId(e.target.value)}>
-              <option value="">اختر المستخدم</option>
-              {allUsers.map((u:any)=><option key={u.id} value={u.id}>{u.name || u.username || u.email}</option>)}
-            </select>
+            <UserSearchSelect value={selectedUserId} onChange={(userId) => setSelectedUserId(userId)} />
             <select className="w-full border rounded-lg p-2" value={selectedModule} onChange={e=>setSelectedModule(e.target.value)}>
-              {MODULES.map(m=><option key={m} value={m}>{m}</option>)}
+              {MODULES.map(([value, label])=><option key={value} value={value}>{label}</option>)}
             </select>
             <select className="w-full border rounded-lg p-2" value={selectedScope} onChange={e=>setSelectedScope(e.target.value)}>
-              {SCOPES.map(s=><option key={s} value={s}>{s}</option>)}
+              {SCOPES.map(([value, label])=><option key={value} value={value}>{label}</option>)}
             </select>
             {selectedScope==="BRANCH" && <select className="w-full border rounded-lg p-2" value={selectedBranchId} onChange={e=>setSelectedBranchId(e.target.value)}><option value="">اختر الفرع</option>{branches.map((b:any)=><option key={b.id} value={b.id}>{b.name}</option>)}</select>}
             {selectedScope==="DEPARTMENT" && <select className="w-full border rounded-lg p-2" value={selectedDeptId} onChange={e=>setSelectedDeptId(e.target.value)}><option value="">اختر القسم</option>{departments.map((d:any)=><option key={d.id} value={d.id}>{d.name}</option>)}</select>}
@@ -287,13 +292,13 @@ export function PermissionsAdmin({ allRoles, allUsers, branches, departments, ap
         <div className="grid gap-6 lg:grid-cols-2">
           <Card><CardHeader><CardTitle>تعديل سلسلة الموافقات</CardTitle></CardHeader><CardContent className="space-y-3">
             <select className="w-full border rounded-lg p-2" value={approvalModule} onChange={e=>setApprovalModule(e.target.value)}>
-              {APPROVAL_MODULES.map(m=><option key={m} value={m}>{m}</option>)}
+              {APPROVAL_MODULES.map(([value, label])=><option key={value} value={value}>{label}</option>)}
             </select>
             {approvalChains.find((c:any)=>c.module===approvalModule)?.chain?.map((l:any, i:number)=>(
               <div key={i} className="flex items-center gap-2">
                 <Badge>المستوى {i+1}</Badge>
                 <select className="flex-1 border rounded p-1" value={l.approverRole} onChange={e=>updateApprovalLevel(i,e.target.value)}>
-                  {APPROVER_ROLES.map(r=><option key={r} value={r}>{r}</option>)}
+                  {APPROVER_ROLES.map(([value, label])=><option key={value} value={value}>{label}</option>)}
                 </select>
                 <Button size="sm" variant="destructive" onClick={()=>removeApprovalLevel(i)}><Trash2 className="h-4 w-4"/></Button>
               </div>
