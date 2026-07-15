@@ -93,7 +93,34 @@ export function I18nRuntime({ initialLocale }: { initialLocale: Locale }) {
       ? "'Noto Sans Arabic', 'Inter', system-ui, -apple-system, sans-serif"
       : "'Inter', 'Noto Sans Arabic', system-ui, -apple-system, sans-serif";
 
-    applyTranslations(document.body, locale, originalText.current, originalAttrs.current);
+    // Routes with a loading.tsx (e.g. app/employee/dashboard) stream their
+    // real content in via Suspense well after this component's own effect
+    // first runs -- the outer layout (and this component) mounts against the
+    // loading fallback, then Next.js swaps in the resolved Server Component
+    // output later, using its own patching mechanism. Rewriting that new
+    // content the instant it appears (a single animation frame was tried and
+    // wasn't enough headroom) can still land while Next is mid-patch, so
+    // React later finds text it never wrote for that node and reports a
+    // hydration mismatch -- both systems end up trying to own the same DOM
+    // node. Debouncing until the DOM has gone quiet for a beat gives that
+    // patching a real chance to finish first; translation still applies to
+    // the user within a fraction of a second, just not on the very same tick
+    // as the content arriving.
+    const DEBOUNCE_MS = 500;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const pendingRoots = new Set<Element>();
+    const flushPendingRoots = () => {
+      debounceTimer = null;
+      for (const root of pendingRoots) applyTranslations(root, locale, originalText.current, originalAttrs.current);
+      pendingRoots.clear();
+    };
+    const scheduleRoot = (root: Element) => {
+      pendingRoots.add(root);
+      if (debounceTimer !== null) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(flushPendingRoots, DEBOUNCE_MS);
+    };
+
+    scheduleRoot(document.body);
 
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
@@ -101,7 +128,7 @@ export function I18nRuntime({ initialLocale }: { initialLocale: Locale }) {
           mutation.addedNodes.forEach((node) => {
             if (node.nodeType === Node.ELEMENT_NODE || node.nodeType === Node.TEXT_NODE) {
               const root = node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as Element);
-              if (root) applyTranslations(root, locale, originalText.current, originalAttrs.current);
+              if (root) scheduleRoot(root);
             }
           });
         }
@@ -111,7 +138,7 @@ export function I18nRuntime({ initialLocale }: { initialLocale: Locale }) {
             originalText.current.set(textNode, textNode.textContent ?? "");
           }
           const parent = textNode.parentElement;
-          if (parent) applyTranslations(parent, locale, originalText.current, originalAttrs.current);
+          if (parent) scheduleRoot(parent);
         }
       }
     });
