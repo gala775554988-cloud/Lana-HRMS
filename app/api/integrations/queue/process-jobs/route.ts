@@ -20,7 +20,7 @@ function isAuthorizedCronRequest(request: NextRequest) {
   return request.headers.get("authorization") === `Bearer ${secret}`;
 }
 
-export async function POST(request: NextRequest) {
+async function processJobs(request: NextRequest, limit: number) {
   try {
     // Must reject on failure, not swallow it -- a caught-and-ignored auth
     // check here left this route fully open whenever CRON_SECRET didn't
@@ -28,8 +28,6 @@ export async function POST(request: NextRequest) {
     if (!isAuthorizedCronRequest(request)) {
       await requireOdooIntegrationAccess("manage");
     }
-    const body = await request.json().catch(() => ({}));
-    const limit = Math.min(Math.max(Number(body.limit || 15), 1), 100);
 
     const jobs = await prisma.integrationJob.findMany({
       where: {
@@ -102,4 +100,20 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     return NextResponse.json({ success: false, message: error instanceof Error ? error.message : String(error) }, { status: statusFor(error) });
   }
+}
+
+// Vercel Cron always sends GET (see cron-sync/route.ts) -- this route
+// previously only exported POST, so even with a cron entry configured it
+// would 405 and never run, leaving every queued
+// ODOO_EMPLOYEE_DETAIL_SYNC job PENDING forever unless someone happened to
+// open that specific employee's profile page (which triggers the same
+// sync directly, bypassing the queue).
+export async function GET(request: NextRequest) {
+  return processJobs(request, 50);
+}
+
+export async function POST(request: NextRequest) {
+  const body = await request.json().catch(() => ({}));
+  const limit = Math.min(Math.max(Number(body.limit || 15), 1), 100);
+  return processJobs(request, limit);
 }
