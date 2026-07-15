@@ -383,7 +383,8 @@ async function ModuleDataSection({
         page={data.page}
         pageCount={data.pageCount}
         total={data.total}
-        buildPageHref={(pageNum) => buildQueryString(query, { [paramKey("page")]: String(pageNum) })}
+        prevHref={buildQueryString(query, { [paramKey("page")]: String(Math.max(data.page - 1, 1)) })}
+        nextHref={buildQueryString(query, { [paramKey("page")]: String(Math.min(data.page + 1, data.pageCount)) })}
       />
     );
   }
