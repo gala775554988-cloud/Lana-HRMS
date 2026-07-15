@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff, IdCard, Loader2 } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
+import { useRouter } from "next/navigation";
 import { loginAction } from "@/lib/auth/actions";
 import { loginSchema, type LoginInput } from "@/lib/validations/auth";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -13,11 +14,17 @@ import { Label } from "@/components/ui/label";
 import type { Dictionary } from "@/lib/i18n";
 
 export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
+  const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const form = useForm<LoginInput>({ resolver: zodResolver(loginSchema), defaultValues: { identifier: "", password: "" } });
+  const form = useForm<LoginInput>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { identifier: "", password: "" },
+    mode: "onChange",
+    reValidateMode: "onChange",
+  });
 
   useEffect(() => {
     const id = window.localStorage.getItem("lana.hrms.rememberedIdentifier");
@@ -31,7 +38,10 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
     startTransition(async () => {
       const result = await loginAction(values);
       if (result.success) {
-        window.location.href = "/";
+        // Soft client-side navigation instead of a full page reload — middleware
+        // still runs and redirects to the right role dashboard, just without
+        // re-downloading/re-parsing the whole document from scratch.
+        router.push("/");
       } else {
         setMessage(result.message);
       }
@@ -49,6 +59,7 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
             type="text"
             inputMode="numeric"
             autoComplete="username"
+            autoFocus
             className="h-9 rounded-none border-0 bg-transparent px-0 pe-7 pt-1 text-sm shadow-none placeholder:text-slate-300 focus-visible:ring-0 dark:placeholder:text-slate-600"
             placeholder="أدخل رقم الهوية أو اسم المستخدم"
             aria-invalid={Boolean(form.formState.errors.identifier)}
