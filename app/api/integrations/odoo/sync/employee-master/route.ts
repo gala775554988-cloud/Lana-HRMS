@@ -178,6 +178,7 @@ export async function POST(request: NextRequest) {
       "department_id",
       "job_id",
       "company_id",
+      "image_1920",
       ...sponsorFields,
     ];
 
@@ -242,6 +243,7 @@ export async function POST(request: NextRequest) {
           lastName: names.lastName,
           email,
           phone: phoneFrom(row),
+          profilePhotoUrl: (row as any).image_1920 ? (String((row as any).image_1920).startsWith("data:") ? String((row as any).image_1920) : `data:image/jpeg;base64,${(row as any).image_1920}`) : undefined,
           sponsor: sponsorValue(row as Record<string, unknown>, sponsorFields),
           hireDate: dateValue(row.first_contract_date) || dateValue(row.create_date) || new Date(),
           status: row.active === false ? "INACTIVE" : "ACTIVE",

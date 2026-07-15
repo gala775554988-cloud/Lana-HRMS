@@ -432,6 +432,14 @@ export class OdooSyncService {
               delete raw.odooDepartmentId; delete raw.odooJobId; delete raw.odooCompanyId; delete raw.odooManagerId; delete raw._odooId; delete raw._odooName; delete raw._hospitalName;
               const vals = {
                 ...raw,
+                odooId: Number(row.id),
+                odooWriteDate: asDate(row.write_date),
+                odooCreateDate: asDate(row.create_date),
+                odooActive: row.active !== false,
+                odooDepartmentId: dId || null,
+                odooJobId: jId || null,
+                odooCompanyId: cId || null,
+                odooParentId: mId || null,
                 ...(dId && deptMap.get(dId) ? { departmentId: deptMap.get(dId) } : {}),
                 ...(jId && jobMap.get(jId) ? { positionId: jobMap.get(jId) } : {}),
                 ...(cId && compMap.get(cId) ? { branchId: compMap.get(cId) } : {}),
@@ -446,23 +454,27 @@ export class OdooSyncService {
             }
           }
 
-          // Bulk find existing employees by employeeNumber/email/nationalId
+          // Bulk find existing employees by employeeNumber/email/nationalId/odooId
+          const allOdooIds = mappedBatch.map(m=> m.odooId).filter(Boolean) as number[];
           const allEmpNumbers = mappedBatch.map(m=> m.values?.employeeNumber).filter(Boolean) as string[];
           const allEmails = mappedBatch.map(m=> m.values?.email).filter(Boolean) as string[];
           const allNationalIds = mappedBatch.map(m=> m.values?.nationalId).filter(Boolean) as string[];
 
+          let existingByOdooId = new Map<number, any>();
           let existingByNumber = new Map<string, any>();
           let existingByEmail = new Map<string, any>();
           let existingByNationalId = new Map<string, any>();
 
           try {
-            if(allEmpNumbers.length>0 || allEmails.length>0 || allNationalIds.length>0) {
+            if(allOdooIds.length>0 || allEmpNumbers.length>0 || allEmails.length>0 || allNationalIds.length>0) {
               const orConditions: any[] = [];
+              if(allOdooIds.length>0) orConditions.push({ odooId: { in: allOdooIds } });
               if(allEmpNumbers.length>0) orConditions.push({ employeeNumber: { in: allEmpNumbers } });
               if(allEmails.length>0) orConditions.push({ email: { in: allEmails } });
               if(allNationalIds.length>0) orConditions.push({ nationalId: { in: allNationalIds } });
               const existingList = await delegate("employee").findMany({ where: { OR: orConditions } }) as any[];
               for(const ex of existingList) {
+                if(ex.odooId) existingByOdooId.set(ex.odooId, ex);
                 if(ex.employeeNumber) existingByNumber.set(ex.employeeNumber, ex);
                 if(ex.email) existingByEmail.set(ex.email, ex);
                 if(ex.nationalId) existingByNationalId.set(ex.nationalId, ex);
@@ -507,7 +519,8 @@ export class OdooSyncService {
             }
             try {
               let existing: any = null;
-              if(values.employeeNumber) existing = existingByNumber.get(values.employeeNumber) || null;
+              if(odooId) existing = existingByOdooId.get(odooId) || null;
+              if(!existing && values.employeeNumber) existing = existingByNumber.get(values.employeeNumber) || null;
               if(!existing && values.email) existing = existingByEmail.get(values.email) || null;
               if(!existing && values.nationalId) existing = existingByNationalId.get(values.nationalId) || null;
 
@@ -525,6 +538,7 @@ export class OdooSyncService {
                   const updated = await delegate("employee").update({ where: { id: existing.id }, data: values });
                   result.updated++; localEmployeeId = String((updated as any).id);
                   // update maps for subsequent duplicates in same batch
+                  if(odooId) existingByOdooId.set(odooId, updated);
                   if(values.employeeNumber) existingByNumber.set(values.employeeNumber, updated);
                   if(values.email) existingByEmail.set(values.email, updated);
                   if(values.nationalId) existingByNationalId.set(values.nationalId, updated);
@@ -572,6 +586,7 @@ export class OdooSyncService {
                 } else {
                   const created = await delegate("employee").create({ data: values });
                   result.created++; localEmployeeId = String((created as any).id);
+                  if(odooId) existingByOdooId.set(odooId, created);
                   if(values.employeeNumber) existingByNumber.set(values.employeeNumber, created);
                   if(values.email) existingByEmail.set(values.email, created);
                   if(values.nationalId) existingByNationalId.set(values.nationalId, created);
@@ -1195,11 +1210,30 @@ export class OdooSyncService {
   private async findLocalEmployeeId(odooEmployeeValue: unknown) {
     const externalId = many2oneId(odooEmployeeValue);
     if (!externalId) return undefined;
+    try {
+      const localByOdooId = await delegate("employee").findFirst({ where: { odooId: externalId } });
+      if (localByOdooId) return objectId(localByOdooId.id);
+    } catch {}
+
     const [employee] = await this.client.read<OdooRecord>("hr.employee", [externalId], ["id", "barcode", "identification_id", "work_email"]);
-    const employeeNumber = employee?.barcode ? String(employee.barcode) : undefined;
-    if (!employeeNumber) return undefined;
-    const local = await delegate("employee").findFirst({ where: { employeeNumber } });
-    return objectId(local?.id);
+    if (!employee) return undefined;
+    const employeeNumber = employee.barcode ? String(employee.barcode).trim() : undefined;
+    const nationalId = employee.identification_id ? String(employee.identification_id).trim() : undefined;
+    const email = employee.work_email ? String(employee.work_email).trim() : undefined;
+
+    let local: any = null;
+    if (employeeNumber) local = await delegate("employee").findFirst({ where: { employeeNumber } });
+    if (!local && nationalId) local = await delegate("employee").findFirst({ where: { nationalId } });
+    if (!local && email) local = await delegate("employee").findFirst({ where: { email } });
+    if (!local) local = await delegate("employee").findFirst({ where: { employeeNumber: `ODOO-${externalId}` } });
+
+    if (local) {
+      try {
+        await delegate("employee").update({ where: { id: local.id }, data: { odooId: externalId } });
+      } catch {}
+      return objectId(local.id);
+    }
+    return undefined;
   }
 
   private async findAttendance(employeeId: number, workDate: Date | string) {
