@@ -2,18 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import * as XLSX from "xlsx";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { hasPermission } from "@/lib/rbac";
-import { applyScopedWhere, canAccessEmployeeId, getAccessProfile, resolveRoleEmployeeIds } from "@/lib/enterprise/hierarchy";
-import { createEnterpriseNotification } from "@/lib/enterprise/notifications";
+import { applyScopedWhere, canAccessEmployeeId, getAccessProfile } from "@/lib/enterprise/hierarchy";
 import { getEmployeeExtraSettings } from "@/lib/enterprise/hospitals";
-import { getEmployeeSalaryProfile, calculateNetSalary } from "@/lib/employee/salary-profile";
-import { writeAuditLog } from "@/lib/audit";
-
-function canManageOvertime(session: any) {
-  const roles = (session?.user?.roles as string[]) ?? [];
-  const permissions = (session?.user?.permissions as string[]) ?? [];
-  return roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER") || hasPermission(permissions, { action: "manage", resource: "overtime" });
-}
+import { canManageOvertime, calculateHours, createOvertimeRequest } from "@/lib/enterprise/overtime";
 
 function parseDate(value: string | null) {
   if (!value) return undefined;
@@ -30,62 +21,9 @@ function monthRange(value: string | null) {
   return { start, end };
 }
 
-function calculateHours(startTime: string, endTime: string, fallback?: number) {
-  if (!startTime || !endTime) return Number(fallback ?? 0);
-  const [startHour, startMinute] = startTime.split(":").map(Number);
-  const [endHour, endMinute] = endTime.split(":").map(Number);
-  if ([startHour, startMinute, endHour, endMinute].some((part) => Number.isNaN(part))) return Number(fallback ?? 0);
-  let minutes = (endHour * 60 + endMinute) - (startHour * 60 + startMinute);
-  if (minutes < 0) minutes += 24 * 60;
-  return Number((minutes / 60).toFixed(2));
-}
-
-function overtimeMultiplier(type: string) {
-  const normalized = type.toLowerCase();
-  if (normalized.includes("holiday") || normalized.includes("عطلة") || normalized.includes("weekend")) return 2;
-  if (normalized.includes("night") || normalized.includes("ليل")) return 1.75;
-  return 1.5;
-}
-
-async function calculateOvertimeAmount(employeeId: string, hours: number, type: string) {
-  const salary = await getEmployeeSalaryProfile(employeeId);
-  const monthlySalary = calculateNetSalary(salary);
-  const hourlyRate = monthlySalary > 0 ? monthlySalary / 240 : 0;
-  return Number((hourlyRate * hours * overtimeMultiplier(type)).toFixed(2));
-}
-
 async function getEmployeeScope(userId: string, roles: string[]) {
   const profile = await getAccessProfile(userId, roles);
   return applyScopedWhere("employees", {}, profile);
-}
-
-async function createHrOnlyWorkflow(employeeId: string, entityId: string, actorUserId: string) {
-  const hrEmployees = await resolveRoleEmployeeIds(["HR_MANAGER"]);
-  const approverUserIds = Array.from(new Set(hrEmployees.map((employee) => employee.userId).filter((id): id is string => Boolean(id))));
-  const instance = await prisma.workflowInstance.create({
-    data: {
-      employeeId,
-      type: "OVERTIME",
-      entityId,
-      status: approverUserIds.length ? "PENDING" : "COMPLETED",
-      currentStep: approverUserIds.length ? 1 : 0
-    }
-  });
-  if (approverUserIds.length) {
-    await prisma.workflowStep.createMany({
-      data: approverUserIds.map((approverUserId, index) => ({
-        workflowInstanceId: instance.id,
-        step: index + 1,
-        approverUserId,
-        status: index === 0 ? "PENDING" : "WAITING"
-      }))
-    });
-    await Promise.all(approverUserIds.slice(0, 1).map((userId) => createEnterpriseNotification({ userId, title: "طلب أوفر تايم جديد", body: "يوجد طلب أوفر تايم بانتظار اعتمادك.", type: "INFO" })));
-  } else {
-    await prisma.overtimeRequest.update({ where: { id: entityId }, data: { status: "APPROVED" } }).catch(() => null);
-  }
-  await writeAuditLog({ actorUserId, action: "overtime:workflow-create", entity: "workflowInstance", entityId: instance.id, metadata: { employeeId, entityId, approverUserIds } }).catch(() => null);
-  return instance;
 }
 
 async function listData(session: any, request: NextRequest) {
@@ -238,27 +176,15 @@ export async function POST(request: NextRequest) {
   if (!(await canAccessEmployeeId(body.employeeId, profile))) return NextResponse.json({ success: false, message: "Forbidden employee scope" }, { status: 403 });
 
   const hours = calculateHours(body.startTime, body.endTime, body.hours);
-  const amount = await calculateOvertimeAmount(body.employeeId, hours, body.overtimeType || "regular");
-  const rate = overtimeMultiplier(body.overtimeType || "regular");
-
-  const overtime = await prisma.overtimeRequest.create({
-    data: {
-      employeeId: body.employeeId,
-      workDate: new Date(body.workDate),
-      hours,
-      rate,
-      reason: body.notes ?? "",
-      status: "PENDING"
-    }
+  const { overtime, amount } = await createOvertimeRequest({
+    employeeId: body.employeeId,
+    workDate: new Date(body.workDate),
+    hours,
+    overtimeType: body.overtimeType || "regular",
+    notes: body.notes,
+    actorUserId: session.user.id,
+    extra: body
   });
-
-  await prisma.appSetting.upsert({
-    where: { key: `overtime.extra.${overtime.id}` },
-    update: { value: { ...body, amount, rate } as any },
-    create: { key: `overtime.extra.${overtime.id}`, value: { ...body, amount, rate } as any, description: "Overtime extra details" }
-  });
-  await createHrOnlyWorkflow(body.employeeId, overtime.id, session.user.id);
-  await writeAuditLog({ actorUserId: session.user.id, action: "overtime:create", entity: "overtimeRequest", entityId: overtime.id, metadata: { amount, hours, rate } }).catch(() => null);
 
   return NextResponse.json({ success: true, overtime, amount });
 }

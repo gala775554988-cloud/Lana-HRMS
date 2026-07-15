@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Download, Plus } from "lucide-react";
+import { Download, Plus, UploadCloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { OvertimeBulkImportDialog } from "@/components/enterprise/overtime-bulk-import-dialog";
 
 type EmployeeOption = { id: string; employeeNumber: string; firstName: string; lastName: string; departmentId?: string | null; branchId?: string | null; department?: { name: string } | null; branch?: { name: string } | null };
 type RefOption = { id: string; name: string };
@@ -28,6 +29,7 @@ export function OvertimeManagementClient() {
   const [rows, setRows] = useState<OvertimeRow[]>([]);
   const [message, setMessage] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [filters, setFilters] = useState({ from: "", to: "", month: "", hospital: "", department: "", branch: "" });
   const [form, setForm] = useState({ employeeId: "", workDate: new Date().toISOString().slice(0, 10), startTime: "17:00", endTime: "19:00", hours: "2", overtimeType: "regular", notes: "", project: "", hospital: "", departmentId: "", branchId: "" });
 
@@ -93,7 +95,12 @@ export function OvertimeManagementClient() {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />إضافة أوفر تايم</CardTitle></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />إضافة أوفر تايم</CardTitle>
+          <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => setBulkImportOpen(true)}>
+            <UploadCloud className="h-4 w-4" />استيراد بالجملة
+          </Button>
+        </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <select value={form.employeeId} onChange={(event) => updateForm("employeeId", event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
             <option value="">الموظف</option>
@@ -149,6 +156,8 @@ export function OvertimeManagementClient() {
           </table>
         </div>
       </div>
+
+      <OvertimeBulkImportDialog open={bulkImportOpen} onOpenChange={setBulkImportOpen} onImported={load} />
     </div>
   );
 }
