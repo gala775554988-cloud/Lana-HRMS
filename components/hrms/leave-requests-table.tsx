@@ -42,14 +42,16 @@ export function LeaveRequestsTable({
   page,
   pageCount,
   total,
-  buildPageHref
+  prevHref,
+  nextHref
 }: {
   records: LeaveRequestRow[];
   stats: Stats;
   page: number;
   pageCount: number;
   total: number;
-  buildPageHref: (page: number) => string;
+  prevHref: string;
+  nextHref: string;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -142,8 +144,8 @@ export function LeaveRequestsTable({
       <div className="flex flex-col gap-3 rounded-lg border bg-card p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <span>صفحة {page} من {pageCount} - {total} سجل</span>
         <div className="flex gap-2">
-          <Button asChild variant="outline" size="sm"><Link href={buildPageHref(Math.max(page - 1, 1))}>السابق</Link></Button>
-          <Button asChild variant="outline" size="sm"><Link href={buildPageHref(Math.min(page + 1, pageCount))}>التالي</Link></Button>
+          <Button asChild variant="outline" size="sm"><Link href={prevHref}>السابق</Link></Button>
+          <Button asChild variant="outline" size="sm"><Link href={nextHref}>التالي</Link></Button>
         </div>
       </div>
     </div>
