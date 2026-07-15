@@ -75,10 +75,11 @@ type WorkbenchData = {
 };
 
 const emptyStats: Stats = { total: 0, waiting: 0, highPriority: 0, deferred: 0, completed: 0, rejected: 0 };
-// Approve/reject are the decisions that take a request out of "waiting for
-// me" -- these get the row removed from the UI immediately; other decisions
-// (transfer/defer/note/priority) wait for the server response as before.
-const REMOVING_DECISIONS = new Set(["APPROVE", "REJECT"]);
+// Approve/reject/transfer are the decisions that take a request out of
+// "waiting for me" -- these get the row removed from the UI immediately;
+// other decisions (defer/note/priority) wait for the server response as
+// before since they don't change whether the item is still in this queue.
+const REMOVING_DECISIONS = new Set(["APPROVE", "REJECT", "TRANSFER"]);
 
 export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | "inbox" | "outbox" }) {
   const [type, setType] = useState("ALL");
