@@ -8,6 +8,7 @@ import { isOdooIntegrationEnabled } from "@/lib/settings";
 import type { LanaSyncEntity } from "@/lib/enterprise/lana-sync-actions";
 import { isLanaDelegate } from "@/lib/enterprise/lana-delegates";
 import { writeAuditLog } from "@/lib/audit";
+import { syncEmployeeFieldsFromOdoo, type FieldSyncMode } from "@/lib/enterprise/lana-field-sync";
 
 export type LanaAiAnswer = {
   answer: string;
@@ -23,6 +24,10 @@ export type LanaAiAnswer = {
   // executing once this response has already been sent, and posts a
   // completion notification with the real result when it's done.
   backgroundSync?: { userId: string; entity: LanaSyncEntity };
+  // Set for a group field-sync command: the API route runs runGroupFieldSync
+  // via after() and the detailed table report lands as a notification once
+  // the whole group has been processed.
+  backgroundFieldSync?: { userId: string; employeeIds: string[]; mode: FieldSyncMode; groupLabel: string; ar: boolean };
 };
 
 function can(permissions: string[] | undefined, action: string, resource: string) {
@@ -117,6 +122,23 @@ export async function answerLanaAi({
   const assignMatch = ASSIGN_RESPONSIBLE_PATTERN.exec(message.trim());
   if (assignMatch) {
     return handleAssignResponsibleCommand({ userId, roles, ar, suggestions, match: assignMatch });
+  }
+
+  // Field-level Odoo re-sync commands ("حدث كود/بيانات/الراتب/المستشفى/
+  // الحساب التحليلي الموظف X من أودو" and the "مجموعة الموظفين ... في
+  // مستشفى Y" group variant). Group pattern checked first since "الموظفين"
+  // (no space right after the "موظف" stem) never overlaps with the single
+  // pattern's "موظف\s+" requirement, but checking group first removes any
+  // doubt. Also placed before policyAnswer() for the same reason as above.
+  const FIELD_SYNC_GROUP_PATTERN = /حدث\s+(كود|بيانات|الراتب|المستشفى|الحساب\s*التحليلي)?\s*(?:مجموعة\s+الموظفين|الموظفين)(?:\s+الموجودين)?\s+في\s+مستشفى\s+(.+?)\s+من\s+أودو/u;
+  const FIELD_SYNC_SINGLE_PATTERN = /حدث\s+(كود|بيانات|الراتب|المستشفى|الحساب\s*التحليلي)?\s*(?:ال)?موظف\s+(.+?)\s+من\s+أودو/u;
+  const groupSyncMatch = FIELD_SYNC_GROUP_PATTERN.exec(message.trim());
+  if (groupSyncMatch) {
+    return handleFieldSyncGroupCommand({ userId, roles, ar, suggestions, match: groupSyncMatch });
+  }
+  const singleSyncMatch = FIELD_SYNC_SINGLE_PATTERN.exec(message.trim());
+  if (singleSyncMatch) {
+    return handleFieldSyncSingleCommand({ userId, roles, ar, suggestions, match: singleSyncMatch });
   }
 
   if (!WHO_CAN_APPROVE_PATTERN.test(message) && !HAS_PERMISSION_PATTERN.test(message)) {
@@ -638,6 +660,151 @@ async function handleAssignResponsibleCommand({
       ? `تم تنفيذ سلسلة الموافقات كالتالي:\n${lines.join("\n")}`
       : `Approval chain executed as follows:\n${lines.join("\n")}`,
     suggestions
+  };
+}
+
+function fieldSyncModeFromDescriptor(descriptor: string | undefined): FieldSyncMode {
+  return descriptor?.trim() === "كود" ? "identity" : "full";
+}
+
+/** "حدث [كود|بيانات|الراتب|المستشفى|الحساب التحليلي] الموظف X من أودو" --
+ * delegate-gated, single-employee, disambiguation-first like the executive
+ * assign command. Runs synchronously (one Odoo round trip) so the detailed
+ * report can be returned immediately in the chat reply itself. */
+async function handleFieldSyncSingleCommand({
+  userId,
+  roles,
+  ar,
+  suggestions,
+  match
+}: {
+  userId: string;
+  roles: string[];
+  ar: boolean;
+  suggestions: string[];
+  match: RegExpExecArray;
+}): Promise<LanaAiAnswer> {
+  if (!(await isLanaDelegate(userId, roles))) {
+    return {
+      answer: ar ? "هذا أمر تنفيذي (مزامنة بيانات من أودو) متاح فقط للمفوَّضين الذين حددهم المسؤول." : "This is an executive command (syncing data from Odoo) available only to designated delegates.",
+      suggestions
+    };
+  }
+  if (!(await isOdooIntegrationEnabled())) {
+    return { answer: ar ? "تكامل Odoo غير مُفعّل حالياً من الإعدادات." : "Odoo integration is currently disabled in settings.", suggestions };
+  }
+
+  const [, descriptor, employeeToken] = match;
+  const mode = fieldSyncModeFromDescriptor(descriptor);
+  const employeeName = employeeToken.trim();
+
+  const candidates = await prisma.employee.findMany({
+    where: {
+      OR: [
+        { employeeNumber: { equals: employeeName, mode: "insensitive" } },
+        { firstName: { contains: employeeName, mode: "insensitive" } },
+        { lastName: { contains: employeeName, mode: "insensitive" } }
+      ]
+    },
+    select: { id: true, employeeNumber: true, firstName: true, lastName: true, position: { select: { title: true } }, department: { select: { name: true } } },
+    take: 10
+  });
+
+  if (candidates.length === 0) {
+    return { answer: ar ? `لم أجد موظفاً باسم أو رقم "${employeeName}". لم يتم تنفيذ أي تغيير.` : `No matching employee found for "${employeeName}". Nothing was executed.`, suggestions };
+  }
+  if (candidates.length > 1) {
+    const options = candidates.map((employee) => `${employee.employeeNumber} - ${employee.firstName} ${employee.lastName} (${employee.position?.title ?? "-"} / ${employee.department?.name ?? "-"})`).join("\n");
+    return {
+      answer: ar
+        ? `وجدت أكثر من موظف مطابق لـ "${employeeName}":\n${options}\n\nيرجى إعادة الأمر باستخدام رقم الموظف الدقيق. لم يتم تنفيذ أي تغيير.`
+        : `More than one matching employee found for "${employeeName}":\n${options}\n\nPlease repeat the command with the exact employee number. Nothing was executed.`,
+      suggestions
+    };
+  }
+
+  const result = await syncEmployeeFieldsFromOdoo(candidates[0].id, mode, ar);
+  await writeAuditLog({
+    actorUserId: userId,
+    action: "lana-ai:field-sync-single",
+    entity: "employee",
+    entityId: candidates[0].id,
+    metadata: { mode, result }
+  });
+
+  if (!result.success) {
+    return {
+      answer: ar
+        ? `العملية: تحديث بيانات\nالنتيجة: فشل التحديث\nالتفاصيل: ${result.label} -- ${result.reason}`
+        : `Operation: update data\nResult: failed\nDetails: ${result.label} -- ${result.reason}`,
+      suggestions
+    };
+  }
+  return {
+    answer: ar
+      ? `العملية: تحديث بيانات\nالنتيجة: تم التحديث بنجاح\nالتفاصيل: ${result.changes.length ? result.changes.join("، ") : "لا يوجد تغيير (البيانات مطابقة بالفعل)"}`
+      : `Operation: update data\nResult: success\nDetails: ${result.changes.length ? result.changes.join(", ") : "no change (already matched)"}`,
+    suggestions
+  };
+}
+
+/** Group variant: "حدث ... مجموعة الموظفين الموجودين في مستشفى Y من أودو".
+ * Same delegate gate and hospital-name disambiguation, but since this can
+ * touch many employees (each a real Odoo round trip), it acknowledges
+ * immediately and the actual run + detailed table report happens via
+ * backgroundFieldSync (executed by the API route through Next.js after()). */
+async function handleFieldSyncGroupCommand({
+  userId,
+  roles,
+  ar,
+  suggestions,
+  match
+}: {
+  userId: string;
+  roles: string[];
+  ar: boolean;
+  suggestions: string[];
+  match: RegExpExecArray;
+}): Promise<LanaAiAnswer> {
+  if (!(await isLanaDelegate(userId, roles))) {
+    return {
+      answer: ar ? "هذا أمر تنفيذي (مزامنة بيانات من أودو) متاح فقط للمفوَّضين الذين حددهم المسؤول." : "This is an executive command (syncing data from Odoo) available only to designated delegates.",
+      suggestions
+    };
+  }
+  if (!(await isOdooIntegrationEnabled())) {
+    return { answer: ar ? "تكامل Odoo غير مُفعّل حالياً من الإعدادات." : "Odoo integration is currently disabled in settings.", suggestions };
+  }
+
+  const [, descriptor, hospitalToken] = match;
+  const mode = fieldSyncModeFromDescriptor(descriptor);
+  const hospitalName = hospitalToken.trim();
+
+  const hospitalCandidates = await prisma.hospital.findMany({ where: { name: { contains: hospitalName, mode: "insensitive" } }, select: { id: true, name: true }, take: 10 });
+  if (hospitalCandidates.length === 0) {
+    return { answer: ar ? `لم أجد مستشفى باسم "${hospitalName}". لم يتم تنفيذ أي تغيير.` : `No matching hospital found for "${hospitalName}". Nothing was executed.`, suggestions };
+  }
+  if (hospitalCandidates.length > 1) {
+    return {
+      answer: ar
+        ? `وجدت أكثر من مستشفى مطابق لـ "${hospitalName}": ${hospitalCandidates.map((h) => h.name).join("، ")}. يرجى إعادة الأمر باستخدام الاسم الدقيق. لم يتم تنفيذ أي تغيير.`
+        : `More than one matching hospital found for "${hospitalName}": ${hospitalCandidates.map((h) => h.name).join(", ")}. Please repeat with the exact name. Nothing was executed.`,
+      suggestions
+    };
+  }
+  const hospital = hospitalCandidates[0];
+
+  const employees = await prisma.employee.findMany({ where: { hospitalId: hospital.id }, select: { id: true }, take: 2000 });
+  if (employees.length === 0) {
+    return { answer: ar ? `لا يوجد موظفون مسجلون في مستشفى ${hospital.name} حالياً.` : `No employees currently recorded at ${hospital.name}.`, suggestions };
+  }
+
+  return {
+    answer: ar
+      ? `بدأت الآن مزامنة بيانات ${employees.length} موظفاً من مستشفى ${hospital.name} مع أودو. سأرسل لك تقريراً مفصلاً (جدول النتائج والمتعثرين) فور الانتهاء.`
+      : `Started syncing ${employees.length} employees from ${hospital.name} with Odoo now. I'll send a detailed report (results table + stragglers) once it's done.`,
+    suggestions,
+    backgroundFieldSync: { userId, employeeIds: employees.map((e) => e.id), mode, groupLabel: ar ? `مستشفى ${hospital.name}` : hospital.name, ar }
   };
 }
 

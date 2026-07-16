@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest, after } from "next/server";
 import { auth } from "@/auth";
 import { answerLanaAi, getLanaAiMonitorData } from "@/lib/enterprise/lana-ai";
 import { runLanaTriggeredSync } from "@/lib/enterprise/lana-sync-actions";
+import { runGroupFieldSync } from "@/lib/enterprise/lana-field-sync";
 import { writeAuditLog } from "@/lib/audit";
 
 // A Lana-triggered sync/document-crawl runs via after() below and can take
@@ -63,7 +64,12 @@ export async function POST(request: NextRequest) {
       // serverless function once the response returns.
       after(() => runLanaTriggeredSync(userId, entity));
     }
-    const { backgroundSync: _backgroundSync, ...clientAnswer } = answer;
+    if (answer.backgroundFieldSync) {
+      const { userId, employeeIds, mode, groupLabel, ar } = answer.backgroundFieldSync;
+      await writeAuditLog({ actorUserId: session.user.id, action: "lana-ai:field-sync-group", entity: "employee", metadata: { employeeIds, mode, groupLabel } }).catch(() => null);
+      after(() => runGroupFieldSync(userId, employeeIds, mode, groupLabel, ar));
+    }
+    const { backgroundSync: _backgroundSync, backgroundFieldSync: _backgroundFieldSync, ...clientAnswer } = answer;
     return NextResponse.json({ success: true, ...clientAnswer });
   } catch (error) {
     return errorJson(error);
