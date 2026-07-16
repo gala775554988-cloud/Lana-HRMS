@@ -129,6 +129,16 @@ export async function requireOdooIntegrationAccess(action: "read" | "manage" = "
   return session;
 }
 
+export function formatEmployeeCode(code?: string | number | null): string {
+  if (!code) return `00ODOO-${Date.now()}`;
+  const clean = String(code).trim();
+  if (clean.startsWith("ODOO-") || clean.startsWith("00ODOO-")) {
+    return clean.startsWith("00") ? clean : `00${clean}`;
+  }
+  const digits = clean.replace(/^[0]+/, "");
+  return `00${digits || clean}`;
+}
+
 export async function syncEmployeeFromOdoo(odooRecord: any) {
   // 1. تنقية البيانات: استبعاد الحقول البنكية حصراً
   const sanitizedData = Object.keys(odooRecord)
@@ -144,52 +154,166 @@ export async function syncEmployeeFromOdoo(odooRecord: any) {
   const firstName = nameParts[0] || rawName;
   const lastName = nameParts.slice(1).join(" ") || "";
   const nationalId = String(sanitizedData.registration_number || sanitizedData.identification_id || `ODOO-${sanitizedData.id}`).trim();
-  const employeeNumber = String(sanitizedData.barcode || sanitizedData.id || `ODOO-${sanitizedData.id}`).trim();
+  const employeeNumber = formatEmployeeCode(sanitizedData.barcode || sanitizedData.employee_code || sanitizedData.id);
+
+  // حل ارتباط المدرسة (x_studio_school_name -> Hospital/Branch)
+  let hospitalId: string | undefined;
+  let branchId: string | undefined;
+  const schoolName = String(sanitizedData.x_studio_school_name || sanitizedData.school || "").trim();
+  if (schoolName && schoolName !== 'غير محدد' && schoolName !== 'false') {
+    try {
+      const hospitalCode = `ODOO-HOSP-${encodeURIComponent(schoolName).slice(0, 40)}`;
+      const hospital = await prisma.hospital.upsert({
+        where: { code: hospitalCode },
+        update: { name: schoolName, isActive: true },
+        create: { name: schoolName, code: hospitalCode, isActive: true }
+      });
+      hospitalId = hospital.id;
+
+      const branchCode = `HOSP-${hospital.id}`;
+      const branch = await prisma.branch.upsert({
+        where: { code: branchCode },
+        update: { name: schoolName, hospitalId: hospital.id, isActive: true },
+        create: { name: schoolName, code: branchCode, hospitalId: hospital.id, isActive: true }
+      });
+      branchId = branch.id;
+    } catch {}
+  }
+
+  // حل الإدارة (department_id)
+  let departmentId: string | undefined;
+  if (sanitizedData.department_id) {
+    const deptName = Array.isArray(sanitizedData.department_id) ? sanitizedData.department_id[1] : String(sanitizedData.department_id);
+    if (deptName && deptName !== 'false') {
+      try {
+        const dept = await prisma.department.findFirst({ where: { name: deptName } });
+        if (dept) departmentId = dept.id;
+        else {
+          const newDept = await prisma.department.create({ data: { name: deptName, description: `Synced from Odoo` } });
+          departmentId = newDept.id;
+        }
+      } catch {}
+    }
+  }
+
+  // الحساب التحليلي (Analytic Account)
+  const analyticAccount = sanitizedData.analytic_account_id
+    ? (Array.isArray(sanitizedData.analytic_account_id) ? sanitizedData.analytic_account_id[1] : String(sanitizedData.analytic_account_id))
+    : undefined;
+
+  // المدير (parent_id -> Manager Employee)
+  let managerId: string | undefined;
+  if (sanitizedData.parent_id) {
+    const parentOdooId = Array.isArray(sanitizedData.parent_id) ? Number(sanitizedData.parent_id[0]) : Number(sanitizedData.parent_id);
+    if (parentOdooId && !isNaN(parentOdooId)) {
+      try {
+        const parentEmp = await prisma.employee.findUnique({ where: { odooId: parentOdooId } });
+        if (parentEmp) managerId = parentEmp.id;
+      } catch {}
+    }
+  }
 
   const employeeData = {
     name: sanitizedData.name,
     nationalId,
+    formattedCode: employeeNumber,
     jobTitle: Array.isArray(sanitizedData.job_id) ? sanitizedData.job_id[1] : (sanitizedData.job_id || 'غير محدد'),
     department: Array.isArray(sanitizedData.department_id) ? sanitizedData.department_id[1] : (sanitizedData.department_id || 'غير محدد'),
     sponsor: Array.isArray(sanitizedData.company_id) ? sanitizedData.company_id[1] : (sanitizedData.company_id || 'غير محدد'),
     wage: sanitizedData.contract_id?.wage || 0,
     salaryDetails: sanitizedData.l10n_sa_salary_details || {},
-    schoolName: sanitizedData.x_studio_school_name || 'غير محدد',
+    schoolName: schoolName || 'غير محدد',
     totalCost: sanitizedData.x_studio_total_cost || 0,
     branch: Array.isArray(sanitizedData.branch_id) ? sanitizedData.branch_id[1] : (sanitizedData.branch_id || 'الفرع الرئيسي'),
-    documents: sanitizedData.document_ids || []
+    documents: sanitizedData.document_ids || sanitizedData.documents || []
+  };
+
+  const upsertPayload = {
+    employeeNumber,
+    firstName,
+    lastName,
+    sponsor: String(employeeData.sponsor),
+    odooId: Number(sanitizedData.id) || null,
+    hospitalId: hospitalId || undefined,
+    branchId: branchId || undefined,
+    departmentId: departmentId || undefined,
+    analyticAccount: analyticAccount || undefined,
+    managerId: managerId || undefined,
+    odooRawData: {
+      ...sanitizedData,
+      documents: employeeData.documents,
+      _mappedExecutiveSummary: employeeData
+    } as any,
+    odooRawDataSyncedAt: new Date()
   };
 
   // 3. الحفظ في Neon PostgreSQL
   return await prisma.employee.upsert({
     where: { nationalId },
-    update: {
-      firstName,
-      lastName,
-      sponsor: String(employeeData.sponsor),
-      odooId: Number(sanitizedData.id) || null,
-      odooRawData: {
-        ...sanitizedData,
-        _mappedExecutiveSummary: employeeData
-      } as any,
-      odooRawDataSyncedAt: new Date()
-    },
+    update: upsertPayload,
     create: {
-      employeeNumber,
+      ...upsertPayload,
       nationalId,
-      firstName,
-      lastName,
       hireDate: new Date(),
-      status: "ACTIVE",
-      sponsor: String(employeeData.sponsor),
-      odooId: Number(sanitizedData.id) || null,
-      odooRawData: {
-        ...sanitizedData,
-        _mappedExecutiveSummary: employeeData
-      } as any,
-      odooRawDataSyncedAt: new Date()
+      status: "ACTIVE"
     }
   });
+}
+
+/**
+ * Comprehensive Full Resync Protocol (Wipe & Sync / Smart Upsert)
+ * 1. Optional Wipe (`TRUNCATE TABLE "Employee" CASCADE` or `deleteMany`).
+ * 2. Fetches all records from Odoo without pagination constraints (`odoo.searchRead`).
+ * 3. Formats codes with `00` prefix (`formatEmployeeCode`).
+ * 4. Comprehensive mapping (`x_studio_school_name` -> Hospital/Branch, `analytic_account_id`, `department_id`, `parent_id`, `documents`).
+ */
+export async function fullResyncFromOdoo(options: { wipeAndSync?: boolean; connectionId?: string } = {}) {
+  if (options.wipeAndSync) {
+    try {
+      await prisma.$executeRawUnsafe(`TRUNCATE TABLE "Employee" CASCADE;`);
+    } catch {
+      await prisma.employee.deleteMany({});
+    }
+  }
+
+  const { client } = await createOdooClientFromConnection(options.connectionId);
+  const allRecords = await client.searchRead("hr.employee", [], [
+    "id", "name", "barcode", "identification_id", "registration_number", "employee_code",
+    "x_studio_school_name", "analytic_account_id", "department_id",
+    "parent_id", "company_id", "job_id", "contract_id", "document_ids",
+    "write_date", "create_date", "active"
+  ], { limit: 100000 });
+
+  let syncedCount = 0;
+  for (const record of allRecords) {
+    try {
+      await syncEmployeeFromOdoo(record);
+      syncedCount++;
+    } catch (err) {
+      console.error(`[FullResync] Error syncing employee ${record.id}:`, err);
+    }
+  }
+
+  // Second pass: resolve manager parent_id references after all employees exist
+  for (const record of allRecords) {
+    if (record.parent_id) {
+      const parentOdooId = Array.isArray(record.parent_id) ? Number(record.parent_id[0]) : Number(record.parent_id);
+      if (parentOdooId && !isNaN(parentOdooId)) {
+        try {
+          const parentEmp = await prisma.employee.findUnique({ where: { odooId: parentOdooId } });
+          const childEmp = await prisma.employee.findUnique({ where: { odooId: Number(record.id) } });
+          if (parentEmp && childEmp && childEmp.managerId !== parentEmp.id) {
+            await prisma.employee.update({
+              where: { id: childEmp.id },
+              data: { managerId: parentEmp.id }
+            });
+          }
+        } catch {}
+      }
+    }
+  }
+
+  return { success: true, count: syncedCount, wiped: Boolean(options.wipeAndSync) };
 }
 
 export async function createOdooClientFromConnection(connectionId?: string) {
