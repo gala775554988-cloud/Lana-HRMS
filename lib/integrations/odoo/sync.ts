@@ -535,6 +535,10 @@ export class OdooSyncService {
   }
 
   async syncEmployees(options: SyncOptions = {}) {
+    if (options.mode === "FULL_RESYNC" || (options as any).fullResync) {
+      const res = await fullResyncFromOdoo({ wipeAndSync: Boolean((options as any).wipeAndSync), connectionId: this.connection?.id });
+      return { ...emptyResult("employees", "ODOO_TO_LANA", false, options.tenantId), pushed: res.count, updated: res.count };
+    }
     const direction = normalizeDirection(options.direction);
     const result = emptyResult("employees", direction, Boolean(options.dryRun), options.tenantId);
     const mapper = getMapper("employees");
