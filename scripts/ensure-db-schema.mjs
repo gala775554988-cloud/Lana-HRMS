@@ -1,14 +1,18 @@
 import { PrismaClient } from '@prisma/client';
 
-async function ensureDbSchema() {
-  const url = process.env.DIRECT_URL || process.env.DATABASE_URL;
-  if (!url) {
-    console.log('[ensure-db-schema] No DATABASE_URL or DIRECT_URL set, skipping auto-DDL.');
-    return;
-  }
+const NEON_DIRECT_URL = "postgresql://neondb_owner:npg_LQznTXG67tKN@ep-still-silence-at0ona1z.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
 
-  console.log('[ensure-db-schema] Connecting to verify and auto-heal database schema...');
-  const client = new PrismaClient();
+async function ensureDbSchema() {
+  const url = !process.env.DIRECT_URL || process.env.DIRECT_URL.includes("supabase.co") || !process.env.DATABASE_URL || process.env.DATABASE_URL.includes("supabase.co")
+    ? NEON_DIRECT_URL
+    : (process.env.DIRECT_URL || process.env.DATABASE_URL);
+
+  console.log('[ensure-db-schema] Connecting to verify and auto-heal database schema on Neon...');
+  const client = new PrismaClient({
+    datasources: {
+      db: { url }
+    }
+  });
 
   const sqlStatements = [
     `CREATE TABLE IF NOT EXISTS "HrPermissionScope" (
