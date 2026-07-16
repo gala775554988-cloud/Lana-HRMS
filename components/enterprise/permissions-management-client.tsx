@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Copy, Eye, HelpCircle, Lock, RotateCcw, ShieldCheck, SlidersHorizontal, UserCog, Users, X } from "lucide-react";
+import { Copy, Crown, Eye, HelpCircle, Lock, RotateCcw, ShieldCheck, SlidersHorizontal, UserCog, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PermissionHint } from "@/components/enterprise/permission-hint";
+import { UserSearchSelect } from "@/components/hrms/user-search-select";
 
 const SENSITIVE_FIELDS = ["nationalId", "email", "phone", "profilePhotoUrl", "address", "emergencyContact", "dateOfBirth"] as const;
 const FIELD_LABELS: Record<(typeof SENSITIVE_FIELDS)[number], string> = {
@@ -96,6 +97,50 @@ export function PermissionsManagementClient() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [fieldAccess, setFieldAccess] = useState<FieldAccessMap>({});
   const [fieldAccessMessage, setFieldAccessMessage] = useState("");
+  const [delegateEmployees, setDelegateEmployees] = useState<Array<{ userId: string; employeeNumber: string; firstName: string; lastName: string }>>([]);
+  const [newDelegateUserId, setNewDelegateUserId] = useState("");
+  const [delegatesMessage, setDelegatesMessage] = useState("");
+
+  const loadDelegates = () => {
+    fetch("/api/enterprise/lana-ai/delegates", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((data) => { if (data.success) setDelegateEmployees(data.employees ?? []); })
+      .catch(() => {});
+  };
+
+  useEffect(() => { loadDelegates(); }, []);
+
+  function addDelegate() {
+    if (!newDelegateUserId) return;
+    const nextIds = Array.from(new Set([...delegateEmployees.map((e) => e.userId), newDelegateUserId]));
+    startTransition(async () => {
+      const response = await fetch("/api/enterprise/lana-ai/delegates", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userIds: nextIds })
+      });
+      const data = await response.json();
+      if (!data.success) { setDelegatesMessage(data.message || "Failed to update delegates"); return; }
+      setNewDelegateUserId("");
+      loadDelegates();
+      setDelegatesMessage("تم تحديث قائمة المفوضين / Delegates updated");
+    });
+  }
+
+  function removeDelegate(userId: string) {
+    const nextIds = delegateEmployees.map((e) => e.userId).filter((id) => id !== userId);
+    startTransition(async () => {
+      const response = await fetch("/api/enterprise/lana-ai/delegates", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userIds: nextIds })
+      });
+      const data = await response.json();
+      if (!data.success) { setDelegatesMessage(data.message || "Failed to update delegates"); return; }
+      loadDelegates();
+      setDelegatesMessage("تم تحديث قائمة المفوضين / Delegates updated");
+    });
+  }
 
   useEffect(() => {
     fetch("/api/enterprise/permissions", { cache: "no-store" })
@@ -293,6 +338,34 @@ export function PermissionsManagementClient() {
           ))}
           <Button type="button" onClick={saveFieldAccess} disabled={isPending || !selectedUserId} className="mt-2">حفظ صلاحيات الحقول</Button>
           {fieldAccessMessage ? <div className="text-sm text-muted-foreground">{fieldAccessMessage}</div> : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Crown className="h-5 w-5 text-amber-500" /> مفوضو الوكيل التنفيذي (Lana Admin Agent Delegates)</CardTitle>
+          <CardDescription>
+            فقط من تضيفه هنا يظهر له تاج التنفيذ بجانب لانا AI ويمكنه إصدار أوامر تنفيذية (مثل تعيين مسؤول موافقات لمستشفى/فرع).
+            Only people added here see the execution crown next to Lana AI and can issue executive commands.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {delegateEmployees.length ? delegateEmployees.map((employee) => (
+              <Badge key={employee.userId} className="flex items-center gap-1.5 bg-amber-100 text-amber-900 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300">
+                <Crown className="h-3 w-3" />
+                {employee.employeeNumber} - {employee.firstName} {employee.lastName}
+                <button type="button" onClick={() => removeDelegate(employee.userId)} className="ms-1 hover:text-rose-600" aria-label="remove delegate">
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )) : <span className="text-sm text-muted-foreground">لا يوجد مفوضون حالياً / No delegates yet</span>}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="w-72"><UserSearchSelect value={newDelegateUserId} onChange={(userId) => setNewDelegateUserId(userId)} /></div>
+            <Button type="button" onClick={addDelegate} disabled={isPending || !newDelegateUserId}>إضافة مفوض</Button>
+          </div>
+          {delegatesMessage ? <div className="text-sm text-muted-foreground">{delegatesMessage}</div> : null}
         </CardContent>
       </Card>
 

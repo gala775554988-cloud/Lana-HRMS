@@ -6,6 +6,8 @@ import { getEffectivePermissionsForRoles } from "@/lib/enterprise/permissions";
 import { getEmployeeFieldAccess, redactHiddenFields } from "@/lib/enterprise/employee-field-access";
 import { isOdooIntegrationEnabled } from "@/lib/settings";
 import type { LanaSyncEntity } from "@/lib/enterprise/lana-sync-actions";
+import { isLanaDelegate } from "@/lib/enterprise/lana-delegates";
+import { writeAuditLog } from "@/lib/audit";
 
 export type LanaAiAnswer = {
   answer: string;
@@ -103,6 +105,19 @@ export async function answerLanaAi({
   const WHO_CAN_APPROVE_PATTERN = /من\s+(يملك|لديه|تملك|لديها)?\s*صلاحية\s*الموافقة|من\s+يستطيع\s+الموافقة|من\s+(يوافق|يعتمد)\s+على|who\s+can\s+approve/i;
   const HAS_PERMISSION_PATTERN = /(يملك|تملك|لديه|لديها)\s*صلاحية|does\s+.*\s+have\s+permission|has\s+permission\s+to/i;
   const canQueryPermissions = roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER") || can(permissions, "read", "permissions");
+
+  // "Executive" command: assign a specific employee as the responsible
+  // approver for a hospital/branch. Also checked before policyAnswer() --
+  // otherwise a command naming "إجازات"/"رواتب" etc. would be swallowed by
+  // the generic policy blurb. Deliberately a narrow, hardcoded pattern (not
+  // a general-purpose command interpreter): gated to explicitly
+  // admin-designated delegates, never guesses on name ambiguity, and always
+  // confirms against freshly re-read DB state after writing.
+  const ASSIGN_RESPONSIBLE_PATTERN = /اجعل[ي]?\s+(?:ال)?موظف(?:ة)?\s+(.+?)\s+مسؤول(?:ة|اً|ا)?\s+عن\s+(مستشفى|فرع)\s+(.+?)(?:\s+ل(?:موافقات|طلبات)\s+(.+?))?[.؟?]?\s*$/u;
+  const assignMatch = ASSIGN_RESPONSIBLE_PATTERN.exec(message.trim());
+  if (assignMatch) {
+    return handleAssignResponsibleCommand({ userId, roles, ar, suggestions, match: assignMatch });
+  }
 
   if (!WHO_CAN_APPROVE_PATTERN.test(message) && !HAS_PERMISSION_PATTERN.test(message)) {
     const policy = policyAnswer(message, ar);
@@ -470,6 +485,158 @@ export async function answerLanaAi({
     answer: openAiAnswer || (ar
       ? "أنا Lana AI. أستطيع مساعدتك في سياسات الموارد البشرية، الطلبات، الرواتب، الإجازات، الأوفر تايم، والبحث داخل البيانات التي تملك صلاحية رؤيتها."
       : "I am Lana AI. I can help with HR policies, requests, payroll, leave, overtime, and searching data you are allowed to access."),
+    suggestions
+  };
+}
+
+const MODULE_KEYWORD_MAP: Array<[RegExp, string, string]> = [
+  [/إجاز/i, "leave", "الإجازات"],
+  [/أوفر|اضافي|إضافي/i, "overtime", "الأوفر تايم"],
+  [/سلف/i, "loan", "السلف"],
+  [/مصروف/i, "expense", "المصروفات"]
+];
+const ALL_APPROVAL_MODULES: Array<[string, string]> = [["leave", "الإجازات"], ["overtime", "الأوفر تايم"], ["loan", "السلف"], ["expense", "المصروفات"]];
+
+/**
+ * Executive command handler: "اجعل الموظف X مسؤولاً عن مستشفى/فرع Y [لموافقات Z]".
+ * Hardcoded, narrow logic per the explicit spec -- not a general interpreter:
+ *   1. Delegate check first, before touching any data.
+ *   2. Any name ambiguity (scope or employee) stops immediately with a
+ *      disambiguation list -- nothing is written until the caller repeats
+ *      the command with an unambiguous identifier (employee number).
+ *   3. After writing, the affected HrApprovalChain rows are re-read fresh
+ *      from the DB (not just the values just sent) for the confirmation
+ *      report, and everything is audit-logged.
+ */
+async function handleAssignResponsibleCommand({
+  userId,
+  roles,
+  ar,
+  suggestions,
+  match
+}: {
+  userId: string;
+  roles: string[];
+  ar: boolean;
+  suggestions: string[];
+  match: RegExpExecArray;
+}): Promise<LanaAiAnswer> {
+  if (!(await isLanaDelegate(userId, roles))) {
+    return {
+      answer: ar
+        ? "هذا أمر تنفيذي (تعديل سلسلة الموافقات) متاح فقط للمفوَّضين الذين حددهم المسؤول في لوحة التحكم. لا تملك هذه الصلاحية حالياً."
+        : "This is an executive command (editing the approval chain) available only to delegates the admin has designated. You don't currently have this permission.",
+      suggestions
+    };
+  }
+
+  const [, employeeToken, scopeKeyword, scopeToken, moduleToken] = match;
+  const scopeType: "HOSPITAL" | "BRANCH" = scopeKeyword.trim() === "مستشفى" ? "HOSPITAL" : "BRANCH";
+
+  // --- Resolve scope (hospital/branch) — stop on 0 or >1 matches ---
+  const scopeName = scopeToken.trim();
+  const scopeCandidates = scopeType === "HOSPITAL"
+    ? await prisma.hospital.findMany({ where: { name: { contains: scopeName, mode: "insensitive" } }, select: { id: true, name: true }, take: 10 })
+    : await prisma.branch.findMany({ where: { name: { contains: scopeName, mode: "insensitive" } }, select: { id: true, name: true }, take: 10 });
+
+  if (scopeCandidates.length === 0) {
+    const label = scopeType === "HOSPITAL" ? "مستشفى" : "فرعاً";
+    return { answer: ar ? `لم أجد ${label} باسم "${scopeName}". لم يتم تنفيذ أي تغيير.` : `No matching ${scopeType.toLowerCase()} found for "${scopeName}". Nothing was executed.`, suggestions };
+  }
+  if (scopeCandidates.length > 1) {
+    return {
+      answer: ar
+        ? `وجدت أكثر من ${scopeType === "HOSPITAL" ? "مستشفى" : "فرع"} مطابق لـ "${scopeName}". يرجى إعادة الأمر باستخدام الاسم الدقيق: ${scopeCandidates.map((c) => c.name).join("، ")}. لم يتم تنفيذ أي تغيير.`
+        : `More than one matching ${scopeType.toLowerCase()} found for "${scopeName}": ${scopeCandidates.map((c) => c.name).join(", ")}. Please repeat the command with the exact name. Nothing was executed.`,
+      suggestions
+    };
+  }
+  const scope = scopeCandidates[0];
+
+  // --- Resolve employee — stop on 0 or >1 matches, with a disambiguation
+  // list showing employee number/title/department (per the explicit spec) ---
+  const employeeName = employeeToken.trim();
+  const employeeCandidates = await prisma.employee.findMany({
+    where: {
+      OR: [
+        { employeeNumber: { equals: employeeName, mode: "insensitive" } },
+        { firstName: { contains: employeeName, mode: "insensitive" } },
+        { lastName: { contains: employeeName, mode: "insensitive" } }
+      ]
+    },
+    select: { id: true, employeeNumber: true, firstName: true, lastName: true, userId: true, position: { select: { title: true } }, department: { select: { name: true } } },
+    take: 10
+  });
+
+  if (employeeCandidates.length === 0) {
+    return { answer: ar ? `لم أجد موظفاً باسم أو رقم "${employeeName}". لم يتم تنفيذ أي تغيير.` : `No matching employee found for "${employeeName}". Nothing was executed.`, suggestions };
+  }
+  if (employeeCandidates.length > 1) {
+    const options = employeeCandidates
+      .map((employee) => `${employee.employeeNumber} - ${employee.firstName} ${employee.lastName} (${employee.position?.title ?? "-"} / ${employee.department?.name ?? "-"})`)
+      .join("\n");
+    return {
+      answer: ar
+        ? `وجدت أكثر من موظف مطابق لـ "${employeeName}":\n${options}\n\nيرجى إعادة الأمر باستخدام رقم الموظف الدقيق (مثال: "اجعل الموظف ${employeeCandidates[0].employeeNumber} مسؤولاً عن ${scopeKeyword} ${scope.name}"). لم يتم تنفيذ أي تغيير.`
+        : `More than one matching employee found for "${employeeName}":\n${options}\n\nPlease repeat the command with the exact employee number. Nothing was executed.`,
+      suggestions
+    };
+  }
+  const employee = employeeCandidates[0];
+  if (!employee.userId) {
+    return {
+      answer: ar
+        ? `الموظف ${employee.firstName} ${employee.lastName} (${employee.employeeNumber}) لا يملك حساب مستخدم مرتبطاً، ولا يمكن تعيينه معتمداً. لم يتم تنفيذ أي تغيير.`
+        : `${employee.firstName} ${employee.lastName} (${employee.employeeNumber}) has no linked user account and can't be assigned as an approver. Nothing was executed.`,
+      suggestions
+    };
+  }
+
+  // --- Resolve module(s): a named type, or all four if none was specified ---
+  const matchedModule = moduleToken ? MODULE_KEYWORD_MAP.find(([pattern]) => pattern.test(moduleToken)) : null;
+  const targetModules: Array<[string, string]> = matchedModule ? [[matchedModule[1], matchedModule[2]]] : ALL_APPROVAL_MODULES;
+
+  // --- Execute: upsert a level-1 scoped override per target module ---
+  const before: Record<string, unknown> = {};
+  for (const [moduleKey] of targetModules) {
+    before[moduleKey] = await prisma.hrApprovalChain.findUnique({
+      where: { module_level_scopeType_scopeId: { module: moduleKey, level: 1, scopeType, scopeId: scope.id } }
+    });
+  }
+
+  for (const [moduleKey] of targetModules) {
+    await prisma.hrApprovalChain.upsert({
+      where: { module_level_scopeType_scopeId: { module: moduleKey, level: 1, scopeType, scopeId: scope.id } },
+      update: { approverUserId: employee.userId, approverRole: "DIRECT_MANAGER", capabilities: ["VIEW", "APPROVE", "REJECT"], isActive: true },
+      create: { module: moduleKey, level: 1, scopeType, scopeId: scope.id, approverUserId: employee.userId, approverRole: "DIRECT_MANAGER", capabilities: ["VIEW", "APPROVE", "REJECT"], isActive: true }
+    });
+  }
+
+  // --- Validation: re-read the freshly-written state from the DB (never
+  // trust the values just sent) to build the confirmation report ---
+  const afterRows = await prisma.hrApprovalChain.findMany({
+    where: { scopeType, scopeId: scope.id, module: { in: targetModules.map(([key]) => key) } },
+    orderBy: { module: "asc" }
+  });
+
+  await writeAuditLog({
+    actorUserId: userId,
+    action: "lana-ai:assign-approver",
+    entity: "hrApprovalChain",
+    metadata: { before, after: afterRows, employeeId: employee.id, scopeType, scopeId: scope.id, scopeName: scope.name }
+  });
+
+  const scopeLabel = scopeType === "HOSPITAL" ? "مستشفى" : "فرع";
+  const employeeLabel = `${employee.firstName} ${employee.lastName} (${employee.employeeNumber})`;
+  const lines = afterRows.map((row) => {
+    const moduleLabel = ALL_APPROVAL_MODULES.find(([key]) => key === row.module)?.[1] ?? row.module;
+    return `${moduleLabel}: ${scopeLabel} ${scope.name} -> ${employeeLabel} (${(row.capabilities ?? []).includes("APPROVE") ? "موافقة/رفض" : "إظهار فقط"})`;
+  });
+
+  return {
+    answer: ar
+      ? `تم تنفيذ سلسلة الموافقات كالتالي:\n${lines.join("\n")}`
+      : `Approval chain executed as follows:\n${lines.join("\n")}`,
     suggestions
   };
 }
