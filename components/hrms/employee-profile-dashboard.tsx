@@ -8,7 +8,7 @@ import {
   Edit, Save, Printer, Download, Archive, ArchiveRestore, 
   UserX, UserCheck, Mail, Phone, MapPin, Building2,
   CalendarDays, Clock3, Award, File, Upload, Trash2, Eye,
-  Search, Filter, Plus
+  Search, Filter, Plus, Smartphone
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -105,6 +105,22 @@ export function EmployeeProfileDashboard({
       alert(json.message || "تمت إعادة التعيين");
     } catch (e) {
       alert("خطأ");
+    }
+  };
+
+  const handleUnbindDevice = async () => {
+    if (!confirm(isAr ? `هل أنت متأكد من فك ارتباط جهاز الجوال للموظف (${fullName})؟ سيتمكن الموظف من تسجيل الدخول من جهاز جديد.` : `Unbind mobile device for ${fullName}?`)) return;
+    try {
+      const res = await fetch("/api/employee/device/unbind", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeeId: employee.id }),
+      });
+      const json = await res.json();
+      alert(json.message || (isAr ? "تم فك ارتباط الجهاز بنجاح" : "Device unbound successfully"));
+      router.refresh();
+    } catch (e) {
+      alert(isAr ? "حدث خطأ أثناء فك ارتباط الجهاز" : "Error unbinding device");
     }
   };
 
@@ -220,6 +236,10 @@ export function EmployeeProfileDashboard({
                       {employee.status === "INACTIVE" ? "إلغاء الأرشفة" : "أرشفة"}
                     </Button>
                     <Button size="sm" variant="outline" onClick={handleResetPassword} className="gap-1"><KeyRound className="h-4 w-4" />إعادة تعيين كلمة المرور</Button>
+                    <Button size="sm" variant="outline" onClick={handleUnbindDevice} className="gap-1.5 border-amber-300 hover:bg-amber-50 text-amber-800 dark:border-amber-800 dark:hover:bg-amber-950/50 dark:text-amber-300">
+                      <Smartphone className="h-4 w-4" />
+                      {isAr ? "إلغاء ربط الجهاز (Unbind Device)" : "Unbind Device"}
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -389,6 +409,27 @@ export function EmployeeProfileDashboard({
 
         {/* 10- Permissions */}
         <TabsContent value="permissions" className="space-y-6 mt-6">
+          <Card className="rounded-3xl border-amber-100 dark:border-amber-950/50 shadow-sm bg-amber-50/30 dark:bg-amber-950/10">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-amber-800 dark:text-amber-300">
+                  <Smartphone className="h-5 w-5" />
+                  ارتباط جهاز الجوال والتحقق الأمني (Device Binding Policy)
+                </CardTitle>
+                <CardDescription className="text-amber-700/80 dark:text-amber-400/80 mt-1">
+                  نظام حماية الحضور والانصراف والدخول الموحد المرتبط ببصمة جهاز الجوال (UUID)
+                </CardDescription>
+              </div>
+              <Button size="sm" variant="outline" onClick={handleUnbindDevice} className="gap-1.5 border-amber-300 bg-white hover:bg-amber-100 text-amber-800 shadow-sm dark:bg-slate-900 dark:border-amber-800 dark:hover:bg-amber-950 dark:text-amber-300">
+                <Smartphone className="h-4 w-4" />
+                {isAr ? "إلغاء ربط الجهاز (Unbind Device)" : "Unbind Device"}
+              </Button>
+            </CardHeader>
+            <CardContent className="text-xs text-amber-800 dark:text-amber-300/90 leading-relaxed">
+              عند تسجيل دخول الموظف لأول مرة أو تسجيل الحضور من التطبيق، يقوم النظام تلقائياً بربط الحساب ببصمة الجهاز الفريدة (UUID). عند محاولة الدخول من جهاز جديد يتم حظر المحاولة وإرسال تنبيه أمني للمسؤول. للتمكين من الدخول من جهاز آخر يرجى الضغط على زر (إلغاء ربط الجهاز).
+            </CardContent>
+          </Card>
+
           <Card className="rounded-3xl border-indigo-100 dark:border-indigo-950/50 shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-indigo-700 dark:text-indigo-300">

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Dictionary } from "@/lib/i18n";
+import { getOrCreateMobileDeviceUUID } from "@/lib/employee/device-uuid";
 
 export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
   const router = useRouter();
@@ -35,8 +36,9 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
     setMessage(null);
     if (rememberMe) window.localStorage.setItem("lana.hrms.rememberedIdentifier", values.identifier);
     else window.localStorage.removeItem("lana.hrms.rememberedIdentifier");
+    const deviceId = getOrCreateMobileDeviceUUID();
     startTransition(async () => {
-      const result = await loginAction(values);
+      const result = await loginAction({ ...values, deviceId });
       if (result.success) {
         // A hard navigation here, not router.push(). A soft/transition-based
         // push landed users on a permanently blank page whenever the

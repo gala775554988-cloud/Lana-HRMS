@@ -14,7 +14,8 @@ export const loginSchema = z.object({
     .min(2, "Enter your username or national ID.")
     .max(64, "Identifier is too long.")
     .trim(),
-  password: z.string().min(1, "Password is required.")
+  password: z.string().min(1, "Password is required."),
+  deviceId: z.string().optional()
 });
 
 export const forgotPasswordSchema = z.object({

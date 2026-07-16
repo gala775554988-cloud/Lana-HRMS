@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations/auth";
 import { verifyPassword, hashPassword } from "@/lib/password";
 import { getCachedEffectivePermissions } from "@/lib/enterprise/permissions";
+import { verifyOrBindEmployeeDevice } from "@/lib/cache/device-cache";
 
 async function getAuthorization(userId: string) {
   const assignments = await prisma.userRole.findMany({
@@ -31,7 +32,7 @@ async function findUserByUsernameOrEmail(value: string, lower: string) {
   return byUsername ?? byEmail;
 }
 
-async function findUser(identifier: string) {
+export async function findUser(identifier: string) {
   const value = identifier.trim();
   const lower = value.toLowerCase();
   // The login form's own placeholder tells employees to sign in with their
@@ -126,6 +127,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       credentials: {
         identifier: { label: "Username", type: "text" },
         password: { label: "Password", type: "password" },
+        deviceId: { label: "Device ID", type: "text" },
       },
       async authorize(credentials) {
         const parsed = loginSchema.safeParse(credentials);
@@ -134,6 +136,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!user?.passwordHash || !user.isActive) return null;
         const ok = await verifyPassword(parsed.data.password, user.passwordHash);
         if (!ok) return null;
+
+        const deviceId = parsed.data.deviceId;
+        if (deviceId && deviceId !== "unknown" && deviceId !== "server-side" && deviceId !== "mobile-session-fallback") {
+          const employee = await prisma.employee.findFirst({
+            where: {
+              OR: [
+                { userId: user.id },
+                { nationalId: user.username || "" },
+                { employeeNumber: user.username || "" }
+              ]
+            },
+            select: { id: true }
+          });
+          if (employee) {
+            const deviceCheck = await verifyOrBindEmployeeDevice(employee.id, deviceId, "mobile");
+            if (!deviceCheck.allowed) {
+              return null;
+            }
+          }
+        }
+
         await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }).catch(() => {});
         const { roles } = await getAuthorization(user.id);
         // Only store roles in JWT, not permissions (too large → cookie chunking → middleware break)

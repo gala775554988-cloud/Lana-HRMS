@@ -2,10 +2,11 @@
 
 import { AuthError } from "next-auth";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
-import { signIn, signOut } from "@/auth";
+import { signIn, signOut, findUser } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { hashPassword } from "@/lib/password";
+import { hashPassword, verifyPassword } from "@/lib/password";
 import { hashToken } from "@/lib/tokens";
+import { verifyOrBindEmployeeDevice } from "@/lib/cache/device-cache";
 import {
   emailVerificationSchema,
   forgotPasswordSchema,
@@ -15,18 +16,74 @@ import {
 
 type ActionState = { success: boolean; message: string };
 
-const BAD_CREDENTIALS = "Invalid username, national ID, password, or account status.";
+const BAD_CREDENTIALS = "بيانات الدخول غير صحيحة (تأكد من رقم الهوية أو كلمة المرور أو حالة ارتباط الجهاز).";
 
 export async function loginAction(input: unknown): Promise<ActionState> {
   const parsed = loginSchema.safeParse(input);
   if (!parsed.success) {
-    return { success: false, message: parsed.error.errors[0]?.message ?? "Invalid login." };
+    return { success: false, message: parsed.error.errors[0]?.message ?? "بيانات الدخول غير صحيحة." };
   }
 
   try {
+    const { identifier, password, deviceId } = parsed.data;
+
+    // 1. Pre-verify identity & password with exact error diagnostics
+    const user = await findUser(identifier);
+    if (!user) {
+      return {
+        success: false,
+        message: "بيانات الدخول غير صحيحة: لم يتم العثور على حساب أو موظف مطابق لرقم الهوية أو اسم المستخدم المرفق."
+      };
+    }
+    if (!user.isActive) {
+      return {
+        success: false,
+        message: "حساب الموظف غير مفعل حالياً. يرجى مراجعة إدارة الموارد البشرية لتفعيل الحساب."
+      };
+    }
+    if (!user.passwordHash) {
+      return {
+        success: false,
+        message: "بيانات الدخول غير صحيحة: لا توجد كلمة مرور معينة للحساب، يرجى مراجعة إدارة الموارد البشرية."
+      };
+    }
+
+    const passwordOk = await verifyPassword(password, user.passwordHash);
+    if (!passwordOk) {
+      return {
+        success: false,
+        message: "بيانات الدخول غير صحيحة: كلمة المرور المدخلة غير مطابقة لحسابك."
+      };
+    }
+
+    // 2. Device Binding Pre-check (Strict Policy & Freeze on mismatch)
+    if (deviceId && deviceId !== "unknown" && deviceId !== "server-side" && deviceId !== "mobile-session-fallback") {
+      const employee = await prisma.employee.findFirst({
+        where: {
+          OR: [
+            { userId: user.id },
+            { nationalId: user.username || "" },
+            { employeeNumber: user.username || "" }
+          ]
+        },
+        select: { id: true }
+      });
+
+      if (employee) {
+        const deviceCheck = await verifyOrBindEmployeeDevice(employee.id, deviceId, "mobile");
+        if (!deviceCheck.allowed) {
+          return {
+            success: false,
+            message: deviceCheck.reason || "حسابك مرتبط بجهاز آخر. يرجى مراجعة الموارد البشرية لإعادة التعيين."
+          };
+        }
+      }
+    }
+
     await signIn("credentials", {
-      identifier: parsed.data.identifier,
-      password: parsed.data.password,
+      identifier,
+      password,
+      deviceId,
       redirect: false,
     });
     return { success: true, message: "" };
