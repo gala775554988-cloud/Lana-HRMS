@@ -1,132 +1,567 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
-import { Bot, Crown, Send, Sparkles, X } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { 
+  Bot, Send, Sparkles, X, Plus, Copy, Check, RefreshCw, Square, 
+  Paperclip, FileText, Image as ImageIcon, FileSpreadsheet, Maximize2, Minimize2, ArrowDown
+} from "lucide-react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 
+type UploadedFile = {
+  name: string;
+  type: string;
+  size: number;
+  dataUri: string;
+};
+
 type ChatMessage = {
+  id: string;
   role: "user" | "assistant";
   content: string;
-  results?: Array<Record<string, unknown>>;
+  files?: UploadedFile[];
+  isStreaming?: boolean;
 };
+
+function LanaMarkdownRenderer({ content }: { content: string }) {
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  function copyCode(code: string, idx: number) {
+    navigator.clipboard.writeText(code);
+    setCopiedIndex(idx);
+    setTimeout(() => setCopiedIndex(null), 2000);
+  }
+
+  // Split into code blocks vs regular text
+  const parts = content.split(/(```[\s\S]*?```)/g);
+
+  return (
+    <div className="space-y-2.5 text-sm leading-relaxed">
+      {parts.map((part, idx) => {
+        if (part.startsWith("```") && part.endsWith("```")) {
+          const lines = part.slice(3, -3).trim().split("\n");
+          const lang = lines[0]?.match(/^[a-zA-Z0-9_-]+$/) ? lines[0] : "";
+          const code = lang ? lines.slice(1).join("\n") : lines.join("\n");
+
+          return (
+            <div key={idx} className="my-2 overflow-hidden rounded-xl border border-slate-700 bg-slate-950 text-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900/80 px-3 py-1.5 text-xs text-slate-400">
+                <span className="font-mono lowercase">{lang || "code"}</span>
+                <button
+                  type="button"
+                  onClick={() => copyCode(code, idx)}
+                  className="flex items-center gap-1.5 rounded px-2 py-0.5 text-xs transition hover:bg-slate-800 hover:text-white"
+                >
+                  {copiedIndex === idx ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                  <span>{copiedIndex === idx ? "تم النسخ" : "نسخ الكود"}</span>
+                </button>
+              </div>
+              <pre className="overflow-x-auto p-3 text-xs font-mono leading-normal text-emerald-300">
+                <code>{code}</code>
+              </pre>
+            </div>
+          );
+        }
+
+        // Format bold, italic, bullet lists
+        return (
+          <div key={idx} className="whitespace-pre-wrap break-words">
+            {part.split("\n").map((line, lIdx) => {
+              const trimmed = line.trim();
+              if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+                return (
+                  <div key={lIdx} className="flex items-start gap-2 ms-2 my-1">
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500" />
+                    <span>{trimmed.slice(2)}</span>
+                  </div>
+                );
+              }
+              if (/^\d+\.\s/.test(trimmed)) {
+                const numMatch = trimmed.match(/^(\d+\.)\s+(.*)/);
+                return (
+                  <div key={lIdx} className="flex items-start gap-2 ms-2 my-1">
+                    <span className="font-bold text-indigo-600 dark:text-indigo-400 shrink-0">{numMatch?.[1]}</span>
+                    <span>{numMatch?.[2] || trimmed}</span>
+                  </div>
+                );
+              }
+              return (
+                <p key={lIdx} className={lIdx > 0 ? "mt-1.5" : ""}>
+                  {line}
+                </p>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export function LanaAiAssistant() {
   const { data: session, status } = useSession();
   const [open, setOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: "assistant", content: "مرحباً، أنا Lana AI. اسألني عن الموارد البشرية أو ابحث داخل البيانات المصرح لك برؤيتها." }
-  ]);
-  const [isPending, startTransition] = useTransition();
-  const [isDelegate, setIsDelegate] = useState(false);
-  const listRef = useRef<HTMLDivElement | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [conversationId, setConversationId] = useState<string | undefined>(undefined);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [files, setFiles] = useState<UploadedFile[]>([]);
+  const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  function scrollToBottom(behavior: ScrollBehavior = "smooth") {
+    messagesEndRef.current?.scrollIntoView({ behavior });
+  }
 
   useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, open]);
+    if (open) {
+      setTimeout(() => scrollToBottom("auto"), 100);
+    }
+  }, [open, messages]);
 
-  useEffect(() => {
-    if (status !== "authenticated") return;
-    fetch("/api/enterprise/lana-ai/delegate-status", { cache: "no-store" })
-      .then((response) => response.json())
-      .then((data) => setIsDelegate(Boolean(data.success && data.isDelegate)))
-      .catch(() => setIsDelegate(false));
-  }, [status]);
+  function handleScroll() {
+    if (!scrollContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+    setShowScrollBottom(scrollHeight - scrollTop - clientHeight > 120);
+  }
 
   if (status !== "authenticated" || !session?.user) return null;
 
-  function send() {
-    const message = input.trim();
-    if (!message || isPending) return;
+  async function handleFileUpload(fileList: FileList | null) {
+    if (!fileList || fileList.length === 0) return;
+    const newFiles: UploadedFile[] = [];
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      if (file.size > 10 * 1024 * 1024) continue; // max 10MB
+      const dataUri = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+      newFiles.push({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        dataUri
+      });
+    }
+    setFiles((prev) => [...prev, ...newFiles]);
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragging(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragging(false);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragging(false);
+    handleFileUpload(e.dataTransfer.files);
+  }
+
+  function startNewChat() {
+    if (isStreaming && abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    setConversationId(undefined);
+    setMessages([]);
     setInput("");
-    setMessages((current) => [...current, { role: "user", content: message }]);
-    startTransition(async () => {
-      try {
-        const response = await fetch("/api/enterprise/lana-ai", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message })
-        });
-        const data = await response.json().catch(() => ({ success: false, message: "تعذر قراءة رد Lana AI" }));
-        if (!response.ok || !data.success) {
-          setMessages((current) => [...current, { role: "assistant", content: data.message || "تعذر تنفيذ الطلب." }]);
-          return;
-        }
-        setMessages((current) => [...current, { role: "assistant", content: data.answer, results: data.results }]);
-      } catch (error) {
-        setMessages((current) => [...current, { role: "assistant", content: error instanceof Error ? error.message : "حدث خطأ غير متوقع." }]);
+    setFiles([]);
+    setIsStreaming(false);
+  }
+
+  function copyMessage(text: string, id: string) {
+    navigator.clipboard.writeText(text);
+    setCopiedMsgId(id);
+    setTimeout(() => setCopiedMsgId(null), 2000);
+  }
+
+  function stopGenerating() {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      setIsStreaming(false);
+    }
+  }
+
+  async function send(customMessage?: string) {
+    const textToSend = (customMessage || input).trim();
+    if (!textToSend && files.length === 0) return;
+    if (isStreaming) return;
+
+    const userMsgId = `user-${Date.now()}`;
+    const assistantMsgId = `assistant-${Date.now()}`;
+    const currentFiles = [...files];
+
+    setMessages((prev) => [
+      ...prev,
+      { id: userMsgId, role: "user", content: textToSend, files: currentFiles.length ? currentFiles : undefined },
+      { id: assistantMsgId, role: "assistant", content: "", isStreaming: true }
+    ]);
+
+    if (!customMessage) {
+      setInput("");
+      setFiles([]);
+    }
+    setIsStreaming(true);
+
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    try {
+      const response = await fetch("/api/enterprise/lana-ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: abortController.signal,
+        body: JSON.stringify({
+          message: textToSend,
+          conversationId,
+          messages: messages.map((m) => ({ role: m.role, content: m.content }))
+        })
+      });
+
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.message || `HTTP ${response.status}`);
       }
-    });
+
+      const newConvId = response.headers.get("X-Conversation-Id");
+      if (newConvId) setConversationId(newConvId);
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = "";
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split("\n").filter(Boolean);
+
+          for (const line of lines) {
+            if (line.startsWith("0:")) {
+              try {
+                const textChunk = JSON.parse(line.slice(2));
+                fullContent += textChunk;
+                setMessages((prev) =>
+                  prev.map((m) => (m.id === assistantMsgId ? { ...m, content: fullContent } : m))
+                );
+                scrollToBottom("auto");
+              } catch {}
+            } else if (line.startsWith("e:") || line.startsWith("3:")) {
+              // stream stop or error
+            }
+          }
+        }
+      }
+
+      setMessages((prev) =>
+        prev.map((m) => (m.id === assistantMsgId ? { ...m, content: fullContent || "تم تنفيذ الطلب.", isStreaming: false } : m))
+      );
+    } catch (err: any) {
+      if (err.name === "AbortError") {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === assistantMsgId ? { ...m, content: m.content + " [تم إيقاف التوليد]", isStreaming: false } : m))
+        );
+      } else {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMsgId
+              ? { ...m, content: `عذراً، حدث خطأ أثناء المعالجة: ${err.message}`, isStreaming: false }
+              : m
+          )
+        );
+      }
+    } finally {
+      setIsStreaming(false);
+      abortControllerRef.current = null;
+    }
+  }
+
+  function getFileIcon(type: string) {
+    if (type.includes("pdf") || type.includes("word")) return <FileText className="h-4 w-4 text-rose-500" />;
+    if (type.includes("sheet") || type.includes("excel") || type.includes("csv")) return <FileSpreadsheet className="h-4 w-4 text-emerald-500" />;
+    return <ImageIcon className="h-4 w-4 text-indigo-500" />;
   }
 
   return (
-    <div className="fixed bottom-5 left-5 z-[70] print:hidden" dir="rtl">
+    <div className="fixed bottom-5 end-5 z-[80] flex flex-col items-end gap-3" dir="rtl">
       {open ? (
-        <div className="mb-3 w-[min(92vw,420px)] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-primary/20 dark:border-slate-800 dark:bg-slate-950">
-          <div className="flex items-center justify-between border-b bg-gradient-to-l from-primary to-primary/60 p-4 text-primary-foreground">
+        <div
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className={`flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl transition-all duration-300 dark:border-slate-800 dark:bg-slate-950 ${
+            isExpanded
+              ? "fixed inset-4 sm:inset-10 z-[100] w-auto h-auto max-w-5xl mx-auto"
+              : "h-[620px] max-h-[85vh] w-[92vw] sm:w-[460px]"
+          } ${isDragging ? "ring-2 ring-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/20" : ""}`}
+        >
+          {/* Header */}
+          <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 px-4 py-3.5 text-white dark:border-slate-800">
             <div className="flex items-center gap-3">
-              <div className="relative grid h-10 w-10 place-items-center rounded-2xl bg-white/15">
-                <Bot className="h-5 w-5" />
-                {isDelegate ? (
-                  <span className="absolute -end-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-amber-400 text-amber-950 shadow" title="وضع التنفيذ (مفوَّض) / Execution mode (delegate)">
-                    <Crown className="h-3 w-3" />
-                  </span>
-                ) : null}
+              <div className="grid h-9 w-9 place-items-center rounded-2xl bg-white/10 backdrop-blur-md shadow-inner">
+                <Sparkles className="h-5 w-5 text-amber-300" />
               </div>
               <div>
-                <p className="font-black">Lana AI</p>
-                <p className="text-xs text-white/75">{isDelegate ? "وضع التنفيذ مفعّل -- أوامر الصلاحيات مسموحة" : "مساعد ذكي آمن حسب صلاحياتك"}</p>
+                <h3 className="font-bold text-sm leading-tight">Lana</h3>
+                <p className="text-[11px] text-indigo-100/90 flex items-center gap-1.5 mt-0.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  المساعد الذكي الفوري
+                </p>
               </div>
             </div>
-            <button type="button" onClick={() => setOpen(false)} className="rounded-xl p-2 hover:bg-white/10" aria-label="Close Lana AI"><X className="h-4 w-4" /></button>
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={startNewChat}
+                title="محادثة جديدة"
+                className="grid h-8 w-8 place-items-center rounded-xl transition hover:bg-white/10 active:scale-95"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsExpanded(!isExpanded)}
+                title={isExpanded ? "تصغير" : "توسيع"}
+                className="grid h-8 w-8 place-items-center rounded-xl transition hover:bg-white/10 active:scale-95"
+              >
+                {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                title="إغلاق"
+                className="grid h-8 w-8 place-items-center rounded-xl transition hover:bg-white/10 active:scale-95"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
-          <div ref={listRef} className="max-h-[420px] space-y-3 overflow-y-auto bg-muted p-4">
-            {messages.map((message, index) => (
-              <div key={index} className={message.role === "user" ? "text-left" : "text-right"}>
-                <div className={`inline-block max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-6 ${message.role === "user" ? "bg-primary text-primary-foreground" : "border bg-white text-slate-800 dark:bg-slate-950 dark:text-slate-100"}`}>
-                  {message.content}
-                  {message.results?.length ? (
-                    <div className="mt-3 space-y-2">
-                      {message.results.map((result, itemIndex) => {
-                        const isProfile = result.type === "employee-profile";
-                        const photoUrl = typeof result.photoUrl === "string" ? result.photoUrl : null;
-                        const entries = Object.entries(result).filter(([key]) => !["type", "photoUrl", "id"].includes(key));
-                        return (
-                          <div key={itemIndex} className="rounded-xl border bg-slate-50 p-2 text-xs text-slate-600 dark:bg-slate-900 dark:text-slate-300">
-                            {photoUrl ? (
-                              <img src={photoUrl} alt={String(result.name ?? "")} className="mb-2 h-16 w-16 rounded-lg object-cover" />
-                            ) : null}
-                            {(isProfile ? entries : entries.slice(0, 5)).map(([key, value]) => <div key={key}><strong>{key}:</strong> {String(value ?? "-")}</div>)}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : null}
+
+          {/* Messages Body */}
+          <div
+            ref={scrollContainerRef}
+            onScroll={handleScroll}
+            className="relative flex-1 overflow-y-auto p-4 space-y-4 text-sm"
+          >
+            {messages.length === 0 ? (
+              <div className="flex h-full flex-col items-center justify-center text-center px-4 py-8">
+                <div className="grid h-14 w-14 place-items-center rounded-3xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400 mb-4 shadow-sm">
+                  <Sparkles className="h-7 w-7" />
+                </div>
+                <h4 className="font-bold text-base mb-1.5">تحدث مع Lana</h4>
+                <p className="text-xs text-muted-foreground max-w-xs mb-6 leading-relaxed">
+                  مساعدك الذكي لإدارة شؤون الموظفين، استعلام الإجازات والرواتب، تسجيل الحضور، وتحليل الملفات (PDF / Excel / Word).
+                </p>
+                <div className="grid w-full gap-2 text-start">
+                  {[
+                    "كم رصيد إجازاتي السنوية المتاح الآن؟",
+                    "سجل لي دخول اليوم من الموبايل",
+                    "ما هي سياسة العمل الإضافي في المؤسسة؟",
+                    "عرض تفاصيل آخر مسير راتب لي"
+                  ].map((sug, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => send(sug)}
+                      className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-xs font-medium text-slate-700 transition hover:border-indigo-500 hover:bg-indigo-50/50 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-300 dark:hover:border-indigo-500/50"
+                    >
+                      {sug}
+                    </button>
+                  ))}
                 </div>
               </div>
-            ))}
+            ) : (
+              messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`flex flex-col gap-1.5 ${msg.role === "user" ? "items-start" : "items-end"}`}
+                >
+                  <div
+                    className={`group relative max-w-[88%] rounded-3xl px-4 py-3 shadow-sm ${
+                      msg.role === "user"
+                        ? "bg-indigo-600 text-white rounded-br-none"
+                        : "bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-bl-none border border-slate-200 dark:border-slate-800"
+                    }`}
+                  >
+                    {/* Uploaded Files Preview inside User Message */}
+                    {msg.files && msg.files.length > 0 && (
+                      <div className="mb-2.5 flex flex-wrap gap-2 border-b border-indigo-500/30 pb-2">
+                        {msg.files.map((f, i) => (
+                          <div key={i} className="flex items-center gap-1.5 rounded-xl bg-indigo-700/80 px-2.5 py-1 text-xs">
+                            {getFileIcon(f.type)}
+                            <span className="max-w-[120px] truncate">{f.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {msg.role === "assistant" ? (
+                      msg.content ? (
+                        <LanaMarkdownRenderer content={msg.content} />
+                      ) : (
+                        <div className="flex items-center gap-2 py-1 text-indigo-600 dark:text-indigo-400">
+                          <span className="flex gap-1">
+                            <span className="h-1.5 w-1.5 rounded-full bg-indigo-600 dark:bg-indigo-400 animate-bounce" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-indigo-600 dark:bg-indigo-400 animate-bounce [animation-delay:0.2s]" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-indigo-600 dark:bg-indigo-400 animate-bounce [animation-delay:0.4s]" />
+                          </span>
+                          <span className="text-xs font-semibold">Lana يكتب الآن...</span>
+                        </div>
+                      )
+                    ) : (
+                      <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
+                    )}
+                  </div>
+
+                  {/* Actions for Assistant Messages */}
+                  {msg.role === "assistant" && msg.content && !msg.isStreaming && (
+                    <div className="flex items-center gap-1 px-2 text-xs text-muted-foreground">
+                      <button
+                        type="button"
+                        onClick={() => copyMessage(msg.content, msg.id)}
+                        className="flex items-center gap-1 rounded-lg px-2 py-1 transition hover:bg-slate-100 dark:hover:bg-slate-900"
+                        title="نسخ الرد"
+                      >
+                        {copiedMsgId === msg.id ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                        <span>{copiedMsgId === msg.id ? "تم النسخ" : "نسخ"}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const userMsgs = messages.filter((m) => m.role === "user");
+                          const lastUserMsg = userMsgs[userMsgs.length - 1]?.content;
+                          if (lastUserMsg) send(lastUserMsg);
+                        }}
+                        className="flex items-center gap-1 rounded-lg px-2 py-1 transition hover:bg-slate-100 dark:hover:bg-slate-900"
+                        title="إعادة توليد الرد"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        <span>إعادة توليد</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+            <div ref={messagesEndRef} />
           </div>
-          <div className="flex gap-2 border-t bg-white p-3 dark:bg-slate-950">
-            <input
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              onKeyDown={(event) => { if (event.key === "Enter") send(); }}
-              placeholder="اسأل Lana AI..."
-              className="h-11 flex-1 rounded-2xl border bg-background px-4 text-sm outline-none focus:border-primary"
-            />
-            <Button type="button" onClick={send} disabled={isPending} className="rounded-2xl bg-primary hover:bg-primary/90"><Send className="h-4 w-4" /></Button>
+
+          {/* Floating Scroll to Bottom Button */}
+          {showScrollBottom && (
+            <button
+              type="button"
+              onClick={() => scrollToBottom("smooth")}
+              className="absolute bottom-20 start-1/2 -translate-x-1/2 z-10 grid h-8 w-8 place-items-center rounded-full border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900 text-slate-700 dark:text-slate-300 transition hover:scale-105 active:scale-95"
+            >
+              <ArrowDown className="h-4 w-4" />
+            </button>
+          )}
+
+          {/* Staged File Pills before Sending */}
+          {files.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 bg-slate-50/80 px-4 py-2 dark:border-slate-800 dark:bg-slate-900/50">
+              {files.map((f, idx) => (
+                <div key={idx} className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-xs shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                  {getFileIcon(f.type)}
+                  <span className="max-w-[140px] truncate font-medium">{f.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setFiles((prev) => prev.filter((_, i) => i !== idx))}
+                    className="ms-1 text-slate-400 hover:text-rose-500"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Input Area */}
+          <div className="shrink-0 border-t border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+            <div className="flex items-end gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1.5 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 dark:border-slate-800 dark:bg-slate-900/50">
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,image/*"
+                onChange={(e) => handleFileUpload(e.target.files)}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                title="إرفاق ملف (PDF / Excel / Word / صور)"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-slate-500 transition hover:bg-slate-200/60 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+              >
+                <Paperclip className="h-4 w-4" />
+              </button>
+
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    send();
+                  }
+                }}
+                placeholder="اسأل Lana أي شيء أو اطلب تنفيذ عملية في النظام..."
+                rows={1}
+                className="max-h-32 min-h-[36px] w-full resize-none border-0 bg-transparent py-2 text-sm focus:outline-none focus:ring-0 placeholder:text-muted-foreground"
+              />
+
+              {isStreaming ? (
+                <button
+                  type="button"
+                  onClick={stopGenerating}
+                  title="إيقاف التوليد"
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-rose-600 text-white shadow-md transition hover:bg-rose-700 active:scale-95"
+                >
+                  <Square className="h-4 w-4 fill-white" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => send()}
+                  disabled={(!input.trim() && files.length === 0) || isStreaming}
+                  title="إرسال"
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-600 text-white shadow-md transition hover:bg-indigo-700 disabled:opacity-40 disabled:pointer-events-none active:scale-95"
+                >
+                  <Send className="h-4 w-4 -rotate-90" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
-      ) : null}
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/60 text-primary-foreground shadow-2xl shadow-primary/30 transition hover:scale-105"
-        aria-label="Open Lana AI"
-      >
-        <Sparkles className="h-6 w-6" />
-      </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="مساعد Lana AI"
+          className="group relative flex items-center gap-2.5 rounded-3xl bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 px-4 py-3 text-white shadow-xl shadow-indigo-600/30 transition-all duration-300 hover:scale-105 hover:shadow-2xl active:scale-95"
+        >
+          <div className="relative grid h-8 w-8 place-items-center rounded-2xl bg-white/20 backdrop-blur-md">
+            <Sparkles className="h-4 w-4 text-amber-300" />
+            <span className="absolute -top-1 -end-1 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-indigo-600 animate-pulse" />
+          </div>
+          <span className="font-bold text-sm tracking-wide">Lana</span>
+        </button>
+      )}
     </div>
   );
 }

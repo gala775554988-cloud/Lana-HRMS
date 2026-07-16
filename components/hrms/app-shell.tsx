@@ -9,7 +9,7 @@ import {
   LayoutDashboard, LogOut, ChevronLeft, ChevronRight, Search,
   Users, Building2, MapPin, Briefcase, FileText, Clock, Calendar,
   DollarSign, GraduationCap, Package, Megaphone, BarChart3, Settings,
-  Shield, GitPullRequest, Sparkles, Menu, X, PlugZap,
+  Shield, GitPullRequest, Sparkles, Bot, Menu, X, PlugZap,
   Wallet,
   ClipboardCheck, UserPlus, CalendarClock, Fingerprint, BarChart4
 } from "lucide-react";
@@ -65,6 +65,7 @@ const navItems: Array<{ href: string; labelKey: NavKey; icon: typeof LayoutDashb
   { href: "/announcements", labelKey: "announcements", icon: Megaphone, group: "systemSettings", resource: ["announcements", "notifications"] },
   { href: "/audit-logs", labelKey: "audit-logs", icon: Shield, group: "systemSettings", resource: "audit-logs" },
   { href: "/settings", labelKey: "settings", icon: Settings, group: "systemSettings", resource: "settings" },
+  { href: "/ai-assistant", labelKey: "ai-assistant", icon: Bot, group: "systemSettings", resource: "reports" },
   { href: "/lana-ai", labelKey: "lana-ai", icon: Sparkles, group: "systemSettings", resource: "reports" },
 ];
 
