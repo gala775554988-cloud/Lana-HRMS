@@ -31,7 +31,11 @@ export async function getLanaDelegateIds(): Promise<string[]> {
 export async function isLanaDelegate(userId: string, roles: string[] = []): Promise<boolean> {
   if (roles.includes("SUPER_ADMIN")) return true;
   const delegateIds = await getLanaDelegateIds();
-  return delegateIds.includes(userId);
+  if (delegateIds.includes(userId)) return true;
+  const dbSuperAdmin = await prisma.userRole.findFirst({
+    where: { userId, role: { name: "SUPER_ADMIN" } }
+  }).catch(() => null);
+  return Boolean(dbSuperAdmin);
 }
 
 export async function setLanaDelegateIds(actorUserId: string, userIds: string[]): Promise<string[]> {

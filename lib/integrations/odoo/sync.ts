@@ -122,9 +122,16 @@ export async function requireOdooIntegrationAccess(action: "read" | "manage" = "
   if (!(await isOdooIntegrationEnabled())) throw new Error("Odoo integration is disabled");
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
-  const roles = session.user.roles as string[] | undefined;
+  let roles = (session.user.roles as string[] | undefined) || [];
+  if (!roles.includes("SUPER_ADMIN") && !roles.includes("HR_MANAGER")) {
+    const dbRoles = await prisma.userRole.findMany({
+      where: { userId: session.user.id },
+      select: { role: { select: { name: true } } }
+    }).catch(() => []);
+    roles = Array.from(new Set([...roles, ...dbRoles.map(r => r.role.name)]));
+  }
   const permissions = session.user.permissions as string[] | undefined;
-  if (roles?.includes("SUPER_ADMIN") || roles?.includes("HR_MANAGER")) return session;
+  if (roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER")) return session;
   if (!hasPermission(permissions, { action, resource: "settings" }, roles)) throw new Error("Forbidden");
   return session;
 }

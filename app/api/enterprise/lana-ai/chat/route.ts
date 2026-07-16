@@ -174,15 +174,24 @@ export async function POST(request: NextRequest) {
 
     // 1. Build Authentication & RBAC context
     const userId = session.user.id;
-    const roles: string[] = (session.user as any).roles || [];
+    let roles: string[] = (session.user as any).roles || [];
     const permissions: string[] = (session.user as any).permissions || [];
     const employee = await prisma.employee.findFirst({
       where: { userId },
       select: { id: true, firstName: true, lastName: true, departmentId: true }
     });
 
-    const isDelegate = await isLanaDelegate(userId).catch(() => false);
-    const isExecutive = roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER") || isDelegate;
+    let isDelegate = await isLanaDelegate(userId, roles).catch(() => false);
+    let isExecutive = roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER") || isDelegate;
+    if (!isExecutive) {
+      const dbRoles = await prisma.userRole.findMany({
+        where: { userId },
+        select: { role: { select: { name: true } } }
+      }).catch(() => []);
+      roles = Array.from(new Set([...roles, ...dbRoles.map(r => r.role.name)]));
+      isDelegate = await isLanaDelegate(userId, roles).catch(() => false);
+      isExecutive = roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER") || isDelegate;
+    }
 
     const authContext: ToolAuthContext = {
       userId,
