@@ -32,6 +32,7 @@ interface Props {
   evaluations: any[];
   payrollItems: any[];
   auditLogs: any[];
+  permissionsScopeContent?: React.ReactNode;
   dictionary: any;
   locale: string;
 }
@@ -51,6 +52,7 @@ export function EmployeeProfileDashboard({
   evaluations,
   payrollItems,
   auditLogs,
+  permissionsScopeContent,
   dictionary,
   locale,
 }: Props) {
@@ -378,7 +380,22 @@ export function EmployeeProfileDashboard({
         </TabsContent>
 
         {/* 10- Permissions */}
-        <TabsContent value="permissions" className="space-y-4 mt-6">
+        <TabsContent value="permissions" className="space-y-6 mt-6">
+          <Card className="rounded-3xl border-indigo-100 dark:border-indigo-950/50 shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-indigo-700 dark:text-indigo-300">
+                <Shield className="h-5 w-5" />
+                نطاقات الصلاحيات المحددة للموظف
+              </CardTitle>
+              <CardDescription>
+                عرض وتتبع النطاقات المؤسسية (كل الشركة، الأفرع، الأقسام، المستشفيات) المربوطة بهذا الموظف
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {permissionsScopeContent}
+            </CardContent>
+          </Card>
+
           <Card className="rounded-2xl"><CardHeader><CardTitle>الصلاحيات - Tree View</CardTitle><CardDescription>إعطاء أي صلاحية لأي موظف بدون تعديل Role بالكامل - Inherited, Custom, Effective</CardDescription></CardHeader><CardContent>
             <div className="space-y-4">
               {["Employee", "Attendance", "Payroll", "Contracts", "Settings"].map((mod) => (

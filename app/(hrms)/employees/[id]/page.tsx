@@ -6,6 +6,7 @@ import { getModuleRecord } from "@/lib/hrms/actions";
 import { getEmployeeSalaryProfile } from "@/lib/employee/salary-profile-store";
 import { getEmployeeFieldAccess, redactHiddenFields } from "@/lib/enterprise/employee-field-access";
 import { EmployeeProfileDashboard } from "@/components/hrms/employee-profile-dashboard";
+import { PermissionsScope } from "@/components/hrms/permissions-scope";
 
 export default async function EmployeeProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -183,6 +184,7 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
       evaluations={evaluations as any}
       payrollItems={payrollItems as any}
       auditLogs={auditLogs as any}
+      permissionsScopeContent={<PermissionsScope employeeId={id} />}
       dictionary={dictionary}
       locale={locale}
     />
