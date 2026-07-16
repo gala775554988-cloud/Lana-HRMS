@@ -12,6 +12,8 @@ export type ToolAuthContext = {
   employeeName?: string | null;
   isExecutive?: boolean;
   isDelegate?: boolean;
+  selectedEmployeeId?: string | null;
+  selectedEmployeeName?: string | null;
 };
 
 function canManageHr(context: ToolAuthContext) {

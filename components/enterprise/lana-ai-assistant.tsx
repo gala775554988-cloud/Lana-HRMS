@@ -219,6 +219,8 @@ export function LanaAiAssistant() {
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
+    const currentSelectedEmployeeId = typeof window !== "undefined" ? window.location.pathname.match(/\/employees\/([a-zA-Z0-9_-]+)/)?.[1] : undefined;
+
     try {
       const response = await fetch("/api/enterprise/lana-ai/chat", {
         method: "POST",
@@ -227,7 +229,11 @@ export function LanaAiAssistant() {
         body: JSON.stringify({
           message: textToSend,
           conversationId,
-          messages: messages.map((m) => ({ role: m.role, content: m.content }))
+          messages: messages.map((m) => ({ role: m.role, content: m.content })),
+          context: {
+            selectedEmployeeId: currentSelectedEmployeeId,
+            pathname: typeof window !== "undefined" ? window.location.pathname : undefined
+          }
         })
       });
 

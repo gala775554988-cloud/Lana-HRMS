@@ -26,7 +26,7 @@ async function generateLocalLanaStream(userMessage: string, context: ToolAuthCon
   try {
     if (/ملف\s+الموظف|بيانات\s+الموظف|جيب\s+ملف|employee\s+profile|getEmployeeProfile|ملف\s+موظف/i.test(text)) {
       const match = text.match(/موظف\s+([a-zA-Z0-9_\u0600-\u06FF-]+)/i) || text.match(/profile\s+([a-zA-Z0-9_-]+)/i);
-      const identifier = match ? match[1].trim() : undefined;
+      const identifier = match ? match[1].trim() : (context.selectedEmployeeId || context.employeeId || undefined);
       const prof = await tools.getEmployeeProfile.execute({ identifier, employeeId: identifier });
       executedTools.push({ tool: "getEmployeeProfile", result: prof });
       if (prof.error) {
@@ -44,7 +44,8 @@ async function generateLocalLanaStream(userMessage: string, context: ToolAuthCon
       } else {
         const nameMatch = text.match(/رصيد\s+إجازة\s+([a-zA-Z0-9_\u0600-\u06FF\s]+)/i) || text.match(/leave\s+balance\s+for\s+([a-zA-Z0-9_\s]+)/i);
         const targetName = nameMatch ? nameMatch[1].trim() : undefined;
-        const bal = await tools.getLeaveBalance.execute({ employeeId: targetName ? undefined : context.employeeId, employeeName: targetName });
+        const targetId = !targetName ? (context.selectedEmployeeId || context.employeeId || undefined) : undefined;
+        const bal = await tools.getLeaveBalance.execute({ employeeId: targetId, employeeName: targetName });
         executedTools.push({ tool: "getLeaveBalance", result: bal });
         if (bal.error) {
           replyText = isAr ? `عذراً: ${bal.error}` : `Sorry: ${bal.error}`;

@@ -74,8 +74,11 @@ export function EmployeeTopBar({ user, employee }: Props) {
 
           <Link href="/employee/profile" className="flex items-center gap-2 pl-2 ml-1 border-l border-slate-200 dark:border-slate-700">
             <div className="hidden sm:block text-right text-xs leading-tight">
-              <div className="font-medium truncate max-w-[110px]">
-                {user?.name || (employee as any)?.firstName || 'موظف'}
+              <div className="font-medium truncate max-w-[130px] flex items-center">
+                <span className="truncate">{user?.name || (employee as any)?.firstName || 'موظف'}</span>
+                {Boolean((employee as any)?.isDelegate || (user as any)?.roles?.some((r: any) => ["SUPER_ADMIN", "HR_MANAGER"].includes(typeof r === "string" ? r : r?.name))) && (
+                  <span className="text-yellow-500 text-sm ms-1 shrink-0" title="مفوض تنفيذي">👑</span>
+                )}
               </div>
               <div className="text-slate-500 text-[10px]">
                 {(employee as any)?.employeeNumber || '---'}

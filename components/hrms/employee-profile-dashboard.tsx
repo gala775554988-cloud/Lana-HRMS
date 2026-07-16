@@ -68,6 +68,11 @@ export function EmployeeProfileDashboard({
   const fullName = `${employee.firstName} ${employee.lastName}`.trim();
   const initials = `${employee.firstName?.[0] || ""}${employee.lastName?.[0] || ""}`.toUpperCase();
 
+  const AdminBadge = ({ isDelegate }: { isDelegate?: boolean }) => {
+    if (!isDelegate) return null;
+    return <span className="text-yellow-500 text-lg ml-2 inline-block" title="مفوض تنفيذي">👑</span>;
+  };
+
   const handleArchive = async () => {
     const isArchived = employee.status === "INACTIVE" || employee.status === "TERMINATED";
     const reason = isArchived ? "" : prompt(isAr ? "سبب الأرشفة (اختياري):" : "Archive reason (optional):") || "";
@@ -186,7 +191,10 @@ export function EmployeeProfileDashboard({
               <div className="flex-1 min-w-0 pt-4 lg:pt-16">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <h1 className="text-3xl font-black tracking-tight">{fullName}</h1>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <h1 className="text-3xl font-black tracking-tight">{fullName}</h1>
+                      <AdminBadge isDelegate={Boolean(employee.isDelegate || employee.user?.roles?.some((r: any) => ["SUPER_ADMIN", "HR_MANAGER"].includes(typeof r === "string" ? r : r.role?.name || r.name)))} />
+                    </div>
                     <p className="text-muted-foreground mt-1 flex flex-wrap gap-2 text-sm">
                       <span className="font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full text-xs">{employee.employeeNumber}</span>
                       <span className="font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full text-xs">{employee.nationalId}</span>
