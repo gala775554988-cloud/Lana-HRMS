@@ -31,6 +31,56 @@ function makeTool(config: any) {
 
 export function createScopedHrTools(context: ToolAuthContext) {
   return {
+    getEmployeeProfile: makeTool({
+      description: "جلب بيانات الموظف بناءً على الرقم الوظيفي أو الهوية أو الاسم / Retrieve employee profile details by employee ID or name.",
+      parameters: z.object({
+        employeeId: z.string().optional().describe("The employee ID or barcode."),
+        identifier: z.string().optional().describe("ID, national ID, or name.")
+      }) as any,
+      execute: async ({ employeeId, identifier }: any) => {
+        const queryId = employeeId || identifier;
+        if (!queryId && !context.employeeId) return { error: "يرجى تحديد رقم أو اسم الموظف." };
+        const target = queryId || context.employeeId!;
+        const emp = await prisma.employee.findFirst({
+          where: {
+            OR: [
+              { id: target },
+              { nationalId: target },
+              { employeeNumber: target },
+              { firstName: { contains: target, mode: "insensitive" } },
+              { lastName: { contains: target, mode: "insensitive" } }
+            ]
+          },
+          include: {
+            department: { select: { name: true, code: true } },
+            position: { select: { title: true } },
+            branch: { select: { name: true } },
+            manager: { select: { firstName: true, lastName: true, employeeNumber: true } }
+          }
+        });
+        if (!emp) return { error: `لم يتم العثور على موظف برقم أو اسم "${target}" في قاعدة البيانات.` };
+
+        if (!canViewAllEmployees(context) && emp.id !== context.employeeId && emp.managerId !== context.employeeId) {
+          return { error: "عذراً: ليس لديك صلاحية لعرض بيانات هذا الموظف." };
+        }
+
+        return {
+          id: emp.id,
+          employeeNumber: emp.employeeNumber,
+          nationalId: canManageHr(context) || emp.id === context.employeeId ? emp.nationalId : "REDACTED",
+          name: `${emp.firstName} ${emp.lastName}`.trim(),
+          email: emp.email || "-",
+          phone: emp.phone || "-",
+          department: emp.department?.name || "بدون قسم",
+          position: emp.position?.title || "بدون مسمى",
+          branch: emp.branch?.name || "الفرع الرئيسي",
+          manager: emp.manager ? `${emp.manager.firstName} ${emp.manager.lastName}` : "لا يوجد",
+          status: emp.status === "ACTIVE" ? "على رأس العمل" : "غير نشط",
+          hireDate: emp.hireDate.toLocaleDateString("ar-SA")
+        };
+      }
+    }),
+
     getEmployee: makeTool({
       description: "Retrieve comprehensive details for a specific employee by ID, national ID, or employee number.",
       parameters: z.object({
@@ -286,22 +336,40 @@ export function createScopedHrTools(context: ToolAuthContext) {
     }),
 
     getLeaveBalance: makeTool({
-      description: "Check the annual leave balance, used days, and remaining days for an employee.",
+      description: "جلب رصيد إجازات الموظف بناءً على الاسم أو الرقم الوظيفي / Check annual leave balance and remaining days.",
       parameters: z.object({
-        employeeId: z.string().optional().describe("Defaults to current employee.")
+        employeeId: z.string().optional().describe("Employee ID or number."),
+        employeeName: z.string().optional().describe("Employee name.")
       }) as any,
-      execute: async ({ employeeId }: any) => {
-        const targetId = employeeId || context.employeeId;
-        if (!targetId) return { error: "Employee profile required." };
-        if (!canManageHr(context) && targetId !== context.employeeId) {
-          return { error: "Access Denied." };
+      execute: async ({ employeeId, employeeName }: any) => {
+        let targetId = employeeId;
+        if (!targetId && employeeName) {
+          const emp = await prisma.employee.findFirst({
+            where: {
+              OR: [
+                { firstName: { contains: employeeName, mode: "insensitive" } },
+                { lastName: { contains: employeeName, mode: "insensitive" } },
+                { employeeNumber: { contains: employeeName } }
+              ]
+            }
+          });
+          if (!emp) return { error: `لم يتم العثور على موظف باسم "${employeeName}".` };
+          targetId = emp.id;
         }
+        targetId = targetId || context.employeeId;
+        if (!targetId) return { error: "يرجى تحديد اسم أو رقم الموظف للاستعلام عن رصيد إجازته." };
+        if (!canManageHr(context) && targetId !== context.employeeId) {
+          return { error: "عذراً: ليس لديك صلاحية للاستعلام عن رصيد إجازة هذا الموظف." };
+        }
+        const empRecord = await prisma.employee.findUnique({ where: { id: targetId }, select: { firstName: true, lastName: true, employeeNumber: true } });
         const requests = await prisma.leaveRequest.findMany({
           where: { employeeId: targetId, status: "APPROVED" }
         });
         const used = requests.reduce((sum, r) => sum + Math.max(1, Math.round((r.endDate.getTime() - r.startDate.getTime()) / (1000 * 60 * 60 * 24))), 0);
         const annualEntitlement = 30;
         return {
+          employeeName: empRecord ? `${empRecord.firstName} ${empRecord.lastName}` : targetId,
+          employeeNumber: empRecord?.employeeNumber || "-",
           annualEntitlement,
           usedDays: used,
           remainingDays: Math.max(0, annualEntitlement - used),

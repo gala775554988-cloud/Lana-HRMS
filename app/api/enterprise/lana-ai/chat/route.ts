@@ -23,20 +23,34 @@ async function generateLocalLanaStream(userMessage: string, context: ToolAuthCon
 
   // Local Intent Analysis & Automated Tool Execution
   try {
-    if (/leave|إجاز|اجاز|رصيد إجاز/i.test(text)) {
+    if (/ملف\s+الموظف|بيانات\s+الموظف|جيب\s+ملف|employee\s+profile|getEmployeeProfile|ملف\s+موظف/i.test(text)) {
+      const match = text.match(/موظف\s+([a-zA-Z0-9_\u0600-\u06FF-]+)/i) || text.match(/profile\s+([a-zA-Z0-9_-]+)/i);
+      const identifier = match ? match[1].trim() : undefined;
+      const prof = await tools.getEmployeeProfile.execute({ identifier, employeeId: identifier });
+      executedTools.push({ tool: "getEmployeeProfile", result: prof });
+      if (prof.error) {
+        replyText = isAr ? `عذراً: ${prof.error}` : `Sorry: ${prof.error}`;
+      } else {
+        replyText = isAr
+          ? `بيانات الموظف (${prof.name}): الرقم الوظيفي (${prof.employeeNumber}) · الهوية (${prof.nationalId}) · القسم (${prof.department}) · المسمى (${prof.position}) · الفرع (${prof.branch}) · المدير المباشر (${prof.manager}) · الحالة (${prof.status}).`
+          : `Employee Profile (${prof.name}): Number (${prof.employeeNumber}) · National ID (${prof.nationalId}) · Dept (${prof.department}) · Position (${prof.position}) · Branch (${prof.branch}) · Status (${prof.status}).`;
+      }
+    } else if (/leave|إجاز|اجاز|رصيد إجاز/i.test(text)) {
       if (/تقديم|طلب جديد|أقدم|اطلب|تقديم إجاز/i.test(text)) {
         replyText = isAr
           ? "افتح صفحة الإجازات ثم اضغط \"طلب جديد\"، واختر نوع الإجازة وحدد التاريخ ثم أرسل الطلب."
           : "Open the Leave page, click \"New Request\", select the leave type, choose your dates, and submit the request.";
       } else {
-        const bal = await tools.getLeaveBalance.execute({ employeeId: context.employeeId });
+        const nameMatch = text.match(/رصيد\s+إجازة\s+([a-zA-Z0-9_\u0600-\u06FF\s]+)/i) || text.match(/leave\s+balance\s+for\s+([a-zA-Z0-9_\s]+)/i);
+        const targetName = nameMatch ? nameMatch[1].trim() : undefined;
+        const bal = await tools.getLeaveBalance.execute({ employeeId: targetName ? undefined : context.employeeId, employeeName: targetName });
         executedTools.push({ tool: "getLeaveBalance", result: bal });
         if (bal.error) {
           replyText = isAr ? `عذراً: ${bal.error}` : `Sorry: ${bal.error}`;
         } else {
           replyText = isAr
-            ? `رصيدك السنوي المستحق هو ${bal.annualEntitlement} يوماً، المستهلك منها ${bal.usedDays} أيام، والرصيد المتبقي المتاح حالياً هو ${bal.remainingDays} يوماً.`
-            : `Your annual entitlement is ${bal.annualEntitlement} days, of which ${bal.usedDays} have been used. Your current remaining balance is ${bal.remainingDays} days.`;
+            ? `رصيد الإجازات السنوي المستحق للموظف (${bal.employeeName || "لك"}) هو ${bal.annualEntitlement} يوماً، المستهلك منها ${bal.usedDays} أيام، والرصيد المتبقي المتاح حالياً هو ${bal.remainingDays} يوماً.`
+            : `Annual leave balance for (${bal.employeeName || "you"}): Entitlement ${bal.annualEntitlement} days, Used ${bal.usedDays} days, Remaining ${bal.remainingDays} days.`;
         }
       }
     } else if (/checkin|check in|حضور|سجل دخول|تسجيل دخول|دخول اليوم/i.test(text)) {
