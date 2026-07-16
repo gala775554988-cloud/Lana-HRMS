@@ -4,36 +4,37 @@ import { resolveApprovalChain } from "@/lib/enterprise/hierarchy";
 import { createEnterpriseNotification, notifyUsers } from "@/lib/enterprise/notifications";
 
 export async function createEnterpriseWorkflow(employeeId: string, type: string, entityId: string) {
-  const approverUserIds = await resolveApprovalChain(employeeId);
+  const approvers = await resolveApprovalChain(employeeId, type.toLowerCase());
   const instance = await prisma.workflowInstance.create({
     data: {
       employeeId,
       type,
       entityId,
-      status: approverUserIds.length ? "PENDING" : "COMPLETED",
-      currentStep: approverUserIds.length ? 1 : 0
+      status: approvers.length ? "PENDING" : "COMPLETED",
+      currentStep: approvers.length ? 1 : 0
     }
   });
 
-  if (approverUserIds.length) {
+  if (approvers.length) {
     await prisma.workflowStep.createMany({
-      data: approverUserIds.map((approverUserId, index) => ({
+      data: approvers.map((approver, index) => ({
         workflowInstanceId: instance.id,
         step: index + 1,
-        approverUserId,
-        status: index === 0 ? "PENDING" : "WAITING"
+        approverUserId: approver.userId,
+        status: index === 0 ? "PENDING" : "WAITING",
+        capabilities: approver.capabilities
       }))
     });
-    await notifyUsers([approverUserIds[0]], "وصول طلب جديد", `New ${type} request is waiting for your approval.`, "INFO");
+    await notifyUsers([approvers[0].userId], "وصول طلب جديد", `New ${type} request is waiting for your approval.`, "INFO");
   }
 
   const employee = await prisma.employee.findUnique({ where: { id: employeeId }, select: { userId: true } });
   if (employee?.userId) {
     await createEnterpriseNotification({
       userId: employee.userId,
-      title: approverUserIds.length ? "تم إرسال الطلب" : "تم اعتماد الطلب",
-      body: approverUserIds.length ? `Your ${type} request has been submitted.` : `Your ${type} request was approved automatically.`,
-      type: approverUserIds.length ? "INFO" : "SUCCESS"
+      title: approvers.length ? "تم إرسال الطلب" : "تم اعتماد الطلب",
+      body: approvers.length ? `Your ${type} request has been submitted.` : `Your ${type} request was approved automatically.`,
+      type: approvers.length ? "INFO" : "SUCCESS"
     });
   }
 
@@ -62,6 +63,12 @@ export async function decideWorkflowStep({
   const currentStep = instance.steps.find((step) => step.step === instance.currentStep && step.status === "PENDING");
   if (!currentStep) throw new Error("No pending workflow step");
   if (currentStep.approverUserId && currentStep.approverUserId !== actorUserId) throw new Error("Forbidden");
+  // A step resolved from a VIEW_ONLY approval-chain level (no APPROVE/REJECT
+  // capability) may see the request but never decide it.
+  const capabilities = currentStep.capabilities?.length ? currentStep.capabilities : ["VIEW", "APPROVE", "REJECT"];
+  if (decision === "APPROVE" && !capabilities.includes("APPROVE")) throw new Error("Forbidden");
+  if (decision === "REJECT" && !capabilities.includes("REJECT")) throw new Error("Forbidden");
+  if (decision === "RETURN" && !capabilities.includes("APPROVE") && !capabilities.includes("REJECT")) throw new Error("Forbidden");
 
   const nextStatus = decision === "APPROVE" ? "APPROVED" : decision === "REJECT" ? "REJECTED" : "RETURNED";
   await prisma.workflowStep.update({

@@ -21,10 +21,11 @@ export default async function PermissionsPage({ searchParams }: { searchParams: 
 
   let scopesContent: React.ReactNode = null;
   if (activeTab === "scopes") {
-    const [allRoles, branches, departments, approvalChains] = await Promise.all([
+    const [allRoles, branches, departments, hospitals, approvalChains] = await Promise.all([
       prisma.role.findMany({ orderBy: { name: "asc" } }),
       prisma.branch.findMany({ select: { id: true, name: true }, where: { isActive: true }, orderBy: { name: "asc" } }),
       prisma.department.findMany({ select: { id: true, name: true }, where: { isActive: true }, orderBy: { name: "asc" } }),
+      prisma.hospital.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
       Promise.all(["leave", "overtime", "loan", "expense"].map(async (m) => ({
         module: m,
         chain: await prisma.hrApprovalChain.findMany({ where: { module: m, isActive: true }, orderBy: { level: "asc" } }),
@@ -35,6 +36,7 @@ export default async function PermissionsPage({ searchParams }: { searchParams: 
         allRoles={JSON.parse(JSON.stringify(allRoles))}
         branches={JSON.parse(JSON.stringify(branches))}
         departments={JSON.parse(JSON.stringify(departments))}
+        hospitals={JSON.parse(JSON.stringify(hospitals))}
         approvalChains={JSON.parse(JSON.stringify(approvalChains))}
       />
     );

@@ -1,13 +1,18 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { auth } from "@/auth";
 import { getRequestDictionary } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { getModuleRecord } from "@/lib/hrms/actions";
 import { getEmployeeSalaryProfile } from "@/lib/employee/salary-profile-store";
+import { getEmployeeFieldAccess, redactHiddenFields } from "@/lib/enterprise/employee-field-access";
 import { EmployeeProfileDashboard } from "@/components/hrms/employee-profile-dashboard";
 
 export default async function EmployeeProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { dictionary, locale } = await getRequestDictionary();
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+  const viewerFieldAccess = await getEmployeeFieldAccess(session.user.id, (session.user.roles as string[]) ?? []);
 
   // Fetch employee with all relations for header and tabs
   const employee = await prisma.employee.findUnique({
@@ -157,9 +162,14 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
     }).catch(() => []),
   ]);
 
+  // Server-side redaction: a HIDDEN field is nulled out here, before it ever
+  // reaches the client bundle -- not just visually hidden in the dashboard
+  // component, which would still leak the real value over the network.
+  const visibleEmployee = redactHiddenFields(employee as unknown as Record<string, unknown>, viewerFieldAccess);
+
   return (
     <EmployeeProfileDashboard
-      employee={employee as any}
+      employee={visibleEmployee as any}
       salaryProfile={salaryProfile}
       yearsOfService={yearsOfService}
       lastSync={lastSync}
