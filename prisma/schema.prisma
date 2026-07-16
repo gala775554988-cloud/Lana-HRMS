@@ -2154,9 +2154,10 @@ model HrPermissionScope {
   id        String   @id @default(cuid())
   userId    String
   module    String   // employees, attendance, payroll, leaves, etc
-  scope     String   @default("ALL") // ALL, BRANCH, DEPARTMENT, TEAM, SELF
+  scope     String   @default("ALL") // ALL, BRANCH, DEPARTMENT, HOSPITAL, TEAM, SELF
   branchId  String?
   departmentId String?
+  hospitalId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

@@ -88,6 +88,7 @@ type Payload = {
 export function PermissionsManagementClient() {
   const [payload, setPayload] = useState<Payload | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const [selectedEmployeeInfo, setSelectedEmployeeInfo] = useState<any>(null);
   const [selectedPermissions, setSelectedPermissions] = useState<Set<string>>(new Set());
   const [copySourceUserId, setCopySourceUserId] = useState<string>("");
   const [template, setTemplate] = useState<string>("EMPLOYEE");
@@ -188,7 +189,7 @@ export function PermissionsManagementClient() {
     });
   }
 
-  const selectedEmployee = useMemo(() => payload?.employees.find((employee) => employee.userId === selectedUserId), [payload, selectedUserId]);
+  const selectedEmployee = useMemo(() => selectedEmployeeInfo || payload?.employees?.find((employee) => employee.userId === selectedUserId) || null, [payload, selectedUserId, selectedEmployeeInfo]);
 
   function viewAs() {
     if (!selectedUserId) return;
@@ -258,16 +259,18 @@ export function PermissionsManagementClient() {
         <CardContent className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="space-y-3">
             <label className="text-sm font-medium">اختيار الموظف / Select employee</label>
-            <select value={selectedUserId} onChange={(event) => setSelectedUserId(event.target.value)} className="h-11 w-full rounded-xl border bg-background px-3 text-sm">
-              {payload.employees.map((employee) => (
-                <option key={employee.id} value={employee.userId ?? ""}>
-                  {employee.employeeNumber} - {employee.firstName} {employee.lastName} ({employee.user?.roles.map((role) => role.role.name).join(", ") || "NO_ROLE"})
-                </option>
-              ))}
-            </select>
+            <UserSearchSelect
+              value={selectedUserId}
+              onChange={(userId, label, employee) => {
+                setSelectedUserId(userId);
+                if (employee) setSelectedEmployeeInfo(employee);
+              }}
+              placeholder="ابحث برقم الهوية أو الاسم أو الرقم الوظيفي..."
+            />
             {selectedEmployee ? (
               <div className="rounded-xl border bg-muted/40 p-3 text-sm text-muted-foreground">
-                {selectedEmployee.department?.name ?? "No department"} • {selectedEmployee.branch?.name ?? "No branch"} • {selectedEmployee.user?.email ?? selectedEmployee.email}
+                <span className="font-semibold text-foreground">{selectedEmployee.firstName} {selectedEmployee.lastName} ({selectedEmployee.employeeNumber || selectedEmployee.nationalId})</span>
+                <span className="block mt-1">{selectedEmployee.department?.name ?? "بدون قسم / No department"} • {selectedEmployee.branch?.name ?? "بدون فرع / No branch"} • {selectedEmployee.user?.email ?? selectedEmployee.email ?? "بدون بريد"}</span>
               </div>
             ) : null}
             <Button type="button" variant="outline" onClick={viewAs} disabled={!selectedUserId || previewLoading}>
@@ -296,9 +299,7 @@ export function PermissionsManagementClient() {
             {Object.keys(payload.templates).map((key) => <option key={key} value={key}>{key}</option>)}
           </select>
           <Button type="button" variant="outline" onClick={() => save("template")} disabled={isPending}>Apply Template</Button>
-          <select value={copySourceUserId} onChange={(event) => setCopySourceUserId(event.target.value)} className="h-10 rounded-xl border bg-background px-3 text-sm">
-            {payload.employees.map((employee) => <option key={employee.id} value={employee.userId ?? ""}>{employee.employeeNumber} - {employee.firstName} {employee.lastName}</option>)}
-          </select>
+          <div className="w-64"><UserSearchSelect value={copySourceUserId} onChange={(userId) => setCopySourceUserId(userId)} placeholder="اختر الموظف المصدر للنسخ..." /></div>
           <Button type="button" variant="outline" onClick={() => save("copy")} disabled={isPending}><Copy className="me-2 h-4 w-4" />Copy Permissions</Button>
         </CardContent>
       </Card>

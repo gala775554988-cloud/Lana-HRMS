@@ -19,7 +19,7 @@ export function UserSearchSelect({
   placeholder = "بحث بالاسم أو الرقم الوظيفي أو الهوية..."
 }: {
   value: string;
-  onChange: (userId: string, label: string) => void;
+  onChange: (userId: string, label?: string, employee?: any) => void;
   placeholder?: string;
 }) {
   const [query, setQuery] = useState("");
@@ -49,17 +49,17 @@ export function UserSearchSelect({
   }, []);
 
   function select(employee: EmployeeSearchResult) {
-    const label = `${employee.firstName} ${employee.lastName} - ${employee.employeeNumber}`;
+    const label = `${employee.firstName} ${employee.lastName} - ${employee.employeeNumber || employee.nationalId}`;
     setSelectedLabel(label);
     setQuery("");
     setResults([]);
     setOpen(false);
-    onChange(employee.userId!, label);
+    onChange(employee.userId!, label, employee);
   }
 
   function clear() {
     setSelectedLabel("");
-    onChange("", "");
+    onChange("", "", null);
   }
 
   if (value && selectedLabel) {

@@ -16,28 +16,11 @@ export async function GET() {
   if (!session?.user?.id) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   if (!isSuperAdmin(session.user.roles as string[] | undefined)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
 
-  const [employees, store] = await Promise.all([
-    prisma.employee.findMany({
-      select: {
-        id: true,
-        employeeNumber: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        userId: true,
-        department: { select: { name: true } },
-        branch: { select: { name: true } },
-        user: { select: { id: true, name: true, email: true, roles: { include: { role: true } } } }
-      },
-      orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
-      take: 500
-    }),
-    getPermissionStore()
-  ]);
+  const store = await getPermissionStore();
 
   return NextResponse.json({
     success: true,
-    employees: employees.filter((employee) => employee.userId),
+    employees: [],
     permissions: ALL_ENTERPRISE_PERMISSIONS,
     categories: PERMISSION_CATEGORIES,
     templates: PERMISSION_TEMPLATES,

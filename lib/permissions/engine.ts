@@ -97,22 +97,23 @@ export async function saveApprovalChain(module: string, approvals: ApprovalChain
 }
 
 export const MODULES = ["employees","attendance","payroll","leaves","loans","overtime","documents","contracts","reports","settings","permissions","audit-logs","integrations"] as const;
-export const SCOPES = ["ALL","BRANCH","DEPARTMENT","TEAM","SELF"] as const;
+export const SCOPES = ["ALL","BRANCH","DEPARTMENT","HOSPITAL","TEAM","SELF"] as const;
 export const APPROVER_ROLES = ["DIRECT_MANAGER","DEPARTMENT_MANAGER","BRANCH_MANAGER","HR_MANAGER","SUPER_ADMIN"] as const;
 
-export async function setUserScope(userId: string, module: string, scope: string, branchId?: string | null, departmentId?: string | null, actorUserId?: string) {
+export async function setUserScope(userId: string, module: string, scope: string, branchId?: string | null, departmentId?: string | null, hospitalId?: string | null, actorUserId?: string) {
   const existing = await prisma.hrPermissionScope.findUnique({ where: { userId_module: { userId, module } } });
+  const data = { scope, branchId: branchId || null, departmentId: departmentId || null, hospitalId: hospitalId || null };
   if (existing) {
-    await prisma.hrPermissionScope.update({ where: { id: existing.id }, data: { scope, branchId, departmentId } });
+    await prisma.hrPermissionScope.update({ where: { id: existing.id }, data });
   } else {
-    await prisma.hrPermissionScope.create({ data: { userId, module, scope, branchId, departmentId } });
+    await prisma.hrPermissionScope.create({ data: { userId, module, ...data } });
   }
   clearPermissionCache(userId);
   if (actorUserId) await prisma.hrPermissionAudit.create({ data: { userId, action: "SET_SCOPE", module, oldValue: existing?.scope || "NONE", newValue: scope, byUserId: actorUserId } });
 }
 
 export async function getAllUserScopes(page = 1, pageSize = 30, search?: string) {
-  const [scopes, total] = await Promise.all([
+  const [scopesRaw, total] = await Promise.all([
     prisma.hrPermissionScope.findMany({
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * pageSize,
@@ -120,5 +121,31 @@ export async function getAllUserScopes(page = 1, pageSize = 30, search?: string)
     }),
     prisma.hrPermissionScope.count(),
   ]);
+
+  const userIds = Array.from(new Set(scopesRaw.map((s) => s.userId).filter(Boolean)));
+  const branchIds = Array.from(new Set(scopesRaw.map((s) => s.branchId).filter(Boolean) as string[]));
+  const deptIds = Array.from(new Set(scopesRaw.map((s) => s.departmentId).filter(Boolean) as string[]));
+  const hospitalIds = Array.from(new Set(scopesRaw.map((s) => (s as any).hospitalId).filter(Boolean) as string[]));
+
+  const [employees, branches, depts, hospitals] = await Promise.all([
+    userIds.length > 0 ? prisma.employee.findMany({ where: { userId: { in: userIds } }, select: { userId: true, firstName: true, lastName: true, employeeNumber: true } }) : [],
+    branchIds.length > 0 ? prisma.branch.findMany({ where: { id: { in: branchIds } }, select: { id: true, name: true } }) : [],
+    deptIds.length > 0 ? prisma.department.findMany({ where: { id: { in: deptIds } }, select: { id: true, name: true } }) : [],
+    hospitalIds.length > 0 ? prisma.hospital.findMany({ where: { id: { in: hospitalIds } }, select: { id: true, name: true } }) : []
+  ]);
+
+  const empMap = new Map(employees.map((e) => [e.userId!, `${e.firstName} ${e.lastName} - ${e.employeeNumber}`]));
+  const branchMap = new Map(branches.map((b) => [b.id, b.name]));
+  const deptMap = new Map(depts.map((d) => [d.id, d.name]));
+  const hospitalMap = new Map(hospitals.map((h) => [h.id, h.name]));
+
+  const scopes = scopesRaw.map((s) => ({
+    ...s,
+    userLabel: empMap.get(s.userId) || `مستخدم (${s.userId.slice(0, 8)})`,
+    branchName: s.branchId ? branchMap.get(s.branchId) || s.branchId : null,
+    departmentName: s.departmentId ? deptMap.get(s.departmentId) || s.departmentId : null,
+    hospitalName: (s as any).hospitalId ? hospitalMap.get((s as any).hospitalId) || (s as any).hospitalId : null
+  }));
+
   return { scopes, total, page, pageSize, pageCount: Math.ceil(total / pageSize) };
 }

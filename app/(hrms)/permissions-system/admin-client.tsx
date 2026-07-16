@@ -26,7 +26,7 @@ const MODULES = [
   ["reports", "التقارير"], ["settings", "الإعدادات"], ["permissions", "الصلاحيات"], ["audit-logs", "سجل التدقيق"],
   ["integrations", "التكاملات"]
 ] as const;
-const SCOPES = [["ALL", "الكل"], ["BRANCH", "الفرع"], ["DEPARTMENT", "الإدارة"], ["TEAM", "الفريق"], ["SELF", "ذاتي"]] as const;
+const SCOPES = [["ALL", "الكل"], ["BRANCH", "الفرع"], ["DEPARTMENT", "الإدارة"], ["HOSPITAL", "مستشفى / موقع"], ["TEAM", "الفريق"], ["SELF", "ذاتي"]] as const;
 const APPROVAL_MODULES = [["leave", "الإجازات"], ["overtime", "الأوفر تايم"], ["loan", "السلف"], ["expense", "المصروفات"]] as const;
 const APPROVER_ROLES = [
   ["DIRECT_MANAGER", "المدير المباشر"], ["DEPARTMENT_MANAGER", "مدير الإدارة"], ["BRANCH_MANAGER", "مدير الفرع"],
@@ -232,6 +232,7 @@ export function PermissionsAdmin({ allRoles, branches, departments, hospitals = 
   const [selectedScope, setSelectedScope] = useState("ALL");
   const [selectedBranchId, setSelectedBranchId] = useState("");
   const [selectedDeptId, setSelectedDeptId] = useState("");
+  const [selectedHospitalId, setSelectedHospitalId] = useState("");
   const [approvalModule, setApprovalModule] = useState("leave");
   const [userLabels, setUserLabels] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState("");
@@ -258,12 +259,53 @@ export function PermissionsAdmin({ allRoles, branches, departments, hospitals = 
   }, [approvalChains]);
 
   const saveScope = async () => {
-    if (!selectedUserId) return;
+    if (!selectedUserId) {
+      setMsg("⚠️ يجب اختيار المستخدم أولاً / Must select a user");
+      return;
+    }
+    if (!selectedScope) {
+      setMsg("⚠️ يجب تحديد نطاق الصلاحية / Must select target scope");
+      return;
+    }
+    if (selectedScope === "BRANCH" && !selectedBranchId) {
+      setMsg("⚠️ يجب اختيار الفرع المستهدف / Must select target branch");
+      return;
+    }
+    if (selectedScope === "DEPARTMENT" && !selectedDeptId) {
+      setMsg("⚠️ يجب اختيار القسم المستهدف / Must select target department");
+      return;
+    }
+    if (selectedScope === "HOSPITAL" && !selectedHospitalId) {
+      setMsg("⚠️ يجب اختيار المستشفى المستهدف / Must select target hospital");
+      return;
+    }
+
     const res = await fetch("/api/permissions/scope", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: selectedUserId, module: selectedModule, scope: selectedScope, branchId: selectedBranchId || null, departmentId: selectedDeptId || null }),
+      body: JSON.stringify({ userId: selectedUserId, module: selectedModule, scope: selectedScope, branchId: selectedBranchId || null, departmentId: selectedDeptId || null, hospitalId: selectedHospitalId || null }),
     });
-    if (res.ok) { setMsg("✅ تم حفظ الصلاحية"); setSelectedUserId(""); setSelectedBranchId(""); setSelectedDeptId(""); fetch("/api/permissions/scope").then(r=>r.json()).then(d=>setScopes(d.scopes||[])); }
+    if (res.ok) {
+      setMsg("✅ تم حفظ الصلاحية ونطاقها بنجاح");
+      setSelectedUserId("");
+      setSelectedBranchId("");
+      setSelectedDeptId("");
+      setSelectedHospitalId("");
+      fetch("/api/permissions/scope").then(r=>r.json()).then(d=>setScopes(d.scopes||[]));
+    } else {
+      const err = await res.json().catch(() => ({}));
+      setMsg("❌ " + (err.error || "فشل حفظ نطاق الصلاحية"));
+    }
+  };
+
+  const removeScope = async (id: string) => {
+    if (!confirm("هل أنت متأكد من حذف نطاق الصلاحية هذا؟")) return;
+    const res = await fetch(`/api/permissions/scope?id=${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setMsg("✅ تم حذف نطاق الصلاحية");
+      fetch("/api/permissions/scope").then(r=>r.json()).then(d=>setScopes(d.scopes||[]));
+    } else {
+      setMsg("❌ فشل حذف نطاق الصلاحية");
+    }
   };
 
   const saveApproval = async () => {
@@ -344,11 +386,46 @@ export function PermissionsAdmin({ allRoles, branches, departments, hospitals = 
             </select>
             {selectedScope==="BRANCH" && <select className="w-full border rounded-lg p-2" value={selectedBranchId} onChange={e=>setSelectedBranchId(e.target.value)}><option value="">اختر الفرع</option>{branches.map((b:any)=><option key={b.id} value={b.id}>{b.name}</option>)}</select>}
             {selectedScope==="DEPARTMENT" && <select className="w-full border rounded-lg p-2" value={selectedDeptId} onChange={e=>setSelectedDeptId(e.target.value)}><option value="">اختر القسم</option>{departments.map((d:any)=><option key={d.id} value={d.id}>{d.name}</option>)}</select>}
+            {selectedScope==="HOSPITAL" && <select className="w-full border rounded-lg p-2" value={selectedHospitalId} onChange={e=>setSelectedHospitalId(e.target.value)}><option value="">اختر المستشفى / الموقع</option>{hospitals.map((h:any)=><option key={h.id} value={h.id}>{h.name}</option>)}</select>}
             <Button onClick={saveScope} className="w-full"><Save className="h-4 w-4 ml-1"/>حفظ</Button>
           </CardContent></Card>
 
-          <Card><CardHeader><CardTitle>الصلاحيات الحالية ({scopes.length})</CardTitle></CardHeader><CardContent className="max-h-96 overflow-auto space-y-2">
-            {scopes.slice(0,50).map((s:any)=><div key={s.id} className="flex items-center justify-between border rounded-lg p-2 text-sm"><span>{s.userId?.slice(0,8)}...</span><Badge>{s.module}</Badge><Badge variant="outline">{s.scope}</Badge></div>)}
+          <Card><CardHeader><CardTitle>الصلاحيات الحالية ({scopes.length})</CardTitle></CardHeader><CardContent className="max-h-96 overflow-auto space-y-3">
+            {scopes.length === 0 ? (
+              <div className="rounded-xl border border-dashed p-6 text-center text-muted-foreground text-sm">
+                لا توجد نطاقات مخصصة حالياً. يتم تطبيق النطاق الافتراضي (كل الشركة).
+              </div>
+            ) : (
+              scopes.map((s: any) => {
+                const moduleLabel = MODULES.find(([k]) => k === s.module)?.[1] || s.module;
+                const scopeInfo = SCOPES.find(([k]) => k === s.scope)?.[1] || s.scope;
+                const targetDetails = s.branchName ? ` (فرع: ${s.branchName})` : s.departmentName ? ` (قسم: ${s.departmentName})` : s.hospitalName ? ` (مستشفى: ${s.hospitalName})` : "";
+                return (
+                  <div key={s.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border bg-card p-3.5 transition hover:border-indigo-500/30">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400 text-xs font-bold">
+                        {s.userLabel ? s.userLabel.charAt(0) : "👤"}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm text-foreground truncate">{s.userLabel || `مستخدم (${s.userId?.slice(0,8)})`}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">تم التحديث: {new Date(s.updatedAt || s.createdAt || Date.now()).toLocaleDateString("ar-SA")}</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                      <Badge variant="secondary" className="text-xs font-semibold bg-indigo-100/80 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
+                        {moduleLabel}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs font-semibold border-indigo-200 text-indigo-600 dark:border-indigo-800 dark:text-indigo-400">
+                        {scopeInfo}{targetDetails}
+                      </Badge>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/50" onClick={() => removeScope(s.id)} title="حذف نطاق الصلاحية">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </CardContent></Card>
         </div>
       )}
