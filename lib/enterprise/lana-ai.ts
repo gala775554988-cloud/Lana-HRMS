@@ -4,6 +4,8 @@ import { applyScopedWhere, getAccessProfile, resolveRoleEmployeeIds } from "@/li
 import { listHospitals } from "@/lib/enterprise/hospitals";
 import { getEffectivePermissionsForRoles } from "@/lib/enterprise/permissions";
 import { getEmployeeFieldAccess, redactHiddenFields } from "@/lib/enterprise/employee-field-access";
+import { isOdooIntegrationEnabled } from "@/lib/settings";
+import type { LanaSyncEntity } from "@/lib/enterprise/lana-sync-actions";
 
 export type LanaAiAnswer = {
   answer: string;
@@ -14,6 +16,11 @@ export type LanaAiAnswer = {
   // log WHICH fields were exposed and to WHOM without ever writing the actual
   // sensitive values into AuditLog.
   sensitiveAccess?: { employeeIds: string[]; fields: string[] };
+  // Set when this reply promised to run a real background job (Odoo sync /
+  // document crawl). The API route runs it via Next.js after() so it keeps
+  // executing once this response has already been sent, and posts a
+  // completion notification with the real result when it's done.
+  backgroundSync?: { userId: string; entity: LanaSyncEntity };
 };
 
 function can(permissions: string[] | undefined, action: string, resource: string) {
@@ -241,6 +248,32 @@ export async function answerLanaAi({
         ? `${target.firstName} ${target.lastName} ${hasView ? "يملك" : "لا يملك"} صلاحية عرض ${resourceLabel}.`
         : `${target.firstName} ${target.lastName} ${hasView ? "does" : "does not"} have permission to view ${resourceLabel}.`,
       suggestions
+    };
+  }
+
+  // Checked before the generic employee-search branch below (which would
+  // otherwise swallow "زامني بيانات الموظفين" / "سحب مستندات الموظفين" etc.
+  // since they also mention "موظف").
+  const SYNC_EMPLOYEES_PATTERN = /زامن|مزامن|اسحب.{0,20}بيانات.{0,20}موظف|شغل.{0,10}مزامنة|sync\s+employees?|run\s+sync/i;
+  const SYNC_DOCUMENTS_PATTERN = /أرشيف\s*المستندات|أرشفة\s*المستندات|(سحب|حدث).{0,10}(مستندات|مرفقات)|مسح.{0,10}مرفقات|crawl.{0,10}document|sync.{0,10}document/i;
+  if (SYNC_EMPLOYEES_PATTERN.test(message) || SYNC_DOCUMENTS_PATTERN.test(message)) {
+    const canTrigger = roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER");
+    if (!canTrigger) {
+      return { answer: ar ? "لا تملك صلاحية تشغيل مزامنة Odoo." : "You do not have permission to trigger an Odoo sync.", suggestions };
+    }
+    if (!(await isOdooIntegrationEnabled())) {
+      return { answer: ar ? "تكامل Odoo غير مُفعّل حالياً من الإعدادات." : "Odoo integration is currently disabled in settings.", suggestions };
+    }
+
+    const wantsDocuments = SYNC_DOCUMENTS_PATTERN.test(message);
+    const entity: LanaSyncEntity = wantsDocuments ? "documents" : "employees";
+    const jobLabel = wantsDocuments ? "أرشفة المستندات" : "مزامنة بيانات الموظفين (والمستشفيات عبر ربط الأقسام)";
+    return {
+      answer: ar
+        ? `بدأت الآن عملية ${jobLabel}. هذه العملية قد تستغرق عدة دقائق لعدد كبير من الموظفين -- سأرسل لك إشعاراً بالنتيجة والعدد الإجمالي فور الانتهاء.`
+        : `Started ${jobLabel} now. This can take several minutes for a large employee count -- I'll notify you with the result and total count once it's done.`,
+      suggestions,
+      backgroundSync: { userId, entity }
     };
   }
 

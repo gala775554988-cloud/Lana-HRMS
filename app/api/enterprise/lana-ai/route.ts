@@ -1,7 +1,13 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, type NextRequest, after } from "next/server";
 import { auth } from "@/auth";
 import { answerLanaAi, getLanaAiMonitorData } from "@/lib/enterprise/lana-ai";
+import { runLanaTriggeredSync } from "@/lib/enterprise/lana-sync-actions";
 import { writeAuditLog } from "@/lib/audit";
+
+// A Lana-triggered sync/document-crawl runs via after() below and can take
+// several minutes for a large employee count -- matches the maxDuration
+// convention already used by every other Odoo-sync-triggering route.
+export const maxDuration = 300;
 
 function errorJson(error: unknown, status = 500) {
   const message = error instanceof Error ? error.message : "Lana AI request failed";
@@ -49,7 +55,16 @@ export async function POST(request: NextRequest) {
         metadata: { employeeIds: answer.sensitiveAccess.employeeIds, fields: answer.sensitiveAccess.fields }
       }).catch(() => null);
     }
-    return NextResponse.json({ success: true, ...answer });
+    if (answer.backgroundSync) {
+      const { userId, entity } = answer.backgroundSync;
+      await writeAuditLog({ actorUserId: session.user.id, action: "lana-ai:trigger-sync", entity: "odooSync", metadata: { syncEntity: entity } }).catch(() => null);
+      // Runs after this response has already been sent -- a bare
+      // fire-and-forget promise here is not guaranteed to finish inside a
+      // serverless function once the response returns.
+      after(() => runLanaTriggeredSync(userId, entity));
+    }
+    const { backgroundSync: _backgroundSync, ...clientAnswer } = answer;
+    return NextResponse.json({ success: true, ...clientAnswer });
   } catch (error) {
     return errorJson(error);
   }
