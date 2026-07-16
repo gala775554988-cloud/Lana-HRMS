@@ -72,7 +72,7 @@ export function EmployeeMobileSidebar() {
                   <Link
                     key={item.href}
                     href={item.href}
-                    prefetch={false}
+                    prefetch={true}
                     onMouseEnter={() => handleIntent(item.href)}
                     onFocus={() => handleIntent(item.href)}
                     onTouchStart={() => handleIntent(item.href)}

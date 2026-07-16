@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { memoryCache } from '@/lib/cache/memory-cache';
@@ -23,7 +24,7 @@ export async function dbQuery<T>(label: string, fn: () => Promise<T>, fallback?:
   throw lastError;
 }
 
-export async function requireEmployee() {
+export const requireEmployee = cache(async () => {
   const session = await auth();
   if (!session?.user?.id) throw new Error('Unauthorized');
   const employee = await dbQuery('requireEmployee.employee.findFirst', () => prisma.employee.findFirst({
@@ -55,7 +56,7 @@ export async function requireEmployee() {
   }));
   if (!employee) throw new Error('Employee profile is not linked to this account');
   return { session, employee };
-}
+});
 
 export function asNumber(value: unknown) {
   if (value && typeof value === 'object' && 'toNumber' in value && typeof (value as { toNumber: () => number }).toNumber === 'function') return (value as { toNumber: () => number }).toNumber();
