@@ -6,13 +6,7 @@
     "iad1"
   ],
   "env": {
-    "AUTH_TRUST_HOST": "true",
-    "DATABASE_URL": "postgresql://neondb_owner:npg_LQznTXG67tKN@ep-still-silence-at0ona1z-pooler.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require",
-    "DIRECT_URL": "postgresql://neondb_owner:npg_LQznTXG67tKN@ep-still-silence-at0ona1z.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
-  },
-  "build.env": {
-    "DATABASE_URL": "postgresql://neondb_owner:npg_LQznTXG67tKN@ep-still-silence-at0ona1z-pooler.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require",
-    "DIRECT_URL": "postgresql://neondb_owner:npg_LQznTXG67tKN@ep-still-silence-at0ona1z.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+    "AUTH_TRUST_HOST": "true"
   },
   "crons": [
     {
