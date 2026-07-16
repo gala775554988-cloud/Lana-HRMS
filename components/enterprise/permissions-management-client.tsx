@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { PermissionHint } from "@/components/enterprise/permission-hint";
 import { UserSearchSelect } from "@/components/hrms/user-search-select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const SENSITIVE_FIELDS = ["nationalId", "email", "phone", "profilePhotoUrl", "address", "emergencyContact", "dateOfBirth"] as const;
 const FIELD_LABELS: Record<(typeof SENSITIVE_FIELDS)[number], string> = {
@@ -33,26 +34,30 @@ type FieldAccessMap = Partial<Record<(typeof SENSITIVE_FIELDS)[number], FieldAcc
 function FieldHint({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <span className="relative inline-flex shrink-0">
-      <button
-        type="button"
-        onClick={(event) => { event.preventDefault(); event.stopPropagation(); setOpen((value) => !value); }}
-        className="rounded-full text-muted-foreground transition hover:text-foreground"
-        aria-label="field hint"
-        aria-expanded={open}
-      >
-        <HelpCircle className="h-3.5 w-3.5" />
-      </button>
-      {open ? (
-        <span
-          role="tooltip"
+    <TooltipProvider delayDuration={100}>
+      <Tooltip open={open} onOpenChange={setOpen}>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={(event) => { event.preventDefault(); event.stopPropagation(); setOpen((value) => !value); }}
+            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800"
+            aria-label="شرح الحقل"
+          >
+            <HelpCircle className="h-3.5 w-3.5" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent
+          side="top"
+          align="start"
+          sideOffset={8}
+          collisionPadding={16}
           onClick={(event) => event.stopPropagation()}
-          className="absolute end-0 top-full z-50 mt-1.5 w-64 rounded-lg border bg-popover p-2.5 text-xs leading-5 text-popover-foreground shadow-lg"
+          className="z-[9999] w-64 p-3 shadow-2xl"
         >
-          {text}
-        </span>
-      ) : null}
-    </span>
+          <span className="block text-slate-100 dark:text-slate-100 leading-relaxed">{text}</span>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
