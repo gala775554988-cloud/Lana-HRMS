@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { createScopedHrTools, type ToolAuthContext } from "@/lib/ai/tools";
 import { getLanaSystemPrompt } from "@/lib/ai/system-prompt";
+import { isLanaDelegate } from "@/lib/enterprise/lana-delegates";
 import { streamText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 
@@ -99,14 +100,20 @@ async function generateLocalLanaStream(userMessage: string, context: ToolAuthCon
         ? `تضم الشركة حالياً ${depts.count} أقسام وإدارات نشطة. يمكنك الاطلاع عليها وتفاصيل موظفيها من وحدة الهيكل التنظيمي.`
         : `The company currently has ${depts.count} active departments. You can view them in the Organization Hierarchy module.`;
     } else if (/مرحبا|هلا|شلونك|كيف حالك|hello|hi|hey|morning/i.test(text)) {
-      replyText = isAr ? "أهلاً وسهلاً! تفضل، كيف أقدر أساعدك اليوم في مواضيع شؤون الموظفين أو استعلامات البيانات؟" : "Hello! How can I help you today with your HR inquiries or data lookups?";
+      replyText = context.isExecutive
+        ? (isAr ? "جاهزة لتنفيذ الأوامر الفورية والاستعلامات المؤسسية." : "Ready for immediate executive commands or institutional lookups.")
+        : (isAr ? "تفضل، كيف أستطيع مساعدتك اليوم في مواضيع شؤون الموظفين؟" : "How can I help you today with your HR inquiries or data lookups?");
     } else {
-      replyText = isAr
-        ? "استلمت استفسارك. للقيام بعمليات محددة مثل (عرض رصيد الإجازات، تسجيل الحضور والانصراف، استعراض الراتب أو التقارير)، يمكنك سؤالي مباشرة وسأقوم بتنفيذها فوراً من النظام حسب صلاحياتك."
-        : "I've received your query. For specific system operations (like checking leave balance, attendance punches, viewing salary slips or reports), ask me directly and I will execute them immediately based on your permissions.";
+      replyText = context.isExecutive
+        ? (isAr ? "يرجى تحديد الإجراء التنفيذي المطلوب فوراً (مثلاً: جلب ملف الموظف X أو استعلام رصيد الإجازات)." : "Please specify the direct executive action required (e.g., get employee profile X or check leave balance).")
+        : (isAr ? "للقيام بعمليات محددة مثل (عرض رصيد الإجازات، تسجيل الحضور، استعراض الراتب)، يمكنك سؤالي مباشرة وسأقوم بتنفيذها فوراً حسب صلاحياتك." : "For specific system operations (like checking leave balance, attendance punches, viewing salary slips), ask me directly and I will execute them immediately.");
     }
   } catch (err: any) {
-    replyText = isAr ? `عذراً، حدث خطأ أثناء تنفيذ الطلب: ${err.message}` : `Sorry, an error occurred while processing: ${err.message}`;
+    const rawMsg = String(err?.message || "");
+    const safeMsg = rawMsg.includes("Digest") || rawMsg.includes("500") || rawMsg.includes("SQL")
+      ? (isAr ? "حدث خطأ داخلي. يرجى المحاولة مرة أخرى أو تحديث الصفحة." : "An internal error occurred. Please try again or refresh.")
+      : rawMsg;
+    replyText = isAr ? `عذراً: ${safeMsg}` : `Error: ${safeMsg}`;
   }
 
   // Save Assistant Message inside conversation history synchronously
@@ -169,13 +176,18 @@ export async function POST(request: NextRequest) {
       select: { id: true, firstName: true, lastName: true, departmentId: true }
     });
 
+    const isDelegate = await isLanaDelegate(userId).catch(() => false);
+    const isExecutive = roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER") || isDelegate;
+
     const authContext: ToolAuthContext = {
       userId,
       roles,
       permissions,
       employeeId: employee?.id || null,
       employeeName: employee ? `${employee.firstName} ${employee.lastName}`.trim() : session.user.name || null,
-      departmentId: employee?.departmentId || null
+      departmentId: employee?.departmentId || null,
+      isExecutive,
+      isDelegate
     };
 
     // 2. Memory System: Get or Create Conversation
