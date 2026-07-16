@@ -7,7 +7,7 @@ import { isOdooIntegrationEnabled } from "@/lib/settings";
 import { getOdooEnvConfig } from "./config";
 import { OdooClient } from "./client";
 import { OdooConfigurationError } from "./auth";
-import { discoverSyncableFields, sanitizeRawRecord } from "./dynamic-fields";
+import { discoverSyncableFields, sanitizeRawRecord, SENSITIVE_FIELDS } from "./dynamic-fields";
 import { syncEmployeeDocuments } from "./documents";
 import { syncEmployeeIdentitiesOnly, type IdentitySyncOutcome, type OdooIdentityRecord } from "./identity-sync";
 import {
@@ -127,6 +127,69 @@ export async function requireOdooIntegrationAccess(action: "read" | "manage" = "
   if (roles?.includes("SUPER_ADMIN") || roles?.includes("HR_MANAGER")) return session;
   if (!hasPermission(permissions, { action, resource: "settings" }, roles)) throw new Error("Forbidden");
   return session;
+}
+
+export async function syncEmployeeFromOdoo(odooRecord: any) {
+  // 1. تنقية البيانات: استبعاد الحقول البنكية حصراً
+  const sanitizedData = Object.keys(odooRecord)
+    .filter((key) => !SENSITIVE_FIELDS.includes(key) && !/(iban|swift|bank_account|sort_code)/i.test(key))
+    .reduce((obj, key) => {
+      obj[key] = odooRecord[key];
+      return obj;
+    }, {} as any);
+
+  // 2. تعيين الحقول المطلوبة بدقة (Mapping)
+  const rawName = String(sanitizedData.name || "Odoo Employee").trim();
+  const nameParts = rawName.split(" ");
+  const firstName = nameParts[0] || rawName;
+  const lastName = nameParts.slice(1).join(" ") || "";
+  const nationalId = String(sanitizedData.registration_number || sanitizedData.identification_id || `ODOO-${sanitizedData.id}`).trim();
+  const employeeNumber = String(sanitizedData.barcode || sanitizedData.id || `ODOO-${sanitizedData.id}`).trim();
+
+  const employeeData = {
+    name: sanitizedData.name,
+    nationalId,
+    jobTitle: Array.isArray(sanitizedData.job_id) ? sanitizedData.job_id[1] : (sanitizedData.job_id || 'غير محدد'),
+    department: Array.isArray(sanitizedData.department_id) ? sanitizedData.department_id[1] : (sanitizedData.department_id || 'غير محدد'),
+    sponsor: Array.isArray(sanitizedData.company_id) ? sanitizedData.company_id[1] : (sanitizedData.company_id || 'غير محدد'),
+    wage: sanitizedData.contract_id?.wage || 0,
+    salaryDetails: sanitizedData.l10n_sa_salary_details || {},
+    schoolName: sanitizedData.x_studio_school_name || 'غير محدد',
+    totalCost: sanitizedData.x_studio_total_cost || 0,
+    branch: Array.isArray(sanitizedData.branch_id) ? sanitizedData.branch_id[1] : (sanitizedData.branch_id || 'الفرع الرئيسي'),
+    documents: sanitizedData.document_ids || []
+  };
+
+  // 3. الحفظ في Neon PostgreSQL
+  return await prisma.employee.upsert({
+    where: { nationalId },
+    update: {
+      firstName,
+      lastName,
+      sponsor: String(employeeData.sponsor),
+      odooId: Number(sanitizedData.id) || null,
+      odooRawData: {
+        ...sanitizedData,
+        _mappedExecutiveSummary: employeeData
+      } as any,
+      odooRawDataSyncedAt: new Date()
+    },
+    create: {
+      employeeNumber,
+      nationalId,
+      firstName,
+      lastName,
+      hireDate: new Date(),
+      status: "ACTIVE",
+      sponsor: String(employeeData.sponsor),
+      odooId: Number(sanitizedData.id) || null,
+      odooRawData: {
+        ...sanitizedData,
+        _mappedExecutiveSummary: employeeData
+      } as any,
+      odooRawDataSyncedAt: new Date()
+    }
+  });
 }
 
 export async function createOdooClientFromConnection(connectionId?: string) {

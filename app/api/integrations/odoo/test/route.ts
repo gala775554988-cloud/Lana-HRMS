@@ -137,11 +137,18 @@ async function runRpcAuthDiagnostics() {
   }
 }
 
-async function listFields(connectionId: string | undefined, model: string, search: string) {
+async function listFields(connectionId: string | undefined, model: string, search: string, runSync = false) {
   const service = await OdooSyncService.forConnection(connectionId);
-  const fields = await service.client.fieldsGet(model, [], ["string", "type", "required", "readonly", "relation", "help"]);
+  const { discoverSyncableFields } = await import("@/lib/integrations/odoo/dynamic-fields");
+  const { fieldNames, excludedBankFields, catalog } = await discoverSyncableFields(service.client, model);
+
+  if (runSync && model === "hr.employee") {
+    const syncRes = await service.syncEmployees({ batchSize: 500, direction: "ODOO_TO_LANA", mode: "FULL" });
+    return { success: true, model, count: fieldNames.length, excludedBankFields, syncResult: syncRes };
+  }
+
   const entries: Array<{ technicalName: string; string?: unknown; help?: unknown; [key: string]: unknown }> =
-    Object.entries(fields).map(([technicalName, meta]) => ({ technicalName, ...meta }));
+    Object.entries(catalog).map(([technicalName, meta]) => ({ technicalName, ...meta, isSensitiveBankField: excludedBankFields.includes(technicalName) }));
   const needle = search.trim().toLowerCase();
   const filtered = needle
     ? entries.filter((entry) =>
@@ -150,7 +157,7 @@ async function listFields(connectionId: string | undefined, model: string, searc
         String(entry.help ?? "").toLowerCase().includes(needle)
       )
     : entries;
-  return { success: true, model, count: filtered.length, totalFields: entries.length, fields: filtered };
+  return { success: true, model, count: filtered.length, totalFields: entries.length, excludedBankFields, fields: filtered };
 }
 
 export async function GET(request: NextRequest) {
@@ -162,7 +169,8 @@ export async function GET(request: NextRequest) {
     const model = request.nextUrl.searchParams.get("fieldsModel");
     if (model) {
       const search = request.nextUrl.searchParams.get("search") || "";
-      return NextResponse.json(await listFields(connectionId, model, search));
+      const runSync = request.nextUrl.searchParams.get("sync") === "true";
+      return NextResponse.json(await listFields(connectionId, model, search, runSync));
     }
     const service = await OdooSyncService.forConnection(connectionId);
     return NextResponse.json(await service.testConnection());

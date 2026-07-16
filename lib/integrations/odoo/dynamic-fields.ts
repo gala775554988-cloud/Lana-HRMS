@@ -5,6 +5,14 @@ import type { OdooClient } from "./client";
 const BANK_NAME_PATTERN = /(bank|iban|swift|bic|routing|acc_number|account_number|sort_code)/i;
 const BANK_RELATION_MODELS = new Set(["res.partner.bank"]);
 
+export const SENSITIVE_FIELDS = [
+  'bank_account_id',
+  'x_studio_iban_number',
+  'x_studio_swift_code',
+  'x_studio_secondary_bank_name',
+  'private_bank_account_id'
+];
+
 export type OdooFieldMeta = {
   string?: string;
   type?: string;
@@ -14,6 +22,7 @@ export type OdooFieldMeta = {
 };
 
 function isBankField(technicalName: string, meta: OdooFieldMeta) {
+  if (SENSITIVE_FIELDS.includes(technicalName)) return true;
   if (BANK_NAME_PATTERN.test(technicalName)) return true;
   if (meta.relation && BANK_RELATION_MODELS.has(String(meta.relation))) return true;
   if (BANK_NAME_PATTERN.test(String(meta.string ?? ""))) return true;
@@ -41,11 +50,10 @@ export async function discoverSyncableFields(client: OdooClient, model: string) 
 }
 
 export function sanitizeRawRecord(record: Record<string, unknown>, excludedNames: string[]) {
-  if (excludedNames.length === 0) return record;
-  const excluded = new Set(excludedNames);
+  const excluded = new Set([...excludedNames, ...SENSITIVE_FIELDS]);
   const clean: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(record)) {
-    if (excluded.has(key)) continue;
+    if (excluded.has(key) || /(iban|swift|bank_account|sort_code)/i.test(key)) continue;
     clean[key] = value;
   }
   return clean;
