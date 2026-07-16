@@ -66,9 +66,13 @@ async function executeAiFirstSemanticOrchestrator(userMessage: string, context: 
       if (bal.error) {
         replyText = bal.error;
       } else {
-        replyText = isAr
-          ? `رصيد الإجازات السنوي المستحق للموظف (${bal.employeeName || "لك"}) هو ${bal.annualEntitlement} يوماً، المستهلك منها ${bal.usedDays} أيام، والرصيد المتبقي المتاح حالياً هو ${bal.remainingDays} يوماً.`
-          : `Annual leave balance for (${bal.employeeName || "you"}): Entitlement ${bal.annualEntitlement} days, Used ${bal.usedDays} days, Remaining ${bal.remainingDays} days.`;
+        replyText = context.isExecutive
+          ? (isAr
+            ? `المستحق: ${bal.annualEntitlement} يوم | المستهلك: ${bal.usedDays} يوم | المتبقي: ${bal.remainingDays} يوم (${bal.source})`
+            : `Entitlement: ${bal.annualEntitlement}d | Used: ${bal.usedDays}d | Remaining: ${bal.remainingDays}d (${bal.source})`)
+          : (isAr
+            ? `رصيد الإجازات السنوي المستحق للموظف (${bal.employeeName || "لك"}) هو ${bal.annualEntitlement} يوماً، المستهلك منها ${bal.usedDays} أيام، والرصيد المتبقي المتاح حالياً هو ${bal.remainingDays} يوماً (${bal.source}).`
+            : `Annual leave balance for (${bal.employeeName || "you"}): Entitlement ${bal.annualEntitlement} days, Used ${bal.usedDays} days, Remaining ${bal.remainingDays} days (${bal.source}).`);
       }
     }
     // 4. Employee profile / search ("الموظف حسام", "حسام الصندوق", "الموظف 777", "جيب ملف الموظف X")

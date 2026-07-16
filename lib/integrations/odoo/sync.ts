@@ -315,6 +315,38 @@ export class OdooSyncService {
     return { success: true, odooId, employeeId: empId, employee: updatedEmployee };
   }
 
+  /**
+   * Real-time Odoo Bridge (`الربط المباشر ببيانات Odoo - Real-time Odoo Bridge`).
+   * Connects directly to Odoo API (`search_read`) to fetch real-time metrics (`wage`, `number_of_days`, `check_in`) right on demand.
+   * This reduces loading on Neon PostgreSQL and makes Lana answers instant.
+   */
+  async fetchLiveOdooMetrics(odooEmployeeId: number) {
+    if (!odooEmployeeId || odooEmployeeId <= 0) return null;
+    try {
+      await this.client.connect();
+      const [contracts, leaves, attendance] = await Promise.all([
+        this.client.search_read("hr.contract", [["employee_id", "=", odooEmployeeId], ["state", "=", "open"]], ["wage", "name"], { limit: 1 }).catch(() => []),
+        this.client.search_read("hr.leave", [["employee_id", "=", odooEmployeeId], ["state", "=", "validate"]], ["number_of_days", "holiday_status_id"], { limit: 20 }).catch(() => []),
+        this.client.search_read("hr.attendance", [["employee_id", "=", odooEmployeeId]], ["check_in", "check_out"], { limit: 1, order: "check_in desc" }).catch(() => [])
+      ]);
+
+      const activeContract = (contracts as any[])?.[0];
+      const liveWage = activeContract?.wage ? Number(activeContract.wage) : null;
+      const usedLeaveDays = (leaves as any[]).reduce((acc: number, l: any) => acc + (Number(l.number_of_days) || 0), 0);
+      const latestAtt = (attendance as any[])?.[0];
+
+      return {
+        odooId: odooEmployeeId,
+        liveWage,
+        usedLeaveDays,
+        latestCheckIn: latestAtt?.check_in || null,
+        latestCheckOut: latestAtt?.check_out || null
+      };
+    } catch (err) {
+      return null;
+    }
+  }
+
   async syncEmployees(options: SyncOptions = {}) {
     const direction = normalizeDirection(options.direction);
     const result = emptyResult("employees", direction, Boolean(options.dryRun), options.tenantId);

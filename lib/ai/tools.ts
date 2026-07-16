@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { tool } from "ai";
 import { prisma } from "@/lib/prisma";
+import { memoryCache } from "@/lib/cache/memory-cache";
 import { applyScopedWhere } from "@/lib/enterprise/hierarchy";
 
 export type ToolAuthContext = {
@@ -45,43 +46,56 @@ export function createScopedHrTools(context: ToolAuthContext) {
         const queryId = employeeId || identifier;
         if (!queryId && !context.employeeId) return { error: "يرجى تحديد رقم أو اسم الموظف." };
         const target = queryId || context.employeeId!;
-        const emp = await prisma.employee.findFirst({
-          where: {
-            OR: [
-              { id: target },
-              { nationalId: target },
-              { employeeNumber: target },
-              { firstName: { contains: target, mode: "insensitive" } },
-              { lastName: { contains: target, mode: "insensitive" } }
-            ]
-          },
-          include: {
-            department: { select: { name: true, code: true } },
-            position: { select: { title: true } },
-            branch: { select: { name: true } },
-            manager: { select: { firstName: true, lastName: true, employeeNumber: true } }
+
+        return memoryCache(`tool:emp_profile:${target}:${context.userId}`, 60_000, async () => {
+          const emp = await prisma.employee.findFirst({
+            where: {
+              OR: [
+                { id: target },
+                { nationalId: target },
+                { employeeNumber: target },
+                { firstName: { contains: target, mode: "insensitive" } },
+                { lastName: { contains: target, mode: "insensitive" } }
+              ]
+            },
+            include: {
+              department: { select: { name: true, code: true } },
+              position: { select: { title: true } },
+              branch: { select: { name: true } },
+              manager: { select: { firstName: true, lastName: true, employeeNumber: true } }
+            }
+          });
+          if (!emp) return { error: `لم يتم العثور على موظف برقم أو اسم "${target}" في قاعدة البيانات.` };
+
+          if (!canViewAllEmployees(context) && emp.id !== context.employeeId && emp.managerId !== context.employeeId) {
+            return { error: "عذراً: ليس لديك صلاحية لعرض بيانات هذا الموظف." };
           }
+
+          let liveMetrics: any = null;
+          if (emp.odooId) {
+            try {
+              const { OdooSyncService } = await import("@/lib/integrations/odoo/sync");
+              const service = await OdooSyncService.forConnection();
+              liveMetrics = await service.fetchLiveOdooMetrics(emp.odooId);
+            } catch {}
+          }
+
+          return {
+            id: emp.id,
+            employeeNumber: emp.employeeNumber,
+            nationalId: canManageHr(context) || emp.id === context.employeeId ? emp.nationalId : "REDACTED",
+            name: `${emp.firstName} ${emp.lastName}`.trim(),
+            email: emp.email || "-",
+            phone: emp.phone || "-",
+            department: emp.department?.name || "بدون قسم",
+            position: emp.position?.title || "بدون مسمى",
+            branch: emp.branch?.name || "الفرع الرئيسي",
+            manager: emp.manager ? `${emp.manager.firstName} ${emp.manager.lastName}` : "لا يوجد",
+            status: emp.status === "ACTIVE" ? "على رأس العمل" : "غير نشط",
+            hireDate: emp.hireDate.toLocaleDateString("ar-SA"),
+            liveWage: liveMetrics?.liveWage ? `${liveMetrics.liveWage} SAR (Odoo Real-time Bridge)` : undefined
+          };
         });
-        if (!emp) return { error: `لم يتم العثور على موظف برقم أو اسم "${target}" في قاعدة البيانات.` };
-
-        if (!canViewAllEmployees(context) && emp.id !== context.employeeId && emp.managerId !== context.employeeId) {
-          return { error: "عذراً: ليس لديك صلاحية لعرض بيانات هذا الموظف." };
-        }
-
-        return {
-          id: emp.id,
-          employeeNumber: emp.employeeNumber,
-          nationalId: canManageHr(context) || emp.id === context.employeeId ? emp.nationalId : "REDACTED",
-          name: `${emp.firstName} ${emp.lastName}`.trim(),
-          email: emp.email || "-",
-          phone: emp.phone || "-",
-          department: emp.department?.name || "بدون قسم",
-          position: emp.position?.title || "بدون مسمى",
-          branch: emp.branch?.name || "الفرع الرئيسي",
-          manager: emp.manager ? `${emp.manager.firstName} ${emp.manager.lastName}` : "لا يوجد",
-          status: emp.status === "ACTIVE" ? "على رأس العمل" : "غير نشط",
-          hireDate: emp.hireDate.toLocaleDateString("ar-SA")
-        };
       }
     }),
 
@@ -346,39 +360,56 @@ export function createScopedHrTools(context: ToolAuthContext) {
         employeeName: z.string().optional().describe("Employee name.")
       }) as any,
       execute: async ({ employeeId, employeeName }: any) => {
-        let targetId = employeeId;
-        if (!targetId && employeeName) {
-          const emp = await prisma.employee.findFirst({
-            where: {
-              OR: [
-                { firstName: { contains: employeeName, mode: "insensitive" } },
-                { lastName: { contains: employeeName, mode: "insensitive" } },
-                { employeeNumber: { contains: employeeName } }
-              ]
-            }
+        const cacheKeyTarget = employeeId || employeeName || context.selectedEmployeeId || context.employeeId || "self";
+        return memoryCache(`tool:leave_bal:${cacheKeyTarget}:${context.userId}`, 30_000, async () => {
+          let targetId = employeeId || context.selectedEmployeeId;
+          let targetEmp: any = null;
+          if (!targetId && employeeName) {
+            targetEmp = await prisma.employee.findFirst({
+              where: {
+                OR: [
+                  { firstName: { contains: employeeName, mode: "insensitive" } },
+                  { lastName: { contains: employeeName, mode: "insensitive" } },
+                  { employeeNumber: { contains: employeeName } }
+                ]
+              }
+            });
+            if (!targetEmp) return { error: `لم يتم العثور على موظف باسم "${employeeName}".` };
+            targetId = targetEmp.id;
+          }
+          targetId = targetId || context.employeeId;
+          if (!targetId) return { error: "يرجى تحديد اسم أو رقم الموظف للاستعلام عن رصيد إجازته." };
+          if (!canManageHr(context) && targetId !== context.employeeId) {
+            return { error: "عذراً: ليس لديك صلاحية للاستعلام عن رصيد إجازة هذا الموظف." };
+          }
+          if (!targetEmp) targetEmp = await prisma.employee.findUnique({ where: { id: targetId }, select: { firstName: true, lastName: true, employeeNumber: true, odooId: true } });
+          const requests = await prisma.leaveRequest.findMany({
+            where: { employeeId: targetId, status: "APPROVED" }
           });
-          if (!emp) return { error: `لم يتم العثور على موظف باسم "${employeeName}".` };
-          targetId = emp.id;
-        }
-        targetId = targetId || context.employeeId;
-        if (!targetId) return { error: "يرجى تحديد اسم أو رقم الموظف للاستعلام عن رصيد إجازته." };
-        if (!canManageHr(context) && targetId !== context.employeeId) {
-          return { error: "عذراً: ليس لديك صلاحية للاستعلام عن رصيد إجازة هذا الموظف." };
-        }
-        const empRecord = await prisma.employee.findUnique({ where: { id: targetId }, select: { firstName: true, lastName: true, employeeNumber: true } });
-        const requests = await prisma.leaveRequest.findMany({
-          where: { employeeId: targetId, status: "APPROVED" }
+          const used = requests.reduce((sum, r) => sum + Math.max(1, Math.round((r.endDate.getTime() - r.startDate.getTime()) / (1000 * 60 * 60 * 24))), 0);
+          const annualEntitlement = 30;
+
+          let liveOdooUsed: number | null = null;
+          if (targetEmp?.odooId) {
+            try {
+              const { OdooSyncService } = await import("@/lib/integrations/odoo/sync");
+              const service = await OdooSyncService.forConnection();
+              const metrics = await service.fetchLiveOdooMetrics(targetEmp.odooId);
+              if (metrics && typeof metrics.usedLeaveDays === "number") liveOdooUsed = metrics.usedLeaveDays;
+            } catch {}
+          }
+
+          const effectiveUsed = liveOdooUsed !== null ? liveOdooUsed : used;
+          return {
+            employeeName: targetEmp ? `${targetEmp.firstName} ${targetEmp.lastName}` : targetId,
+            employeeNumber: targetEmp?.employeeNumber || "-",
+            annualEntitlement,
+            usedDays: effectiveUsed,
+            remainingDays: Math.max(0, annualEntitlement - effectiveUsed),
+            source: liveOdooUsed !== null ? "Real-time Odoo Bridge (مباشر من Odoo)" : "Neon Database",
+            pendingRequestsCount: await prisma.leaveRequest.count({ where: { employeeId: targetId, status: "PENDING" } })
+          };
         });
-        const used = requests.reduce((sum, r) => sum + Math.max(1, Math.round((r.endDate.getTime() - r.startDate.getTime()) / (1000 * 60 * 60 * 24))), 0);
-        const annualEntitlement = 30;
-        return {
-          employeeName: empRecord ? `${empRecord.firstName} ${empRecord.lastName}` : targetId,
-          employeeNumber: empRecord?.employeeNumber || "-",
-          annualEntitlement,
-          usedDays: used,
-          remainingDays: Math.max(0, annualEntitlement - used),
-          pendingRequestsCount: await prisma.leaveRequest.count({ where: { employeeId: targetId, status: "PENDING" } })
-        };
       }
     }),
 
