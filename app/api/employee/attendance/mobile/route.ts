@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { requireEmployee } from '@/lib/employee/portal';
 import { findAllowedSiteForEmployee, riyadhWorkDate } from '@/lib/attendance/sites';
 import { writeAuditLog } from '@/lib/audit';
+import { verifyOrBindEmployeeDevice } from '@/lib/cache/device-cache';
 
 function notePayload(input: Record<string, unknown>) {
   return JSON.stringify({ ...input, recordedAt: new Date().toISOString() });
@@ -12,6 +13,13 @@ export async function POST(request: NextRequest) {
   try {
     const { employee, session } = await requireEmployee();
     const body = await request.json();
+
+    // 1. High-speed Redis / In-Memory check (< 50ms) for mobile device binding
+    const deviceCheck = await verifyOrBindEmployeeDevice(employee.id, body.deviceId || request.headers.get('x-device-id'), 'mobile');
+    if (!deviceCheck.allowed) {
+      return NextResponse.json({ success: false, message: deviceCheck.reason || 'هذا الحساب مربوط بجهاز جوال آخر بالفعل. يرجى التواصل مع إدارة الموارد البشرية لفك الارتباط قبل الدخول من هذا الجهاز.' }, { status: 403 });
+    }
+
     const action = body.action === 'checkout' ? 'checkout' : 'checkin';
     const latitude = Number(body.latitude);
     const longitude = Number(body.longitude);

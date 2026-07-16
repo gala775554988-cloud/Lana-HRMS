@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Fingerprint, LocateFixed, LogIn, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getOrCreateMobileDeviceUUID } from "@/lib/employee/device-uuid";
 
 type Result = { success: boolean; message?: string; site?: { name: string }; distanceMeters?: number; action?: string };
 
@@ -54,7 +55,7 @@ export function EmployeeMobileAttendancePunch() {
         const res = await fetch('/api/employee/attendance/mobile', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action, latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy, biometric }),
+          body: JSON.stringify({ action, latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy, biometric, deviceId: getOrCreateMobileDeviceUUID() }),
         });
         const json = await res.json();
         setResult(json);
