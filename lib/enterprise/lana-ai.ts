@@ -4,6 +4,11 @@ import { applyScopedWhere, getAccessProfile, resolveRoleEmployeeIds } from "@/li
 import { listHospitals } from "@/lib/enterprise/hospitals";
 import { getEffectivePermissionsForRoles } from "@/lib/enterprise/permissions";
 import { getEmployeeFieldAccess, redactHiddenFields } from "@/lib/enterprise/employee-field-access";
+import { isOdooIntegrationEnabled } from "@/lib/settings";
+import type { LanaSyncEntity } from "@/lib/enterprise/lana-sync-actions";
+import { isLanaDelegate } from "@/lib/enterprise/lana-delegates";
+import { writeAuditLog } from "@/lib/audit";
+import { syncEmployeeFieldsFromOdoo, type FieldSyncMode } from "@/lib/enterprise/lana-field-sync";
 
 export type LanaAiAnswer = {
   answer: string;
@@ -14,6 +19,15 @@ export type LanaAiAnswer = {
   // log WHICH fields were exposed and to WHOM without ever writing the actual
   // sensitive values into AuditLog.
   sensitiveAccess?: { employeeIds: string[]; fields: string[] };
+  // Set when this reply promised to run a real background job (Odoo sync /
+  // document crawl). The API route runs it via Next.js after() so it keeps
+  // executing once this response has already been sent, and posts a
+  // completion notification with the real result when it's done.
+  backgroundSync?: { userId: string; entity: LanaSyncEntity };
+  // Set for a group field-sync command: the API route runs runGroupFieldSync
+  // via after() and the detailed table report lands as a notification once
+  // the whole group has been processed.
+  backgroundFieldSync?: { userId: string; employeeIds: string[]; mode: FieldSyncMode; groupLabel: string; ar: boolean };
 };
 
 function can(permissions: string[] | undefined, action: string, resource: string) {
@@ -96,6 +110,36 @@ export async function answerLanaAi({
   const WHO_CAN_APPROVE_PATTERN = /من\s+(يملك|لديه|تملك|لديها)?\s*صلاحية\s*الموافقة|من\s+يستطيع\s+الموافقة|من\s+(يوافق|يعتمد)\s+على|who\s+can\s+approve/i;
   const HAS_PERMISSION_PATTERN = /(يملك|تملك|لديه|لديها)\s*صلاحية|does\s+.*\s+have\s+permission|has\s+permission\s+to/i;
   const canQueryPermissions = roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER") || can(permissions, "read", "permissions");
+
+  // "Executive" command: assign a specific employee as the responsible
+  // approver for a hospital/branch. Also checked before policyAnswer() --
+  // otherwise a command naming "إجازات"/"رواتب" etc. would be swallowed by
+  // the generic policy blurb. Deliberately a narrow, hardcoded pattern (not
+  // a general-purpose command interpreter): gated to explicitly
+  // admin-designated delegates, never guesses on name ambiguity, and always
+  // confirms against freshly re-read DB state after writing.
+  const ASSIGN_RESPONSIBLE_PATTERN = /اجعل[ي]?\s+(?:ال)?موظف(?:ة)?\s+(.+?)\s+مسؤول(?:ة|اً|ا)?\s+عن\s+(مستشفى|فرع)\s+(.+?)(?:\s+ل(?:موافقات|طلبات)\s+(.+?))?[.؟?]?\s*$/u;
+  const assignMatch = ASSIGN_RESPONSIBLE_PATTERN.exec(message.trim());
+  if (assignMatch) {
+    return handleAssignResponsibleCommand({ userId, roles, ar, suggestions, match: assignMatch });
+  }
+
+  // Field-level Odoo re-sync commands ("حدث كود/بيانات/الراتب/المستشفى/
+  // الحساب التحليلي الموظف X من أودو" and the "مجموعة الموظفين ... في
+  // مستشفى Y" group variant). Group pattern checked first since "الموظفين"
+  // (no space right after the "موظف" stem) never overlaps with the single
+  // pattern's "موظف\s+" requirement, but checking group first removes any
+  // doubt. Also placed before policyAnswer() for the same reason as above.
+  const FIELD_SYNC_GROUP_PATTERN = /حدث\s+(كود|بيانات|الراتب|المستشفى|الحساب\s*التحليلي)?\s*(?:مجموعة\s+الموظفين|الموظفين)(?:\s+الموجودين)?\s+في\s+مستشفى\s+(.+?)\s+من\s+أودو/u;
+  const FIELD_SYNC_SINGLE_PATTERN = /حدث\s+(كود|بيانات|الراتب|المستشفى|الحساب\s*التحليلي)?\s*(?:ال)?موظف\s+(.+?)\s+من\s+أودو/u;
+  const groupSyncMatch = FIELD_SYNC_GROUP_PATTERN.exec(message.trim());
+  if (groupSyncMatch) {
+    return handleFieldSyncGroupCommand({ userId, roles, ar, suggestions, match: groupSyncMatch });
+  }
+  const singleSyncMatch = FIELD_SYNC_SINGLE_PATTERN.exec(message.trim());
+  if (singleSyncMatch) {
+    return handleFieldSyncSingleCommand({ userId, roles, ar, suggestions, match: singleSyncMatch });
+  }
 
   if (!WHO_CAN_APPROVE_PATTERN.test(message) && !HAS_PERMISSION_PATTERN.test(message)) {
     const policy = policyAnswer(message, ar);
@@ -241,6 +285,32 @@ export async function answerLanaAi({
         ? `${target.firstName} ${target.lastName} ${hasView ? "يملك" : "لا يملك"} صلاحية عرض ${resourceLabel}.`
         : `${target.firstName} ${target.lastName} ${hasView ? "does" : "does not"} have permission to view ${resourceLabel}.`,
       suggestions
+    };
+  }
+
+  // Checked before the generic employee-search branch below (which would
+  // otherwise swallow "زامني بيانات الموظفين" / "سحب مستندات الموظفين" etc.
+  // since they also mention "موظف").
+  const SYNC_EMPLOYEES_PATTERN = /زامن|مزامن|اسحب.{0,20}بيانات.{0,20}موظف|شغل.{0,10}مزامنة|sync\s+employees?|run\s+sync/i;
+  const SYNC_DOCUMENTS_PATTERN = /أرشيف\s*المستندات|أرشفة\s*المستندات|(سحب|حدث).{0,10}(مستندات|مرفقات)|مسح.{0,10}مرفقات|crawl.{0,10}document|sync.{0,10}document/i;
+  if (SYNC_EMPLOYEES_PATTERN.test(message) || SYNC_DOCUMENTS_PATTERN.test(message)) {
+    const canTrigger = roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER");
+    if (!canTrigger) {
+      return { answer: ar ? "لا تملك صلاحية تشغيل مزامنة Odoo." : "You do not have permission to trigger an Odoo sync.", suggestions };
+    }
+    if (!(await isOdooIntegrationEnabled())) {
+      return { answer: ar ? "تكامل Odoo غير مُفعّل حالياً من الإعدادات." : "Odoo integration is currently disabled in settings.", suggestions };
+    }
+
+    const wantsDocuments = SYNC_DOCUMENTS_PATTERN.test(message);
+    const entity: LanaSyncEntity = wantsDocuments ? "documents" : "employees";
+    const jobLabel = wantsDocuments ? "أرشفة المستندات" : "مزامنة بيانات الموظفين (والمستشفيات عبر ربط الأقسام)";
+    return {
+      answer: ar
+        ? `بدأت الآن عملية ${jobLabel}. هذه العملية قد تستغرق عدة دقائق لعدد كبير من الموظفين -- سأرسل لك إشعاراً بالنتيجة والعدد الإجمالي فور الانتهاء.`
+        : `Started ${jobLabel} now. This can take several minutes for a large employee count -- I'll notify you with the result and total count once it's done.`,
+      suggestions,
+      backgroundSync: { userId, entity }
     };
   }
 
@@ -438,6 +508,303 @@ export async function answerLanaAi({
       ? "أنا Lana AI. أستطيع مساعدتك في سياسات الموارد البشرية، الطلبات، الرواتب، الإجازات، الأوفر تايم، والبحث داخل البيانات التي تملك صلاحية رؤيتها."
       : "I am Lana AI. I can help with HR policies, requests, payroll, leave, overtime, and searching data you are allowed to access."),
     suggestions
+  };
+}
+
+const MODULE_KEYWORD_MAP: Array<[RegExp, string, string]> = [
+  [/إجاز/i, "leave", "الإجازات"],
+  [/أوفر|اضافي|إضافي/i, "overtime", "الأوفر تايم"],
+  [/سلف/i, "loan", "السلف"],
+  [/مصروف/i, "expense", "المصروفات"]
+];
+const ALL_APPROVAL_MODULES: Array<[string, string]> = [["leave", "الإجازات"], ["overtime", "الأوفر تايم"], ["loan", "السلف"], ["expense", "المصروفات"]];
+
+/**
+ * Executive command handler: "اجعل الموظف X مسؤولاً عن مستشفى/فرع Y [لموافقات Z]".
+ * Hardcoded, narrow logic per the explicit spec -- not a general interpreter:
+ *   1. Delegate check first, before touching any data.
+ *   2. Any name ambiguity (scope or employee) stops immediately with a
+ *      disambiguation list -- nothing is written until the caller repeats
+ *      the command with an unambiguous identifier (employee number).
+ *   3. After writing, the affected HrApprovalChain rows are re-read fresh
+ *      from the DB (not just the values just sent) for the confirmation
+ *      report, and everything is audit-logged.
+ */
+async function handleAssignResponsibleCommand({
+  userId,
+  roles,
+  ar,
+  suggestions,
+  match
+}: {
+  userId: string;
+  roles: string[];
+  ar: boolean;
+  suggestions: string[];
+  match: RegExpExecArray;
+}): Promise<LanaAiAnswer> {
+  if (!(await isLanaDelegate(userId, roles))) {
+    return {
+      answer: ar
+        ? "هذا أمر تنفيذي (تعديل سلسلة الموافقات) متاح فقط للمفوَّضين الذين حددهم المسؤول في لوحة التحكم. لا تملك هذه الصلاحية حالياً."
+        : "This is an executive command (editing the approval chain) available only to delegates the admin has designated. You don't currently have this permission.",
+      suggestions
+    };
+  }
+
+  const [, employeeToken, scopeKeyword, scopeToken, moduleToken] = match;
+  const scopeType: "HOSPITAL" | "BRANCH" = scopeKeyword.trim() === "مستشفى" ? "HOSPITAL" : "BRANCH";
+
+  // --- Resolve scope (hospital/branch) — stop on 0 or >1 matches ---
+  const scopeName = scopeToken.trim();
+  const scopeCandidates = scopeType === "HOSPITAL"
+    ? await prisma.hospital.findMany({ where: { name: { contains: scopeName, mode: "insensitive" } }, select: { id: true, name: true }, take: 10 })
+    : await prisma.branch.findMany({ where: { name: { contains: scopeName, mode: "insensitive" } }, select: { id: true, name: true }, take: 10 });
+
+  if (scopeCandidates.length === 0) {
+    const label = scopeType === "HOSPITAL" ? "مستشفى" : "فرعاً";
+    return { answer: ar ? `لم أجد ${label} باسم "${scopeName}". لم يتم تنفيذ أي تغيير.` : `No matching ${scopeType.toLowerCase()} found for "${scopeName}". Nothing was executed.`, suggestions };
+  }
+  if (scopeCandidates.length > 1) {
+    return {
+      answer: ar
+        ? `وجدت أكثر من ${scopeType === "HOSPITAL" ? "مستشفى" : "فرع"} مطابق لـ "${scopeName}". يرجى إعادة الأمر باستخدام الاسم الدقيق: ${scopeCandidates.map((c) => c.name).join("، ")}. لم يتم تنفيذ أي تغيير.`
+        : `More than one matching ${scopeType.toLowerCase()} found for "${scopeName}": ${scopeCandidates.map((c) => c.name).join(", ")}. Please repeat the command with the exact name. Nothing was executed.`,
+      suggestions
+    };
+  }
+  const scope = scopeCandidates[0];
+
+  // --- Resolve employee — stop on 0 or >1 matches, with a disambiguation
+  // list showing employee number/title/department (per the explicit spec) ---
+  const employeeName = employeeToken.trim();
+  const employeeCandidates = await prisma.employee.findMany({
+    where: {
+      OR: [
+        { employeeNumber: { equals: employeeName, mode: "insensitive" } },
+        { firstName: { contains: employeeName, mode: "insensitive" } },
+        { lastName: { contains: employeeName, mode: "insensitive" } }
+      ]
+    },
+    select: { id: true, employeeNumber: true, firstName: true, lastName: true, userId: true, position: { select: { title: true } }, department: { select: { name: true } } },
+    take: 10
+  });
+
+  if (employeeCandidates.length === 0) {
+    return { answer: ar ? `لم أجد موظفاً باسم أو رقم "${employeeName}". لم يتم تنفيذ أي تغيير.` : `No matching employee found for "${employeeName}". Nothing was executed.`, suggestions };
+  }
+  if (employeeCandidates.length > 1) {
+    const options = employeeCandidates
+      .map((employee) => `${employee.employeeNumber} - ${employee.firstName} ${employee.lastName} (${employee.position?.title ?? "-"} / ${employee.department?.name ?? "-"})`)
+      .join("\n");
+    return {
+      answer: ar
+        ? `وجدت أكثر من موظف مطابق لـ "${employeeName}":\n${options}\n\nيرجى إعادة الأمر باستخدام رقم الموظف الدقيق (مثال: "اجعل الموظف ${employeeCandidates[0].employeeNumber} مسؤولاً عن ${scopeKeyword} ${scope.name}"). لم يتم تنفيذ أي تغيير.`
+        : `More than one matching employee found for "${employeeName}":\n${options}\n\nPlease repeat the command with the exact employee number. Nothing was executed.`,
+      suggestions
+    };
+  }
+  const employee = employeeCandidates[0];
+  if (!employee.userId) {
+    return {
+      answer: ar
+        ? `الموظف ${employee.firstName} ${employee.lastName} (${employee.employeeNumber}) لا يملك حساب مستخدم مرتبطاً، ولا يمكن تعيينه معتمداً. لم يتم تنفيذ أي تغيير.`
+        : `${employee.firstName} ${employee.lastName} (${employee.employeeNumber}) has no linked user account and can't be assigned as an approver. Nothing was executed.`,
+      suggestions
+    };
+  }
+
+  // --- Resolve module(s): a named type, or all four if none was specified ---
+  const matchedModule = moduleToken ? MODULE_KEYWORD_MAP.find(([pattern]) => pattern.test(moduleToken)) : null;
+  const targetModules: Array<[string, string]> = matchedModule ? [[matchedModule[1], matchedModule[2]]] : ALL_APPROVAL_MODULES;
+
+  // --- Execute: upsert a level-1 scoped override per target module ---
+  const before: Record<string, unknown> = {};
+  for (const [moduleKey] of targetModules) {
+    before[moduleKey] = await prisma.hrApprovalChain.findUnique({
+      where: { module_level_scopeType_scopeId: { module: moduleKey, level: 1, scopeType, scopeId: scope.id } }
+    });
+  }
+
+  for (const [moduleKey] of targetModules) {
+    await prisma.hrApprovalChain.upsert({
+      where: { module_level_scopeType_scopeId: { module: moduleKey, level: 1, scopeType, scopeId: scope.id } },
+      update: { approverUserId: employee.userId, approverRole: "DIRECT_MANAGER", capabilities: ["VIEW", "APPROVE", "REJECT"], isActive: true },
+      create: { module: moduleKey, level: 1, scopeType, scopeId: scope.id, approverUserId: employee.userId, approverRole: "DIRECT_MANAGER", capabilities: ["VIEW", "APPROVE", "REJECT"], isActive: true }
+    });
+  }
+
+  // --- Validation: re-read the freshly-written state from the DB (never
+  // trust the values just sent) to build the confirmation report ---
+  const afterRows = await prisma.hrApprovalChain.findMany({
+    where: { scopeType, scopeId: scope.id, module: { in: targetModules.map(([key]) => key) } },
+    orderBy: { module: "asc" }
+  });
+
+  await writeAuditLog({
+    actorUserId: userId,
+    action: "lana-ai:assign-approver",
+    entity: "hrApprovalChain",
+    metadata: { before, after: afterRows, employeeId: employee.id, scopeType, scopeId: scope.id, scopeName: scope.name }
+  });
+
+  const scopeLabel = scopeType === "HOSPITAL" ? "مستشفى" : "فرع";
+  const employeeLabel = `${employee.firstName} ${employee.lastName} (${employee.employeeNumber})`;
+  const lines = afterRows.map((row) => {
+    const moduleLabel = ALL_APPROVAL_MODULES.find(([key]) => key === row.module)?.[1] ?? row.module;
+    return `${moduleLabel}: ${scopeLabel} ${scope.name} -> ${employeeLabel} (${(row.capabilities ?? []).includes("APPROVE") ? "موافقة/رفض" : "إظهار فقط"})`;
+  });
+
+  return {
+    answer: ar
+      ? `تم تنفيذ سلسلة الموافقات كالتالي:\n${lines.join("\n")}`
+      : `Approval chain executed as follows:\n${lines.join("\n")}`,
+    suggestions
+  };
+}
+
+function fieldSyncModeFromDescriptor(descriptor: string | undefined): FieldSyncMode {
+  return descriptor?.trim() === "كود" ? "identity" : "full";
+}
+
+/** "حدث [كود|بيانات|الراتب|المستشفى|الحساب التحليلي] الموظف X من أودو" --
+ * delegate-gated, single-employee, disambiguation-first like the executive
+ * assign command. Runs synchronously (one Odoo round trip) so the detailed
+ * report can be returned immediately in the chat reply itself. */
+async function handleFieldSyncSingleCommand({
+  userId,
+  roles,
+  ar,
+  suggestions,
+  match
+}: {
+  userId: string;
+  roles: string[];
+  ar: boolean;
+  suggestions: string[];
+  match: RegExpExecArray;
+}): Promise<LanaAiAnswer> {
+  if (!(await isLanaDelegate(userId, roles))) {
+    return {
+      answer: ar ? "هذا أمر تنفيذي (مزامنة بيانات من أودو) متاح فقط للمفوَّضين الذين حددهم المسؤول." : "This is an executive command (syncing data from Odoo) available only to designated delegates.",
+      suggestions
+    };
+  }
+  if (!(await isOdooIntegrationEnabled())) {
+    return { answer: ar ? "تكامل Odoo غير مُفعّل حالياً من الإعدادات." : "Odoo integration is currently disabled in settings.", suggestions };
+  }
+
+  const [, descriptor, employeeToken] = match;
+  const mode = fieldSyncModeFromDescriptor(descriptor);
+  const employeeName = employeeToken.trim();
+
+  const candidates = await prisma.employee.findMany({
+    where: {
+      OR: [
+        { employeeNumber: { equals: employeeName, mode: "insensitive" } },
+        { firstName: { contains: employeeName, mode: "insensitive" } },
+        { lastName: { contains: employeeName, mode: "insensitive" } }
+      ]
+    },
+    select: { id: true, employeeNumber: true, firstName: true, lastName: true, position: { select: { title: true } }, department: { select: { name: true } } },
+    take: 10
+  });
+
+  if (candidates.length === 0) {
+    return { answer: ar ? `لم أجد موظفاً باسم أو رقم "${employeeName}". لم يتم تنفيذ أي تغيير.` : `No matching employee found for "${employeeName}". Nothing was executed.`, suggestions };
+  }
+  if (candidates.length > 1) {
+    const options = candidates.map((employee) => `${employee.employeeNumber} - ${employee.firstName} ${employee.lastName} (${employee.position?.title ?? "-"} / ${employee.department?.name ?? "-"})`).join("\n");
+    return {
+      answer: ar
+        ? `وجدت أكثر من موظف مطابق لـ "${employeeName}":\n${options}\n\nيرجى إعادة الأمر باستخدام رقم الموظف الدقيق. لم يتم تنفيذ أي تغيير.`
+        : `More than one matching employee found for "${employeeName}":\n${options}\n\nPlease repeat the command with the exact employee number. Nothing was executed.`,
+      suggestions
+    };
+  }
+
+  const result = await syncEmployeeFieldsFromOdoo(candidates[0].id, mode, ar);
+  await writeAuditLog({
+    actorUserId: userId,
+    action: "lana-ai:field-sync-single",
+    entity: "employee",
+    entityId: candidates[0].id,
+    metadata: { mode, result }
+  });
+
+  if (!result.success) {
+    return {
+      answer: ar
+        ? `العملية: تحديث بيانات\nالنتيجة: فشل التحديث\nالتفاصيل: ${result.label} -- ${result.reason}`
+        : `Operation: update data\nResult: failed\nDetails: ${result.label} -- ${result.reason}`,
+      suggestions
+    };
+  }
+  return {
+    answer: ar
+      ? `العملية: تحديث بيانات\nالنتيجة: تم التحديث بنجاح\nالتفاصيل: ${result.changes.length ? result.changes.join("، ") : "لا يوجد تغيير (البيانات مطابقة بالفعل)"}`
+      : `Operation: update data\nResult: success\nDetails: ${result.changes.length ? result.changes.join(", ") : "no change (already matched)"}`,
+    suggestions
+  };
+}
+
+/** Group variant: "حدث ... مجموعة الموظفين الموجودين في مستشفى Y من أودو".
+ * Same delegate gate and hospital-name disambiguation, but since this can
+ * touch many employees (each a real Odoo round trip), it acknowledges
+ * immediately and the actual run + detailed table report happens via
+ * backgroundFieldSync (executed by the API route through Next.js after()). */
+async function handleFieldSyncGroupCommand({
+  userId,
+  roles,
+  ar,
+  suggestions,
+  match
+}: {
+  userId: string;
+  roles: string[];
+  ar: boolean;
+  suggestions: string[];
+  match: RegExpExecArray;
+}): Promise<LanaAiAnswer> {
+  if (!(await isLanaDelegate(userId, roles))) {
+    return {
+      answer: ar ? "هذا أمر تنفيذي (مزامنة بيانات من أودو) متاح فقط للمفوَّضين الذين حددهم المسؤول." : "This is an executive command (syncing data from Odoo) available only to designated delegates.",
+      suggestions
+    };
+  }
+  if (!(await isOdooIntegrationEnabled())) {
+    return { answer: ar ? "تكامل Odoo غير مُفعّل حالياً من الإعدادات." : "Odoo integration is currently disabled in settings.", suggestions };
+  }
+
+  const [, descriptor, hospitalToken] = match;
+  const mode = fieldSyncModeFromDescriptor(descriptor);
+  const hospitalName = hospitalToken.trim();
+
+  const hospitalCandidates = await prisma.hospital.findMany({ where: { name: { contains: hospitalName, mode: "insensitive" } }, select: { id: true, name: true }, take: 10 });
+  if (hospitalCandidates.length === 0) {
+    return { answer: ar ? `لم أجد مستشفى باسم "${hospitalName}". لم يتم تنفيذ أي تغيير.` : `No matching hospital found for "${hospitalName}". Nothing was executed.`, suggestions };
+  }
+  if (hospitalCandidates.length > 1) {
+    return {
+      answer: ar
+        ? `وجدت أكثر من مستشفى مطابق لـ "${hospitalName}": ${hospitalCandidates.map((h) => h.name).join("، ")}. يرجى إعادة الأمر باستخدام الاسم الدقيق. لم يتم تنفيذ أي تغيير.`
+        : `More than one matching hospital found for "${hospitalName}": ${hospitalCandidates.map((h) => h.name).join(", ")}. Please repeat with the exact name. Nothing was executed.`,
+      suggestions
+    };
+  }
+  const hospital = hospitalCandidates[0];
+
+  const employees = await prisma.employee.findMany({ where: { hospitalId: hospital.id }, select: { id: true }, take: 2000 });
+  if (employees.length === 0) {
+    return { answer: ar ? `لا يوجد موظفون مسجلون في مستشفى ${hospital.name} حالياً.` : `No employees currently recorded at ${hospital.name}.`, suggestions };
+  }
+
+  return {
+    answer: ar
+      ? `بدأت الآن مزامنة بيانات ${employees.length} موظفاً من مستشفى ${hospital.name} مع أودو. سأرسل لك تقريراً مفصلاً (جدول النتائج والمتعثرين) فور الانتهاء.`
+      : `Started syncing ${employees.length} employees from ${hospital.name} with Odoo now. I'll send a detailed report (results table + stragglers) once it's done.`,
+    suggestions,
+    backgroundFieldSync: { userId, employeeIds: employees.map((e) => e.id), mode, groupLabel: ar ? `مستشفى ${hospital.name}` : hospital.name, ar }
   };
 }
 

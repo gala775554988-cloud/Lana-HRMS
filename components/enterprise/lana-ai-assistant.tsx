@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Bot, Send, Sparkles, X } from "lucide-react";
+import { Bot, Crown, Send, Sparkles, X } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 
@@ -19,11 +19,20 @@ export function LanaAiAssistant() {
     { role: "assistant", content: "مرحباً، أنا Lana AI. اسألني عن الموارد البشرية أو ابحث داخل البيانات المصرح لك برؤيتها." }
   ]);
   const [isPending, startTransition] = useTransition();
+  const [isDelegate, setIsDelegate] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, open]);
+
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    fetch("/api/enterprise/lana-ai/delegate-status", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((data) => setIsDelegate(Boolean(data.success && data.isDelegate)))
+      .catch(() => setIsDelegate(false));
+  }, [status]);
 
   if (status !== "authenticated" || !session?.user) return null;
 
@@ -57,10 +66,17 @@ export function LanaAiAssistant() {
         <div className="mb-3 w-[min(92vw,420px)] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-primary/20 dark:border-slate-800 dark:bg-slate-950">
           <div className="flex items-center justify-between border-b bg-gradient-to-l from-primary to-primary/60 p-4 text-primary-foreground">
             <div className="flex items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded-2xl bg-white/15"><Bot className="h-5 w-5" /></div>
+              <div className="relative grid h-10 w-10 place-items-center rounded-2xl bg-white/15">
+                <Bot className="h-5 w-5" />
+                {isDelegate ? (
+                  <span className="absolute -end-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-amber-400 text-amber-950 shadow" title="وضع التنفيذ (مفوَّض) / Execution mode (delegate)">
+                    <Crown className="h-3 w-3" />
+                  </span>
+                ) : null}
+              </div>
               <div>
                 <p className="font-black">Lana AI</p>
-                <p className="text-xs text-white/75">مساعد ذكي آمن حسب صلاحياتك</p>
+                <p className="text-xs text-white/75">{isDelegate ? "وضع التنفيذ مفعّل -- أوامر الصلاحيات مسموحة" : "مساعد ذكي آمن حسب صلاحياتك"}</p>
               </div>
             </div>
             <button type="button" onClick={() => setOpen(false)} className="rounded-xl p-2 hover:bg-white/10" aria-label="Close Lana AI"><X className="h-4 w-4" /></button>
