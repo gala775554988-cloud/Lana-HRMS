@@ -71,6 +71,7 @@ type RequestRecord = {
   updatedAt: string;
   priority: string;
   currentApprover: string;
+  steps?: Array<{ step: number; status: string }>;
   employee?: {
     employeeNumber: string;
     nationalId: string;
@@ -110,6 +111,7 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
   const [targetUserId, setTargetUserId] = useState("");
   const [deferPreset, setDeferPreset] = useState("tomorrow");
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState<"success" | "error">("success");
   const [timelineWorkflowId, setTimelineWorkflowId] = useState<string | null>(null);
 
   const selectedIds = useMemo(() => Array.from(selected), [selected]);
@@ -175,9 +177,10 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
     },
     onError: (error, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(queryKey, context.previous);
+      setMessageTone("error");
       setMessage(error instanceof Error ? error.message : "فشل تحديث الطلب");
     },
-    onSuccess: () => setMessage("تم تحديث الطلب بنجاح"),
+    onSuccess: () => { setMessageTone("success"); setMessage("تم تحديث الطلب بنجاح"); },
     onSettled: () => {
       // Reconcile stats/counts with the server in the background regardless
       // of whether this decision optimistically touched the row list.
@@ -211,10 +214,12 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
     },
     onError: (error, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(queryKey, context.previous);
+      setMessageTone("error");
       setMessage(error instanceof Error ? error.message : "فشل تنفيذ العملية الجماعية");
     },
     onSuccess: (result) => {
       setSelected(new Set());
+      setMessageTone(result.failures.length ? "error" : "success");
       setMessage(result.failures.length ? `تم التنفيذ مع فشل ${result.failures.length} من ${result.total} طلب` : "تم تنفيذ العملية الجماعية");
     },
     onSettled: () => {
@@ -243,6 +248,11 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
   // "stuck" while any one mutation is pending.
   const isRowPending = (id: string) => decideMutation.isPending && decideMutation.variables?.id === id;
   const isActionPending = (id: string, decision: string) => isRowPending(id) && decideMutation.variables?.decision === decision;
+  // Mirrors decideWorkflowStep's own precondition (instance.status === PENDING
+  // AND the current step number is itself still PENDING, not DEFERRED) so the
+  // buttons are only shown when the API call would actually succeed.
+  const isActionable = (request: RequestRecord) =>
+    request.status === "PENDING" && (request.steps ?? []).find((step) => step.step === request.currentStep)?.status === "PENDING";
 
   return (
     <div className="space-y-5">
@@ -297,7 +307,11 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
         </div>
       </div>
 
-      {message ? <div className="rounded-xl border bg-background p-3 text-sm text-muted-foreground">{message}</div> : null}
+      {message ? (
+        <div className={`rounded-xl border p-3 text-sm ${messageTone === "error" ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-400" : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-400"}`}>
+          {message}
+        </div>
+      ) : null}
 
       <div className="overflow-hidden rounded-xl border bg-background shadow-sm">
         <div className="overflow-x-auto">
@@ -339,28 +353,42 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
                   <td className="px-3 py-3">
                     <div className="flex flex-wrap gap-1">
                       <Button type="button" size="sm" variant="outline" onClick={() => setTimelineWorkflowId(request.id)} disabled={isRowPending(request.id)}><History className="h-3.5 w-3.5" />السجل</Button>
-                      <Button type="button" size="sm" onClick={() => decide(request.id, "APPROVE")} disabled={isPending}>
-                        {isActionPending(request.id, "APPROVE") ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                        {isActionPending(request.id, "APPROVE") ? "جارٍ..." : "موافقة"}
-                      </Button>
-                      <Button type="button" size="sm" variant="destructive" onClick={() => decide(request.id, "REJECT")} disabled={isPending}>
-                        {isActionPending(request.id, "REJECT") ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
-                        {isActionPending(request.id, "REJECT") ? "جارٍ..." : "رفض"}
-                      </Button>
-                      <Button type="button" size="sm" variant="outline" onClick={() => decide(request.id, "RETURN")} disabled={isPending}>
-                        {isActionPending(request.id, "RETURN") ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
-                        {isActionPending(request.id, "RETURN") ? "جارٍ..." : "إرجاع"}
-                      </Button>
-                      <Button type="button" size="sm" variant="outline" onClick={() => targetUserId && decide(request.id, "TRANSFER", { targetUserId })} disabled={isPending || !targetUserId}>
-                        {isActionPending(request.id, "TRANSFER") ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                        {isActionPending(request.id, "TRANSFER") ? "جارٍ..." : "تحويل"}
-                      </Button>
-                      <Button type="button" size="sm" variant="outline" onClick={() => decide(request.id, "DEFER", { deferPreset })} disabled={isPending}>
-                        {isActionPending(request.id, "DEFER") ? <Loader2 className="me-1 h-3.5 w-3.5 animate-spin" /> : null}{isActionPending(request.id, "DEFER") ? "جارٍ..." : "تأجيل"}
-                      </Button>
-                      <Button type="button" size="sm" variant="outline" onClick={() => note(request.id)} disabled={isPending}>
-                        {isActionPending(request.id, "NOTE") ? <Loader2 className="me-1 h-3.5 w-3.5 animate-spin" /> : null}{isActionPending(request.id, "NOTE") ? "جارٍ..." : "ملاحظة"}
-                      </Button>
+                      {/* Decision actions only make sense on a request that's actually
+                          awaiting a decision right now -- the "all"/"decided" scopes
+                          legitimately include already-APPROVED/REJECTED/RETURNED rows,
+                          and calling decideWorkflowStep on those always fails with
+                          "No pending workflow step" (there's nothing left to decide),
+                          which read as "the button does nothing" from the UI. */}
+                      {isActionable(request) ? (
+                        <>
+                          <Button type="button" size="sm" onClick={() => decide(request.id, "APPROVE")} disabled={isPending}>
+                            {isActionPending(request.id, "APPROVE") ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                            {isActionPending(request.id, "APPROVE") ? "جارٍ..." : "موافقة"}
+                          </Button>
+                          <Button type="button" size="sm" variant="destructive" onClick={() => decide(request.id, "REJECT")} disabled={isPending}>
+                            {isActionPending(request.id, "REJECT") ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+                            {isActionPending(request.id, "REJECT") ? "جارٍ..." : "رفض"}
+                          </Button>
+                          <Button type="button" size="sm" variant="outline" onClick={() => decide(request.id, "RETURN")} disabled={isPending}>
+                            {isActionPending(request.id, "RETURN") ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                            {isActionPending(request.id, "RETURN") ? "جارٍ..." : "إرجاع"}
+                          </Button>
+                          <Button type="button" size="sm" variant="outline" onClick={() => targetUserId && decide(request.id, "TRANSFER", { targetUserId })} disabled={isPending || !targetUserId}>
+                            {isActionPending(request.id, "TRANSFER") ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                            {isActionPending(request.id, "TRANSFER") ? "جارٍ..." : "تحويل"}
+                          </Button>
+                          <Button type="button" size="sm" variant="outline" onClick={() => decide(request.id, "DEFER", { deferPreset })} disabled={isPending}>
+                            {isActionPending(request.id, "DEFER") ? <Loader2 className="me-1 h-3.5 w-3.5 animate-spin" /> : null}{isActionPending(request.id, "DEFER") ? "جارٍ..." : "تأجيل"}
+                          </Button>
+                          <Button type="button" size="sm" variant="outline" onClick={() => note(request.id)} disabled={isPending}>
+                            {isActionPending(request.id, "NOTE") ? <Loader2 className="me-1 h-3.5 w-3.5 animate-spin" /> : null}{isActionPending(request.id, "NOTE") ? "جارٍ..." : "ملاحظة"}
+                          </Button>
+                        </>
+                      ) : (
+                        <span className="px-2 py-1.5 text-xs text-muted-foreground">
+                          {request.status !== "PENDING" ? "لا يوجد إجراء متاح (تم البت في الطلب)" : "لا يوجد إجراء متاح حالياً (الطلب مؤجل)"}
+                        </span>
+                      )}
                     </div>
                   </td>
                 </tr>

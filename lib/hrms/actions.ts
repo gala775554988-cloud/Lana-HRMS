@@ -16,6 +16,7 @@ import { requirePasswordChange } from "@/lib/auth/password-change-policy";
 import { isEnterpriseResourceAllowed } from "@/lib/enterprise/resource-access";
 import { getEmployeeIdsByHospital } from "@/lib/enterprise/hospitals";
 import { withQueryTiming } from "@/lib/perf/query-timer";
+import { getEmployeeFieldAccess, filterEditableFields } from "@/lib/enterprise/employee-field-access";
 
 type QueryInput = {
   resourceKey: string;
@@ -661,10 +662,17 @@ export async function updateModuleRecord(input: MutationInput) {
 
   if (resource.key === "employees" && resource.model === "employee") {
     data.positionId = await resolveEmployeePositionId(data.positionId);
-    const record = await delegateFor(resource.model).update({ where: { id: input.id }, data });
+    // Real, server-side field-level enforcement: strip any sensitive field
+    // (nationalId, email, phone, photo, address, emergency contact, DOB)
+    // the acting user isn't explicitly granted EDIT on. This is the actual
+    // security boundary -- the view-page redaction alone can't stop a
+    // direct call to this action.
+    const fieldAccess = await getEmployeeFieldAccess(session.user.id, (session.user.roles as string[]) ?? []);
+    const { data: allowedData, blockedFields } = filterEditableFields(data, fieldAccess);
+    const record = await delegateFor(resource.model).update({ where: { id: input.id }, data: allowedData });
     await saveEmployeeSalaryProfile(input.id, salaryProfile);
 
-    await writeAuditLog({ actorUserId: session.user.id, action: "update", entity: resource.model, entityId: input.id, metadata: { before: serialize(existingRecord), after: serialize({ ...data, salaryProfileUpdated: true }) } });
+    await writeAuditLog({ actorUserId: session.user.id, action: "update", entity: resource.model, entityId: input.id, metadata: { before: serialize(existingRecord), after: serialize({ ...allowedData, salaryProfileUpdated: true }), blockedFields: blockedFields.length ? blockedFields : undefined } });
     await notifyRole(["SUPER_ADMIN", "HR_MANAGER"], "تعديل موظف", `Employee record ${input.id} was updated.`, "INFO").catch(() => null);
     revalidatePath("/" + resource.key);
     revalidatePath("/" + resource.key + "/" + input.id);

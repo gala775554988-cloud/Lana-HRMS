@@ -1,7 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/rbac";
-import { applyScopedWhere, getAccessProfile } from "@/lib/enterprise/hierarchy";
+import { applyScopedWhere, getAccessProfile, resolveRoleEmployeeIds } from "@/lib/enterprise/hierarchy";
 import { listHospitals } from "@/lib/enterprise/hospitals";
+import { getEffectivePermissionsForRoles } from "@/lib/enterprise/permissions";
+import { getEmployeeFieldAccess, redactHiddenFields } from "@/lib/enterprise/employee-field-access";
 
 export type LanaAiAnswer = {
   answer: string;
@@ -86,8 +88,161 @@ export async function answerLanaAi({
     ? ["ابحث عن موظف", "اشرح سياسة الإجازات", "حلل البيانات الناقصة", "اعرض المستشفيات"]
     : ["Search employee", "Explain leave policy", "Analyze missing data", "Show hospitals"];
 
-  const policy = policyAnswer(message, ar);
-  if (policy) return { answer: policy, suggestions };
+  // These permission-query intents must be checked BEFORE policyAnswer():
+  // policyAnswer's loose keyword matching (e.g. /leave|إجاز/, /payroll|رواتب/)
+  // would otherwise swallow a specific question like "من يملك صلاحية
+  // الموافقة على إجازات..." or "هل الموظف X يملك صلاحية رؤية الرواتب"
+  // and answer with the generic policy blurb instead.
+  const WHO_CAN_APPROVE_PATTERN = /من\s+(يملك|لديه|تملك|لديها)?\s*صلاحية\s*الموافقة|من\s+يستطيع\s+الموافقة|من\s+(يوافق|يعتمد)\s+على|who\s+can\s+approve/i;
+  const HAS_PERMISSION_PATTERN = /(يملك|تملك|لديه|لديها)\s*صلاحية|does\s+.*\s+have\s+permission|has\s+permission\s+to/i;
+  const canQueryPermissions = roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER") || can(permissions, "read", "permissions");
+
+  if (!WHO_CAN_APPROVE_PATTERN.test(message) && !HAS_PERMISSION_PATTERN.test(message)) {
+    const policy = policyAnswer(message, ar);
+    if (policy) return { answer: policy, suggestions };
+  }
+
+  if (WHO_CAN_APPROVE_PATTERN.test(message)) {
+    if (!canQueryPermissions) {
+      return { answer: ar ? "لا تملك صلاحية الاطلاع على من يملك صلاحيات الموافقة." : "You do not have permission to view who can approve requests.", suggestions };
+    }
+
+    const moduleKeywordMap: Array<[RegExp, string]> = [
+      [/إجاز|leave/i, "leave"],
+      [/أوفر|overtime|اضافي|إضافي/i, "overtime"],
+      [/سلف|loan/i, "loan"],
+      [/مصروف|expense/i, "expense"]
+    ];
+    const matchedModule = moduleKeywordMap.find(([pattern]) => pattern.test(message))?.[1];
+    if (!matchedModule) {
+      return { answer: ar ? "يرجى تحديد نوع الطلب (إجازات، أوفر تايم، سلف، مصروفات) لمعرفة المعتمدين." : "Please specify the request type (leave, overtime, loan, expense) to find approvers.", suggestions };
+    }
+
+    const [hospitals, branches] = await Promise.all([
+      prisma.hospital.findMany({ select: { id: true, name: true }, take: 200 }),
+      prisma.branch.findMany({ select: { id: true, name: true }, take: 200 })
+    ]);
+    const matchedHospital = hospitals.find((h) => message.includes(h.name));
+    const matchedBranch = branches.find((b) => message.includes(b.name));
+
+    const configured = await prisma.hrApprovalChain.findMany({ where: { module: matchedModule, isActive: true }, orderBy: { level: "asc" } });
+    const levels = Array.from(new Set(configured.map((row) => row.level))).sort((a, b) => a - b);
+    const resolvedRows = levels
+      .map((level) => {
+        const atLevel = configured.filter((row) => row.level === level);
+        return (
+          (matchedHospital && atLevel.find((row) => row.scopeType === "HOSPITAL" && row.scopeId === matchedHospital.id)) ||
+          (matchedBranch && atLevel.find((row) => row.scopeType === "BRANCH" && row.scopeId === matchedBranch.id)) ||
+          atLevel.find((row) => row.scopeType === "GLOBAL" || !row.scopeType)
+        );
+      })
+      .filter((row): row is NonNullable<typeof row> => Boolean(row) && (row!.capabilities ?? []).includes("APPROVE"));
+
+    const approverNames: string[] = [];
+    for (const row of resolvedRows) {
+      if (row.approverUserId) {
+        const employee = await prisma.employee.findFirst({ where: { userId: row.approverUserId }, select: { firstName: true, lastName: true } });
+        if (employee) approverNames.push(`${employee.firstName} ${employee.lastName}`);
+        continue;
+      }
+      if (row.approverRole === "HR_MANAGER" || row.approverRole === "SUPER_ADMIN") {
+        const managers = await resolveRoleEmployeeIds([row.approverRole]);
+        const names = await prisma.employee.findMany({ where: { id: { in: managers.map((m) => m.id) } }, select: { firstName: true, lastName: true } });
+        approverNames.push(...names.map((n) => `${n.firstName} ${n.lastName}`));
+      } else if (row.approverRole === "BRANCH_MANAGER" && matchedBranch) {
+        const managers = await resolveRoleEmployeeIds(["BRANCH_MANAGER"], { branchId: matchedBranch.id });
+        const names = await prisma.employee.findMany({ where: { id: { in: managers.map((m) => m.id) } }, select: { firstName: true, lastName: true } });
+        approverNames.push(...names.map((n) => `${n.firstName} ${n.lastName}`));
+      } else if (row.approverRole === "DIRECT_MANAGER" || row.approverRole === "DEPARTMENT_MANAGER") {
+        approverNames.push(ar ? `(يعتمد على ${row.approverRole === "DIRECT_MANAGER" ? "المدير المباشر" : "مدير الإدارة"} لكل موظف)` : `(depends on each employee's ${row.approverRole === "DIRECT_MANAGER" ? "direct manager" : "department manager"})`);
+      }
+    }
+
+    if (!configured.length) {
+      return {
+        answer: ar
+          ? `لا توجد سلسلة موافقات مخصصة لهذا النوع من الطلبات؛ يتم استخدام التسلسل الافتراضي (المدير المباشر ثم مدير الفرع/الإدارة ثم الموارد البشرية).`
+          : "No custom approval chain is configured for this request type; the default hierarchy (direct manager, then branch/department manager, then HR) applies.",
+        suggestions
+      };
+    }
+    const scopeLabel = matchedHospital ? ` لمستشفى ${matchedHospital.name}` : matchedBranch ? ` لفرع ${matchedBranch.name}` : "";
+    return {
+      answer: approverNames.length
+        ? (ar ? `الأشخاص الذين يملكون صلاحية الموافقة${scopeLabel}: ${approverNames.join("، ")}.` : `Approvers${scopeLabel}: ${approverNames.join(", ")}.`)
+        : (ar ? "لم يتم العثور على معتمدين محددين ضمن سلسلة الموافقات المُعدة." : "No specific approvers found in the configured approval chain."),
+      suggestions
+    };
+  }
+
+  if (HAS_PERMISSION_PATTERN.test(message)) {
+    if (!canQueryPermissions) {
+      return { answer: ar ? "لا تملك صلاحية الاطلاع على صلاحيات الموظفين الآخرين." : "You do not have permission to view other employees' permissions.", suggestions };
+    }
+
+    const resourceKeywordMap: Array<[RegExp, string, string]> = [
+      [/راتب|رواتب|payroll|salary/i, "payroll", "الرواتب"],
+      [/إجاز|leave/i, "leave", "الإجازات"],
+      [/حضور|attendance/i, "attendance", "الحضور"],
+      [/تقارير|report/i, "reports", "التقارير"],
+      [/عقود|contract/i, "contracts", "العقود"],
+      [/مستندات|document/i, "documents", "المستندات"],
+      [/سلف|loan/i, "loans", "السلف"],
+      [/أوفر|overtime/i, "overtime", "الأوفر تايم"],
+      [/إعدادات|settings/i, "settings", "الإعدادات"],
+      [/صلاحيات|permissions/i, "permissions", "الصلاحيات"]
+    ];
+    const matchedResource = resourceKeywordMap.find(([pattern]) => pattern.test(message));
+    const [, resourceKey, resourceLabel] = matchedResource ?? [null, "payroll", "الرواتب"];
+
+    // Include the "ال" (definite article) prefixed form of every resource
+    // stem too -- otherwise stripping "رواتب" out of "الرواتب" leaves a
+    // stray "ال" behind that pollutes the employee-name search term below.
+    const resourceKeywordPattern = new RegExp(
+      resourceKeywordMap.flatMap(([pattern]) => [pattern.source, `ال(?:${pattern.source})`]).join("|"),
+      "gi"
+    );
+    const nameHint = message
+      .replace(/هل|الموظف|موظف|يملك|تملك|لديه|لديها|صلاحية|رؤية|عرض|does|have|permission|to|view|see/gi, "")
+      .replace(resourceKeywordPattern, "")
+      .replace(/[؟?.,]/g, "")
+      .trim();
+
+    const profile = await getAccessProfile(userId, roles);
+    const where = await applyScopedWhere("employees", {}, profile);
+    const matches = await prisma.employee.findMany({
+      where: {
+        AND: [
+          where as any,
+          nameHint ? { OR: [{ firstName: { contains: nameHint, mode: "insensitive" } }, { lastName: { contains: nameHint, mode: "insensitive" } }, { employeeNumber: { contains: nameHint, mode: "insensitive" } }] } : {}
+        ]
+      },
+      select: { id: true, firstName: true, lastName: true, userId: true },
+      take: 2
+    });
+
+    if (matches.length !== 1 || !matches[0].userId) {
+      return {
+        answer: matches.length > 1
+          ? (ar ? "وجدت أكثر من موظف مطابق، يرجى تحديد الاسم أو الكود بدقة أكبر." : "More than one matching employee found -- please narrow down the name or employee number.")
+          : (ar ? "لم أجد موظفاً مطابقاً ضمن نطاق صلاحياتك." : "No matching employee found within your authorized scope."),
+        suggestions
+      };
+    }
+
+    const target = matches[0];
+    const targetRoleRows = await prisma.userRole.findMany({ where: { userId: target.userId! }, select: { role: { select: { name: true } } } });
+    const targetRoles = targetRoleRows.map((row) => row.role.name);
+    const effectivePermissions = await getEffectivePermissionsForRoles(targetRoles, target.userId!);
+    const hasView = hasPermission(effectivePermissions, { action: "read", resource: resourceKey }, targetRoles);
+
+    return {
+      answer: ar
+        ? `${target.firstName} ${target.lastName} ${hasView ? "يملك" : "لا يملك"} صلاحية عرض ${resourceLabel}.`
+        : `${target.firstName} ${target.lastName} ${hasView ? "does" : "does not"} have permission to view ${resourceLabel}.`,
+      suggestions
+    };
+  }
 
   if (/موظف|employee|staff|عامل/.test(lowered)) {
     const profile = await getAccessProfile(userId, roles);
@@ -161,6 +316,11 @@ export async function answerLanaAi({
       });
       if (matches.length === 1) {
         const employee = matches[0];
+        // Field-level access is per VIEWER (the caller), not per target --
+        // an admin can restrict what a specific staff member sees whenever
+        // THEY look at any employee's sensitive fields through this tool.
+        const fieldAccess = await getEmployeeFieldAccess(userId, roles);
+        const exposedFields = (["nationalId", "email", "phone", "profilePhotoUrl"] as const).filter((field) => fieldAccess[field] !== "HIDDEN");
         return {
           answer: ar
             ? `بيانات الموظف ${employee.firstName} ${employee.lastName}:`
@@ -170,11 +330,11 @@ export async function answerLanaAi({
             type: "employee-profile",
             id: employee.id,
             employeeNumber: employee.employeeNumber,
-            nationalId: employee.nationalId,
+            nationalId: fieldAccess.nationalId === "HIDDEN" ? undefined : employee.nationalId,
             name: `${employee.firstName} ${employee.lastName}`,
-            email: employee.email,
-            phone: employee.phone,
-            photoUrl: employee.profilePhotoUrl,
+            email: fieldAccess.email === "HIDDEN" ? undefined : employee.email,
+            phone: fieldAccess.phone === "HIDDEN" ? undefined : employee.phone,
+            photoUrl: fieldAccess.profilePhotoUrl === "HIDDEN" ? undefined : employee.profilePhotoUrl,
             status: employee.status,
             hireDate: employee.hireDate,
             department: employee.department?.name,
@@ -183,7 +343,7 @@ export async function answerLanaAi({
             manager: employee.manager ? `${employee.manager.firstName} ${employee.manager.lastName}` : undefined,
             documents: employee.documents.map((doc) => `${doc.name} (${doc.type}/${doc.status})`).join(", ") || (ar ? "لا توجد مستندات" : "No documents")
           }],
-          sensitiveAccess: { employeeIds: [employee.id], fields: ["nationalId", "profilePhotoUrl", "email", "phone"] }
+          sensitiveAccess: exposedFields.length ? { employeeIds: [employee.id], fields: exposedFields } : undefined
         };
       }
       if (matches.length > 1) {

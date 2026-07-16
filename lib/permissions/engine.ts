@@ -69,9 +69,30 @@ export async function getApprovalChain(module: string) {
   return prisma.hrApprovalChain.findMany({ where: { module, isActive: true }, orderBy: { level: "asc" } });
 }
 
-export async function saveApprovalChain(module: string, approvals: { level: number; approverRole: string }[]) {
+export type ApprovalChainLevelInput = {
+  level: number;
+  approverRole: string;
+  approverUserId?: string | null;
+  scopeType?: string;
+  scopeId?: string | null;
+  capabilities?: string[];
+};
+
+export async function saveApprovalChain(module: string, approvals: ApprovalChainLevelInput[]) {
   await prisma.hrApprovalChain.deleteMany({ where: { module } });
-  for (const a of approvals) await prisma.hrApprovalChain.create({ data: { module, level: a.level, approverRole: a.approverRole } });
+  for (const a of approvals) {
+    await prisma.hrApprovalChain.create({
+      data: {
+        module,
+        level: a.level,
+        approverRole: a.approverRole,
+        approverUserId: a.approverUserId || null,
+        scopeType: a.scopeType || "GLOBAL",
+        scopeId: a.scopeId || "",
+        capabilities: a.capabilities?.length ? a.capabilities : ["VIEW", "APPROVE", "REJECT"]
+      }
+    });
+  }
   return getApprovalChain(module);
 }
 

@@ -71,10 +71,6 @@ export async function getAccessProfile(userId: string, roles: string[] = []): Pr
   };
 }
 
-function unique(values: Array<string | null | undefined>) {
-  return Array.from(new Set(values.filter((value): value is string => Boolean(value))));
-}
-
 export async function resolveRoleEmployeeIds(roleNames: string[], filters?: { branchId?: string | null; departmentId?: string | null }) {
   const employees = await prisma.employee.findMany({
     where: {
@@ -147,38 +143,110 @@ export async function canAccessEmployeeId(employeeId: string, profile: AccessPro
   return count > 0;
 }
 
-export async function resolveApprovalChain(employeeId: string) {
+type ChainEmployee = { id: string; userId: string | null; departmentId: string | null; branchId: string | null; managerId: string | null };
+
+async function resolveRoleForEmployee(role: string, employee: ChainEmployee, store: HierarchyStore): Promise<string[]> {
+  if (role === "DIRECT_MANAGER") {
+    // Employee.managerId is kept in sync from Odoo automatically -- prefer it
+    // over the manually-admin-configured directManagers map, which requires
+    // re-entering the same relationship by hand and can drift out of sync.
+    const directManagerId = employee.managerId ?? store.directManagers[employee.id];
+    if (!directManagerId) return [];
+    const manager = await prisma.employee.findUnique({ where: { id: directManagerId }, select: { userId: true } });
+    return manager?.userId ? [manager.userId] : [];
+  }
+  if (role === "BRANCH_MANAGER") {
+    const branchManagerId = employee.branchId ? store.branchManagers[employee.branchId] : undefined;
+    const managers = branchManagerId
+      ? await prisma.employee.findMany({ where: { id: branchManagerId }, select: { userId: true } })
+      : await resolveRoleEmployeeIds(["BRANCH_MANAGER"], { branchId: employee.branchId });
+    return managers.map((manager) => manager.userId).filter((id): id is string => Boolean(id));
+  }
+  if (role === "DEPARTMENT_MANAGER") {
+    const departmentManagerId = employee.departmentId ? store.departmentManagers[employee.departmentId] : undefined;
+    const managers = departmentManagerId
+      ? await prisma.employee.findMany({ where: { id: departmentManagerId }, select: { userId: true } })
+      : await resolveRoleEmployeeIds(["DEPARTMENT_MANAGER"], { departmentId: employee.departmentId });
+    return managers.map((manager) => manager.userId).filter((id): id is string => Boolean(id));
+  }
+  if (role === "HR_MANAGER") {
+    const managers = store.hrManagers.length
+      ? await prisma.employee.findMany({ where: { id: { in: store.hrManagers } }, select: { userId: true } })
+      : await resolveRoleEmployeeIds(["HR_MANAGER"]);
+    return managers.map((manager) => manager.userId).filter((id): id is string => Boolean(id));
+  }
+  if (role === "SUPER_ADMIN") {
+    const admins = await prisma.user.findMany({ where: { roles: { some: { role: { name: "SUPER_ADMIN" } } } }, select: { id: true } });
+    return admins.map((admin) => admin.id);
+  }
+  return [];
+}
+
+export type ResolvedApprover = { userId: string; capabilities: string[] };
+
+/** Default hierarchy-based chain (unchanged behavior): direct manager, then
+ * branch/department managers, then HR managers -- used whenever no
+ * HrApprovalChain rows exist for the given module, or no module is passed. */
+async function resolveDefaultChain(employee: ChainEmployee, store: HierarchyStore): Promise<ResolvedApprover[]> {
+  const [directManagerIds, branchManagerIds, departmentManagerIds, hrManagerIds] = await Promise.all([
+    resolveRoleForEmployee("DIRECT_MANAGER", employee, store),
+    resolveRoleForEmployee("BRANCH_MANAGER", employee, store),
+    resolveRoleForEmployee("DEPARTMENT_MANAGER", employee, store),
+    resolveRoleForEmployee("HR_MANAGER", employee, store)
+  ]);
+  return [...directManagerIds, ...branchManagerIds, ...departmentManagerIds, ...hrManagerIds].map((userId) => ({ userId, capabilities: ["VIEW", "APPROVE", "REJECT"] }));
+}
+
+/** Resolves the admin-configured HrApprovalChain for `module` against this
+ * specific employee: for each level number, prefers a scope-specific row
+ * (BRANCH/HOSPITAL matching the employee's own branch/hospital) over the
+ * GLOBAL row at that level, then resolves it to a concrete userId either
+ * directly (approverUserId, used for scoped/named overrides) or via the
+ * same role lookup as the default chain. A level with no matching row (e.g.
+ * only a scope override exists and it doesn't match this employee) is
+ * skipped rather than blocking the whole chain. */
+async function resolveConfiguredChain(
+  rows: Array<{ level: number; approverRole: string; approverUserId: string | null; scopeType: string; scopeId: string; capabilities: string[] }>,
+  employee: ChainEmployee & { hospitalId?: string | null },
+  store: HierarchyStore
+): Promise<ResolvedApprover[]> {
+  const levels = Array.from(new Set(rows.map((row) => row.level))).sort((a, b) => a - b);
+  const result: ResolvedApprover[] = [];
+
+  for (const level of levels) {
+    const rowsAtLevel = rows.filter((row) => row.level === level);
+    const matched =
+      rowsAtLevel.find((row) => row.scopeType === "BRANCH" && row.scopeId && row.scopeId === employee.branchId) ??
+      rowsAtLevel.find((row) => row.scopeType === "HOSPITAL" && row.scopeId && row.scopeId === employee.hospitalId) ??
+      rowsAtLevel.find((row) => row.scopeType === "GLOBAL" || !row.scopeType);
+    if (!matched) continue;
+
+    const userIds = matched.approverUserId ? [matched.approverUserId] : await resolveRoleForEmployee(matched.approverRole, employee, store);
+    for (const userId of userIds) result.push({ userId, capabilities: matched.capabilities?.length ? matched.capabilities : ["VIEW", "APPROVE", "REJECT"] });
+  }
+  return result;
+}
+
+export async function resolveApprovalChain(employeeId: string, module?: string): Promise<ResolvedApprover[]> {
   const [employee, store] = await Promise.all([
-    prisma.employee.findUnique({ where: { id: employeeId }, select: { id: true, userId: true, departmentId: true, branchId: true, managerId: true } }),
+    prisma.employee.findUnique({ where: { id: employeeId }, select: { id: true, userId: true, departmentId: true, branchId: true, managerId: true, hospitalId: true } }),
     getHierarchyStore()
   ]);
   if (!employee) return [];
 
-  // Employee.managerId is kept in sync from Odoo automatically -- prefer it
-  // over the manually-admin-configured directManagers map, which requires
-  // re-entering the same relationship by hand and can drift out of sync.
-  // Fall back to the manual map only for employees not yet Odoo-synced.
-  const directManagerId = employee.managerId ?? store.directManagers[employee.id];
-  const branchManagerId = employee.branchId ? store.branchManagers[employee.branchId] : undefined;
-  const departmentManagerId = employee.departmentId ? store.departmentManagers[employee.departmentId] : undefined;
+  let resolved: ResolvedApprover[] = [];
+  if (module) {
+    const configured = await prisma.hrApprovalChain.findMany({ where: { module, isActive: true }, orderBy: { level: "asc" } });
+    if (configured.length) resolved = await resolveConfiguredChain(configured, employee, store);
+  }
+  if (!resolved.length) resolved = await resolveDefaultChain(employee, store);
 
-  const [directManager, branchManagers, departmentManagers, hrManagers] = await Promise.all([
-    directManagerId ? prisma.employee.findUnique({ where: { id: directManagerId }, select: { id: true, userId: true } }) : null,
-    branchManagerId
-      ? prisma.employee.findMany({ where: { id: branchManagerId }, select: { id: true, userId: true } })
-      : resolveRoleEmployeeIds(["BRANCH_MANAGER"], { branchId: employee.branchId }),
-    departmentManagerId
-      ? prisma.employee.findMany({ where: { id: departmentManagerId }, select: { id: true, userId: true } })
-      : resolveRoleEmployeeIds(["DEPARTMENT_MANAGER"], { departmentId: employee.departmentId }),
-    store.hrManagers.length
-      ? prisma.employee.findMany({ where: { id: { in: store.hrManagers } }, select: { id: true, userId: true } })
-      : resolveRoleEmployeeIds(["HR_MANAGER"])
-  ]);
-
-  return unique([
-    directManager?.userId,
-    ...branchManagers.map((manager) => manager.userId),
-    ...departmentManagers.map((manager) => manager.userId),
-    ...hrManagers.map((manager) => manager.userId)
-  ]).filter((userId) => userId !== employee.userId);
+  const seen = new Set<string>();
+  const deduped: ResolvedApprover[] = [];
+  for (const approver of resolved) {
+    if (approver.userId === employee.userId || seen.has(approver.userId)) continue;
+    seen.add(approver.userId);
+    deduped.push(approver);
+  }
+  return deduped;
 }

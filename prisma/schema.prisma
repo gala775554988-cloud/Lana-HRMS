@@ -946,6 +946,7 @@ model WorkflowStep {
   comments           String?
   createdAt          DateTime         @default(now())
   viewedAt           DateTime?
+  capabilities       String[]         @default(["APPROVE", "REJECT"]) // Snapshot of what this step's approver may do, resolved from HrApprovalChain at creation time
   workflowInstance   WorkflowInstance @relation(fields: [workflowInstanceId], references: [id], onDelete: Cascade)
 }
 
@@ -2168,13 +2169,18 @@ model HrApprovalChain {
   id        String   @id @default(cuid())
   module    String   // leave, overtime, loan, expense, etc
   level     Int      @default(1)
-  approverRole String @default("DIRECT_MANAGER") // DIRECT_MANAGER, DEPARTMENT_MANAGER, BRANCH_MANAGER, HR_MANAGER, SUPER_ADMIN
+  approverRole String @default("DIRECT_MANAGER") // DIRECT_MANAGER, DEPARTMENT_MANAGER, BRANCH_MANAGER, HR_MANAGER, SUPER_ADMIN -- used when approverUserId is not set
+  approverUserId String? // Specific named person for this level; takes priority over approverRole
+  scopeType String  @default("GLOBAL") // GLOBAL | BRANCH | HOSPITAL -- narrows this level to requests from a specific branch/hospital
+  scopeId   String  @default("") // Branch.id or Hospital.id when scopeType != GLOBAL; "" (not null) so the unique index below behaves predictably
+  capabilities String[] @default(["VIEW", "APPROVE", "REJECT"]) // What this level's approver can do: VIEW (see only), APPROVE, REJECT
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([module, level])
+  @@unique([module, level, scopeType, scopeId])
   @@index([module])
+  @@index([approverUserId])
 }
 
 model HrPermissionAudit {
