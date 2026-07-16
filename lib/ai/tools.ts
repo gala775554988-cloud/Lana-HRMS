@@ -533,6 +533,93 @@ export function createScopedHrTools(context: ToolAuthContext) {
       }
     }),
 
+    getEmployeePermissions: makeTool({
+      description: "Retrieve effective permissions, roles, and permission scopes assigned to an employee by name or ID.",
+      parameters: z.object({
+        employeeIdentifier: z.string().describe("Employee name, national ID, or barcode/number.")
+      }) as any,
+      execute: async ({ employeeIdentifier }: any) => {
+        const target = employeeIdentifier || context.selectedEmployeeId || context.employeeId;
+        if (!target) return { error: "يرجى تحديد اسم أو رقم الموظف للاستعلام عن صلاحياته." };
+        if (!canManageHr(context) && target !== context.employeeId) return { error: "Access Denied: Insufficient permissions." };
+
+        const emp = await prisma.employee.findFirst({
+          where: {
+            OR: [
+              { id: target },
+              { nationalId: target },
+              { employeeNumber: target },
+              { firstName: { contains: target, mode: "insensitive" } },
+              { lastName: { contains: target, mode: "insensitive" } }
+            ]
+          },
+          include: {
+            user: { include: { roles: { include: { role: true } } } }
+          }
+        });
+        if (!emp) return { error: `لم يتم العثور على موظف باسم أو رقم "${target}".` };
+        if (!emp.user) return { error: `الموظف (${emp.firstName} ${emp.lastName}) غير مربوط بحساب مستخدم في النظام بعد.` };
+
+        const scopes = await prisma.hrPermissionScope.findMany({ where: { userId: emp.user.id } });
+        return {
+          employeeName: `${emp.firstName} ${emp.lastName}`,
+          employeeNumber: emp.employeeNumber,
+          userId: emp.user.id,
+          roles: emp.user.roles.map((r) => r.role.name),
+          scopes: scopes.map((s) => ({ module: s.module, scope: s.scope, branchId: s.branchId, departmentId: s.departmentId, hospitalId: (s as any).hospitalId }))
+        };
+      }
+    }),
+
+    grantEmployeePermission: makeTool({
+      description: "Grant or assign specific permissions, roles, or scopes (such as payroll permissions, leave permissions, or manager role) to an employee.",
+      parameters: z.object({
+        employeeIdentifier: z.string().describe("Employee name, national ID, or barcode/number."),
+        permissionOrRole: z.string().describe("The permission, role, or module to grant (e.g. 'payroll', 'leaves', 'manage:payroll', 'HR_MANAGER')."),
+        scope: z.string().optional().default("ALL").describe("Scope of permission: ALL, BRANCH, DEPARTMENT, HOSPITAL, TEAM, SELF.")
+      }) as any,
+      execute: async ({ employeeIdentifier, permissionOrRole, scope }: any) => {
+        if (!canManageHr(context) && !context.isExecutive && !context.roles.includes("SUPER_ADMIN")) {
+          return { error: "Access Denied: Only HR Managers or Executive Delegates can modify employee permissions." };
+        }
+        const target = employeeIdentifier || context.selectedEmployeeId;
+        if (!target) return { error: "يرجى تحديد اسم أو رقم الموظف لمنحه الصلاحية." };
+
+        const emp = await prisma.employee.findFirst({
+          where: {
+            OR: [
+              { id: target },
+              { nationalId: target },
+              { employeeNumber: target },
+              { firstName: { contains: target, mode: "insensitive" } },
+              { lastName: { contains: target, mode: "insensitive" } }
+            ]
+          },
+          include: { user: true }
+        });
+        if (!emp) return { error: `لم يتم العثور على موظف باسم أو رقم "${target}".` };
+        if (!emp.user) return { error: `الموظف (${emp.firstName} ${emp.lastName}) غير مربوط بحساب مستخدم.` };
+
+        const cleanPerm = permissionOrRole.toLowerCase();
+        let moduleName = "employees";
+        if (cleanPerm.includes("payroll") || cleanPerm.includes("راتب") || cleanPerm.includes("رواتب")) moduleName = "payroll";
+        else if (cleanPerm.includes("leave") || cleanPerm.includes("إجاز") || cleanPerm.includes("اجاز")) moduleName = "leaves";
+        else if (cleanPerm.includes("attendance") || cleanPerm.includes("حضور") || cleanPerm.includes("دوام")) moduleName = "attendance";
+        else if (cleanPerm.includes("contract") || cleanPerm.includes("عقد") || cleanPerm.includes("عقود")) moduleName = "contracts";
+
+        const { setUserScope } = await import("@/lib/permissions/engine");
+        await setUserScope(emp.user.id, moduleName, scope || "ALL", null, null, null, context.userId);
+
+        return {
+          success: true,
+          employeeName: `${emp.firstName} ${emp.lastName}`,
+          module: moduleName,
+          scope: scope || "ALL",
+          message: `تم منح الموظف (${emp.firstName} ${emp.lastName}) صلاحية الوصول وإدارة وحدة (${moduleName}) بنطاق (${scope || "ALL"}) بنجاح.`
+        };
+      }
+    }),
+
     getDepartments: makeTool({
       description: "List company departments and their employee headcounts.",
       parameters: z.object({}) as any,
