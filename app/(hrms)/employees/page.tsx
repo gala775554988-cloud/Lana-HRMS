@@ -11,7 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { EmployeeList } from "@/components/hrms/employee-list";
 import { MergedModuleTabs } from "@/components/hrms/merged-module-tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Network, Users, UsersRound } from "lucide-react";
+import { Network, Users, UsersRound, Building2 } from "lucide-react";
 
 const OrganizationHierarchyClient = dynamicImport(() => import("@/components/enterprise/organization-hierarchy-client").then((mod) => mod.OrganizationHierarchyClient));
 
@@ -67,6 +67,20 @@ function buildFastEmployeeWhere(query: Query) {
   if (tab === "active") and.push({ status: "ACTIVE" });
   else if (filters.status) and.push({ status: filters.status });
   else and.push({ status: { not: "INACTIVE" } });
+
+  const hospitalParam = one(query.hospitalId)?.trim() || filters.hospital;
+  if (hospitalParam) {
+    and.push({
+      OR: [
+        { hospitalId: hospitalParam },
+        { hospital: { id: hospitalParam } },
+        { hospital: { name: { contains: hospitalParam, mode: "insensitive" } } },
+        { branchId: hospitalParam },
+        { branch: { id: hospitalParam } },
+        { branch: { name: { contains: hospitalParam, mode: "insensitive" } } },
+      ],
+    });
+  }
 
   if (filters.department) and.push({ department: { name: { contains: filters.department, mode: "insensitive" } } });
   if (filters.branch) and.push({ branch: { name: { contains: filters.branch, mode: "insensitive" } } });
@@ -191,6 +205,8 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
   const canUseFastPath = roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER");
   const isSuperAdmin = roles.includes("SUPER_ADMIN");
   const activeTab = one(query.tab) ?? "directory";
+  const hospitalFilterId = one(query.hospitalId)?.trim() || one(query.hospital)?.trim();
+  const hospitalName = hospitalFilterId ? (await prisma.hospital.findUnique({ where: { id: hospitalFilterId } }).catch(() => null))?.name || hospitalFilterId : null;
 
   let directoryContent: React.ReactNode = null;
   if (activeTab === "directory") {
@@ -214,6 +230,22 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="space-y-6">
+      {hospitalName && (
+        <div className="flex items-center justify-between rounded-2xl border border-indigo-200 bg-indigo-50/80 p-4 text-indigo-900 shadow-sm dark:border-indigo-900/60 dark:bg-indigo-950/40 dark:text-indigo-200">
+          <div className="flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-600 text-white shadow-md">
+              <Building2 className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="font-black text-base">عرض مخصص لمستشفى / موقع: {hospitalName}</p>
+              <p className="text-xs opacity-80 mt-0.5">يتم عرض الموظفين المربوطين بهذا المستشفى فقط</p>
+            </div>
+          </div>
+          <Link href="/employees" className="rounded-xl border border-indigo-300 bg-white px-3.5 py-1.5 text-xs font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-100 dark:border-indigo-800 dark:bg-slate-900 dark:text-indigo-300">
+            إلغاء الفلترة • عرض الكل
+          </Link>
+        </div>
+      )}
       <MergedModuleTabs
         defaultValue="directory"
         items={[

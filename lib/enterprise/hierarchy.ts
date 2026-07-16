@@ -143,7 +143,7 @@ export async function canAccessEmployeeId(employeeId: string, profile: AccessPro
   return count > 0;
 }
 
-type ChainEmployee = { id: string; userId: string | null; departmentId: string | null; branchId: string | null; managerId: string | null };
+type ChainEmployee = { id: string; userId: string | null; departmentId: string | null; branchId: string | null; hospitalId?: string | null; managerId: string | null };
 
 async function resolveRoleForEmployee(role: string, employee: ChainEmployee, store: HierarchyStore): Promise<string[]> {
   if (role === "DIRECT_MANAGER") {
@@ -154,6 +154,18 @@ async function resolveRoleForEmployee(role: string, employee: ChainEmployee, sto
     if (!directManagerId) return [];
     const manager = await prisma.employee.findUnique({ where: { id: directManagerId }, select: { userId: true } });
     return manager?.userId ? [manager.userId] : [];
+  }
+  if (role === "SUPERVISOR" || role === "HOSPITAL_SUPERVISOR") {
+    if (employee.hospitalId) {
+      const hospitalScopes = await prisma.hrPermissionScope.findMany({
+        where: { scope: "HOSPITAL", hospitalId: employee.hospitalId },
+        select: { userId: true }
+      });
+      const userIds = hospitalScopes.map((s) => s.userId).filter(Boolean);
+      if (userIds.length > 0) return Array.from(new Set(userIds));
+    }
+    const fallbackIds = await resolveRoleForEmployee("DIRECT_MANAGER", employee, store);
+    return fallbackIds.length > 0 ? fallbackIds : resolveRoleForEmployee("BRANCH_MANAGER", employee, store);
   }
   if (role === "BRANCH_MANAGER") {
     const branchManagerId = employee.branchId ? store.branchManagers[employee.branchId] : undefined;
@@ -187,14 +199,16 @@ export type ResolvedApprover = { userId: string; capabilities: string[] };
 /** Default hierarchy-based chain (unchanged behavior): direct manager, then
  * branch/department managers, then HR managers -- used whenever no
  * HrApprovalChain rows exist for the given module, or no module is passed. */
-async function resolveDefaultChain(employee: ChainEmployee, store: HierarchyStore): Promise<ResolvedApprover[]> {
-  const [directManagerIds, branchManagerIds, departmentManagerIds, hrManagerIds] = await Promise.all([
+async function resolveDefaultChain(employee: ChainEmployee & { hospitalId?: string | null }, store: HierarchyStore): Promise<ResolvedApprover[]> {
+  const [hospitalSupervisorIds, directManagerIds, branchManagerIds, departmentManagerIds, hrManagerIds] = await Promise.all([
+    employee.hospitalId ? resolveRoleForEmployee("HOSPITAL_SUPERVISOR", employee, store) : Promise.resolve([]),
     resolveRoleForEmployee("DIRECT_MANAGER", employee, store),
     resolveRoleForEmployee("BRANCH_MANAGER", employee, store),
     resolveRoleForEmployee("DEPARTMENT_MANAGER", employee, store),
     resolveRoleForEmployee("HR_MANAGER", employee, store)
   ]);
-  return [...directManagerIds, ...branchManagerIds, ...departmentManagerIds, ...hrManagerIds].map((userId) => ({ userId, capabilities: ["VIEW", "APPROVE", "REJECT"] }));
+  const combined = [...hospitalSupervisorIds, ...directManagerIds, ...branchManagerIds, ...departmentManagerIds, ...hrManagerIds];
+  return combined.map((userId) => ({ userId, capabilities: ["VIEW", "APPROVE", "REJECT"] }));
 }
 
 /** Resolves the admin-configured HrApprovalChain for `module` against this

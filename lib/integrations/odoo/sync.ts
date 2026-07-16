@@ -637,9 +637,10 @@ export class OdooSyncService {
           // entity) -- resolve by exact name match instead, creating a
           // Hospital directory row on first sight of a new name.
           const hospitalNames = Array.from(new Set(
-            rows.map((r) => many2oneName((r as any).school) || textValue((r as any).school)).filter(Boolean) as string[]
+            rows.map((r) => many2oneName((r as any).school) || textValue((r as any).school) || many2oneName((r as any).x_studio_school_name) || textValue((r as any).x_studio_school_name)).filter(Boolean) as string[]
           ));
           const hospitalMap = new Map<string, string>();
+          const hospitalBranchMap = new Map<string, string>();
           if (hospitalNames.length > 0) {
             try {
               const existingHospitals = await delegate("hospital").findMany({ where: { name: { in: hospitalNames } } }) as any[];
@@ -649,6 +650,17 @@ export class OdooSyncService {
                 try {
                   const created = await delegate("hospital").create({ data: { name, code: `ODOO-SCHOOL-${name}`.slice(0, 191) } }) as any;
                   hospitalMap.set(name, created.id);
+                } catch {}
+              }
+              for (const name of hospitalNames) {
+                const hospId = hospitalMap.get(name);
+                if (!hospId) continue;
+                try {
+                  let branch = await delegate("branch").findFirst({ where: { OR: [{ name }, { code: `HOSP-${hospId}`.slice(0, 191) }] } }) as any;
+                  if (!branch) {
+                    branch = await delegate("branch").create({ data: { name, code: `HOSP-${hospId}`.slice(0, 191), city: "Riyadh", isActive: true } }) as any;
+                  }
+                  if (branch?.id) hospitalBranchMap.set(name, branch.id);
                 } catch {}
               }
             } catch {}
@@ -694,7 +706,7 @@ export class OdooSyncService {
               const jId = many2oneId((row as any).job_id);
               const cId = many2oneId((row as any).company_id);
               const mId = many2oneId((row as any).parent_id);
-              const hospitalName: string | undefined = raw._hospitalName;
+              const hospitalName: string | undefined = raw._hospitalName || many2oneName((row as any).x_studio_school_name) || textValue((row as any).x_studio_school_name) || undefined;
               delete raw.odooDepartmentId; delete raw.odooJobId; delete raw.odooCompanyId; delete raw.odooManagerId; delete raw._odooId; delete raw._odooName; delete raw._hospitalName;
               const vals = {
                 ...raw,
@@ -708,7 +720,7 @@ export class OdooSyncService {
                 odooParentId: mId || null,
                 ...(dId && deptMap.get(dId) ? { departmentId: deptMap.get(dId) } : {}),
                 ...(jId && jobMap.get(jId) ? { positionId: jobMap.get(jId) } : {}),
-                ...(cId && compMap.get(cId) ? { branchId: compMap.get(cId) } : {}),
+                ...(cId && compMap.get(cId) ? { branchId: compMap.get(cId) } : (hospitalName && hospitalBranchMap.get(hospitalName) ? { branchId: hospitalBranchMap.get(hospitalName) } : {})),
                 ...(mId && managerMap.get(mId) ? { managerId: managerMap.get(mId) } : {}),
                 ...(hospitalName && hospitalMap.get(hospitalName) ? { hospitalId: hospitalMap.get(hospitalName) } : {}),
                 odooRawData: sanitizeRawRecord(row as Record<string, unknown>, excludedBankFields),
