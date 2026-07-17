@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { OdooSyncService } from "@/lib/integrations/odoo/sync";
+import { OdooSyncService, fullResyncFromOdoo, hasInternalSyncToken } from "@/lib/integrations/odoo/sync";
 import { writeAuditLog } from "@/lib/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-// Triggered by Vercel Cron (see vercel.json "crons"). Vercel sends
-// `Authorization: Bearer $CRON_SECRET` automatically when CRON_SECRET is set
-// as a project environment variable — this is the only auth check here since
-// there is no logged-in user for a scheduled invocation.
 function isAuthorizedCronRequest(request: NextRequest) {
+  if (hasInternalSyncToken(request)) return true;
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
   return request.headers.get("authorization") === `Bearer ${secret}`;
@@ -22,10 +19,12 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const service = await OdooSyncService.forConnection(request.nextUrl.searchParams.get("connectionId") || undefined);
+    const connectionId = request.nextUrl.searchParams.get("connectionId") || undefined;
+    const resyncResult = await fullResyncFromOdoo({ wipeAndSync: false, connectionId }).catch((err) => ({ error: err.message || String(err) }));
+    const service = await OdooSyncService.forConnection(connectionId);
     const result = await service.sync({ entity: "all", direction: "BIDIRECTIONAL" });
-    await writeAuditLog({ action: "ODOO_CRON_SYNC", entity: "odoo", metadata: { entity: result.entity, pulled: result.pulled, pushed: result.pushed, created: result.created, updated: result.updated, skipped: result.skipped, errors: result.errors.length } }).catch(() => undefined);
-    return NextResponse.json({ success: true, result });
+    await writeAuditLog({ action: "ODOO_CRON_SYNC", entity: "odoo", metadata: { resyncResult, entity: result.entity, pulled: result.pulled, pushed: result.pushed, created: result.created, updated: result.updated, skipped: result.skipped, errors: result.errors.length } }).catch(() => undefined);
+    return NextResponse.json({ success: true, resyncResult, result });
   } catch (error) {
     return NextResponse.json({ success: false, message: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }

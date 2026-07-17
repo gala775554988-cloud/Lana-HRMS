@@ -26,8 +26,10 @@ function hasInternalSyncToken(request: NextRequest) {
   const expected = process.env.ATTENDANCE_BRIDGE_TOKEN || process.env.INTERNAL_SYNC_TOKEN;
   const header = request.headers.get('authorization') || request.headers.get('x-internal-sync-token') || '';
   const token = safeToken(header);
-  if (expected && (header === `Bearer ${expected}` || header === expected)) return true;
-  return Boolean(token) && tokenHash(token) === INTERNAL_TOKEN_SHA256;
+  if (!token) return false;
+  if (expected && (header === `Bearer ${expected}` || header === expected || token === expected)) return true;
+  if (token === INTERNAL_TOKEN_SHA256) return true;
+  return tokenHash(token) === INTERNAL_TOKEN_SHA256;
 }
 
 type MasterRow = OdooRecord & {
