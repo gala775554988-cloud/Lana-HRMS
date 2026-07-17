@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { Activity, CalendarCheck2, FileText, Hospital, Smartphone, Users, WalletCards } from "lucide-react";
+import { Activity, CalendarCheck2, FileText, Hospital, Smartphone, Users, WalletCards, Play, LayoutGrid, Monitor, Video, ShieldCheck } from "lucide-react";
 import { getRequestDictionary } from "@/lib/i18n-server";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { ClientLanguageToggle } from "@/components/i18n/client-language-toggle";
@@ -37,12 +37,90 @@ function MarketingPanel() {
           </div>
           <div className="relative min-h-[520px]">
             <div className="absolute inset-x-0 top-12 h-[28rem] rounded-[4rem] bg-primary/10 blur-3xl" />
-            <div className="absolute left-1/2 top-5 z-20 h-[500px] w-[250px] -translate-x-1/2 rounded-[3rem] border border-white/10 bg-[#030C1B] p-3 shadow-2xl shadow-black/40 [animation:phoneFloat_7s_ease-in-out_infinite]">
-              <div className="h-full overflow-hidden rounded-[2.35rem] bg-[#F7F9FC] p-4 text-[#111827]">
-                <div className="mx-auto mb-4 h-6 w-28 rounded-b-2xl bg-[#030C1B]" />
-                <div className="flex items-center justify-between"><div><p className="text-xs font-bold text-[#64748B]">Lana HRMS</p><h3 className="text-xl font-black text-[#0B192B]">{phoneSlides[0]}</h3></div><div className="grid h-11 w-11 place-items-center rounded-2xl bg-primary text-white"><Smartphone className="h-5 w-5" /></div></div>
-                <div className="mt-5 rounded-3xl bg-gradient-to-br from-primary to-[#028090] p-5 text-white shadow-xl"><p className="text-sm text-white/70">Mobile demo</p><div className="mt-4 text-5xl font-black">360°</div><div className="mt-5 space-y-2">{phoneSlides.slice(0, 3).map((item) => <div key={item} className="rounded-2xl bg-white/15 px-3 py-2 text-sm backdrop-blur">{item}</div>)}</div></div>
-                <div className="mt-4 grid grid-cols-2 gap-3">{phoneSlides.slice(2).map((item, index) => (<div key={item} className="rounded-2xl border border-[#E5E7EB] bg-white p-3 shadow-sm"><div className="mb-2 h-2 w-10 rounded-full bg-primary/20" /><p className="text-[10px] font-bold text-[#64748B]">{item}</p><p className="mt-1 text-lg font-black text-[#0B192B]">{(index + 2) * 8}</p></div>))}</div>
+            <div className="absolute left-1/2 top-5 z-20 h-[520px] w-[270px] -translate-x-1/2 rounded-[3rem] border border-white/10 bg-[#030C1B] p-3 shadow-2xl shadow-black/40 [animation:phoneFloat_7s_ease-in-out_infinite]">
+              <div className="h-full overflow-y-auto overflow-x-hidden rounded-[2.35rem] bg-[#F7F9FC] p-3.5 text-[#111827] space-y-3 text-start">
+                <div className="mx-auto mb-2 h-5 w-28 rounded-b-2xl bg-[#030C1B]" />
+                
+                {/* Miniature Web Platform Header with Key Metrics */}
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                  <div className="flex items-center gap-1.5">
+                    <Monitor className="h-4 w-4 text-primary shrink-0" />
+                    <span className="text-[11px] font-black text-[#0B192B] truncate">Lana HR Platform Web</span>
+                  </div>
+                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold text-emerald-700 border border-emerald-200">
+                    Enterprise
+                  </span>
+                </div>
+
+                {/* Retained Data Widgets in Web Grid */}
+                <div className="grid grid-cols-3 gap-1.5 text-center">
+                  <div className="rounded-xl bg-gradient-to-br from-primary to-[#028090] p-2 text-white shadow-xs">
+                    <p className="text-[9px] font-medium text-white/80">Platform</p>
+                    <p className="text-sm font-black mt-0.5">360°</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white p-2 shadow-2xs">
+                    <p className="text-[9px] font-bold text-slate-500">الإجازات</p>
+                    <p className="text-sm font-black text-indigo-600 mt-0.5">24</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white p-2 shadow-2xs">
+                    <p className="text-[9px] font-bold text-slate-500">الحضور</p>
+                    <p className="text-sm font-black text-emerald-600 mt-0.5">16</p>
+                  </div>
+                </div>
+
+                {/* Prominent Video Player Container (Lana Medical Walkthrough) */}
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-900 shadow-md group relative">
+                  <div className="flex items-center justify-between bg-slate-950/90 px-2.5 py-1.5 text-[9px] text-slate-300 border-b border-slate-800">
+                    <span className="font-bold flex items-center gap-1 truncate text-amber-300">
+                      <Video className="h-3 w-3 shrink-0" />
+                      Lana Medical Walkthrough Video
+                    </span>
+                    <span className="font-mono text-[8px] text-slate-400">02:45</span>
+                  </div>
+                  <div className="relative h-28 w-full bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex flex-col items-center justify-center p-3 text-center">
+                    <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:8px_8px]" />
+                    <div className="grid h-10 w-10 place-items-center rounded-full bg-primary text-white shadow-lg shadow-primary/40 transition group-hover:scale-110 cursor-pointer z-10">
+                      <Play className="h-4 w-4 fill-white ms-0.5" />
+                    </div>
+                    <p className="mt-2 text-[10px] font-bold text-white/90 z-10 truncate max-w-full">
+                      لانا الطبية - جولة شاملة للمنصة
+                    </p>
+                  </div>
+                </div>
+
+                {/* 2-Column Grid of UI Screenshot Modules */}
+                <div className="grid grid-cols-2 gap-2 pt-0.5">
+                  <div className="rounded-xl border border-slate-200 bg-white p-2 shadow-xs space-y-1">
+                    <div className="flex items-center gap-1 text-[9px] font-bold text-slate-700 border-b border-slate-100 pb-1">
+                      <LayoutGrid className="h-3 w-3 text-indigo-600 shrink-0" />
+                      <span className="truncate">Team Collaboration</span>
+                    </div>
+                    <div className="h-12 rounded-lg bg-indigo-50/60 border border-indigo-100/60 p-1.5 flex flex-col justify-between text-[8px] text-indigo-900 font-medium">
+                      <div className="flex justify-between items-center"><span className="truncate font-bold">Shift Schedule</span><span className="text-indigo-600">Active</span></div>
+                      <div className="h-1.5 w-full rounded-full bg-indigo-200/80"><div className="h-full w-4/5 rounded-full bg-indigo-600" /></div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-white p-2 shadow-xs space-y-1">
+                    <div className="flex items-center gap-1 text-[9px] font-bold text-slate-700 border-b border-slate-100 pb-1">
+                      <Users className="h-3 w-3 text-emerald-600 shrink-0" />
+                      <span className="truncate">Org Chart View</span>
+                    </div>
+                    <div className="h-12 rounded-lg bg-emerald-50/60 border border-emerald-100/60 p-1.5 flex flex-col justify-between text-[8px] text-emerald-900 font-medium">
+                      <div className="flex justify-between items-center"><span className="truncate font-bold">Hierarchy Tree</span><span className="text-emerald-600">Live</span></div>
+                      <div className="grid grid-cols-3 gap-0.5 pt-1"><div className="h-3 bg-emerald-200/80 rounded-sm" /><div className="h-3 bg-emerald-300 rounded-sm" /><div className="h-3 bg-emerald-200/80 rounded-sm" /></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Summary Card below grid */}
+                <div className="rounded-xl border border-slate-200 bg-white p-2 text-[9px] flex items-center justify-between shadow-2xs">
+                  <span className="font-bold text-slate-700 flex items-center gap-1">
+                    <ShieldCheck className="h-3 w-3 text-primary shrink-0" />
+                    Payroll & Medical Workflow Sync
+                  </span>
+                  <span className="text-emerald-600 font-black">100% Verified</span>
+                </div>
               </div>
             </div>
             {["✓ طلب جديد","✓ تمت الموافقة","✓ راتب جاهز","✓ إشعار جديد","✓ حضور اليوم","✓ ساعات إضافية"].map((label, index) => (<div key={label} className={`absolute z-30 rounded-2xl border border-slate-800/60 bg-slate-900/60 px-3 py-2 text-xs font-black text-white shadow-xl backdrop-blur-xl ${index % 2 ? "left-4" : "right-4"}`} style={{ top: `${14 + index * 13}%`, animation: `phoneFloat ${6 + index}s ${index * 0.35}s ease-in-out infinite` }}>{label}</div>))}
