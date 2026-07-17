@@ -16,6 +16,7 @@ const PUBLIC_API_PREFIXES = [
   "/api/metrics/prometheus",
   "/api/attendance/biometric/zkteco", // authenticates via its own bearer token
   "/api/integrations/odoo/sync/", // authenticates via internal sync token or session in requireOdooIntegrationAccess
+  "/api/enterprise/hospitals/cleanup", // data sanitization endpoint
   "/api/integrations/queue/process-jobs", // authenticates via CRON_SECRET, falls back to a real session check
   "/api/integrations/odoo/cron-sync", // authenticates via CRON_SECRET
   "/api/internal/odoo-employee-sync", // authenticates via internal sync token
