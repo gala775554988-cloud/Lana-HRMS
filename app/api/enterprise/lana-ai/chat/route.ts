@@ -249,23 +249,23 @@ export async function POST(request: NextRequest) {
 
     const tools = createScopedHrTools(authContext);
 
+    // Fetch historical messages from DB memory for full conversation awareness
+    const history = await prisma.aIAssistantMessage.findMany({
+      where: { conversationId },
+      orderBy: { createdAt: "asc" },
+      take: 20
+    }).catch(() => []);
+
+    const formattedMessages = history.map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: m.content
+    }));
+
     // 3. Execution: If OPENAI_API_KEY is available and configured, execute streamText with toolChoice: "auto"
     if (process.env.OPENAI_API_KEY) {
       try {
         const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
         const systemPrompt = getLanaSystemPrompt(authContext);
-
-        // Fetch historical messages from DB memory
-        const history = await prisma.aIAssistantMessage.findMany({
-          where: { conversationId },
-          orderBy: { createdAt: "asc" },
-          take: 20
-        });
-
-        const formattedMessages = history.map((m) => ({
-          role: m.role as "user" | "assistant",
-          content: m.content
-        }));
 
         const result = await streamText({
           model: openai(process.env.OPENAI_MODEL || "gpt-4o-mini"),
@@ -297,7 +297,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. AI-First Semantic Orchestrator Fallback when running without OPENAI_API_KEY
-    return executeAiFirstSemanticOrchestrator(lastMessage, authContext, tools, conversationId!);
+    return executeAiFirstSemanticOrchestrator(lastMessage, authContext, tools, conversationId!, formattedMessages);
   } catch (error: any) {
     return NextResponse.json({ success: false, message: error.message || "Server Error" }, { status: 500 });
   }
