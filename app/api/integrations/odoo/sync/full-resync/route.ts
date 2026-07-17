@@ -15,7 +15,7 @@ export const maxDuration = 300;
  */
 export async function POST(request: NextRequest) {
   try {
-    await requireOdooIntegrationAccess("manage");
+    await requireOdooIntegrationAccess("manage", request);
     const body = await request.json().catch(() => ({}));
     const wipeAndSync = Boolean(body.wipeAndSync);
     const connectionId = body.connectionId || undefined;

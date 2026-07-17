@@ -11,7 +11,7 @@ export function statusFor(error: unknown) {
 
 export async function runOdooEntitySync(request: NextRequest, entity: SyncEntity) {
   try {
-    await requireOdooIntegrationAccess("manage");
+    await requireOdooIntegrationAccess("manage", request);
     const body = await request.json().catch(() => ({}));
     const tenantId = body.tenantId || request.headers.get("x-tenant-id") || undefined;
     const service = await OdooSyncService.forConnection(body.connectionId);
