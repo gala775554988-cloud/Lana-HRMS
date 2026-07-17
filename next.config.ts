@@ -6,8 +6,7 @@ const withBundleAnalyzer = bundleAnalyzer({ enabled: process.env.ANALYZE === "tr
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  output: "standalone",
-  outputFileTracingRoot: process.cwd(),
+  output: process.env.VERCEL ? undefined : "standalone",
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: true },
   // lucide-react is imported broadly across components as named imports;
