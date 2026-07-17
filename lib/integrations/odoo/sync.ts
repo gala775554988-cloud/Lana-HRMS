@@ -181,7 +181,8 @@ export async function syncEmployeeFromOdoo(odooRecord: any) {
   // حل ارتباط المدرسة (x_studio_school_name -> Hospital/Branch)
   let hospitalId: string | undefined;
   let branchId: string | undefined;
-  const schoolName = String(sanitizedData.x_studio_school_name || sanitizedData.school || "").trim();
+  const rawSchoolVal = sanitizedData.x_studio_school_name || sanitizedData.school || sanitizedData.work_location_id;
+  const schoolName = String(Array.isArray(rawSchoolVal) ? rawSchoolVal[1] : rawSchoolVal || "").trim();
   if (schoolName && schoolName !== 'غير محدد' && schoolName !== 'false') {
     try {
       const hospitalCode = `ODOO-HOSP-${encodeURIComponent(schoolName).slice(0, 40)}`;
@@ -300,12 +301,24 @@ export async function fullResyncFromOdoo(options: { wipeAndSync?: boolean; conne
 
   try {
     const { client } = await createOdooClientFromConnection(options.connectionId);
-    const allRecords = await client.searchRead("hr.employee", [], [
-      "id", "name", "barcode", "identification_id", "registration_number", "employee_code",
-      "x_studio_school_name", "analytic_account_id", "department_id",
-      "parent_id", "company_id", "job_id", "contract_id", "document_ids",
-      "write_date", "create_date", "active"
-    ], { limit: 100000 });
+    let availableFields = [
+      "id", "name", "barcode", "identification_id", "department_id",
+      "parent_id", "job_id", "company_id", "active", "write_date", "create_date"
+    ];
+    try {
+      const discovery = await discoverSyncableFields(client, "hr.employee");
+      const desiredFields = [
+        "id", "name", "barcode", "identification_id", "registration_number", "employee_code",
+        "x_studio_school_name", "school", "work_location_id", "analytic_account_id", "department_id",
+        "parent_id", "coach_id", "company_id", "job_id", "contract_id", "document_ids", "documents",
+        "write_date", "create_date", "active"
+      ];
+      availableFields = desiredFields.filter((f) => discovery.fieldNames.includes(f) || f === "id");
+    } catch {
+      // Fallback if discovery fails
+    }
+
+    const allRecords = await client.searchRead("hr.employee", [], availableFields, { limit: 100000 });
 
     let syncedCount = 0;
     for (const record of allRecords) {
