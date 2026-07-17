@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { TokenRegister } from "./token-register";
 
 const SW_CACHE_VERSION = "v5";
 const SW_CACHE_STORAGE_KEY = "lana.hrms.sw-cache-version";
@@ -52,5 +53,5 @@ export function PWARegister() {
     return () => window.removeEventListener("load", registerServiceWorker);
   }, []);
 
-  return null;
+  return <TokenRegister />;
 }
