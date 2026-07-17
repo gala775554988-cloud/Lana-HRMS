@@ -40,6 +40,7 @@ const navItems: Array<{ href: string; labelKey: NavKey; icon: typeof LayoutDashb
 
   { href: "/employees", labelKey: "employees", icon: Users, group: "peopleContracts", resource: "employees" },
   { href: "/branches", labelKey: "departments-branches", icon: MapPin, group: "peopleContracts", resource: ["departments", "branches"] },
+  { href: "/hospitals", labelKey: "hospitals", icon: Building2, group: "peopleContracts", resource: ["hospitals", "branches"] },
   { href: "/contracts", labelKey: "contracts", icon: FileText, group: "peopleContracts", resource: ["contracts", "documents"] },
   { href: "/setup", labelKey: "setup", icon: Briefcase, group: "peopleContracts", resource: ["positions", "employment-types", "nationalities"] },
 

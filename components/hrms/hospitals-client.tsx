@@ -1,9 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Building2, Users, MapPin, Briefcase, Plus, Search, LayoutGrid, Table as TableIcon, ExternalLink, Edit } from "lucide-react";
 
 type Hospital = {
   id: string;
@@ -20,6 +24,7 @@ type Hospital = {
 type Ref = { id: string; name: string; code: string };
 
 export function HospitalsClient() {
+  const router = useRouter();
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [departments, setDepartments] = useState<Ref[]>([]);
   const [branches, setBranches] = useState<Ref[]>([]);
@@ -27,6 +32,7 @@ export function HospitalsClient() {
   const [departmentId, setDepartmentId] = useState("");
   const [branchId, setBranchId] = useState("");
   const [isActive, setIsActive] = useState("");
+  const [viewMode, setViewMode] = useState<"card" | "table">("card");
   const [editing, setEditing] = useState<Hospital | null>(null);
   const [form, setForm] = useState({ name: "", code: "", departmentId: "", branchId: "", isActive: true });
   const [message, setMessage] = useState("");
@@ -91,70 +97,194 @@ export function HospitalsClient() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-sm shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900/85 dark:shadow-slate-950/30">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="البحث" />
-          <select value={departmentId} onChange={(event) => setDepartmentId(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
-            <option value="">الإدارة</option>
-            {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
-          </select>
-          <select value={branchId} onChange={(event) => setBranchId(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
-            <option value="">الفرع</option>
-            {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-          </select>
-          <select value={isActive} onChange={(event) => setIsActive(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
-            <option value="">الحالة</option>
-            <option value="true">نشط</option>
-            <option value="false">غير نشط</option>
-          </select>
-          <Button type="button" onClick={() => startEdit()}>إضافة مستشفى</Button>
+    <div className="space-y-6" dir="rtl">
+      {/* Search and Filters Bar */}
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
+          <div className="relative flex-1 w-full">
+            <Search className="absolute right-3.5 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="ابحث عن مستشفى أو موقع طبي بالاسم أو الرمز..."
+              className="pr-10 h-10 rounded-xl"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-end">
+            <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className="h-10 rounded-xl border bg-background px-3 text-sm">
+              <option value="">كل الإدارات</option>
+              {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
+            </select>
+            <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className="h-10 rounded-xl border bg-background px-3 text-sm">
+              <option value="">كل الفروع</option>
+              {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+            </select>
+            <div className="flex rounded-xl border overflow-hidden bg-muted/30 p-0.5">
+              <Button
+                variant={viewMode === "card" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("card")}
+                className="rounded-lg gap-1.5 h-8 px-3"
+              >
+                <LayoutGrid className="h-4 w-4" />
+                بطاقات
+              </Button>
+              <Button
+                variant={viewMode === "table" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("table")}
+                className="rounded-lg gap-1.5 h-8 px-3"
+              >
+                <TableIcon className="h-4 w-4" />
+                جدول
+              </Button>
+            </div>
+            <Button type="button" onClick={() => startEdit()} className="rounded-xl gap-1.5 h-10">
+              <Plus className="h-4 w-4" />
+              إضافة مستشفى
+            </Button>
+          </div>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-sm shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900/85 dark:shadow-slate-950/30">
-        <h2 className="mb-4 text-lg font-semibold">{editing ? "تعديل مستشفى" : "إضافة مستشفى"}</h2>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <Input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="اسم المستشفى" />
-          <Input value={form.code} onChange={(event) => setForm((current) => ({ ...current, code: event.target.value }))} placeholder="الرمز" />
-          <select value={form.departmentId} onChange={(event) => setForm((current) => ({ ...current, departmentId: event.target.value }))} className="h-10 rounded-md border bg-background px-3 text-sm">
-            <option value="">الإدارة</option>
-            {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
-          </select>
-          <select value={form.branchId} onChange={(event) => setForm((current) => ({ ...current, branchId: event.target.value }))} className="h-10 rounded-md border bg-background px-3 text-sm">
-            <option value="">الفرع</option>
-            {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-          </select>
-          <label className="flex items-center gap-2 rounded-md border px-3 text-sm"><input type="checkbox" checked={form.isActive} onChange={(event) => setForm((current) => ({ ...current, isActive: event.target.checked }))} />نشط</label>
+      {editing || form.name ? (
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <h2 className="mb-4 text-lg font-semibold">{editing ? "تعديل مستشفى" : "إضافة مستشفى جديد"}</h2>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <Input value={form.name} onChange={(e) => setForm((current) => ({ ...current, name: e.target.value }))} placeholder="اسم المستشفى" className="rounded-xl" />
+            <Input value={form.code} onChange={(e) => setForm((current) => ({ ...current, code: e.target.value }))} placeholder="الرمز" className="rounded-xl" />
+            <select value={form.departmentId} onChange={(e) => setForm((current) => ({ ...current, departmentId: e.target.value }))} className="h-10 rounded-xl border bg-background px-3 text-sm">
+              <option value="">الإدارة</option>
+              {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
+            </select>
+            <select value={form.branchId} onChange={(e) => setForm((current) => ({ ...current, branchId: e.target.value }))} className="h-10 rounded-xl border bg-background px-3 text-sm">
+              <option value="">الفرع</option>
+              {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+            </select>
+            <label className="flex items-center gap-2 rounded-xl border px-3 text-sm cursor-pointer select-none">
+              <input type="checkbox" checked={form.isActive} onChange={(e) => setForm((current) => ({ ...current, isActive: e.target.checked }))} className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500" />
+              نشط
+            </label>
+          </div>
+          <div className="mt-4 flex gap-2">
+            <Button type="button" disabled={isPending || !form.name.trim()} onClick={save} className="rounded-xl px-6">حفظ</Button>
+            <Button type="button" variant="outline" onClick={() => startEdit()} className="rounded-xl px-6">إلغاء</Button>
+          </div>
         </div>
-        <div className="mt-4 flex gap-2">
-          <Button type="button" disabled={isPending || !form.name.trim()} onClick={save}>حفظ</Button>
-          <Button type="button" variant="outline" onClick={() => startEdit()}>إلغاء</Button>
+      ) : null}
+
+      {message ? <div className="rounded-xl border bg-indigo-50/50 p-3 text-sm text-indigo-900 dark:bg-indigo-950/20 dark:text-indigo-200">{message}</div> : null}
+
+      {viewMode === "card" ? (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {hospitals.map((hospital) => (
+            <Card
+              key={hospital.id}
+              onClick={() => router.push(`/hospitals/${hospital.id}`)}
+              className="rounded-3xl border border-slate-200/80 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:border-indigo-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-800 cursor-pointer overflow-hidden flex flex-col justify-between"
+            >
+              <CardHeader className="pb-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="h-12 w-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                      <Building2 className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg font-bold text-slate-900 dark:text-slate-100 leading-snug">
+                        {hospital.name}
+                      </CardTitle>
+                      <CardDescription className="text-xs font-mono text-muted-foreground mt-0.5">
+                        {hospital.code}
+                      </CardDescription>
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent className="space-y-4 pt-0">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+                  <Badge variant="secondary" className="gap-1.5 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/60 font-bold px-3 py-1 rounded-xl text-xs">
+                    <Users className="h-3.5 w-3.5" />
+                    {hospital.employeeCount} موظف نشط
+                  </Badge>
+                  <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${hospital.isActive ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300" : "bg-slate-100 text-slate-500"}`}>
+                    {hospital.isActive ? "نشط" : "غير نشط"}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground pt-1">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <Briefcase className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{hospital.department?.name || "الإدارة غير محددة"}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 truncate">
+                    <MapPin className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{hospital.branch?.name || "الفرع غير محدد"}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800" onClick={(e) => e.stopPropagation()}>
+                  <Button size="sm" variant="outline" className="rounded-xl text-xs h-8 px-3" onClick={() => startEdit(hospital)}>
+                    <Edit className="h-3.5 w-3.5 me-1" />
+                    تعديل
+                  </Button>
+                  <Button size="sm" className="rounded-xl text-xs h-8 px-3 gap-1 bg-indigo-600 hover:bg-indigo-700 text-white" onClick={() => router.push(`/hospitals/${hospital.id}`)}>
+                    <span>عرض الموظفين</span>
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+          {hospitals.length === 0 ? (
+            <div className="col-span-full rounded-3xl border border-dashed border-slate-300 p-12 text-center text-muted-foreground dark:border-slate-700">
+              <Building2 className="mx-auto h-12 w-12 text-slate-400 mb-3" />
+              <p className="font-semibold text-base">لا توجد مستشفيات أو مواقع طبية متطابقة مع البحث</p>
+            </div>
+          ) : null}
         </div>
-      </div>
-
-      {message ? <div className="rounded-xl border bg-background p-3 text-sm text-muted-foreground">{message}</div> : null}
-
-      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900 dark:shadow-slate-950/30">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/70 text-muted-foreground">
-            <tr><th className="px-4 py-3 text-start">المستشفى</th><th className="px-4 py-3 text-start">الإدارة</th><th className="px-4 py-3 text-start">الفرع</th><th className="px-4 py-3 text-start">عدد الموظفين</th><th className="px-4 py-3 text-start">الحالة</th><th className="px-4 py-3 text-start">الإجراءات</th></tr>
-          </thead>
-          <tbody>
-            {hospitals.map((hospital) => (
-              <tr key={hospital.id} className="border-t border-slate-100 transition-colors hover:bg-indigo-50/40 dark:border-slate-800 dark:hover:bg-indigo-950/20">
-                <td className="px-4 py-3">{hospital.name}<div className="text-xs text-muted-foreground">{hospital.code}</div></td>
-                <td className="px-4 py-3">{hospital.department?.name ?? "-"}</td>
-                <td className="px-4 py-3">{hospital.branch?.name ?? "-"}</td>
-                <td className="px-4 py-3">{hospital.employeeCount}</td>
-                <td className="px-4 py-3">{hospital.isActive ? "نشط" : "غير نشط"}</td>
-                <td className="px-4 py-3"><div className="flex gap-2"><Button asChild size="sm" variant="outline"><Link href={`/employees?hospital=${encodeURIComponent(hospital.name)}`}>عرض</Link></Button><Button size="sm" variant="outline" onClick={() => startEdit(hospital)}>تعديل</Button></div></td>
+      ) : (
+        <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/70 text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3 text-start">المستشفى</th>
+                <th className="px-4 py-3 text-start">الإدارة</th>
+                <th className="px-4 py-3 text-start">الفرع</th>
+                <th className="px-4 py-3 text-start">عدد الموظفين النشطين</th>
+                <th className="px-4 py-3 text-start">الحالة</th>
+                <th className="px-4 py-3 text-start">الإجراءات</th>
               </tr>
-            ))}
-            {hospitals.length === 0 ? <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">لا توجد مستشفيات</td></tr> : null}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {hospitals.map((hospital) => (
+                <tr key={hospital.id} className="border-t border-slate-100 transition-colors hover:bg-indigo-50/40 dark:border-slate-800 dark:hover:bg-indigo-950/20">
+                  <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100 cursor-pointer" onClick={() => router.push(`/hospitals/${hospital.id}`)}>
+                    {hospital.name}
+                    <div className="text-xs font-mono font-normal text-muted-foreground">{hospital.code}</div>
+                  </td>
+                  <td className="px-4 py-3">{hospital.department?.name ?? "-"}</td>
+                  <td className="px-4 py-3">{hospital.branch?.name ?? "-"}</td>
+                  <td className="px-4 py-3">
+                    <Badge variant="secondary" className="gap-1 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 font-bold">
+                      <Users className="h-3 w-3" />
+                      {hospital.employeeCount}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3">{hospital.isActive ? "نشط" : "غير نشط"}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" className="rounded-xl h-8 text-xs" onClick={() => router.push(`/hospitals/${hospital.id}`)}>عرض الموظفين</Button>
+                      <Button size="sm" variant="outline" className="rounded-xl h-8 text-xs" onClick={() => startEdit(hospital)}>تعديل</Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {hospitals.length === 0 ? <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">لا توجد مستشفيات</td></tr> : null}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

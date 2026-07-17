@@ -25,7 +25,7 @@ export default async function HospitalDetailsPage({
   if (!hospital) notFound();
 
   const filters = {
-    hospital: hospital.name,
+    hospital: hospital.id,
     department: typeof query.department === "string" ? query.department : undefined,
     branch: typeof query.branch === "string" ? query.branch : undefined,
     project: typeof query.project === "string" ? query.project : undefined,
@@ -47,14 +47,14 @@ export default async function HospitalDetailsPage({
   });
 
   return (
-    <section className="space-y-6">
-      <div className="flex items-center justify-between gap-4 rounded-2xl border bg-background p-6 shadow-sm">
+    <section className="space-y-6" dir={locale === "ar" ? "rtl" : "ltr"}>
+      <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div>
-          <p className="text-sm font-medium text-muted-foreground">المستشفيات</p>
-          <h1 className="text-3xl font-semibold tracking-tight">{hospital.name}</h1>
-          <p className="mt-2 text-muted-foreground">الموظفون التابعون لهذه المستشفى فقط.</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">المستشفيات والمواقع الطبية</p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100 mt-1">{hospital.name}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">جدول الموظفين التابعين لهذا المستشفى حصراً ({data.total} موظف)</p>
         </div>
-        <Button asChild variant="outline"><Link href="/hospitals">رجوع</Link></Button>
+        <Button asChild variant="outline" className="rounded-xl px-4 py-2"><Link href="/hospitals">← العودة إلى قائمة المستشفيات</Link></Button>
       </div>
       <EmployeeList
         resource={employeeResource}
@@ -67,6 +67,7 @@ export default async function HospitalDetailsPage({
         pageSize={data.pageSize}
         dictionary={dictionary}
         locale={locale}
+        fromHref={`/hospitals/${id}`}
       />
     </section>
   );

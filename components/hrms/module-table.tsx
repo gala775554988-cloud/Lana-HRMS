@@ -28,7 +28,7 @@ function formatHeader(field: string, fieldsDict: Record<string, string>) {
   return field.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
 }
 
-export function ModuleTable({ resource, records, dictionary, locale = "en" }: { resource: HrmsModule; records: Row[]; dictionary: Dictionary; locale?: Locale }) {
+export function ModuleTable({ resource, records, dictionary, locale = "en", fromHref }: { resource: HrmsModule; records: Row[]; dictionary: Dictionary; locale?: Locale; fromHref?: string }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const helper = createColumnHelper<Row>();
@@ -59,7 +59,10 @@ export function ModuleTable({ resource, records, dictionary, locale = "en" }: { 
     helper.display({ id: "actions", header: dictionary.table.actions, cell: ({ row }) => {
       const workflowId = typeof row.original._workflowId === "string" ? row.original._workflowId : "";
       const canAct = Boolean(row.original._canAct && workflowId);
-      const openHref = resource.key === "departments" ? `/employees?department=${encodeURIComponent(String(row.original.name ?? ""))}` : "/" + resource.key + "/" + row.original.id;
+      const baseOpenHref = "/" + resource.key + "/" + row.original.id;
+      const openHref = resource.key === "departments"
+        ? `/employees?department=${encodeURIComponent(String(row.original.name ?? ""))}`
+        : (fromHref && resource.key === "employees" ? `${baseOpenHref}?from=${encodeURIComponent(fromHref)}` : baseOpenHref);
       const openLabel = resource.key === "departments" ? "عرض" : dictionary.table.open;
       return (
         <div className="flex flex-wrap justify-end gap-1.5">

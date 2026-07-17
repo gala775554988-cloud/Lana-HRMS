@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { 
   User, Briefcase, Wallet, Clock, Calendar, FileText, 
@@ -33,6 +34,7 @@ interface Props {
   payrollItems: any[];
   auditLogs: any[];
   permissionsScopeContent?: React.ReactNode;
+  backHref?: string;
   dictionary: any;
   locale: string;
 }
@@ -53,6 +55,7 @@ export function EmployeeProfileDashboard({
   payrollItems,
   auditLogs,
   permissionsScopeContent,
+  backHref,
   dictionary,
   locale,
 }: Props) {
@@ -189,6 +192,16 @@ export function EmployeeProfileDashboard({
 
   return (
     <div className="space-y-6" dir={isAr ? "rtl" : "ltr"}>
+      {backHref && (
+        <div className="flex items-center">
+          <Button asChild variant="outline" size="sm" className="gap-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50 shadow-sm dark:border-indigo-800 dark:bg-slate-900 dark:text-indigo-300 dark:hover:bg-indigo-950/50 rounded-xl px-4 py-2 font-semibold">
+            <Link href={backHref}>
+              <span className="text-base leading-none">←</span>
+              {isAr ? "العودة إلى صفحة المستشفى والموظفين" : "Back to Hospital Employees"}
+            </Link>
+          </Button>
+        </div>
+      )}
       {/* Header - Glassmorphism, Rounded XL */}
       <Card className="overflow-hidden border-0 shadow-2xl bg-white/80 backdrop-blur-xl dark:bg-slate-900/80">
         <div className="h-32 bg-gradient-to-r from-indigo-600 via-violet-600 to-blue-600 relative">

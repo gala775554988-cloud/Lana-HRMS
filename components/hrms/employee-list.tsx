@@ -40,9 +40,10 @@ interface EmployeeListProps {
   pageSize: number;
   dictionary: Dictionary;
   locale: Locale;
+  fromHref?: string;
 }
 
-export function EmployeeList({ resource, records, totalCount, page, pageCount, search: initialSearch, filters = {}, pageSize, dictionary, locale }: EmployeeListProps) {
+export function EmployeeList({ resource, records, totalCount, page, pageCount, search: initialSearch, filters = {}, pageSize, dictionary, locale, fromHref }: EmployeeListProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const activeTab = (searchParams.get("tab") as TabType) || "all";
@@ -113,12 +114,12 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
   }, [records]);
   
   const handleEdit = useCallback((id: string) => { 
-    // Prefetch and instant navigation
-    router.prefetch(`/employees/${id}`);
+    const targetUrl = fromHref ? `/employees/${id}?from=${encodeURIComponent(fromHref)}` : `/employees/${id}`;
+    router.prefetch(targetUrl);
     startTransition(() => {
-      router.push(`/employees/${id}`); 
+      router.push(targetUrl); 
     });
-  }, [router]);
+  }, [router, fromHref]);
   
   const handleDocuments = useCallback((id: string) => {
     router.prefetch(`/contracts?tab=documents&documents__employeeId=${id}`);
@@ -278,7 +279,7 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
       )}
 
       {viewMode === "table" && (
-        <ModuleTable resource={resource} records={records as unknown as (Record<string, unknown> & { id: string })[]} dictionary={dictionary} locale={locale} />
+        <ModuleTable resource={resource} records={records as unknown as (Record<string, unknown> & { id: string })[]} dictionary={dictionary} locale={locale} fromHref={fromHref} />
       )}
 
       <div className="flex flex-col gap-3 rounded-lg border bg-card p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">

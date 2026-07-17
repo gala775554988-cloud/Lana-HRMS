@@ -8,8 +8,16 @@ import { getEmployeeFieldAccess, redactHiddenFields } from "@/lib/enterprise/emp
 import { EmployeeProfileDashboard } from "@/components/hrms/employee-profile-dashboard";
 import { PermissionsScope } from "@/components/hrms/permissions-scope";
 
-export default async function EmployeeProfilePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EmployeeProfilePage({
+  params,
+  searchParams
+}: {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { id } = await params;
+  const query = searchParams ? await searchParams.catch(() => ({})) : {};
+  const backHref = typeof query?.from === "string" ? query.from : undefined;
   const { dictionary, locale } = await getRequestDictionary();
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
@@ -185,6 +193,7 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
       payrollItems={payrollItems as any}
       auditLogs={auditLogs as any}
       permissionsScopeContent={<PermissionsScope employeeId={id} />}
+      backHref={backHref}
       dictionary={dictionary}
       locale={locale}
     />

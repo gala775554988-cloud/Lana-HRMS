@@ -64,24 +64,70 @@ export async function getEmployeeExtraSettings() {
 export async function getEmployeeIdsByHospital(hospital: string) {
   const target = normalize(hospital);
   if (!target) return [];
+
+  const dbEmployees = await prisma.employee.findMany({
+    where: {
+      OR: [
+        { hospitalId: hospital },
+        { hospital: { id: hospital } },
+        { hospital: { name: { equals: hospital, mode: "insensitive" } } },
+        { hospital: { code: { equals: hospital, mode: "insensitive" } } }
+      ]
+    },
+    select: { id: true }
+  });
+  const dbIds = dbEmployees.map((e) => e.id);
+
   const extra = await getEmployeeExtraSettings();
-  return extra
+  const extraIds = extra
     .filter((item) => normalize(String(item.value.hospital ?? "")) === target)
     .map((item) => item.employeeId);
+
+  return Array.from(new Set([...dbIds, ...extraIds]));
 }
 
 export async function listHospitals(filters?: { search?: string; departmentId?: string; branchId?: string; isActive?: string }) {
-  const [store, extra, departments, branches] = await Promise.all([
+  const [store, extra, departments, branches, sqlHospitals] = await Promise.all([
     getHospitalStore(),
     getEmployeeExtraSettings(),
     prisma.department.findMany({ select: { id: true, name: true, code: true } }),
-    prisma.branch.findMany({ select: { id: true, name: true, code: true } })
+    prisma.branch.findMany({ select: { id: true, name: true, code: true } }),
+    prisma.hospital.findMany({
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        branchId: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        _count: { select: { employees: { where: { status: "ACTIVE" } } } }
+      }
+    })
   ]);
 
   const now = new Date().toISOString();
-  const byName = new Map<string, HospitalRecord>();
+  const byName = new Map<string, HospitalRecord & { sqlEmployeeCount?: number }>();
+
+  for (const h of sqlHospitals) {
+    byName.set(normalize(h.name), {
+      id: h.id,
+      name: h.name,
+      code: h.code,
+      departmentId: null,
+      branchId: h.branchId || null,
+      isActive: h.isActive,
+      createdAt: h.createdAt ? new Date(h.createdAt).toISOString() : now,
+      updatedAt: h.updatedAt ? new Date(h.updatedAt).toISOString() : now,
+      sqlEmployeeCount: h._count.employees
+    });
+  }
+
   for (const hospital of Object.values(store.hospitals)) {
-    byName.set(normalize(hospital.name), hospital);
+    const key = normalize(hospital.name);
+    if (!byName.has(key)) {
+      byName.set(key, hospital);
+    }
   }
 
   for (const item of extra) {
@@ -100,11 +146,11 @@ export async function listHospitals(filters?: { search?: string; departmentId?: 
     });
   }
 
-  const counts = new Map<string, number>();
+  const extraCounts = new Map<string, number>();
   for (const item of extra) {
     const name = normalize(String(item.value.hospital ?? ""));
     if (!name) continue;
-    counts.set(name, (counts.get(name) ?? 0) + 1);
+    extraCounts.set(name, (extraCounts.get(name) ?? 0) + 1);
   }
 
   const employees = await prisma.employee.findMany({
@@ -114,8 +160,10 @@ export async function listHospitals(filters?: { search?: string; departmentId?: 
       nationalId: true,
       firstName: true,
       lastName: true,
+      hospitalId: true,
       department: { select: { id: true, name: true, code: true } },
-      branch: { select: { id: true, name: true, code: true } }
+      branch: { select: { id: true, name: true, code: true } },
+      position: { select: { id: true, title: true } }
     },
     take: 10000
   });
@@ -126,10 +174,10 @@ export async function listHospitals(filters?: { search?: string; departmentId?: 
   const items = Array.from(byName.values())
     .map((hospital) => {
       const normalizedHospital = normalize(hospital.name);
-      const hospitalEmployees = extra
-        .filter((item) => normalize(String(item.value.hospital ?? "")) === normalizedHospital)
-        .map((item) => employeeById.get(item.employeeId))
-        .filter(Boolean) as typeof employees;
+      const sqlEmployeesCount = employees.filter((e) => e.hospitalId === hospital.id).length;
+      const combinedCount = Math.max(hospital.sqlEmployeeCount ?? 0, sqlEmployeesCount, extraCounts.get(normalizedHospital) ?? 0);
+
+      const hospitalEmployees = employees.filter((e) => e.hospitalId === hospital.id || (extra.some((ex) => ex.employeeId === e.id && normalize(String(ex.value.hospital ?? "")) === normalizedHospital)));
       const department = departments.find((item) => item.id === hospital.departmentId) ?? null;
       const branch = branches.find((item) => item.id === hospital.branchId) ?? null;
       const smartSearchText = [
@@ -139,9 +187,9 @@ export async function listHospitals(filters?: { search?: string; departmentId?: 
         department?.code,
         branch?.name,
         branch?.code,
-        ...hospitalEmployees.flatMap((employee) => [employee.firstName, employee.lastName, `${employee.firstName} ${employee.lastName}`, employee.employeeNumber, employee.nationalId, employee.department?.name, employee.department?.code, employee.branch?.name, employee.branch?.code])
+        ...hospitalEmployees.flatMap((employee) => [employee.firstName, employee.lastName, `${employee.firstName} ${employee.lastName}`, employee.employeeNumber, employee.nationalId, employee.department?.name, employee.department?.code, employee.branch?.name, employee.branch?.code, employee.position?.title])
       ].filter(Boolean).join(" ").toLowerCase();
-      return { ...hospital, employeeCount: counts.get(normalizedHospital) ?? 0, department, branch, smartSearchText };
+      return { ...hospital, employeeCount: combinedCount, department, branch, smartSearchText };
     })
     .filter((hospital) => !search || hospital.smartSearchText.includes(search))
     .filter((hospital) => !filters?.departmentId || hospital.departmentId === filters.departmentId)
