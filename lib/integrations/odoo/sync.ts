@@ -161,7 +161,24 @@ export function formatEmployeeCode(code?: string | number | null): string {
   return `00${digits || clean}`;
 }
 
+function extractMany2oneText(val: unknown, fallback = ""): string {
+  if (!val || val === false || val === "false") return fallback;
+  if (Array.isArray(val) && val.length >= 2) return String(val[1] || fallback).trim();
+  return String(val).trim();
+}
+
+function parseOdooDate(val: unknown): Date | undefined {
+  if (!val || val === false || val === "false") return undefined;
+  const str = String(val).trim();
+  if (!str) return undefined;
+  const parsed = new Date(str);
+  return isNaN(parsed.getTime()) ? undefined : parsed;
+}
+
 export async function syncEmployeeFromOdoo(odooRecord: any) {
+  // 0. Logging تفصيلي لمراقبة كائن الموظف الخام القادم من أودو
+  console.log("Raw Odoo Data:", odooRecord);
+
   // 1. تنقية البيانات: استبعاد الحقول البنكية حصراً
   const sanitizedData = Object.keys(odooRecord)
     .filter((key) => !SENSITIVE_FIELDS.includes(key) && !/(iban|swift|bank_account|sort_code)/i.test(key))
@@ -170,7 +187,7 @@ export async function syncEmployeeFromOdoo(odooRecord: any) {
       return obj;
     }, {} as any);
 
-  // 2. تعيين الحقول المطلوبة بدقة (Mapping)
+  // 2. تعيين الحقول المطلوبة بدقة (Mapping) واستخراج النصوص من Many2one
   const rawName = String(sanitizedData.name || "Odoo Employee").trim();
   const nameParts = rawName.split(" ");
   const firstName = nameParts[0] || rawName;
@@ -179,11 +196,21 @@ export async function syncEmployeeFromOdoo(odooRecord: any) {
   const rawEmpCode = sanitizedData.registration_number || sanitizedData.employee_code || sanitizedData.barcode || sanitizedData.id;
   const employeeNumber = formatEmployeeCode(rawEmpCode);
 
-  // حل ارتباط المدرسة (x_studio_school_name -> Hospital/Branch)
+  // استخراج النصوص الصافية من الكائنات العلائقية (Many2one tuples [id, "Name"])
+  const jobTitle = extractMany2oneText(sanitizedData.job_id || sanitizedData.job_title, "غير محدد");
+  const deptName = extractMany2oneText(sanitizedData.department_id, "غير محدد");
+  const sponsorName = extractMany2oneText(sanitizedData.company_id || sanitizedData.x_sponsor, "غير محدد");
+  const branchNameRaw = extractMany2oneText(sanitizedData.branch_id || sanitizedData.work_location_id, "الفرع الرئيسي");
+  const analyticAccount = extractMany2oneText(sanitizedData.analytic_account_id, "");
+
+  // معالجة التواريخ وتحويلها من ISO أودو إلى Date في PostgreSQL
+  const hireDateParsed = parseOdooDate(sanitizedData.first_contract_date || sanitizedData.date || sanitizedData.hire_date || sanitizedData.create_date);
+  const birthDateParsed = parseOdooDate(sanitizedData.birthday || sanitizedData.date_of_birth || sanitizedData.birth_date);
+
+  // حل ارتباط المدرسة / المستشفى (x_studio_school_name أو school أو work_location_id)
   let hospitalId: string | undefined;
   let branchId: string | undefined;
-  const rawSchoolVal = sanitizedData.x_studio_school_name || sanitizedData.school || sanitizedData.work_location_id;
-  const schoolName = String(Array.isArray(rawSchoolVal) ? rawSchoolVal[1] : rawSchoolVal || "").trim();
+  const schoolName = extractMany2oneText(sanitizedData.x_studio_school_name || sanitizedData.school || sanitizedData.work_location_id);
   if (schoolName && schoolName !== 'غير محدد' && schoolName !== 'false') {
     try {
       const hospitalCode = `ODOO-HOSP-${encodeURIComponent(schoolName).slice(0, 40)}`;
@@ -202,30 +229,45 @@ export async function syncEmployeeFromOdoo(odooRecord: any) {
       });
       branchId = branch.id;
     } catch {}
+  } else if (branchNameRaw && branchNameRaw !== 'غير محدد') {
+    try {
+      const bCode = `ODOO-BR-${encodeURIComponent(branchNameRaw).slice(0, 40)}`;
+      const branch = await prisma.branch.upsert({
+        where: { code: bCode },
+        update: { name: branchNameRaw, isActive: true },
+        create: { name: branchNameRaw, code: bCode, isActive: true }
+      });
+      branchId = branch.id;
+    } catch {}
   }
 
-  // حل الإدارة (department_id)
+  // حل ارتباط الإدارة (Department FK)
   let departmentId: string | undefined;
-  if (sanitizedData.department_id) {
-    const deptName = Array.isArray(sanitizedData.department_id) ? sanitizedData.department_id[1] : String(sanitizedData.department_id);
-    if (deptName && deptName !== 'false') {
-      try {
-        const dept = await prisma.department.findFirst({ where: { name: deptName } });
-        if (dept) departmentId = dept.id;
-        else {
-          const newDept = await prisma.department.create({ data: { name: deptName, description: `Synced from Odoo` } });
-          departmentId = newDept.id;
-        }
-      } catch {}
-    }
+  if (deptName && deptName !== 'غير محدد' && deptName !== 'false') {
+    try {
+      const dept = await prisma.department.findFirst({ where: { name: deptName } });
+      if (dept) departmentId = dept.id;
+      else {
+        const newDept = await prisma.department.create({ data: { name: deptName, description: `Synced from Odoo` } });
+        departmentId = newDept.id;
+      }
+    } catch {}
   }
 
-  // الحساب التحليلي (Analytic Account)
-  const analyticAccount = sanitizedData.analytic_account_id
-    ? (Array.isArray(sanitizedData.analytic_account_id) ? sanitizedData.analytic_account_id[1] : String(sanitizedData.analytic_account_id))
-    : undefined;
+  // حل ارتباط المنصب الوظيفي (Position FK)
+  let positionId: string | undefined;
+  if (jobTitle && jobTitle !== 'غير محدد' && jobTitle !== 'false') {
+    try {
+      const pos = await prisma.position.findFirst({ where: { title: jobTitle } });
+      if (pos) positionId = pos.id;
+      else {
+        const newPos = await prisma.position.create({ data: { title: jobTitle, code: `JOB-${Date.now().toString().slice(-6)}` } });
+        positionId = newPos.id;
+      }
+    } catch {}
+  }
 
-  // المدير (parent_id -> Manager Employee)
+  // المدير المباشر (parent_id -> Manager Employee)
   let managerId: string | undefined;
   if (sanitizedData.parent_id) {
     const parentOdooId = Array.isArray(sanitizedData.parent_id) ? Number(sanitizedData.parent_id[0]) : Number(sanitizedData.parent_id);
@@ -241,14 +283,16 @@ export async function syncEmployeeFromOdoo(odooRecord: any) {
     name: sanitizedData.name,
     nationalId,
     formattedCode: employeeNumber,
-    jobTitle: Array.isArray(sanitizedData.job_id) ? sanitizedData.job_id[1] : (sanitizedData.job_id || 'غير محدد'),
-    department: Array.isArray(sanitizedData.department_id) ? sanitizedData.department_id[1] : (sanitizedData.department_id || 'غير محدد'),
-    sponsor: Array.isArray(sanitizedData.company_id) ? sanitizedData.company_id[1] : (sanitizedData.company_id || 'غير محدد'),
+    jobTitle,
+    department: deptName,
+    sponsor: sponsorName,
     wage: sanitizedData.contract_id?.wage || 0,
     salaryDetails: sanitizedData.l10n_sa_salary_details || {},
-    schoolName: schoolName || 'غير محدد',
+    schoolName: schoolName || branchNameRaw || 'غير محدد',
     totalCost: sanitizedData.x_studio_total_cost || 0,
-    branch: Array.isArray(sanitizedData.branch_id) ? sanitizedData.branch_id[1] : (sanitizedData.branch_id || 'الفرع الرئيسي'),
+    branch: branchNameRaw,
+    dateOfBirth: birthDateParsed ? birthDateParsed.toISOString() : null,
+    hireDate: (hireDateParsed || new Date()).toISOString(),
     documents: sanitizedData.document_ids || sanitizedData.documents || []
   };
 
@@ -256,13 +300,16 @@ export async function syncEmployeeFromOdoo(odooRecord: any) {
     employeeNumber,
     firstName,
     lastName,
-    sponsor: String(employeeData.sponsor),
+    sponsor: sponsorName,
     odooId: Number(sanitizedData.id) || null,
     hospitalId: hospitalId || undefined,
     branchId: branchId || undefined,
     departmentId: departmentId || undefined,
+    positionId: positionId || undefined,
     analyticAccount: analyticAccount || undefined,
     managerId: managerId || undefined,
+    dateOfBirth: birthDateParsed || null,
+    hireDate: hireDateParsed || new Date(),
     odooRawData: {
       ...sanitizedData,
       documents: employeeData.documents,
@@ -278,7 +325,6 @@ export async function syncEmployeeFromOdoo(odooRecord: any) {
     create: {
       ...upsertPayload,
       nationalId,
-      hireDate: new Date(),
       status: "ACTIVE"
     }
   });
