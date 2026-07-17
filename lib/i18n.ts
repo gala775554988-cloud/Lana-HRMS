@@ -394,6 +394,42 @@ export const dictionaries = {
       reports: "Reusable report definitions for HR analytics.",
       settings: "Application-level settings and configuration values.",
       "audit-logs": "Immutable trail of sensitive HRMS changes."
+    },
+    hospitals: {
+      title: "Hospitals & Medical Sites",
+      description: "Manage medical sites, branches, and assigned employees.",
+      searchPlaceholder: "Search hospital or medical site by name or code...",
+      activeEmployees: "Active Employees",
+      viewEmployees: "View Employees",
+      addHospital: "Add Hospital",
+      editHospital: "Edit Hospital",
+      backToHospitals: "Back to Hospital Directory",
+      backToEmployees: "Back to Hospital Employees",
+      department: "Department",
+      branch: "Branch",
+      status: "Status",
+      active: "Active",
+      inactive: "Inactive",
+      noRecords: "No hospitals found matching criteria"
+    },
+    hierarchy: {
+      title: "Organization Hierarchy & Structure",
+      description: "Interactive expand-on-click organizational tree and managerial assignments.",
+      tabChart: "Interactive Org Tree",
+      tabDepartments: "Department Managers",
+      tabOverrides: "Direct Managers (Overrides)",
+      tabProjects: "HR Managers & Projects",
+      saveHierarchy: "Save Hierarchy",
+      loadingLazy: "Loading direct subordinates for manager...",
+      topLevelRoots: "Executive Leadership & Top Level Roots"
+    },
+    aiAssistant: {
+      title: "Lana AI Assistant",
+      newChat: "New Conversation",
+      chatHistory: "Conversation History",
+      placeholder: "Ask about HR metrics, leave balances, attendance, or attach documents...",
+      proactiveSuggestion: "Proactive Suggestion:",
+      memoryActive: "Connected to real-time Neon PostgreSQL conversation memory."
     }
   },
   ar: {
@@ -765,6 +801,42 @@ export const dictionaries = {
       error: "فشل الرفع",
       photo: "رفع صورة",
       logo: "رفع شعار"
+    },
+    hospitals: {
+      title: "المستشفيات والمواقع الطبية",
+      description: "إدارة المستشفيات والمراكز الطبية وربط الفروع والموظفين المباشرين.",
+      searchPlaceholder: "ابحث عن مستشفى أو موقع طبي بالاسم أو الرمز...",
+      activeEmployees: "موظف نشط",
+      viewEmployees: "عرض الموظفين",
+      addHospital: "إضافة مستشفى",
+      editHospital: "تعديل",
+      backToHospitals: "العودة إلى قائمة المستشفيات",
+      backToEmployees: "العودة إلى قائمة موظفي المستشفى",
+      department: "الإدارة",
+      branch: "الفرع",
+      status: "الحالة الوظيفية",
+      active: "نشط",
+      inactive: "غير نشط",
+      noRecords: "لا توجد مستشفيات أو مواقع طبية متطابقة مع البحث"
+    },
+    hierarchy: {
+      title: "الهيكل التنظيمي والتسلسل الإداري للمؤسسة",
+      description: "نظام الهيكل الشجري التفاعلي التدريجي وتحديد مسارات المراجع الإدارية.",
+      tabChart: "الهيكل الشجري التفاعلي",
+      tabDepartments: "مدراء الإدارات والأقسام",
+      tabOverrides: "المدراء المباشرون (استثناءات)",
+      tabProjects: "مدراء الموارد البشرية والمشاريع",
+      saveHierarchy: "حفظ التعديلات",
+      loadingLazy: "جاري تحميل المرؤوسين المباشرين للمدير...",
+      topLevelRoots: "القيادات ورؤساء الفرق الرئيسية (المستوى الأعلى)"
+    },
+    aiAssistant: {
+      title: "لانا المساعد الذكي",
+      newChat: "محادثة جديدة",
+      chatHistory: "سجل المحادثات",
+      placeholder: "اسألني عن أرصدة الإجازات، الرواتب، الحضور وانصراف اليوم، أو ارفق المستندات للتحليل...",
+      proactiveSuggestion: "💡 مبادرة لانا:",
+      memoryActive: "متصل بذاكرة المساعد في قاعدة بيانات Neon مباشرة وبسرية تامة."
     }
   }
 } as const;
