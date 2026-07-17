@@ -62,12 +62,11 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const headerLocale = requestHeaders.get("x-lana-locale");
   const cookieLocale = cookieStore.get("lana-locale")?.value;
   const locale = normalizeLocale(headerLocale ?? cookieLocale);
-  const session = await auth().catch(() => null);
 
   return (
     <html lang={locale} dir={getDirection(locale)} className="light" style={{ colorScheme: "light" }} suppressHydrationWarning>
       <body>
-        <SessionProvider session={session} refetchOnWindowFocus={false} refetchWhenOffline={false}>
+        <SessionProvider refetchOnWindowFocus={false} refetchWhenOffline={false}>
           <QueryProvider>
             <ThemeProvider>
               <PWARegister />

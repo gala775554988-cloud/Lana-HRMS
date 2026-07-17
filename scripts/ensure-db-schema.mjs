@@ -6,9 +6,10 @@ async function ensureDbSchema() {
     process.exit(0);
   }, 25000);
 
-  const url = process.env.DIRECT_URL || process.env.DATABASE_URL;
+  const rawUrl = process.env.POSTGRES_PRISMA_URL || process.env.DIRECT_URL || process.env.DATABASE_URL || "";
+  const url = rawUrl.trim();
   if (!url) {
-    console.warn('[ensure-db-schema] Neither DIRECT_URL nor DATABASE_URL is set in environment variables. Skipping schema verification.');
+    console.warn('[ensure-db-schema] Neither POSTGRES_PRISMA_URL nor DATABASE_URL is set in environment variables. Skipping schema verification.');
     return;
   }
 

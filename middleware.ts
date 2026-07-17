@@ -32,39 +32,51 @@ function isPublicApiRoute(pathname: string) {
 }
 
 export async function middleware(request: NextRequest) {
-  const p = request.nextUrl.pathname;
-  const isRoot = p === "/";
-  const isApi = p.startsWith("/api");
+  try {
+    const p = request.nextUrl.pathname;
+    const isRoot = p === "/";
+    const isApi = p.startsWith("/api");
 
-  // Skip getToken for public pages — no JWT verify needed
-  if (!isApi && !isRoot && (p.startsWith("/login") || p.startsWith("/forgot-password") || p.startsWith("/reset-password") || p.startsWith("/verify-email"))) {
+    // Skip getToken for public pages — no JWT verify needed
+    if (!isApi && !isRoot && (p.startsWith("/login") || p.startsWith("/forgot-password") || p.startsWith("/reset-password") || p.startsWith("/verify-email"))) {
+      return NextResponse.next();
+    }
+    if (isApi && isPublicApiRoute(p)) {
+      return NextResponse.next();
+    }
+
+    const secureCookie = request.nextUrl.protocol === "https:";
+    const token = await getToken({
+      req: request, secret: AUTH_SECRET,
+      secureCookie,
+      cookieName: `${secureCookie ? "__Secure-" : ""}authjs.session-token`,
+    });
+    const loggedIn = !!token;
+    const roles: string[] = (token?.roles as string[]) ?? [];
+
+    if (isApi) {
+      if (!loggedIn) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+      return NextResponse.next();
+    }
+
+    if (loggedIn && (isRoot || p.startsWith("/login") || p.startsWith("/forgot-password") || p.startsWith("/reset-password") || p.startsWith("/verify-email"))) {
+      return NextResponse.redirect(new URL(resolveRoleDashboard(roles), request.url));
+    }
+    if (!loggedIn) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
     return NextResponse.next();
-  }
-  if (isApi && isPublicApiRoute(p)) {
-    return NextResponse.next();
-  }
-
-  const secureCookie = request.nextUrl.protocol === "https:";
-  const token = await getToken({
-    req: request, secret: AUTH_SECRET,
-    secureCookie,
-    cookieName: `${secureCookie ? "__Secure-" : ""}authjs.session-token`,
-  });
-  const loggedIn = !!token;
-  const roles: string[] = (token?.roles as string[]) ?? [];
-
-  if (isApi) {
-    if (!loggedIn) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
-    return NextResponse.next();
-  }
-
-  if (loggedIn && (isRoot || p.startsWith("/login") || p.startsWith("/forgot-password") || p.startsWith("/reset-password") || p.startsWith("/verify-email"))) {
-    return NextResponse.redirect(new URL(resolveRoleDashboard(roles), request.url));
-  }
-  if (!loggedIn) {
+  } catch (err: any) {
+    console.error("[Middleware][FATAL_ERROR] Stack trace:", err?.stack || err);
+    const p = request.nextUrl.pathname;
+    if (p.startsWith("/api")) {
+      return NextResponse.json({ success: false, message: "Unauthorized (Middleware Error)" }, { status: 401 });
+    }
+    if (p.startsWith("/login")) {
+      return NextResponse.next();
+    }
     return NextResponse.redirect(new URL("/login", request.url));
   }
-  return NextResponse.next();
 }
 
 export const config = {

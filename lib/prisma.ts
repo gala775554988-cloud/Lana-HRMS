@@ -103,9 +103,10 @@ async function ensureSchemaReady(client: PrismaClient) {
 }
 
 const prismaClientSingleton = () => {
-  const dbUrl = process.env.DATABASE_URL;
+  const rawDbUrl = process.env.POSTGRES_PRISMA_URL || process.env.DATABASE_URL || process.env.DIRECT_URL || "";
+  const dbUrl = rawDbUrl.trim();
   if (!dbUrl) {
-    console.warn("[Prisma] process.env.DATABASE_URL is not set in environment variables");
+    console.warn("[Prisma] Neither POSTGRES_PRISMA_URL nor DATABASE_URL is set in environment variables");
   }
 
   const client = new PrismaClient({

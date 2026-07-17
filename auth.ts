@@ -130,76 +130,96 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         deviceId: { label: "Device ID", type: "text" },
       },
       async authorize(credentials) {
-        const parsed = loginSchema.safeParse(credentials);
-        if (!parsed.success) return null;
-        const user = await findUser(parsed.data.identifier);
-        if (!user?.passwordHash || !user.isActive) return null;
-        const ok = await verifyPassword(parsed.data.password, user.passwordHash);
-        if (!ok) return null;
+        try {
+          const parsed = loginSchema.safeParse(credentials);
+          if (!parsed.success) return null;
+          const user = await findUser(parsed.data.identifier);
+          if (!user?.passwordHash || !user.isActive) return null;
+          const ok = await verifyPassword(parsed.data.password, user.passwordHash);
+          if (!ok) return null;
 
-        const deviceId = parsed.data.deviceId;
-        if (deviceId && deviceId !== "unknown" && deviceId !== "server-side" && deviceId !== "mobile-session-fallback") {
-          const employee = await prisma.employee.findFirst({
-            where: {
-              OR: [
-                { userId: user.id },
-                { nationalId: user.username || "" },
-                { employeeNumber: user.username || "" }
-              ]
-            },
-            select: { id: true }
-          });
-          if (employee) {
-            const deviceCheck = await verifyOrBindEmployeeDevice(employee.id, deviceId, "mobile");
-            if (!deviceCheck.allowed) {
-              return null;
+          const deviceId = parsed.data.deviceId;
+          if (deviceId && deviceId !== "unknown" && deviceId !== "server-side" && deviceId !== "mobile-session-fallback") {
+            try {
+              const employee = await prisma.employee.findFirst({
+                where: {
+                  OR: [
+                    { userId: user.id },
+                    { nationalId: user.username || "" },
+                    { employeeNumber: user.username || "" }
+                  ]
+                },
+                select: { id: true }
+              });
+              if (employee) {
+                const deviceCheck = await verifyOrBindEmployeeDevice(employee.id, deviceId, "mobile");
+                if (!deviceCheck.allowed) {
+                  return null;
+                }
+              }
+            } catch (deviceErr: any) {
+              console.error("[Auth][DEVICE_BINDING_ERROR] Stack trace:", deviceErr?.stack || deviceErr);
             }
           }
-        }
 
-        await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }).catch(() => {});
-        const { roles } = await getAuthorization(user.id);
-        // Only store roles in JWT, not permissions (too large → cookie chunking → middleware break)
-        return {
-          id: user.id, name: user.name, email: user.email, image: user.image,
-          roles,
-          mustChangePassword: user.mustChangePassword ?? false,
-          passwordChanged: user.passwordChanged ?? false,
-        };
+          await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }).catch(() => {});
+          const { roles } = await getAuthorization(user.id);
+          // Only store roles in JWT, not permissions (too large → cookie chunking → middleware break)
+          return {
+            id: user.id, name: user.name, email: user.email, image: user.image,
+            roles,
+            mustChangePassword: user.mustChangePassword ?? false,
+            passwordChanged: user.passwordChanged ?? false,
+          };
+        } catch (authorizeErr: any) {
+          console.error("[Auth][AUTHORIZE_FATAL_ERROR] Stack trace:", authorizeErr?.stack || authorizeErr);
+          return null;
+        }
       },
     }),
   ],
 
   callbacks: {
     async jwt({ token, user, trigger }) {
-      if (user) {
-        token.sub = user.id!;
-        token.name = user.name ?? undefined;
-        token.email = user.email ?? undefined;
-        token.picture = user.image ?? undefined;
-        token.roles = (user as any).roles ?? [];
-        (token as any).mustChangePassword = (user as any).mustChangePassword ?? false;
-        (token as any).passwordChanged = (user as any).passwordChanged ?? false;
-      }
-      if (trigger === "update" && token.sub) {
-        try { const authz = await getAuthorization(token.sub); token.roles = authz.roles; } catch {}
+      try {
+        if (user) {
+          token.sub = user.id!;
+          token.name = user.name ?? undefined;
+          token.email = user.email ?? undefined;
+          token.picture = user.image ?? undefined;
+          token.roles = (user as any).roles ?? [];
+          (token as any).mustChangePassword = (user as any).mustChangePassword ?? false;
+          (token as any).passwordChanged = (user as any).passwordChanged ?? false;
+        }
+        if (trigger === "update" && token.sub) {
+          try { const authz = await getAuthorization(token.sub); token.roles = authz.roles; } catch (e: any) { console.error("[Auth][JWT_UPDATE_ERROR]", e?.stack || e); }
+        }
+      } catch (jwtErr: any) {
+        console.error("[Auth][JWT_FATAL_ERROR] Stack trace:", jwtErr?.stack || jwtErr);
       }
       return token;
     },
 
     async session({ session, token }) {
-      if (token.sub) {
-        session.user.id = token.sub;
-        session.user.name = token.name ?? session.user.name;
-        session.user.email = token.email ?? session.user.email;
-        session.user.image = token.picture ?? session.user.image;
-        (session.user as any).roles = token.roles ?? [];
-        (session.user as any).mustChangePassword = (token as any).mustChangePassword ?? false;
-        (session.user as any).passwordChanged = (token as any).passwordChanged ?? false;
-        const roles: string[] = token.roles ?? [];
-        // Computed fresh (short-lived cache) rather than baked into the JWT --
-        // keeps the cookie small and lets permission edits take effect quickly.
-        (session.user as any).permissions = await getCachedEffectivePermissions(token.sub, roles);
+      try {
+        if (token.sub) {
+          session.user.id = token.sub;
+          session.user.name = token.name ?? session.user.name;
+          session.user.email = token.email ?? session.user.email;
+          session.user.image = token.picture ?? session.user.image;
+          (session.user as any).roles = token.roles ?? [];
+          (session.user as any).mustChangePassword = (token as any).mustChangePassword ?? false;
+          (session.user as any).passwordChanged = (token as any).passwordChanged ?? false;
+          const roles: string[] = token.roles ?? [];
+          try {
+            (session.user as any).permissions = await getCachedEffectivePermissions(token.sub, roles);
+          } catch (permErr: any) {
+            console.error("[Auth][SESSION_PERMISSIONS_ERROR] Stack trace:", permErr?.stack || permErr);
+            (session.user as any).permissions = [];
+          }
+        }
+      } catch (sessionErr: any) {
+        console.error("[Auth][SESSION_FATAL_ERROR] Stack trace:", sessionErr?.stack || sessionErr);
       }
       return session;
     },

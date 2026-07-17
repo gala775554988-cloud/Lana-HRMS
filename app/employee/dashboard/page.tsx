@@ -11,13 +11,14 @@ function Stat({ title, value, icon: Icon, tone }: { title: string; value: string
 }
 
 export default async function EmployeeDashboard() {
-  const { employee, session } = await requireEmployee();
-  const data = await getPortalDashboard(employee.id, session.user.id);
-  const completion = profileCompletion(employee);
-  const fullName = `${employee.firstName} ${employee.lastName}`.trim();
-  const nextSalary = data.payroll ? `${asNumber(data.payroll.netPay || data.payroll.baseSalary).toLocaleString('ar-SA')} ${data.payroll.currency}` : 'غير مسجل';
-  return (
-    <main className="space-y-6" dir="rtl">
+  try {
+    const { employee, session } = await requireEmployee();
+    const data = await getPortalDashboard(employee.id, session.user.id);
+    const completion = profileCompletion(employee);
+    const fullName = `${employee.firstName} ${employee.lastName}`.trim();
+    const nextSalary = data.payroll ? `${asNumber(data.payroll.netPay || data.payroll.baseSalary).toLocaleString('ar-SA')} ${data.payroll.currency}` : 'غير مسجل';
+    return (
+      <main className="space-y-6" dir="rtl">
       <section className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-indigo-700 via-violet-700 to-slate-950 text-white shadow-2xl">
         <div className="grid gap-6 p-6 lg:grid-cols-[1.2fr_.8fr] lg:p-8">
           <div className="flex flex-col gap-5 md:flex-row md:items-center">
@@ -69,4 +70,8 @@ export default async function EmployeeDashboard() {
       <EmployeeRequestCategories />
     </main>
   );
+  } catch (err: any) {
+    console.error("[EmployeeDashboard][FATAL_ERROR] Stack trace:", err?.stack || err);
+    throw err;
+  }
 }
