@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, RefreshCw, Home, Copy, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, RefreshCw, Home, Copy, CheckCircle2, LogOut } from "lucide-react";
+import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { parseClientError } from "@/lib/errors";
 import type { StructuredError } from "@/lib/errors";
@@ -42,6 +43,19 @@ export default function HrmsError({ error, reset }: { error: Error & { digest?: 
     suggestion: "أعد تحميل الصفحة أو حاول مرة أخرى",
   };
 
+  const isUnlinkedOrAuthError = error?.message?.includes("not linked") || error?.message?.includes("Unauthorized") || error?.message?.includes("Forbidden");
+
+  const handleSignOutAndPurge = async () => {
+    try {
+      window.localStorage.clear();
+      window.sessionStorage.clear();
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
+    } catch {}
+    await signOut({ redirect: true, callbackUrl: "/login" });
+  };
+
   return (
     <section className="flex min-h-[60vh] items-center justify-center p-4">
       <div className="max-w-lg w-full rounded-xl border bg-background p-6 shadow-sm">
@@ -60,6 +74,22 @@ export default function HrmsError({ error, reset }: { error: Error & { digest?: 
         <div className="rounded-lg bg-muted/50 p-3 mb-4">
           <p className="text-sm text-foreground">{err.message}</p>
         </div>
+
+        {isUnlinkedOrAuthError ? (
+          <div className="rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 p-4 mb-4 space-y-3" dir="rtl">
+            <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-bold">
+              <AlertTriangle className="h-5 w-5 shrink-0" />
+              <span>حسابك غير مربوط ببطاقة موظف أو يحمل جلسة قديمة</span>
+            </div>
+            <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
+              بسبب تحديث قاعدة بيانات النظام (Neon PostgreSQL)، قد تكون بيانات الجلسة المخزنة في متصفحك تشير إلى هيكل قديم. اضغط على زر مسح الجلسة بالأسفل لإعادة الدخول النظيف.
+            </p>
+            <Button onClick={handleSignOutAndPurge} className="w-full rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold gap-2 text-xs h-10">
+              <LogOut className="h-4 w-4" />
+              <span>مسح الجلسة وتسجيل الخروج النظيف (Sign out & Clear Cookies)</span>
+            </Button>
+          </div>
+        ) : null}
 
         {/* Cause */}
         {err.cause && (
