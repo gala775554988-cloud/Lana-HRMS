@@ -1788,14 +1788,16 @@ model MobilePlatformRecord {
 }
 
 model EmployeeMobileDevice {
-  id         String   @id @default(cuid())
-  employeeId String   @unique
-  deviceId   String   @unique
-  platform   String   @default("mobile")
-  lastSeenAt DateTime @default(now())
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  id               String   @id @default(cuid())
+  employeeId       String   @unique
+  deviceId         String   @unique
+  platform         String   @default("mobile")
+  fcmToken         String?
+  pushSubscription Json?
+  lastSeenAt       DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  employee         Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([employeeId, deviceId])
   @@index([deviceId])

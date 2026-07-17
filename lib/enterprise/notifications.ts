@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { sendPushNotification } from "./notifications-service";
 
 export type EnterpriseNotificationType = "INFO" | "SUCCESS" | "WARNING" | "ERROR";
 
@@ -7,13 +8,15 @@ export async function createEnterpriseNotification({
   title,
   body,
   type = "INFO",
-  dedupe = false
+  dedupe = false,
+  pushToMobile = false
 }: {
   userId?: string | null;
   title: string;
   body: string;
   type?: EnterpriseNotificationType;
   dedupe?: boolean;
+  pushToMobile?: boolean;
 }) {
   if (dedupe) {
     const existing = await prisma.notification.findFirst({
@@ -22,9 +25,15 @@ export async function createEnterpriseNotification({
     if (existing) return existing;
   }
 
-  return prisma.notification.create({
+  const notification = await prisma.notification.create({
     data: { userId: userId ?? null, title, body, type }
   });
+
+  if (userId && (pushToMobile || type === "WARNING" || type === "ERROR")) {
+    await sendPushNotification(userId, title, body).catch(() => null);
+  }
+
+  return notification;
 }
 
 export async function notifyUsers(userIds: Array<string | null | undefined>, title: string, body: string, type: EnterpriseNotificationType = "INFO") {

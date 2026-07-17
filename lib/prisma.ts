@@ -60,6 +60,8 @@ async function ensureSchemaReady(client: PrismaClient) {
       `CREATE UNIQUE INDEX IF NOT EXISTS "EmployeeMobileDevice_deviceId_key" ON "EmployeeMobileDevice"("deviceId");`,
       `CREATE INDEX IF NOT EXISTS "EmployeeMobileDevice_employeeId_deviceId_idx" ON "EmployeeMobileDevice"("employeeId", "deviceId");`,
       `CREATE INDEX IF NOT EXISTS "EmployeeMobileDevice_deviceId_idx" ON "EmployeeMobileDevice"("deviceId");`,
+      `ALTER TABLE "EmployeeMobileDevice" ADD COLUMN IF NOT EXISTS "fcmToken" TEXT;`,
+      `ALTER TABLE "EmployeeMobileDevice" ADD COLUMN IF NOT EXISTS "pushSubscription" JSONB;`,
       `ALTER TABLE "HrPermissionScope" ADD COLUMN IF NOT EXISTS "hospitalId" TEXT;`,
       `ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "sponsor" TEXT;`,
       `ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "odooRawData" JSONB;`,
