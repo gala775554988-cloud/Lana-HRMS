@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -81,10 +83,11 @@
   html { scroll-behavior: smooth; }
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Cairo', 'Inter', 'Noto Sans Arabic', system-ui, -apple-system, sans-serif;
+    font-family: 'Cairo', sans-serif;
+    -webkit-font-smoothing: antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
-  [lang="en"] body { font-family: 'Inter', 'Cairo', system-ui, -apple-system, sans-serif; }
+  [lang="en"] body { font-family: 'Cairo', sans-serif; }
   :focus-visible { @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background; }
   [dir="rtl"] .rtl-flip { transform: scaleX(-1); }
   ::selection { background: hsl(var(--primary) / 0.18); }

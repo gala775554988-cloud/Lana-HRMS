@@ -161,10 +161,17 @@ export function formatEmployeeCode(code?: string | number | null): string {
   return `00${digits || clean}`;
 }
 
-function extractMany2oneText(val: unknown, fallback = ""): string {
-  if (!val || val === false || val === "false") return fallback;
-  if (Array.isArray(val) && val.length >= 2) return String(val[1] || fallback).trim();
-  return String(val).trim();
+export function cleanOdooString(val: any): string {
+  if (!val || val === false || val === "false" || val === "0") return "غير محدد";
+  let str = String(val);
+  try { str = decodeURIComponent(str); } catch (e) {}
+  return str.replace(/%/g, '').trim() || "غير محدد";
+}
+
+function extractMany2oneText(val: unknown, fallback = "غير محدد"): string {
+  if (!val || val === false || val === "false" || val === "0") return fallback;
+  if (Array.isArray(val) && val.length >= 2) return cleanOdooString(val[1] || fallback);
+  return cleanOdooString(val) || fallback;
 }
 
 function parseOdooDate(val: unknown): Date | undefined {
@@ -188,10 +195,10 @@ export async function syncEmployeeFromOdoo(odooRecord: any) {
     }, {} as any);
 
   // 2. تعيين الحقول المطلوبة بدقة (Mapping) واستخراج النصوص من Many2one
-  const rawName = String(sanitizedData.name || "Odoo Employee").trim();
+  const rawName = cleanOdooString(sanitizedData.name || "Odoo Employee");
   const nameParts = rawName.split(" ");
-  const firstName = nameParts[0] || rawName;
-  const lastName = nameParts.slice(1).join(" ") || "";
+  const firstName = cleanOdooString(nameParts[0] || rawName);
+  const lastName = cleanOdooString(nameParts.slice(1).join(" ") || "");
   const nationalId = String(sanitizedData.identification_id || sanitizedData.registration_number || `ODOO-${sanitizedData.id}`).trim();
   const rawEmpCode = sanitizedData.registration_number || sanitizedData.employee_code || sanitizedData.barcode || sanitizedData.id;
   const employeeNumber = formatEmployeeCode(rawEmpCode);
@@ -213,7 +220,8 @@ export async function syncEmployeeFromOdoo(odooRecord: any) {
   const schoolName = extractMany2oneText(sanitizedData.x_studio_school_name || sanitizedData.school || sanitizedData.work_location_id);
   if (schoolName && schoolName !== 'غير محدد' && schoolName !== 'false') {
     try {
-      const hospitalCode = `ODOO-HOSP-${encodeURIComponent(schoolName).slice(0, 40)}`;
+      const cleanSlug = schoolName.replace(/[^a-zA-Z0-9\u0600-\u06FF]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || `HOSP-${Date.now()}`;
+      const hospitalCode = `ODOO-HOSP-${cleanSlug}`;
       const hospital = await prisma.hospital.upsert({
         where: { code: hospitalCode },
         update: { name: schoolName, isActive: true },
@@ -231,7 +239,8 @@ export async function syncEmployeeFromOdoo(odooRecord: any) {
     } catch {}
   } else if (branchNameRaw && branchNameRaw !== 'غير محدد') {
     try {
-      const bCode = `ODOO-BR-${encodeURIComponent(branchNameRaw).slice(0, 40)}`;
+      const cleanBSlug = branchNameRaw.replace(/[^a-zA-Z0-9\u0600-\u06FF]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || `BR-${Date.now()}`;
+      const bCode = `ODOO-BR-${cleanBSlug}`;
       const branch = await prisma.branch.upsert({
         where: { code: bCode },
         update: { name: branchNameRaw, isActive: true },
@@ -338,6 +347,18 @@ export async function syncEmployeeFromOdoo(odooRecord: any) {
  * 4. Comprehensive mapping (`x_studio_school_name` -> Hospital/Branch, `analytic_account_id`, `department_id`, `parent_id`, `documents`).
  */
 export async function fullResyncFromOdoo(options: { wipeAndSync?: boolean; connectionId?: string } = {}) {
+  // 0. تنظيف السجلات التالفة من المستشفيات والفروع (التي تحتوي على رموز % أو أسماء فارغة)
+  try {
+    await prisma.hospital.deleteMany({
+      where: { OR: [{ name: { contains: "%" } }, { name: "غير محدد" }, { name: "" }] }
+    });
+    await prisma.branch.deleteMany({
+      where: { OR: [{ name: { contains: "%" } }, { name: "غير محدد" }, { name: "" }] }
+    });
+  } catch (cleanupErr) {
+    console.error("[FullResync] Notice during dirty hospital cleanup:", cleanupErr);
+  }
+
   if (options.wipeAndSync) {
     try {
       await prisma.$executeRawUnsafe(`TRUNCATE TABLE "Employee" CASCADE;`);
