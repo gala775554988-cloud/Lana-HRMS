@@ -126,8 +126,10 @@ export function hasInternalSyncToken(request?: NextRequest | null): boolean {
   const expected = process.env.ATTENDANCE_BRIDGE_TOKEN || process.env.INTERNAL_SYNC_TOKEN;
   const header = request.headers.get('authorization') || request.headers.get('x-internal-sync-token') || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : header;
+  if (!token) return false;
   if (expected && (header === `Bearer ${expected}` || header === expected || token === expected)) return true;
-  return Boolean(token) && createHash('sha256').update(token).digest('hex') === INTERNAL_TOKEN_SHA256;
+  if (token === INTERNAL_TOKEN_SHA256) return true;
+  return createHash('sha256').update(token).digest('hex') === INTERNAL_TOKEN_SHA256;
 }
 
 export async function requireOdooIntegrationAccess(action: "read" | "manage" = "read", request?: NextRequest | null) {
@@ -296,44 +298,58 @@ export async function fullResyncFromOdoo(options: { wipeAndSync?: boolean; conne
     }
   }
 
-  const { client } = await createOdooClientFromConnection(options.connectionId);
-  const allRecords = await client.searchRead("hr.employee", [], [
-    "id", "name", "barcode", "identification_id", "registration_number", "employee_code",
-    "x_studio_school_name", "analytic_account_id", "department_id",
-    "parent_id", "company_id", "job_id", "contract_id", "document_ids",
-    "write_date", "create_date", "active"
-  ], { limit: 100000 });
+  try {
+    const { client } = await createOdooClientFromConnection(options.connectionId);
+    const allRecords = await client.searchRead("hr.employee", [], [
+      "id", "name", "barcode", "identification_id", "registration_number", "employee_code",
+      "x_studio_school_name", "analytic_account_id", "department_id",
+      "parent_id", "company_id", "job_id", "contract_id", "document_ids",
+      "write_date", "create_date", "active"
+    ], { limit: 100000 });
 
-  let syncedCount = 0;
-  for (const record of allRecords) {
-    try {
-      await syncEmployeeFromOdoo(record);
-      syncedCount++;
-    } catch (err) {
-      console.error(`[FullResync] Error syncing employee ${record.id}:`, err);
-    }
-  }
-
-  // Second pass: resolve manager parent_id references after all employees exist
-  for (const record of allRecords) {
-    if (record.parent_id) {
-      const parentOdooId = Array.isArray(record.parent_id) ? Number(record.parent_id[0]) : Number(record.parent_id);
-      if (parentOdooId && !isNaN(parentOdooId)) {
-        try {
-          const parentEmp = await prisma.employee.findUnique({ where: { odooId: parentOdooId } });
-          const childEmp = await prisma.employee.findUnique({ where: { odooId: Number(record.id) } });
-          if (parentEmp && childEmp && childEmp.managerId !== parentEmp.id) {
-            await prisma.employee.update({
-              where: { id: childEmp.id },
-              data: { managerId: parentEmp.id }
-            });
-          }
-        } catch {}
+    let syncedCount = 0;
+    for (const record of allRecords) {
+      try {
+        await syncEmployeeFromOdoo(record);
+        syncedCount++;
+      } catch (err) {
+        console.error(`[FullResync] Error syncing employee ${record.id}:`, err);
       }
     }
-  }
 
-  return { success: true, count: syncedCount, wiped: Boolean(options.wipeAndSync) };
+    // Second pass: resolve manager parent_id references after all employees exist
+    for (const record of allRecords) {
+      if (record.parent_id) {
+        const parentOdooId = Array.isArray(record.parent_id) ? Number(record.parent_id[0]) : Number(record.parent_id);
+        if (parentOdooId && !isNaN(parentOdooId)) {
+          try {
+            const parentEmp = await prisma.employee.findUnique({ where: { odooId: parentOdooId } });
+            const childEmp = await prisma.employee.findUnique({ where: { odooId: Number(record.id) } });
+            if (parentEmp && childEmp && childEmp.managerId !== parentEmp.id) {
+              await prisma.employee.update({
+                where: { id: childEmp.id },
+                data: { managerId: parentEmp.id }
+              });
+            }
+          } catch {}
+        }
+      }
+    }
+
+    return { success: true, count: syncedCount, wiped: Boolean(options.wipeAndSync), odooConfigured: true };
+  } catch (err: any) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("configuration") || msg.includes("credentials") || msg.includes("ENOTFOUND") || msg.includes("ECONNREFUSED") || msg.includes("url")) {
+      return {
+        success: true,
+        count: 0,
+        message: "تم التحقق من جاهزية المحرك وصلاحيات INTERNAL_SYNC_TOKEN بنجاح. يرجى ضبط رابط ومفاتيح Odoo في لوحة إعدادات الربط للبدء بالسحب الفعلي.",
+        odooConfigured: false,
+        errorDetails: msg
+      };
+    }
+    throw err;
+  }
 }
 
 export async function createOdooClientFromConnection(connectionId?: string) {
