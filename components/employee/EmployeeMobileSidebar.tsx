@@ -37,7 +37,7 @@ export function EmployeeMobileSidebar() {
         onClick={() => setOpen(true)}
         aria-label="فتح قائمة التنقل"
         aria-expanded={open}
-        className="fixed bottom-5 end-5 z-[60] grid h-14 w-14 place-items-center rounded-2xl bg-indigo-600 text-white shadow-xl shadow-indigo-600/30 transition-transform active:scale-95"
+        className="fixed bottom-5 right-5 z-[60] grid h-14 w-14 place-items-center rounded-2xl bg-indigo-600 text-white shadow-xl shadow-indigo-600/30 transition-transform active:scale-95"
       >
         <Menu className="h-6 w-6" />
       </button>

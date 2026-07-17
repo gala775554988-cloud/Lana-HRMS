@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
-import { 
+import {
   Bot, Send, Sparkles, X, Plus, Copy, Check, RefreshCw, Square, 
   Paperclip, FileText, Image as ImageIcon, FileSpreadsheet, Maximize2, Minimize2, ArrowDown
 } from "lucide-react";
@@ -111,27 +110,18 @@ export function LanaAiAssistant() {
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
-  const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
+  // Static UI lockdown: Lana's icon is a fixed, non-draggable element -- any
+  // (x, y) coordinates a previous version may have stored while dragging was
+  // still enabled are stale and must never be read back.
   useEffect(() => {
     try {
-      const savedPos = window.localStorage.getItem("lana.ai.position");
-      if (savedPos) {
-        const parsed = JSON.parse(savedPos);
-        if (typeof parsed.x === "number" && typeof parsed.y === "number") {
-          setPosition(parsed);
-        }
-      }
+      window.localStorage.removeItem("lana.ai.position");
+      window.localStorage.removeItem("lana.executive.position");
+      window.sessionStorage.removeItem("lana.ai.position");
+      window.sessionStorage.removeItem("lana.executive.position");
     } catch {}
   }, []);
-
-  const handleDragEnd = (_event: any, info: any) => {
-    const newPos = { x: position.x + info.offset.x, y: position.y + info.offset.y };
-    setPosition(newPos);
-    try {
-      window.localStorage.setItem("lana.ai.position", JSON.stringify(newPos));
-    } catch {}
-  };
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -325,12 +315,8 @@ export function LanaAiAssistant() {
   }
 
   return (
-    <motion.div
-      drag={!isExpanded}
-      dragMomentum={false}
-      animate={{ x: isExpanded ? 0 : position.x, y: isExpanded ? 0 : position.y }}
-      onDragEnd={handleDragEnd}
-      className="fixed bottom-5 end-5 z-[80] flex flex-col items-end gap-3"
+    <div
+      className="fixed bottom-5 left-5 z-[80] flex flex-col items-start gap-3"
       dir="rtl"
     >
       {open ? (
@@ -597,6 +583,6 @@ export function LanaAiAssistant() {
           <span className="font-bold text-sm tracking-wide">Lana</span>
         </button>
       )}
-    </motion.div>
+    </div>
   );
 }

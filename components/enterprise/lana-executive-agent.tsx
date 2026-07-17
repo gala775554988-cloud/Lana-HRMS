@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { useChat } from "@ai-sdk/react";
 import { motion } from "framer-motion";
 import { Sparkles, Send, Minus, Zap, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+
+type ExecutiveMessage = { id: string; role: "user" | "assistant"; content: string };
 
 export function LanaExecutiveAgent() {
   const [isMinimized, setIsMinimized] = useState(false);
@@ -31,9 +32,10 @@ export function LanaExecutiveAgent() {
     } catch {}
   };
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, append } = useChat({
-    api: "/api/lana/executive-actions"
-  });
+  const [messages, setMessages] = useState<ExecutiveMessage[]>([]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -44,6 +46,77 @@ export function LanaExecutiveAgent() {
       scrollToBottom();
     }
   }, [messages, isMinimized]);
+
+  // Streams from /api/lana/executive-actions, which emits the legacy
+  // `0:"chunk"\n` / `e:{...}\n` data-stream protocol -- the same wire format
+  // components/enterprise/lana-ai-assistant.tsx already parses by hand below,
+  // reused here instead of the AI SDK's `useChat()` (whose currently
+  // installed version returns a different shape -- no `input` /
+  // `handleSubmit` / `isLoading` -- and expects its own newer SSE protocol
+  // that this route does not emit).
+  async function sendMessage(text: string) {
+    const trimmed = text.trim();
+    if (!trimmed || isLoading) return;
+
+    const userMsgId = `user-${Date.now()}`;
+    const assistantMsgId = `assistant-${Date.now()}`;
+    const nextMessages = [...messages, { id: userMsgId, role: "user" as const, content: trimmed }];
+    setMessages([...nextMessages, { id: assistantMsgId, role: "assistant" as const, content: "" }]);
+    setInput("");
+    setIsLoading(true);
+
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    try {
+      const response = await fetch("/api/lana/executive-actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: abortController.signal,
+        body: JSON.stringify({ messages: nextMessages.map((m) => ({ role: m.role, content: m.content })) })
+      });
+
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.message || `HTTP ${response.status}`);
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = "";
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split("\n").filter(Boolean);
+          for (const line of lines) {
+            if (line.startsWith("0:")) {
+              try {
+                fullContent += JSON.parse(line.slice(2));
+                setMessages((prev) => prev.map((m) => (m.id === assistantMsgId ? { ...m, content: fullContent } : m)));
+              } catch {}
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      if (err?.name !== "AbortError") {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === assistantMsgId ? { ...m, content: `عذراً، حدث خطأ أثناء المعالجة: ${err.message}` } : m))
+        );
+      }
+    } finally {
+      setIsLoading(false);
+      abortControllerRef.current = null;
+    }
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    sendMessage(input);
+  }
 
   const suggestions = [
     "اعتمد جميع طلبات مستشفى لانا المعلقة",
@@ -132,7 +205,7 @@ export function LanaExecutiveAgent() {
                 <button
                   key={i}
                   type="button"
-                  onClick={() => append({ role: "user", content: sug })}
+                  onClick={() => sendMessage(sug)}
                   className="rounded-xl border border-slate-200/80 bg-white p-2.5 text-xs font-semibold text-slate-700 hover:border-indigo-500 hover:bg-indigo-50/40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-indigo-600 text-start transition shadow-2xs"
                 >
                   {sug}
@@ -179,7 +252,7 @@ export function LanaExecutiveAgent() {
       <form onSubmit={handleSubmit} className="p-3 bg-white dark:bg-slate-900 border-t border-slate-200/80 dark:border-slate-800 flex items-center gap-2">
         <input
           value={input}
-          onChange={handleInputChange}
+          onChange={(e) => setInput(e.target.value)}
           placeholder="مثلاً: اعتمد جميع طلبات مستشفى لانا..."
           className="flex-1 rounded-2xl border border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-950 px-3.5 py-2.5 text-xs font-semibold text-slate-800 dark:text-slate-100 outline-none focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 transition"
         />
