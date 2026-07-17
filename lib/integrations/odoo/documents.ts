@@ -15,7 +15,7 @@ type OdooAttachment = OdooRecord & {
 export type DocumentSyncResult = {
   imported: number;
   skipped: number;
-  errors: Array<{ attachmentId?: number; message: string }>;
+  errors: Array<{ attachmentId?: number; attachmentName?: string; message: string }>;
 };
 
 function sanitizeFileName(name: string) {
@@ -66,7 +66,12 @@ export async function syncEmployeeDocuments(client: OdooClient, odooEmployeeId: 
       const mimeType = attachment.mimetype || "application/octet-stream";
       const objectPath = `odoo-documents/${localEmployeeId}/${attachment.id}-${fileName}`;
       const fileUrl = await uploadFileToSupabase(buffer, objectPath, mimeType);
-      if (!fileUrl) { result.errors.push({ attachmentId: attachment.id, message: "Storage upload failed (Supabase not configured or request failed)" }); continue; }
+      if (!fileUrl) {
+        const errMsg = "Storage upload failed (Storage bucket not configured or permissions denied)";
+        console.error(`[OdooAttachmentSync] Failed for file '${attachment.name || fileName}' (ID #${attachment.id}): ${errMsg}`);
+        result.errors.push({ attachmentId: attachment.id, attachmentName: attachment.name || fileName, message: errMsg });
+        continue;
+      }
 
       await prisma.employeeDocument.create({
         data: {
@@ -84,7 +89,9 @@ export async function syncEmployeeDocuments(client: OdooClient, odooEmployeeId: 
       });
       result.imported += 1;
     } catch (error) {
-      result.errors.push({ attachmentId: attachment.id, message: error instanceof Error ? error.message : String(error) });
+      const errMsg = error instanceof Error ? error.message : String(error);
+      console.error(`[OdooAttachmentSync] Error processing file '${attachment.name || "unknown"}' (ID #${attachment.id}): ${errMsg}`);
+      result.errors.push({ attachmentId: attachment.id, attachmentName: attachment.name || "unknown", message: errMsg });
     }
   }
 
