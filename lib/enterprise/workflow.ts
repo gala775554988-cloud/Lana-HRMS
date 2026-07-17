@@ -62,9 +62,20 @@ export async function decideWorkflowStep({
 
   const currentStep = instance.steps.find((step) => step.step === instance.currentStep && step.status === "PENDING");
   if (!currentStep) throw new Error("No pending workflow step");
-  if (currentStep.approverUserId && currentStep.approverUserId !== actorUserId) throw new Error("Forbidden");
-  // A step resolved from a VIEW_ONLY approval-chain level (no APPROVE/REJECT
-  // capability) may see the request but never decide it.
+
+  if (currentStep.approverUserId && currentStep.approverUserId !== actorUserId) {
+    // Dynamic Self-Healing Auth Check: re-verify if actor is live legitimate approver
+    const liveChain = await resolveApprovalChain(instance.employeeId, instance.type.toLowerCase());
+    const liveApprover = liveChain[instance.currentStep - 1];
+    if (!liveApprover || liveApprover.userId !== actorUserId) {
+      throw new Error("Forbidden");
+    }
+    await prisma.workflowStep.update({
+      where: { id: currentStep.id },
+      data: { approverUserId: actorUserId, capabilities: liveApprover.capabilities || currentStep.capabilities || ["VIEW", "APPROVE", "REJECT"] }
+    });
+  }
+
   const capabilities = currentStep.capabilities?.length ? currentStep.capabilities : ["VIEW", "APPROVE", "REJECT"];
   if (decision === "APPROVE" && !capabilities.includes("APPROVE")) throw new Error("Forbidden");
   if (decision === "REJECT" && !capabilities.includes("REJECT")) throw new Error("Forbidden");
@@ -86,7 +97,19 @@ export async function decideWorkflowStep({
     const nextStep = instance.steps.find((step) => step.step > instance.currentStep);
     if (nextStep) {
       currentStepNumber = nextStep.step;
-      await prisma.workflowStep.update({ where: { id: nextStep.id }, data: { status: "PENDING" } });
+      const liveChain = await resolveApprovalChain(instance.employeeId, instance.type.toLowerCase());
+      const liveApproverForNext = liveChain[currentStepNumber - 1];
+      const updatedApproverUserId = liveApproverForNext?.userId || nextStep.approverUserId;
+      const updatedCapabilities = liveApproverForNext?.capabilities || nextStep.capabilities || ["VIEW", "APPROVE", "REJECT"];
+
+      await prisma.workflowStep.update({
+        where: { id: nextStep.id },
+        data: {
+          status: "PENDING",
+          approverUserId: updatedApproverUserId,
+          capabilities: updatedCapabilities
+        }
+      });
     } else {
       workflowStatus = "COMPLETED";
       currentStepNumber = instance.currentStep + 1;
@@ -128,4 +151,53 @@ export async function decideWorkflowStep({
   }
 
   return updated;
+}
+
+/**
+ * Auto-Heal Dynamic Pipeline Engine:
+ * Immediately updates the current approver (`approverUserId`) on all PENDING workflow steps
+ * for an employee (or all employees in a hospital) whenever their hierarchy, permissions,
+ * or hospital supervisor assignments change via `EnterpriseAccessManager` or `WorkflowManager`.
+ */
+export async function autoHealPendingWorkflowsForEmployee(options: { employeeId?: string; hospitalId?: string }) {
+  try {
+    const where: Record<string, unknown> = { status: "PENDING" };
+    if (options.employeeId) {
+      where.employeeId = options.employeeId;
+    } else if (options.hospitalId) {
+      const emps = await prisma.employee.findMany({ where: { hospitalId: options.hospitalId }, select: { id: true } });
+      const empIds = emps.map((e) => e.id);
+      if (!empIds.length) return { healed: 0 };
+      where.employeeId = { in: empIds };
+    } else {
+      return { healed: 0 };
+    }
+
+    const pendingInstances = await prisma.workflowInstance.findMany({
+      where,
+      include: { steps: { orderBy: { step: "asc" } } }
+    });
+
+    let healedCount = 0;
+    for (const instance of pendingInstances) {
+      const currentStep = instance.steps.find((step) => step.step === instance.currentStep && step.status === "PENDING");
+      if (!currentStep) continue;
+
+      const liveChain = await resolveApprovalChain(instance.employeeId, instance.type.toLowerCase());
+      const liveApprover = liveChain[instance.currentStep - 1];
+      if (liveApprover && liveApprover.userId && liveApprover.userId !== currentStep.approverUserId) {
+        await prisma.workflowStep.update({
+          where: { id: currentStep.id },
+          data: {
+            approverUserId: liveApprover.userId,
+            capabilities: liveApprover.capabilities || currentStep.capabilities || ["VIEW", "APPROVE", "REJECT"]
+          }
+        });
+        healedCount++;
+      }
+    }
+    return { healed: healedCount };
+  } catch {
+    return { healed: 0 };
+  }
 }

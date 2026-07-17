@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { ALL_ENTERPRISE_PERMISSIONS, PERMISSION_CATEGORIES, PERMISSION_TEMPLATES, getPermissionStore, setUserPermissions, type PermissionKey } from "@/lib/enterprise/permissions";
+import { autoHealPendingWorkflowsForEmployee } from "@/lib/enterprise/workflow";
 
 function isSuperAdmin(roles: string[] | undefined) {
   return Boolean(roles?.includes("SUPER_ADMIN"));
@@ -78,4 +79,69 @@ export async function PATCH(request: NextRequest) {
   });
 
   return NextResponse.json({ success: true, permissions: result });
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+    if (!isSuperAdmin(session.user.roles as string[] | undefined)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+
+    const body = await request.json().catch(() => ({})) as {
+      employeeId?: string;
+      permissions?: string[];
+      grantHospitalSupervisor?: boolean;
+    };
+
+    if (!body.employeeId) return NextResponse.json({ success: false, message: "employeeId is required" }, { status: 400 });
+
+    const employee = await prisma.employee.findUnique({
+      where: { id: body.employeeId },
+      select: { id: true, userId: true, hospitalId: true, branchId: true }
+    });
+    if (!employee) return NextResponse.json({ success: false, message: "Employee not found" }, { status: 404 });
+
+    // 1. Update RBAC UserRole / Permission Store if userId exists
+    if (employee.userId && Array.isArray(body.permissions)) {
+      await setUserPermissions({
+        actorUserId: session.user.id,
+        targetUserId: employee.userId,
+        grants: body.permissions as any[],
+        denies: [],
+        temporaryGrants: {},
+        ip: getClientIp(request),
+        reason: "AccessManagerSave"
+      });
+    }
+
+    // 2. Update HrPermissionScope for Hospital Supervisor if requested
+    if (employee.userId && typeof body.grantHospitalSupervisor === "boolean") {
+      if (body.grantHospitalSupervisor && employee.hospitalId) {
+        await prisma.hrPermissionScope.upsert({
+          where: { userId_module: { userId: employee.userId, module: "HOSPITAL_SUPERVISOR" } },
+          update: { scope: "HOSPITAL", hospitalId: employee.hospitalId },
+          create: { userId: employee.userId, module: "HOSPITAL_SUPERVISOR", scope: "HOSPITAL", hospitalId: employee.hospitalId }
+        });
+      } else {
+        await prisma.hrPermissionScope.deleteMany({
+          where: { userId: employee.userId, module: "HOSPITAL_SUPERVISOR" }
+        });
+      }
+    }
+
+    // 3. Trigger Auto-Heal Pipeline Engine across all PENDING workflows
+    const healResult = await autoHealPendingWorkflowsForEmployee({
+      employeeId: employee.id,
+      hospitalId: employee.hospitalId || undefined
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `تم تحديث بطاقة الصلاحيات للموظف بنجاح، وإعادة توجيه (${healResult.healed}) طلب معلق إلى المرجع المعتمد الجديد تلقائياً.`,
+      healedWorkflows: healResult.healed
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ success: false, message }, { status: 500 });
+  }
 }
