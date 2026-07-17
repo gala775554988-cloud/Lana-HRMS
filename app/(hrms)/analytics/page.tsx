@@ -11,6 +11,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { getRequestDictionary } from "@/lib/i18n-server";
 import type { Dictionary, Locale } from "@/lib/i18n";
+import { LanaAnalytics } from "@/components/enterprise/lana-analytics";
 
 const DashboardCharts = dynamic(() => import("@/components/hrms/dashboard-charts").then((mod) => mod.DashboardCharts), {
   loading: () => <div className="h-64 animate-pulse rounded-2xl bg-muted" />,
@@ -234,6 +235,7 @@ export async function CompanyOverview({ locale, dictionary, showCharts = true }:
 
   return (
     <div className="space-y-8">
+      <LanaAnalytics />
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((card, index) => <KpiCard key={card.title} {...card} index={index} />)}
       </div>
