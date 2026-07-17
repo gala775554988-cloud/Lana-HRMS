@@ -175,8 +175,9 @@ export async function syncEmployeeFromOdoo(odooRecord: any) {
   const nameParts = rawName.split(" ");
   const firstName = nameParts[0] || rawName;
   const lastName = nameParts.slice(1).join(" ") || "";
-  const nationalId = String(sanitizedData.registration_number || sanitizedData.identification_id || `ODOO-${sanitizedData.id}`).trim();
-  const employeeNumber = formatEmployeeCode(sanitizedData.barcode || sanitizedData.employee_code || sanitizedData.id);
+  const nationalId = String(sanitizedData.identification_id || sanitizedData.registration_number || `ODOO-${sanitizedData.id}`).trim();
+  const rawEmpCode = sanitizedData.registration_number || sanitizedData.employee_code || sanitizedData.barcode || sanitizedData.id;
+  const employeeNumber = formatEmployeeCode(rawEmpCode);
 
   // حل ارتباط المدرسة (x_studio_school_name -> Hospital/Branch)
   let hospitalId: string | undefined;
