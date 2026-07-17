@@ -143,7 +143,7 @@ async function executeAiFirstSemanticOrchestrator(
     replyText = safeMsg;
   }
 
-  // Save Assistant Message inside conversation history synchronously
+  // Save Assistant Message inside conversation history synchronously and touch conversation timestamp
   await prisma.aIAssistantMessage.create({
     data: {
       conversationId,
@@ -152,6 +152,10 @@ async function executeAiFirstSemanticOrchestrator(
       toolCalls: executedTools.length ? (executedTools as any) : undefined,
       output: { generated: true } as any
     }
+  }).catch(() => {});
+  await prisma.aIAssistantConversation.update({
+    where: { id: conversationId },
+    data: { updatedAt: new Date() }
   }).catch(() => {});
 
   // Encode text as AI SDK stream format
@@ -238,13 +242,17 @@ export async function POST(request: NextRequest) {
       conversationId = conv.id;
     }
 
-    // Save user message to memory
+    // Save user message to memory and touch conversation timestamp
     await prisma.aIAssistantMessage.create({
       data: {
         conversationId,
         role: "user",
         content: lastMessage
       }
+    }).catch(() => {});
+    await prisma.aIAssistantConversation.update({
+      where: { id: conversationId },
+      data: { updatedAt: new Date() }
     }).catch(() => {});
 
     const tools = createScopedHrTools(authContext);
@@ -284,6 +292,10 @@ export async function POST(request: NextRequest) {
                 toolCalls: toolCalls ? (toolCalls as any) : undefined,
                 output: toolResults ? (toolResults as any) : undefined
               }
+            }).catch(() => {});
+            await prisma.aIAssistantConversation.update({
+              where: { id: conversationId! },
+              data: { updatedAt: new Date() }
             }).catch(() => {});
           }
         });

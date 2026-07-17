@@ -110,6 +110,7 @@ export function LanaAiFullPageClient() {
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -123,6 +124,50 @@ export function LanaAiFullPageClient() {
     scrollToBottom("auto");
   }, [messages]);
 
+  async function loadConversations() {
+    try {
+      const res = await fetch("/api/enterprise/lana-ai/conversations");
+      const data = await res.json();
+      if (data.success && Array.isArray(data.conversations)) {
+        setConversations(data.conversations);
+      }
+    } catch {}
+  }
+
+  useEffect(() => {
+    loadConversations();
+  }, []);
+
+  async function loadConversation(targetId: string) {
+    if (isStreaming && abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      setIsStreaming(false);
+    }
+    setIsLoadingHistory(true);
+    try {
+      const res = await fetch(`/api/enterprise/lana-ai/conversations/${targetId}`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.messages)) {
+        setConversationId(targetId);
+        setMessages(data.messages);
+      }
+    } catch {
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  }
+
+  async function deleteConversation(targetId: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    try {
+      await fetch(`/api/enterprise/lana-ai/conversations/${targetId}`, { method: "DELETE" });
+      setConversations((prev) => prev.filter((c) => c.id !== targetId));
+      if (conversationId === targetId) {
+        startNewChat();
+      }
+    } catch {}
+  }
+
   function startNewChat() {
     if (isStreaming && abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -132,6 +177,7 @@ export function LanaAiFullPageClient() {
     setInput("");
     setFiles([]);
     setIsStreaming(false);
+    loadConversations();
   }
 
   function copyMessage(text: string, id: string) {
@@ -254,6 +300,7 @@ export function LanaAiFullPageClient() {
     } finally {
       setIsStreaming(false);
       abortControllerRef.current = null;
+      loadConversations();
     }
   }
 
@@ -277,10 +324,43 @@ export function LanaAiFullPageClient() {
         </button>
 
         <div className="flex-1 overflow-y-auto space-y-2 text-sm">
-          <div className="text-xs font-bold text-muted-foreground px-2 pb-1">سجل المحادثات</div>
-          <div className="rounded-2xl border border-dashed p-6 text-center text-xs text-muted-foreground">
-            المحادثة الحالية نشطة ومربوطة بذاكرة قاعدة البيانات.
-          </div>
+          <div className="text-xs font-bold text-muted-foreground px-2 pb-1">سجل المحادثات ({conversations.length})</div>
+          {isLoadingHistory ? (
+            <div className="rounded-2xl border border-dashed p-6 text-center text-xs text-muted-foreground animate-pulse">
+              جاري جلب المحادثة المباشرة من Neon...
+            </div>
+          ) : conversations.length === 0 ? (
+            <div className="rounded-2xl border border-dashed p-6 text-center text-xs text-muted-foreground">
+              لا توجد محادثات سابقة مسجلة في قاعدة بيانات Neon. ابدأ محادثة جديدة الآن.
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              {conversations.map((conv) => (
+                <div
+                  key={conv.id}
+                  onClick={() => loadConversation(conv.id)}
+                  className={`group flex items-center justify-between gap-2 rounded-2xl px-3 py-2.5 text-xs transition-all cursor-pointer ${
+                    conversationId === conv.id
+                      ? "bg-indigo-50 text-indigo-700 font-bold border border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800"
+                      : "text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800/60"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <MessageSquare className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
+                    <span className="truncate">{conv.title}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => deleteConversation(conv.id, e)}
+                    className="opacity-0 group-hover:opacity-100 rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 transition shrink-0"
+                    title="حذف المحادثة من قاعدة البيانات"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
