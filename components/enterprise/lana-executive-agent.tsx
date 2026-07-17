@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { useChat } from "ai/react";
-import { Sparkles, Send, Minus, Maximize2, ShieldCheck, CheckCircle2, RefreshCw, Zap, Bot, ChevronUp, ChevronDown } from "lucide-react";
+import { useChat } from "@ai-sdk/react";
+import { Sparkles, Send, Minus, Zap, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
