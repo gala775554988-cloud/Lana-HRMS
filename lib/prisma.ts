@@ -102,12 +102,11 @@ async function ensureSchemaReady(client: PrismaClient) {
   } catch {}
 }
 
-const NEON_POOLER_URL = "postgresql://neondb_owner:npg_LQznTXG67tKN@ep-still-silence-at0ona1z-pooler.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
-
 const prismaClientSingleton = () => {
-  const dbUrl = !process.env.DATABASE_URL || process.env.DATABASE_URL.includes("supabase.co")
-    ? NEON_POOLER_URL
-    : process.env.DATABASE_URL;
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    console.warn("[Prisma] process.env.DATABASE_URL is not set in environment variables");
+  }
 
   const client = new PrismaClient({
     datasources: {

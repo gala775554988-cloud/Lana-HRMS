@@ -1,16 +1,16 @@
 import { PrismaClient } from '@prisma/client';
 
-const NEON_DIRECT_URL = "postgresql://neondb_owner:npg_LQznTXG67tKN@ep-still-silence-at0ona1z.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
-
 async function ensureDbSchema() {
   setTimeout(() => {
     console.log('[ensure-db-schema] 25s timeout reached, safely exiting so Vercel build can proceed without hang...');
     process.exit(0);
   }, 25000);
 
-  const url = !process.env.DIRECT_URL || process.env.DIRECT_URL.includes("supabase.co") || !process.env.DATABASE_URL || process.env.DATABASE_URL.includes("supabase.co")
-    ? NEON_DIRECT_URL
-    : (process.env.DIRECT_URL || process.env.DATABASE_URL);
+  const url = process.env.DIRECT_URL || process.env.DATABASE_URL;
+  if (!url) {
+    console.warn('[ensure-db-schema] Neither DIRECT_URL nor DATABASE_URL is set in environment variables. Skipping schema verification.');
+    return;
+  }
 
   console.log('[ensure-db-schema] Connecting to verify and auto-heal database schema on Neon...');
   const client = new PrismaClient({
