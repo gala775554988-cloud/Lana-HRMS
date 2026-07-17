@@ -270,13 +270,14 @@ export async function POST(request: NextRequest) {
     }));
 
     // 3. Execution: If OPENAI_API_KEY is available and configured, execute streamText with toolChoice: "auto"
-    if (process.env.OPENAI_API_KEY) {
+    const openAiKey = (process.env.OPENAI_API_KEY || "").trim();
+    if (openAiKey) {
       try {
-        const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        const openai = createOpenAI({ apiKey: openAiKey });
         const systemPrompt = getLanaSystemPrompt(authContext);
 
         const result = await streamText({
-          model: openai(process.env.OPENAI_MODEL || "gpt-4o-mini"),
+          model: openai((process.env.OPENAI_MODEL || "").trim() || "gpt-4o-mini"),
           system: systemPrompt,
           messages: formattedMessages.length ? (formattedMessages as any) : (messages as any),
           tools: tools as any,
