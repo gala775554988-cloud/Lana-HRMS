@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, ShieldAlert, CheckCircle2, Smartphone } from "lucide-react";
+import { Loader2, CheckCircle2, Smartphone } from "lucide-react";
 
 interface UnbindDeviceButtonProps {
   employeeId: string;
