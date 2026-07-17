@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import { 
   Bot, Send, Sparkles, X, Plus, Copy, Check, RefreshCw, Square, 
   Paperclip, FileText, Image as ImageIcon, FileSpreadsheet, Maximize2, Minimize2, ArrowDown
@@ -110,6 +111,27 @@ export function LanaAiAssistant() {
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  useEffect(() => {
+    try {
+      const savedPos = window.localStorage.getItem("lana.ai.position");
+      if (savedPos) {
+        const parsed = JSON.parse(savedPos);
+        if (typeof parsed.x === "number" && typeof parsed.y === "number") {
+          setPosition(parsed);
+        }
+      }
+    } catch {}
+  }, []);
+
+  const handleDragEnd = (_event: any, info: any) => {
+    const newPos = { x: position.x + info.offset.x, y: position.y + info.offset.y };
+    setPosition(newPos);
+    try {
+      window.localStorage.setItem("lana.ai.position", JSON.stringify(newPos));
+    } catch {}
+  };
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -303,7 +325,14 @@ export function LanaAiAssistant() {
   }
 
   return (
-    <div className="fixed bottom-5 end-5 z-[80] flex flex-col items-end gap-3" dir="rtl">
+    <motion.div
+      drag={!isExpanded}
+      dragMomentum={false}
+      animate={{ x: isExpanded ? 0 : position.x, y: isExpanded ? 0 : position.y }}
+      onDragEnd={handleDragEnd}
+      className="fixed bottom-5 end-5 z-[80] flex flex-col items-end gap-3"
+      dir="rtl"
+    >
       {open ? (
         <div
           onDragOver={handleDragOver}
@@ -312,7 +341,7 @@ export function LanaAiAssistant() {
           className={`flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl transition-all duration-300 dark:border-slate-800 dark:bg-slate-950 ${
             isExpanded
               ? "fixed inset-4 sm:inset-10 z-[100] w-auto h-auto max-w-5xl mx-auto"
-              : "h-[620px] max-h-[85vh] w-[92vw] sm:w-[460px]"
+              : "h-[460px] max-h-[78vh] w-[90vw] sm:w-[380px]"
           } ${isDragging ? "ring-2 ring-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/20" : ""}`}
         >
           {/* Header */}
@@ -568,6 +597,6 @@ export function LanaAiAssistant() {
           <span className="font-bold text-sm tracking-wide">Lana</span>
         </button>
       )}
-    </div>
+    </motion.div>
   );
 }

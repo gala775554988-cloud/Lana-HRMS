@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useChat } from "@ai-sdk/react";
+import { motion } from "framer-motion";
 import { Sparkles, Send, Minus, Zap, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +10,26 @@ import { Badge } from "@/components/ui/badge";
 export function LanaExecutiveAgent() {
   const [isMinimized, setIsMinimized] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    try {
+      const savedPos = window.localStorage.getItem("lana.executive.position");
+      if (savedPos) {
+        const parsed = JSON.parse(savedPos);
+        if (typeof parsed.x === "number" && typeof parsed.y === "number") setPosition(parsed);
+      }
+    } catch {}
+  }, []);
+
+  const handleDragEnd = (_event: any, info: any) => {
+    const newPos = { x: position.x + info.offset.x, y: position.y + info.offset.y };
+    setPosition(newPos);
+    try {
+      window.localStorage.setItem("lana.executive.position", JSON.stringify(newPos));
+    } catch {}
+  };
 
   const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, append } = useChat({
     api: "/api/lana/executive-actions"
@@ -53,7 +73,11 @@ export function LanaExecutiveAgent() {
   }
 
   return (
-    <div
+    <motion.div
+      drag
+      dragMomentum={false}
+      animate={{ x: position.x, y: position.y }}
+      onDragEnd={handleDragEnd}
       className="fixed bottom-6 right-6 z-[9999] w-96 sm:w-[420px] rounded-3xl bg-white/95 dark:bg-slate-900/95 shadow-2xl border border-slate-200/80 dark:border-slate-800 backdrop-blur-xl overflow-hidden flex flex-col transition-all duration-300 animate-in fade-in slide-in-from-bottom-5"
       dir="rtl"
     >
@@ -173,6 +197,6 @@ export function LanaExecutiveAgent() {
         <span>RBAC Protected</span>
         <span className="text-teal-600 dark:text-teal-400 font-bold">100% Executive Verified</span>
       </div>
-    </div>
+    </motion.div>
   );
 }
