@@ -8,6 +8,7 @@ import { signOut } from 'next-auth/react';
 import { BrandLogo } from '@/components/brand/brand-logo';
 import { ClientLanguageToggle } from '@/components/i18n/client-language-toggle';
 import { NotificationBell } from '@/components/enterprise/notification-bell';
+import { PortalMenu } from '@/components/portal-menu';
 
 interface Props {
   user: any;
@@ -47,6 +48,8 @@ export function EmployeeTopBar({ user, employee }: Props) {
           textClassName="hidden sm:block"
           subtitleClassName="text-slate-500 dark:text-slate-400"
         />
+
+        <PortalMenu className="hidden lg:flex mx-2" />
 
         {/* Search */}
         <div className="hidden md:flex flex-1 max-w-md">

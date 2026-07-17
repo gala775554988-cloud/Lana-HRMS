@@ -53,10 +53,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   width: "device-width", initialScale: 1, maximumScale: 1,
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#0F172A" }
-  ]
+  themeColor: "#ffffff"
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -68,7 +65,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const session = await auth().catch(() => null);
 
   return (
-    <html lang={locale} dir={getDirection(locale)} suppressHydrationWarning>
+    <html lang={locale} dir={getDirection(locale)} className="light" style={{ colorScheme: "light" }} suppressHydrationWarning>
       <body>
         <SessionProvider session={session} refetchOnWindowFocus={false} refetchWhenOffline={false}>
           <QueryProvider>
