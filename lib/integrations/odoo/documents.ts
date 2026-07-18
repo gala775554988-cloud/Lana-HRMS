@@ -29,7 +29,7 @@ function sanitizeFileName(name: string) {
  * Fetches attachments directly from Odoo (`ir.attachment`) in one single bulk search_read
  * query without looping 1,620 times over individual employee IDs.
  */
-export async function bulkSyncAllOdooDocuments(client: OdooClient, limit = 1000): Promise<DocumentSyncResult> {
+export async function bulkSyncAllOdooDocuments(client: OdooClient, limit = 2000): Promise<DocumentSyncResult> {
   const result: DocumentSyncResult = { imported: 0, skipped: 0, errors: [] };
 
   const attachments = await client.search_read<OdooAttachment>(
@@ -81,7 +81,7 @@ export async function bulkSyncAllOdooDocuments(client: OdooClient, limit = 1000)
     } catch {}
   }
 
-  // Process only new unimported attachments (up to 150 per run to prevent serverless timeout)
+  // Process new unimported attachments (up to 200 per run to prevent serverless timeout)
   let processedNew = 0;
   for (const attachment of attachments) {
     if (BANK_NAME_PATTERN.test(String(attachment.name ?? ""))) {
@@ -92,8 +92,7 @@ export async function bulkSyncAllOdooDocuments(client: OdooClient, limit = 1000)
       result.skipped += 1;
       continue;
     }
-    if (processedNew >= 150) {
-      // Defer remaining to next invocation
+    if (processedNew >= 200) {
       continue;
     }
 
@@ -121,7 +120,8 @@ export async function bulkSyncAllOdooDocuments(client: OdooClient, limit = 1000)
       
       let fileUrl = await uploadFileToSupabase(buffer, objectPath, mimeType);
       if (!fileUrl) {
-        if (buffer.byteLength < 10_000_000) {
+        // Prevent Postgres 512MB storage quota overflow: only embed files < 400KB as direct data URI
+        if (buffer.byteLength < 400_000) {
           fileUrl = `data:${mimeType};base64,${full.datas}`;
         } else {
           fileUrl = `/api/employee/${localEmployeeId}/documents/download/${attachment.id}`;
@@ -154,9 +154,7 @@ export async function bulkSyncAllOdooDocuments(client: OdooClient, limit = 1000)
 
 /**
  * Pulls every attachment Odoo has linked to an employee record (res_model=hr.employee or hr.contract) and
- * mirrors it into EmployeeDocument. If Supabase storage is unconfigured or returns null, gracefully falls back
- * to saving the document via data URI or direct storage so the employee's documents tab always displays every
- * Odoo file (residency cards, training certificates, ID copies, etc.).
+ * mirrors it into EmployeeDocument.
  */
 export async function syncEmployeeDocuments(client: OdooClient, odooEmployeeId: number, localEmployeeId: string): Promise<DocumentSyncResult> {
   const result: DocumentSyncResult = { imported: 0, skipped: 0, errors: [] };
@@ -202,7 +200,7 @@ export async function syncEmployeeDocuments(client: OdooClient, odooEmployeeId: 
       
       let fileUrl = await uploadFileToSupabase(buffer, objectPath, mimeType);
       if (!fileUrl) {
-        if (buffer.byteLength < 10_000_000) {
+        if (buffer.byteLength < 400_000) {
           fileUrl = `data:${mimeType};base64,${full.datas}`;
         } else {
           fileUrl = `/api/employee/${localEmployeeId}/documents/download/${attachment.id}`;
