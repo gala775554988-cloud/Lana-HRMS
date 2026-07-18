@@ -18,6 +18,7 @@ import { BrandLogo } from "@/components/brand/brand-logo";
 import { ClientLanguageToggle } from "@/components/i18n/client-language-toggle";
 import { NotificationBell } from "@/components/enterprise/notification-bell";
 import { isEnterpriseResourceAllowed } from "@/lib/enterprise/resource-access";
+import { usePendingApprovalsCount } from "@/lib/hooks/use-pending-approvals-count";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/hrms/theme-toggle";
 import { QuickSearchModal } from "@/components/hrms/quick-search-modal";
@@ -97,6 +98,7 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
 
   const userRoles = useMemo(() => (session?.user?.roles as string[]) || [], [session?.user?.roles]);
   const userPermissions = useMemo(() => (session?.user?.permissions as string[]) || [], [session?.user?.permissions]);
+  const { data: pendingApprovalsCount } = usePendingApprovalsCount(status === "authenticated");
 
   // REMOVED: useEffect that redirects to /login on unauthenticated.
   // Rely on middleware.ts for auth protection — it redirects to /login
@@ -214,10 +216,21 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
                       )}
                       title={sidebarCollapsed ? label : undefined}
                     >
-                      <Icon className={cn(
-                        "h-5 w-5 shrink-0 transition-transform group-hover:scale-110",
-                        active ? "text-white dark:text-slate-950" : "text-slate-400 group-hover:text-indigo-600 dark:text-slate-500 dark:group-hover:text-indigo-400"
-                      )} />
+                      <span className="relative inline-flex shrink-0">
+                        <Icon className={cn(
+                          "h-5 w-5 shrink-0 transition-transform group-hover:scale-110",
+                          active ? "text-white dark:text-slate-950" : "text-slate-400 group-hover:text-indigo-600 dark:text-slate-500 dark:group-hover:text-indigo-400"
+                        )} />
+                        {item.href === "/approvals" && pendingApprovalsCount ? (
+                          <span
+                            key={pendingApprovalsCount}
+                            className="absolute -top-1.5 -end-2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive px-0.5 text-[10px] font-bold leading-none text-destructive-foreground ring-2 ring-white dark:ring-slate-950"
+                            aria-label={`${pendingApprovalsCount} pending approvals`}
+                          >
+                            {pendingApprovalsCount > 99 ? "99+" : pendingApprovalsCount}
+                          </span>
+                        ) : null}
+                      </span>
                       {(!sidebarCollapsed || mobileMenuOpen) && (
                         <span className="truncate">{label}</span>
                       )}

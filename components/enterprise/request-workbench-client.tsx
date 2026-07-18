@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ApprovalTimeline } from "@/components/enterprise/approval-timeline";
+import { PENDING_APPROVALS_QUERY_KEY } from "@/lib/hooks/use-pending-approvals-count";
 
 const typeLabels: Record<string, string> = {
   ALL: "كل الأنواع",
@@ -185,6 +186,7 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
       // Reconcile stats/counts with the server in the background regardless
       // of whether this decision optimistically touched the row list.
       queryClient.invalidateQueries({ queryKey: ["enterprise-requests"] });
+      queryClient.invalidateQueries({ queryKey: PENDING_APPROVALS_QUERY_KEY });
     }
   });
 
@@ -224,6 +226,7 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["enterprise-requests"] });
+      queryClient.invalidateQueries({ queryKey: PENDING_APPROVALS_QUERY_KEY });
     }
   });
 

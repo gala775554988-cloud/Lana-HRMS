@@ -949,6 +949,8 @@ model WorkflowStep {
   viewedAt           DateTime?
   capabilities       String[]         @default(["APPROVE", "REJECT"]) // Snapshot of what this step's approver may do, resolved from HrApprovalChain at creation time
   workflowInstance   WorkflowInstance @relation(fields: [workflowInstanceId], references: [id], onDelete: Cascade)
+
+  @@index([approverUserId, status])
 }
 
 // ====================== ENTERPRISE UPGRADE MODELS ======================
