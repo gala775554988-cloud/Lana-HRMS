@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 async function executeDocumentSync(request: NextRequest) {
   try {
     const limitParam = request.nextUrl.searchParams.get("limit");
-    const limit = limitParam ? parseInt(limitParam, 10) : 500;
+    const limit = limitParam ? parseInt(limitParam, 10) : 2000;
 
     const client = OdooClient.fromEnv();
     await client.connect();
@@ -34,7 +34,7 @@ async function executeDocumentSync(request: NextRequest) {
       where: { odooId: { not: null } },
       select: { id: true, odooId: true, firstName: true, lastName: true },
       take: limit,
-      orderBy: { updatedAt: "desc" }
+      orderBy: { id: "asc" }
     });
 
     let totalImported = 0;

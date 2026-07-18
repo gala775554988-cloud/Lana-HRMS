@@ -32,11 +32,11 @@ export async function syncEmployeeDocuments(client: OdooClient, odooEmployeeId: 
   const result: DocumentSyncResult = { imported: 0, skipped: 0, errors: [] };
   if (!odooEmployeeId || odooEmployeeId <= 0 || !localEmployeeId) return result;
 
-  // Search ir.attachment linked to hr.employee
+  // Search ir.attachment linked to odooEmployeeId across all HR/partner/contract models
   const attachments = await client.search_read<OdooAttachment>(
     "ir.attachment",
-    [["res_model", "in", ["hr.employee", "hr.contract"]], ["res_id", "=", odooEmployeeId]],
-    ["id", "name", "mimetype", "file_size", "create_date"],
+    [["res_id", "=", odooEmployeeId]],
+    ["id", "name", "mimetype", "file_size", "create_date", "res_model"],
     { limit: 200 }
   ).catch(() => []);
 
