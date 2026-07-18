@@ -1,13 +1,8 @@
 import type { LanaAttendance, LanaContract, LanaDepartment, LanaEmployee, LanaLeave, LanaPayrollItem, MapperDefinition, OdooRecord, OdooWriteValues, SyncConflict, SyncEntity } from "./types";
 
 function formatEmployeeCodeHelper(code?: string | number | null): string {
-  if (!code) return `00ODOO-${Date.now()}`;
-  const clean = String(code).trim();
-  if (clean.startsWith("ODOO-") || clean.startsWith("00ODOO-")) {
-    return clean.startsWith("00") ? clean : `00${clean}`;
-  }
-  const digits = clean.replace(/^[0]+/, "");
-  return `00${digits || clean}`;
+  if (code === undefined || code === null || code === "") return `ODOO-${Date.now()}`;
+  return String(code).trim();
 }
 
 export const ODOO_MAPPERS: Record<string, MapperDefinition> = {

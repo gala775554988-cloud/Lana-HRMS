@@ -144,13 +144,8 @@ export async function requireOdooIntegrationAccess(action: "read" | "manage" = "
 }
 
 export function formatEmployeeCode(code?: string | number | null): string {
-  if (!code) return `00ODOO-${Date.now()}`;
-  const clean = String(code).trim();
-  if (clean.startsWith("ODOO-") || clean.startsWith("00ODOO-")) {
-    return clean.startsWith("00") ? clean : `00${clean}`;
-  }
-  const digits = clean.replace(/^[0]+/, "");
-  return `00${digits || clean}`;
+  if (code === undefined || code === null || code === "") return `ODOO-${Date.now()}`;
+  return String(code).trim();
 }
 
 export function cleanOdooString(val: any): string {
