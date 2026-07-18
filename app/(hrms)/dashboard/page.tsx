@@ -15,8 +15,8 @@ export const metadata = {
 };
 
 export default async function CentralDashboardPage() {
-  const session = await auth();
-  const { locale, dictionary } = await getRequestDictionary();
+  const session = await auth().catch(() => null);
+  const { locale, dictionary } = await getRequestDictionary().catch(() => ({ locale: "ar" as const, dictionary: {} as any }));
 
   const quickShortcuts = [
     {
@@ -141,9 +141,9 @@ export default async function CentralDashboardPage() {
         </div>
       </div>
 
-      {/* Company Overview (KPIs, Live Metrics, Charts, Lana AI Executive Insights) */}
+      {/* Company Overview (KPIs, Live Metrics, Lana AI Executive Insights) */}
       <Suspense fallback={<OverviewSkeleton />}>
-        <CompanyOverview locale={locale} dictionary={dictionary} showCharts={true} />
+        <CompanyOverview locale={locale || "ar"} dictionary={dictionary || {}} showCharts={false} />
       </Suspense>
     </div>
   );
