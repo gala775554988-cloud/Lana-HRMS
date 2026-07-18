@@ -55,7 +55,7 @@ export function RequestsCenter({ employeeId }: { employeeId: string }) {
             <button
               key={t.key}
               onClick={() => { setActiveType(t.key); setMessage(null); }}
-              className={`w-full text-left px-3 py-2.5 rounded-xl mb-1 text-sm transition ${activeType === t.key ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100'}`}
+              className={`w-full text-left px-3 py-2.5 rounded-xl mb-1 text-sm transition ${activeType === t.key ? 'bg-primary text-white' : 'hover:bg-slate-100'}`}
             >
               {t.label}
             </button>

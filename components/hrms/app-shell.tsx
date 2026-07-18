@@ -136,7 +136,7 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
   if (status === "loading") {
     return (
       <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
-        <div className="hidden h-screen w-[284px] shrink-0 border-e border-teal-100/60 bg-white/80 backdrop-blur-xl lg:block dark:border-slate-800/80 dark:bg-slate-950/80" />
+        <div className="hidden h-screen w-[284px] shrink-0 border-e border-primary/10 bg-white/80 backdrop-blur-xl lg:block dark:border-slate-800/80 dark:bg-slate-950/80" />
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="h-16 shrink-0 border-b border-border/80 bg-white/90 dark:bg-slate-950/90" />
           <main className="min-w-0 flex-1 overflow-y-auto p-4 lg:p-8">{children}</main>
@@ -158,20 +158,22 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
         />
       )}
 
-      {/* Pro Max UI Glassmorphism Sidebar with Soft Mint Accents & Comfortable Spacing */}
+      {/* Premium glassmorphism sidebar: mint/violet gradient accents, layered
+          depth shadows, and motion tuned with the shared premium easing so
+          hover/active states feel considered rather than instant snaps. */}
       <aside
         className={cn(
-          "fixed inset-y-0 start-0 z-50 flex h-screen flex-col border-e border-teal-100/70 bg-gradient-to-b from-white/95 via-teal-50/30 to-white/95 shadow-xl shadow-teal-900/5 backdrop-blur-2xl transition-all duration-300 ease-in-out lg:sticky lg:top-0 lg:z-auto lg:shadow-none lg:!translate-x-0 dark:border-slate-800/80 dark:bg-gradient-to-b dark:from-slate-950/95 dark:via-slate-900/90 dark:to-slate-950/95",
+          "fixed inset-y-0 start-0 z-50 flex h-screen flex-col border-e border-primary/10 bg-gradient-to-b from-white/95 via-primary/[0.04] to-white/95 shadow-xl shadow-primary/5 backdrop-blur-2xl transition-all duration-300 ease-premium lg:sticky lg:top-0 lg:z-auto lg:shadow-none lg:!translate-x-0 dark:border-slate-800/80 dark:bg-gradient-to-b dark:from-slate-950/95 dark:via-slate-900/90 dark:to-slate-950/95",
           sidebarCollapsed ? "lg:w-[78px]" : "lg:w-[284px]",
           "w-[284px]",
           mobileMenuOpen ? "translate-x-0" : "rtl:translate-x-full ltr:-translate-x-full"
         )}
       >
-        <div className="flex h-16 items-center justify-between border-b border-teal-100/60 px-4 lg:hidden dark:border-slate-800/80">
+        <div className="flex h-16 items-center justify-between border-b border-primary/10 px-4 lg:hidden dark:border-slate-800/80">
           <BrandLogo href="/" size="sm" showText={true} />
           <button
             onClick={() => setMobileMenuOpen(false)}
-            className="rounded-xl p-2 text-slate-500 hover:bg-teal-50/80 dark:hover:bg-slate-800 transition-colors"
+            className="rounded-xl p-2 text-slate-500 hover:bg-primary/10 dark:hover:bg-slate-800 transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
@@ -184,7 +186,7 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
             <div key={groupKey} className="space-y-1.5">
               {!sidebarCollapsed && (
                 <div className="flex items-center gap-2 px-3 mb-2 pt-1">
-                  <span className="flex h-1.5 w-1.5 rounded-full bg-teal-500/80 shadow-2xs shadow-teal-500" />
+                  <span className="flex h-1.5 w-1.5 rounded-full bg-primary/80 shadow-2xs shadow-primary" />
                   <p className="text-[11px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
                     {dictionary.navGroups[groupKey]} {groupEmoji[groupKey]}
                   </p>
@@ -204,18 +206,18 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
                       onFocus={() => prefetchRoute(item.href)}
                       onClick={() => setMobileMenuOpen(false)}
                       className={cn(
-                        "group relative flex items-center gap-3.5 rounded-2xl px-3.5 py-3 text-sm font-bold transition-all duration-300 ease-out border",
+                        "group relative flex items-center gap-3.5 rounded-2xl px-3.5 py-3 text-sm font-bold transition-all duration-300 ease-premium border",
                         sidebarCollapsed ? "lg:justify-center lg:px-2.5 lg:py-3" : "",
                         active
-                          ? "bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-black shadow-lg shadow-teal-600/25 border-teal-500/40 scale-[1.01] dark:from-teal-500 dark:to-emerald-600 dark:text-slate-950 dark:shadow-teal-500/20"
-                          : "border-transparent text-slate-600 hover:bg-teal-50/80 hover:text-teal-800 hover:border-teal-100/80 hover:shadow-2xs dark:text-slate-400 dark:hover:bg-teal-950/40 dark:hover:text-teal-200 dark:hover:border-teal-900/40"
+                          ? "bg-gradient-to-l from-primary to-secondary text-white font-black shadow-premium-md border-primary/40 dark:text-slate-950"
+                          : "border-transparent text-slate-600 hover:translate-x-0.5 rtl:hover:-translate-x-0.5 hover:bg-primary/8 hover:text-primary hover:border-primary/15 hover:shadow-premium-sm dark:text-slate-400 dark:hover:bg-primary/10 dark:hover:text-primary dark:hover:border-primary/20"
                       )}
                       title={sidebarCollapsed ? label : undefined}
                     >
                       <span className="relative inline-flex shrink-0">
                         <Icon className={cn(
-                          "h-5 w-5 shrink-0 transition-transform duration-300 group-hover:scale-110",
-                          active ? "text-white dark:text-slate-950 drop-shadow-xs" : "text-slate-400 group-hover:text-teal-600 dark:text-slate-500 dark:group-hover:text-teal-400"
+                          "h-5 w-5 shrink-0 transition-transform duration-300 ease-premium group-hover:scale-110",
+                          active ? "text-white dark:text-slate-950 drop-shadow-xs" : "text-slate-400 group-hover:text-primary dark:text-slate-500 dark:group-hover:text-primary"
                         )} />
                         {item.href === "/approvals" && pendingApprovalsCount ? (
                           <span
@@ -249,9 +251,9 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
         </div>
 
         {(!sidebarCollapsed || mobileMenuOpen) && (
-          <div className="m-3 rounded-3xl border border-teal-200/60 bg-gradient-to-br from-teal-50/90 via-emerald-50/50 to-white/90 p-4 shadow-md shadow-teal-900/5 backdrop-blur-xl dark:border-teal-800/40 dark:from-teal-950/50 dark:via-emerald-950/30 dark:to-slate-900/80">
-            <div className="flex items-center gap-2.5 text-teal-900 dark:text-teal-200 font-extrabold text-xs">
-              <div className="flex h-6 w-6 items-center justify-center rounded-xl bg-teal-600 text-white shadow-sm shadow-teal-600/30">
+          <div className="hover-lift m-3 rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/10 via-secondary/5 to-white/90 p-4 shadow-premium-md backdrop-blur-xl dark:border-primary/20 dark:from-primary/10 dark:via-secondary/10 dark:to-slate-900/80">
+            <div className="flex items-center gap-2.5 text-primary dark:text-primary font-extrabold text-xs">
+              <div className="flex h-6 w-6 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-secondary text-white shadow-sm shadow-primary/30">
                 <Sparkles className="h-3.5 w-3.5 animate-pulse" />
               </div>
               <span>Lana AI Pro Max</span>
@@ -265,7 +267,7 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
 
       <div className="flex min-w-0 flex-1 flex-col h-screen">
       {/* Cleaned Pro Max Header (Smart Search removed per requirement #2) */}
-      <header className="sticky top-0 z-30 shrink-0 border-b border-teal-100/60 bg-white/90 shadow-2xs shadow-teal-900/5 backdrop-blur-2xl dark:border-slate-800/80 dark:bg-slate-950/90 dark:shadow-slate-950/40">
+      <header className="sticky top-0 z-30 shrink-0 border-b border-primary/10 bg-white/90 shadow-2xs shadow-primary/5 backdrop-blur-2xl dark:border-slate-800/80 dark:bg-slate-950/90 dark:shadow-slate-950/40">
         <div className="flex h-16 items-center justify-between gap-4 px-4 lg:px-6">
           <div className="flex items-center gap-3">
             <button
@@ -277,7 +279,7 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
             </button>
             <button
               onClick={toggleSidebar}
-              className="hidden lg:flex h-9 w-9 items-center justify-center rounded-xl hover:bg-teal-50/80 text-slate-600 hover:text-teal-700 transition-all dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-teal-300 border border-transparent hover:border-teal-200/50"
+              className="hidden lg:flex h-9 w-9 items-center justify-center rounded-xl hover:bg-primary/10 text-slate-600 hover:text-primary transition-all duration-300 ease-premium dark:text-slate-400 dark:hover:bg-primary/10 dark:hover:text-primary border border-transparent hover:border-primary/20"
               aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
               {sidebarCollapsed ? <ChevronLeft className="h-4.5 w-4.5" /> : <ChevronRight className="h-4.5 w-4.5" />}
@@ -297,11 +299,11 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
           {/* Right section: Notification Bell, Language, Theme, User Badge, Logout */}
           <div className="flex items-center gap-3 ms-auto">
             <NotificationBell />
-            <ClientLanguageToggle variant="ghost" className="hidden sm:inline-flex rounded-xl hover:bg-teal-50/80 dark:hover:bg-slate-900" />
+            <ClientLanguageToggle variant="ghost" className="hidden sm:inline-flex rounded-xl hover:bg-primary/10 dark:hover:bg-slate-900" />
             <ThemeToggle />
             <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-slate-800" />
             <div className="hidden sm:flex items-center gap-3 pl-1">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-600 to-emerald-600 text-white text-sm font-black shadow-md shadow-teal-600/20">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-secondary text-white text-sm font-black shadow-premium-sm">
                 {session.user?.name?.charAt(0) || "👑"}
               </div>
               <div className="flex flex-col min-w-0">
@@ -310,7 +312,7 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
                 </p>
                 <div className="flex gap-1 mt-1">
                   {userRoles.slice(0, 2).map((role: string) => (
-                    <Badge key={role} variant="secondary" className="text-[9px] font-black px-2 py-0.5 rounded-lg bg-teal-50 text-teal-800 border-teal-200/60 dark:bg-teal-950/60 dark:text-teal-300 dark:border-teal-800/50">
+                    <Badge key={role} variant="secondary" className="text-[9px] font-black px-2 py-0.5 bg-primary/10 text-primary border-primary/20 dark:bg-primary/15 dark:text-primary dark:border-primary/25">
                       {role === "SUPER_ADMIN" ? "👑 SUPER_ADMIN" : role}
                     </Badge>
                   ))}

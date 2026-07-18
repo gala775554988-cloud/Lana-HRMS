@@ -113,7 +113,7 @@ export function UserSearchSelect({
               {employee.profilePhotoUrl ? (
                 <img src={employee.profilePhotoUrl} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
               ) : (
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-[11px] font-bold text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/8 text-[11px] font-bold text-primary dark:bg-primary/50 dark:text-primary/50">
                   {employee.firstName.charAt(0)}{employee.lastName.charAt(0)}
                 </span>
               )}

@@ -1,9 +1,8 @@
-import { Suspense } from "react";
 import { Activity, CalendarCheck2, FileText, Hospital, Smartphone, Users, WalletCards, LayoutGrid, Monitor, Video, ShieldCheck } from "lucide-react";
 import { getRequestDictionary } from "@/lib/i18n-server";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { ClientLanguageToggle } from "@/components/i18n/client-language-toggle";
-import { LoginForm } from "./login-form";
+import { LoginCard } from "@/components/auth/login-card";
 
 const stats = [
   { label: "عدد الموظفين", value: "4580", icon: Users },
@@ -20,14 +19,14 @@ const PHONE_VIDEO_POSTER = `data:image/svg+xml,${encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="220" viewBox="0 0 400 220">
     <defs>
       <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stop-color="#00A896"/>
-        <stop offset="100%" stop-color="#028090"/>
+        <stop offset="0%" stop-color="#2ED3C6"/>
+        <stop offset="100%" stop-color="#19BFAF"/>
       </linearGradient>
     </defs>
     <rect width="400" height="220" fill="url(#g)"/>
     <circle cx="200" cy="100" r="28" fill="rgba(255,255,255,0.2)"/>
     <circle cx="200" cy="100" r="19" fill="#ffffff"/>
-    <path d="M193 89 L213 100 L193 111 Z" fill="#00A896"/>
+    <path d="M193 89 L213 100 L193 111 Z" fill="#19BFAF"/>
     <text x="200" y="155" font-family="Cairo, sans-serif" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">لانا الطبية</text>
   </svg>`
 )}`;
@@ -70,13 +69,13 @@ function MarketingPanel() {
 
                 {/* Retained Data Widgets in Web Grid */}
                 <div className="grid grid-cols-3 gap-1.5 text-center">
-                  <div className="rounded-xl bg-gradient-to-br from-primary to-[#028090] p-2 text-white shadow-xs">
+                  <div className="rounded-xl bg-gradient-to-br from-primary to-[#19BFAF] p-2 text-white shadow-xs">
                     <p className="text-[9px] font-medium text-white/80">Platform</p>
                     <p className="text-sm font-black mt-0.5">360°</p>
                   </div>
                   <div className="rounded-xl border border-slate-200 bg-white p-2 shadow-2xs">
                     <p className="text-[9px] font-bold text-slate-500">الإجازات</p>
-                    <p className="text-sm font-black text-indigo-600 mt-0.5">24</p>
+                    <p className="text-sm font-black text-primary mt-0.5">24</p>
                   </div>
                   <div className="rounded-xl border border-slate-200 bg-white p-2 shadow-2xs">
                     <p className="text-[9px] font-bold text-slate-500">الحضور</p>
@@ -108,12 +107,12 @@ function MarketingPanel() {
                 <div className="grid grid-cols-2 gap-2 pt-0.5">
                   <div className="rounded-xl border border-slate-200 bg-white p-2 shadow-xs space-y-1">
                     <div className="flex items-center gap-1 text-[9px] font-bold text-slate-700 border-b border-slate-100 pb-1">
-                      <LayoutGrid className="h-3 w-3 text-indigo-600 shrink-0" />
+                      <LayoutGrid className="h-3 w-3 text-primary shrink-0" />
                       <span className="truncate">Team Collaboration</span>
                     </div>
-                    <div className="h-12 rounded-lg bg-indigo-50/60 border border-indigo-100/60 p-1.5 flex flex-col justify-between text-[8px] text-indigo-900 font-medium">
-                      <div className="flex justify-between items-center"><span className="truncate font-bold">Shift Schedule</span><span className="text-indigo-600">Active</span></div>
-                      <div className="h-1.5 w-full rounded-full bg-indigo-200/80"><div className="h-full w-4/5 rounded-full bg-indigo-600" /></div>
+                    <div className="h-12 rounded-lg bg-primary/60 border border-primary/60 p-1.5 flex flex-col justify-between text-[8px] text-primary font-medium">
+                      <div className="flex justify-between items-center"><span className="truncate font-bold">Shift Schedule</span><span className="text-primary">Active</span></div>
+                      <div className="h-1.5 w-full rounded-full bg-primary/80"><div className="h-full w-4/5 rounded-full bg-primary" /></div>
                     </div>
                   </div>
 
@@ -162,21 +161,10 @@ export default async function LoginPage() {
   }));
   const isAr = locale === "ar";
   const loginPanel = (
-    <section className="relative flex min-h-screen items-center justify-center bg-slate-50/90 p-6 dark:bg-slate-950" dir={isAr ? "rtl" : "ltr"}>
+    <section className="relative flex min-h-screen items-center justify-center bg-white p-6 dark:bg-slate-950" dir={isAr ? "rtl" : "ltr"}>
       <div className="absolute end-4 top-4"><ClientLanguageToggle variant="outline" /></div>
-      <div className="w-full max-w-md">
-        <div className="mb-7 flex flex-col items-center text-center lg:items-start lg:text-start">
-          <div className="flex items-center gap-3">
-            <BrandLogo href="/" size="hero" showText={false} logoClassName="border-slate-300 shadow-2xl shadow-primary/10 ring-4 ring-white/80 dark:border-slate-700 dark:ring-slate-800" imageClassName="p-2" />
-            <h1 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 sm:text-3xl">Lana <span className="font-medium text-primary">HRMS</span></h1>
-          </div>
-          <p className="mt-3 text-sm font-medium text-slate-400 dark:text-slate-500">البوابة الموحدة لدخول الموظفين والمسؤولين</p>
-        </div>
-        <div className="rounded-2xl border border-slate-200/80 bg-white/70 p-8 shadow-glass backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/70">
-          <Suspense><LoginForm dictionary={dictionary} /></Suspense>
-        </div>
-      </div>
+      <LoginCard dictionary={dictionary} />
     </section>
   );
-  return (<main className="min-h-screen bg-slate-50 dark:bg-slate-950" dir="ltr"><div className="grid min-h-screen lg:grid-cols-[65fr_35fr]">{isAr ? (<><MarketingPanel />{loginPanel}</>) : (<>{loginPanel}<MarketingPanel /></>)}</div></main>);
+  return (<main className="min-h-screen bg-white dark:bg-slate-950" dir="ltr"><div className="grid min-h-screen lg:grid-cols-[65fr_35fr]">{isAr ? (<><MarketingPanel />{loginPanel}</>) : (<>{loginPanel}<MarketingPanel /></>)}</div></main>);
 }

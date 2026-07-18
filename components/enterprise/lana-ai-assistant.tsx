@@ -71,7 +71,7 @@ function LanaMarkdownRenderer({ content }: { content: string }) {
               if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
                 return (
                   <div key={lIdx} className="flex items-start gap-2 ms-2 my-1">
-                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500" />
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-secondary" />
                     <span>{trimmed.slice(2)}</span>
                   </div>
                 );
@@ -80,7 +80,7 @@ function LanaMarkdownRenderer({ content }: { content: string }) {
                 const numMatch = trimmed.match(/^(\d+\.)\s+(.*)/);
                 return (
                   <div key={lIdx} className="flex items-start gap-2 ms-2 my-1">
-                    <span className="font-bold text-indigo-600 dark:text-indigo-400 shrink-0">{numMatch?.[1]}</span>
+                    <span className="font-bold text-secondary dark:text-secondary/50 shrink-0">{numMatch?.[1]}</span>
                     <span>{numMatch?.[2] || trimmed}</span>
                   </div>
                 );
@@ -311,7 +311,7 @@ export function LanaAiAssistant() {
   function getFileIcon(type: string) {
     if (type.includes("pdf") || type.includes("word")) return <FileText className="h-4 w-4 text-rose-500" />;
     if (type.includes("sheet") || type.includes("excel") || type.includes("csv")) return <FileSpreadsheet className="h-4 w-4 text-emerald-500" />;
-    return <ImageIcon className="h-4 w-4 text-indigo-500" />;
+    return <ImageIcon className="h-4 w-4 text-secondary" />;
   }
 
   return (
@@ -328,17 +328,17 @@ export function LanaAiAssistant() {
             isExpanded
               ? "fixed inset-4 sm:inset-10 z-[100] w-auto h-auto max-w-5xl mx-auto"
               : "h-[460px] max-h-[78vh] w-[90vw] sm:w-[380px]"
-          } ${isDragging ? "ring-2 ring-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/20" : ""}`}
+          } ${isDragging ? "ring-2 ring-secondary bg-secondary/50 dark:bg-secondary/20" : ""}`}
         >
           {/* Header */}
-          <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 px-4 py-3.5 text-white dark:border-slate-800">
+          <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-gradient-to-r from-secondary via-secondary to-purple-700 px-4 py-3.5 text-white dark:border-slate-800">
             <div className="flex items-center gap-3">
               <div className="grid h-9 w-9 place-items-center rounded-2xl bg-white/10 backdrop-blur-md shadow-inner">
                 <Sparkles className="h-5 w-5 text-amber-300" />
               </div>
               <div>
                 <h3 className="font-bold text-sm leading-tight">Lana</h3>
-                <p className="text-[11px] text-indigo-100/90 flex items-center gap-1.5 mt-0.5">
+                <p className="text-[11px] text-secondary/90 flex items-center gap-1.5 mt-0.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   المساعد الذكي الفوري
                 </p>
@@ -381,7 +381,7 @@ export function LanaAiAssistant() {
           >
             {messages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center text-center px-4 py-8">
-                <div className="grid h-14 w-14 place-items-center rounded-3xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400 mb-4 shadow-sm">
+                <div className="grid h-14 w-14 place-items-center rounded-3xl bg-secondary/8 text-secondary dark:bg-secondary/50 dark:text-secondary/50 mb-4 shadow-sm">
                   <Sparkles className="h-7 w-7" />
                 </div>
                 <h4 className="font-bold text-base mb-1.5">تحدث مع Lana</h4>
@@ -399,7 +399,7 @@ export function LanaAiAssistant() {
                       key={i}
                       type="button"
                       onClick={() => send(sug)}
-                      className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-xs font-medium text-slate-700 transition hover:border-indigo-500 hover:bg-indigo-50/50 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-300 dark:hover:border-indigo-500/50"
+                      className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-xs font-medium text-slate-700 transition hover:border-secondary hover:bg-secondary/50 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-300 dark:hover:border-secondary/50"
                     >
                       {sug}
                     </button>
@@ -415,15 +415,15 @@ export function LanaAiAssistant() {
                   <div
                     className={`group relative max-w-[88%] rounded-3xl px-4 py-3 shadow-sm ${
                       msg.role === "user"
-                        ? "bg-indigo-600 text-white rounded-br-none"
+                        ? "bg-secondary text-white rounded-br-none"
                         : "bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-bl-none border border-slate-200 dark:border-slate-800"
                     }`}
                   >
                     {/* Uploaded Files Preview inside User Message */}
                     {msg.files && msg.files.length > 0 && (
-                      <div className="mb-2.5 flex flex-wrap gap-2 border-b border-indigo-500/30 pb-2">
+                      <div className="mb-2.5 flex flex-wrap gap-2 border-b border-secondary/30 pb-2">
                         {msg.files.map((f, i) => (
-                          <div key={i} className="flex items-center gap-1.5 rounded-xl bg-indigo-700/80 px-2.5 py-1 text-xs">
+                          <div key={i} className="flex items-center gap-1.5 rounded-xl bg-secondary/80 px-2.5 py-1 text-xs">
                             {getFileIcon(f.type)}
                             <span className="max-w-[120px] truncate">{f.name}</span>
                           </div>
@@ -435,11 +435,11 @@ export function LanaAiAssistant() {
                       msg.content ? (
                         <LanaMarkdownRenderer content={msg.content} />
                       ) : (
-                        <div className="flex items-center gap-2 py-1 text-indigo-600 dark:text-indigo-400">
+                        <div className="flex items-center gap-2 py-1 text-secondary dark:text-secondary/50">
                           <span className="flex gap-1">
-                            <span className="h-1.5 w-1.5 rounded-full bg-indigo-600 dark:bg-indigo-400 animate-bounce" />
-                            <span className="h-1.5 w-1.5 rounded-full bg-indigo-600 dark:bg-indigo-400 animate-bounce [animation-delay:0.2s]" />
-                            <span className="h-1.5 w-1.5 rounded-full bg-indigo-600 dark:bg-indigo-400 animate-bounce [animation-delay:0.4s]" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-secondary dark:bg-secondary/50 animate-bounce" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-secondary dark:bg-secondary/50 animate-bounce [animation-delay:0.2s]" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-secondary dark:bg-secondary/50 animate-bounce [animation-delay:0.4s]" />
                           </span>
                           <span className="text-xs font-semibold">Lana يكتب الآن...</span>
                         </div>
@@ -514,7 +514,7 @@ export function LanaAiAssistant() {
 
           {/* Input Area */}
           <div className="shrink-0 border-t border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
-            <div className="flex items-end gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1.5 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 dark:border-slate-800 dark:bg-slate-900/50">
+            <div className="flex items-end gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1.5 focus-within:border-secondary focus-within:ring-2 focus-within:ring-secondary/20 dark:border-slate-800 dark:bg-slate-900/50">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -561,7 +561,7 @@ export function LanaAiAssistant() {
                   onClick={() => send()}
                   disabled={(!input.trim() && files.length === 0) || isStreaming}
                   title="إرسال"
-                  className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-600 text-white shadow-md transition hover:bg-indigo-700 disabled:opacity-40 disabled:pointer-events-none active:scale-95"
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-secondary text-white shadow-md transition hover:bg-secondary disabled:opacity-40 disabled:pointer-events-none active:scale-95"
                 >
                   <Send className="h-4 w-4 -rotate-90" />
                 </button>
@@ -574,11 +574,11 @@ export function LanaAiAssistant() {
           type="button"
           onClick={() => setOpen(true)}
           aria-label="مساعد Lana AI"
-          className="group relative flex items-center gap-2.5 rounded-3xl bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 px-4 py-3 text-white shadow-xl shadow-indigo-600/30 transition-all duration-300 hover:scale-105 hover:shadow-2xl active:scale-95"
+          className="group relative flex items-center gap-2.5 rounded-3xl bg-gradient-to-r from-secondary via-secondary to-purple-700 px-4 py-3 text-white shadow-xl shadow-secondary/30 transition-all duration-300 hover:scale-105 hover:shadow-2xl active:scale-95"
         >
           <div className="relative grid h-8 w-8 place-items-center rounded-2xl bg-white/20 backdrop-blur-md">
             <Sparkles className="h-4 w-4 text-amber-300" />
-            <span className="absolute -top-1 -end-1 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-indigo-600 animate-pulse" />
+            <span className="absolute -top-1 -end-1 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-secondary animate-pulse" />
           </div>
           <span className="font-bold text-sm tracking-wide">Lana</span>
         </button>

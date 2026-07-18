@@ -145,7 +145,7 @@ export function InstallButton({
                     <p className="text-muted-foreground mt-0.5">
                       مرر في قائمة الخيارات لأسفل واضغط على الخيار الذي يحتوي على علامة المربع والزائد.
                     </p>
-                    <div className="mt-2 inline-flex items-center gap-1 rounded-lg bg-white dark:bg-slate-800 border px-2.5 py-1 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 shadow-2xs">
+                    <div className="mt-2 inline-flex items-center gap-1 rounded-lg bg-white dark:bg-slate-800 border px-2.5 py-1 text-[11px] font-bold text-primary dark:text-primary/50 shadow-2xs">
                       <PlusSquare className="h-3.5 w-3.5" />
                       <span>إضافة إلى الشاشة الرئيسية (Add to Home Screen)</span>
                     </div>

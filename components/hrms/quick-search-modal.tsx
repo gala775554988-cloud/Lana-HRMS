@@ -222,7 +222,7 @@ export function QuickSearchModal({ isOpen, onClose }: QuickSearchModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 pt-16 sm:pt-24 backdrop-blur-sm animate-in fade-in duration-200">
       <div 
-        className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-[#E5E7EB] bg-white shadow-2xl shadow-indigo-950/30 dark:border-slate-800 dark:bg-slate-900 mx-4"
+        className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-[#E5E7EB] bg-white shadow-2xl shadow-primary/30 dark:border-slate-800 dark:bg-slate-900 mx-4"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Search Header */}
@@ -306,7 +306,7 @@ export function QuickSearchModal({ isOpen, onClose }: QuickSearchModalProps) {
                                   {item.title}
                                 </span>
                                 {item.badge && (
-                                  <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-extrabold text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300">
+                                  <span className="rounded-full bg-primary/12 px-2 py-0.5 text-[10px] font-extrabold text-primary dark:bg-primary/60 dark:text-primary/30">
                                     {item.badge}
                                   </span>
                                 )}
@@ -316,7 +316,7 @@ export function QuickSearchModal({ isOpen, onClose }: QuickSearchModalProps) {
                               </p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                          <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 group-hover:text-primary dark:group-hover:text-primary/50">
                             <span className="hidden sm:inline">انتقال</span>
                             <CornerDownLeft className="h-3.5 w-3.5" />
                           </div>
@@ -340,7 +340,7 @@ export function QuickSearchModal({ isOpen, onClose }: QuickSearchModalProps) {
               <kbd className="rounded border bg-white px-1.5 py-0.5 font-mono shadow-xs dark:bg-slate-800 dark:border-slate-700">Enter</kbd> للفتح
             </span>
           </div>
-          <div className="flex items-center gap-1.5 text-indigo-600 font-bold dark:text-indigo-400">
+          <div className="flex items-center gap-1.5 text-primary font-bold dark:text-primary/50">
             <Sparkles className="h-3.5 w-3.5" />
             <span>Lana Search Engine v2.0</span>
           </div>

@@ -160,7 +160,7 @@ export function EmployeeBulkImportDialog({ open, onOpenChange, locale = "ar" }: 
           </div>
 
           <div className="h-3 overflow-hidden rounded-full bg-muted">
-            <div className="h-full bg-indigo-600 transition-all" style={{ width: `${progress}%` }} />
+            <div className="h-full bg-primary transition-all" style={{ width: `${progress}%` }} />
           </div>
 
           <div className="flex flex-wrap gap-2">

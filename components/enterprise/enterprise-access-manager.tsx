@@ -163,7 +163,7 @@ export function EnterpriseAccessManager({
         <CardHeader className="border-b border-slate-100 bg-slate-50/70 pb-5 dark:border-slate-800 dark:bg-slate-900/50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-11 w-11 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shadow-xs">
+              <div className="h-11 w-11 rounded-2xl bg-primary/8 dark:bg-primary/60 text-primary dark:text-primary/50 flex items-center justify-center shadow-xs">
                 <Shield className="h-6 w-6" />
               </div>
               <div>
@@ -194,16 +194,16 @@ export function EnterpriseAccessManager({
                 className="pr-10 h-11 rounded-2xl text-xs font-semibold bg-slate-50/50 dark:bg-slate-900"
               />
             </div>
-            <Button type="submit" disabled={isSearching || !searchQuery.trim()} className="h-11 rounded-2xl px-6 bg-indigo-600 hover:bg-indigo-700 font-bold gap-2">
+            <Button type="submit" disabled={isSearching || !searchQuery.trim()} className="h-11 rounded-2xl px-6 bg-primary hover:bg-primary font-bold gap-2">
               {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <span>استعلام</span>}
             </Button>
           </form>
 
           {/* Selected Employee Info */}
           {employee ? (
-            <div className="rounded-2xl border border-indigo-200/80 bg-indigo-50/40 p-4 dark:border-indigo-900/60 dark:bg-indigo-950/20 flex items-center justify-between gap-4 animate-in fade-in duration-200">
+            <div className="rounded-2xl border border-primary/80 bg-primary/40 p-4 dark:border-primary/60 dark:bg-primary/20 flex items-center justify-between gap-4 animate-in fade-in duration-200">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-indigo-600 text-white font-bold flex items-center justify-center text-sm shadow-xs">
+                <div className="h-10 w-10 rounded-xl bg-primary text-white font-bold flex items-center justify-center text-sm shadow-xs">
                   {employee.name[0]}
                 </div>
                 <div>
@@ -239,7 +239,7 @@ export function EnterpriseAccessManager({
                   key={key}
                   className={`flex items-center gap-3 rounded-2xl border p-3.5 transition-all cursor-pointer select-none ${
                     checked
-                      ? "border-indigo-500 bg-indigo-50/30 dark:border-indigo-700 dark:bg-indigo-950/20"
+                      ? "border-primary bg-primary/30 dark:border-primary dark:bg-primary/20"
                       : "border-slate-200/80 hover:bg-slate-50/50 dark:border-slate-800 dark:hover:bg-slate-900/40"
                   }`}
                 >
@@ -248,7 +248,7 @@ export function EnterpriseAccessManager({
                     checked={checked}
                     onChange={(e) => setPermissions({ ...permissions, [key]: e.target.checked })}
                     disabled={!employee}
-                    className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 disabled:opacity-40"
+                    className="h-4 w-4 rounded text-primary focus:ring-primary disabled:opacity-40"
                   />
                   <span className={`text-xs font-bold ${!employee ? "opacity-50" : "text-slate-800 dark:text-slate-200"}`}>
                     {permissionLabels[key] || key}
@@ -262,9 +262,9 @@ export function EnterpriseAccessManager({
             type="button"
             onClick={handleSave}
             disabled={isPending || !employee}
-            className="w-full h-12 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-indigo-600 dark:hover:bg-indigo-700 font-black text-sm shadow-lg gap-2"
+            className="w-full h-12 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-primary dark:hover:bg-primary font-black text-sm shadow-lg gap-2"
           >
-            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 text-indigo-400" />}
+            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 text-primary/50" />}
             <span>حفظ الإعدادات وإرسال إشعار التفعيل للموظف</span>
           </Button>
         </CardContent>

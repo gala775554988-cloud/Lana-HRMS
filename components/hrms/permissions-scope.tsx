@@ -83,7 +83,7 @@ export default async function PermissionsScope({ employeeId }: { employeeId: str
         {scopes.map((scope) => (
           <div key={scope.id} className="scope-item flex items-center justify-between p-3 rounded-xl border bg-card text-sm font-medium shadow-sm">
             <span>{scope.name}</span>
-            <span className="text-xs px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+            <span className="text-xs px-2.5 py-1 rounded-full bg-primary/8 text-primary dark:bg-primary/60 dark:text-primary/30">
               {scope.scope}
             </span>
           </div>

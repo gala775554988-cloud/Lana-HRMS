@@ -20,14 +20,14 @@ const VIDEO_POSTER = `data:image/svg+xml,${encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
     <defs>
       <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stop-color="#00A896"/>
-        <stop offset="100%" stop-color="#028090"/>
+        <stop offset="0%" stop-color="#2ED3C6"/>
+        <stop offset="100%" stop-color="#19BFAF"/>
       </linearGradient>
     </defs>
     <rect width="800" height="500" fill="url(#g)"/>
     <circle cx="400" cy="230" r="52" fill="rgba(255,255,255,0.2)"/>
     <circle cx="400" cy="230" r="36" fill="#ffffff"/>
-    <path d="M389 210 L423 230 L389 250 Z" fill="#00A896"/>
+    <path d="M389 210 L423 230 L389 250 Z" fill="#19BFAF"/>
     <text x="400" y="330" font-family="Cairo, sans-serif" font-size="26" font-weight="700" fill="#ffffff" text-anchor="middle">لانا الطبية</text>
   </svg>`
 )}`;

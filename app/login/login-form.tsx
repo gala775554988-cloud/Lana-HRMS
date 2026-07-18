@@ -11,18 +11,14 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { TurnstileWidget } from "@/components/auth/turnstile-widget";
 import type { Dictionary } from "@/lib/i18n";
 import { getOrCreateMobileDeviceUUID } from "@/lib/employee/device-uuid";
 
-const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
-
-export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
+export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictionary; onLoginSuccess?: () => void | Promise<void> }) {
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -42,8 +38,18 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
     else window.localStorage.removeItem("lana.hrms.rememberedIdentifier");
     const deviceId = getOrCreateMobileDeviceUUID();
     startTransition(async () => {
-      const result = await loginAction({ ...values, deviceId, turnstileToken });
+      const result = await loginAction({ ...values, deviceId });
       if (result.success) {
+        // A hard navigation here, not router.push(). A soft/transition-based
+        // push landed users on a permanently blank page whenever the
+        // destination route hit a (separately real, since-fixed) hydration
+        // mismatch: React can abandon a transition's pending render on error
+        // without falling back to anything, leaving the URL updated but the
+        // DOM never actually replaced. A full navigation re-does the whole
+        // request/hydration cycle from scratch the same way a fresh page
+        // load does, which the same mismatch only ever produced a
+        // recoverable console warning for, not a blank screen.
+        if (onLoginSuccess) await onLoginSuccess();
         window.location.href = "/";
       } else {
         setMessage(result.message);
@@ -116,13 +122,10 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
         <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} className="h-4 w-4 rounded border-input text-primary focus-visible:ring-primary" />
         <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{dictionary?.auth?.rememberTitle || "تذكر مساحة العمل"}</span>
       </label>
-      {TURNSTILE_SITE_KEY ? (
-        <TurnstileWidget siteKey={TURNSTILE_SITE_KEY} onVerify={setTurnstileToken} />
-      ) : null}
       <Button
         className="h-12 w-full rounded-lg text-sm font-semibold shadow-lg shadow-primary/20 active:scale-95"
         type="submit"
-        disabled={isPending || !turnstileToken}
+        disabled={isPending}
       >
         {isPending ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : null}{dictionary?.auth?.submit || "تسجيل الدخول"}
       </Button>

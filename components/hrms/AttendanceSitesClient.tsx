@@ -56,7 +56,7 @@ export function AttendanceSitesClient({ initialSites }: { initialSites: Site[] }
       </div>
 
       <Card className="rounded-3xl">
-        <CardHeader><CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5 text-indigo-600" />إضافة / تعديل موقع</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5 text-primary" />إضافة / تعديل موقع</CardTitle></CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-3">
           <Input placeholder="اسم الموقع / المستشفى" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           <Input type="number" step="any" placeholder="Latitude" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: Number(e.target.value) })} />

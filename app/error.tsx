@@ -138,7 +138,7 @@ export default function RootError({ error, reset }: { error: Error & { digest?: 
               {copied ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
               {copied ? "تم النسخ" : "نسخ"}
             </Button>
-            <Button size="sm" onClick={reset} className="gap-1.5 text-xs rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold">
+            <Button size="sm" onClick={reset} className="gap-1.5 text-xs rounded-xl bg-primary hover:bg-primary text-white font-bold">
               <RefreshCw className="h-3.5 w-3.5" />
               إعادة المحاولة
             </Button>

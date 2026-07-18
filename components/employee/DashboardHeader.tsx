@@ -42,7 +42,7 @@ export function DashboardHeader({ employee, attendanceStatus = 'present' }: Prop
             className="h-14 w-14 rounded-2xl object-cover border border-slate-200 dark:border-slate-700 shadow-sm" 
           />
         ) : (
-          <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-2xl font-semibold border border-white/20 shadow-sm">
+          <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-primary to-violet-600 flex items-center justify-center text-white text-2xl font-semibold border border-white/20 shadow-sm">
             {(employee.firstName?.[0] || '?')}{(employee.lastName?.[0] || '?')}
           </div>
         )}
@@ -59,7 +59,7 @@ export function DashboardHeader({ employee, attendanceStatus = 'present' }: Prop
       <div className="flex items-center gap-4">
         {/* Current Time */}
         <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-sm">
-          <Clock className="h-4 w-4 text-indigo-600" />
+          <Clock className="h-4 w-4 text-primary" />
           <div className="text-sm font-medium tabular-nums">{time}</div>
         </div>
 

@@ -60,7 +60,7 @@ export function EmployeeTopBar({ user, employee }: Props) {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="ابحث عن طلبات أو وثائق..."
-              className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-indigo-300 dark:focus:border-indigo-700"
+              className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-primary/30 dark:focus:border-primary"
             />
           </div>
         </div>

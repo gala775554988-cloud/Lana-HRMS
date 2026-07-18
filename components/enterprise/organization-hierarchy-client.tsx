@@ -97,13 +97,13 @@ function LazyTreeNode({ employee, level = 0 }: { employee: Employee; level?: num
     <div className="select-none text-sm">
       <div
         onClick={handleToggle}
-        className={`flex items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs transition-all duration-200 hover:border-indigo-300 hover:bg-indigo-50/40 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-800 dark:hover:bg-indigo-950/20 ${
+        className={`flex items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs transition-all duration-200 hover:border-primary/30 hover:bg-primary/40 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-primary dark:hover:bg-primary/20 ${
           hasChildren ? "cursor-pointer font-medium" : "cursor-default text-slate-700 dark:text-slate-300"
         }`}
       >
         <div className="flex items-center gap-3 min-w-0">
           {hasChildren ? (
-            <div className="h-6 w-6 rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400 flex items-center justify-center shrink-0">
+            <div className="h-6 w-6 rounded-lg bg-primary/8 text-primary dark:bg-primary/60 dark:text-primary/50 flex items-center justify-center shrink-0">
               {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4 rtl:rotate-180" />}
             </div>
           ) : (
@@ -115,7 +115,7 @@ function LazyTreeNode({ employee, level = 0 }: { employee: Employee; level?: num
             {employee.profilePhotoUrl ? (
               <AvatarImage src={employee.profilePhotoUrl} alt={fullName} className="object-cover" />
             ) : (
-              <AvatarFallback className="bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 font-bold text-xs">{initials}</AvatarFallback>
+              <AvatarFallback className="bg-primary/12 text-primary dark:bg-primary dark:text-primary/30 font-bold text-xs">{initials}</AvatarFallback>
             )}
           </Avatar>
           <div className="min-w-0">
@@ -131,7 +131,7 @@ function LazyTreeNode({ employee, level = 0 }: { employee: Employee; level?: num
           </div>
         </div>
         {hasChildren ? (
-          <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-2.5 py-0.5 text-xs font-semibold shrink-0 gap-1 shadow-xs">
+          <Badge className="bg-primary hover:bg-primary text-white rounded-xl px-2.5 py-0.5 text-xs font-semibold shrink-0 gap-1 shadow-xs">
             <Users className="h-3 w-3" />
             <span>{employee.childrenCount} مرؤوس</span>
           </Badge>
@@ -139,10 +139,10 @@ function LazyTreeNode({ employee, level = 0 }: { employee: Employee; level?: num
       </div>
 
       {isOpen && (
-        <div className="mt-2 ms-4 border-s-2 border-indigo-200/80 ps-4 space-y-2 dark:border-indigo-900/60 rtl:ms-0 rtl:me-4 rtl:border-s-0 rtl:border-e-2 rtl:ps-0 rtl:pe-4 animate-in fade-in duration-200">
+        <div className="mt-2 ms-4 border-s-2 border-primary/80 ps-4 space-y-2 dark:border-primary/60 rtl:ms-0 rtl:me-4 rtl:border-s-0 rtl:border-e-2 rtl:ps-0 rtl:pe-4 animate-in fade-in duration-200">
           {loading ? (
             <div className="flex items-center gap-2.5 rounded-xl border border-dashed border-slate-300 bg-slate-50/50 p-4 text-xs font-medium text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
-              <Loader2 className="h-4 w-4 animate-spin text-indigo-600 dark:text-indigo-400" />
+              <Loader2 className="h-4 w-4 animate-spin text-primary dark:text-primary/50" />
               <span>جاري تحميل المرؤوسين المباشرين للمدير ({fullName})...</span>
             </div>
           ) : children && children.length > 0 ? (
@@ -194,10 +194,10 @@ function LazyDepartmentNode({ department }: { department: Department }) {
     <div className="space-y-2">
       <div
         onClick={handleToggle}
-        className="flex items-center justify-between gap-4 rounded-2xl border border-indigo-200/80 bg-indigo-50/40 p-4 shadow-xs transition-all duration-200 hover:border-indigo-300 hover:bg-indigo-100/50 dark:border-indigo-900/50 dark:bg-indigo-950/20 dark:hover:border-indigo-800 dark:hover:bg-indigo-950/40 cursor-pointer"
+        className="flex items-center justify-between gap-4 rounded-2xl border border-primary/80 bg-primary/40 p-4 shadow-xs transition-all duration-200 hover:border-primary/30 hover:bg-primary/50 dark:border-primary/50 dark:bg-primary/20 dark:hover:border-primary dark:hover:bg-primary/40 cursor-pointer"
       >
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+          <div className="h-10 w-10 rounded-xl bg-primary text-white flex items-center justify-center shrink-0 shadow-sm">
             {isOpen ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5 rtl:rotate-180" />}
           </div>
           <div>
@@ -205,17 +205,17 @@ function LazyDepartmentNode({ department }: { department: Department }) {
             <p className="text-xs font-mono text-muted-foreground mt-0.5">رمز القسم: {department.code}</p>
           </div>
         </div>
-        <Badge variant="secondary" className="bg-white text-indigo-700 border-indigo-200 dark:bg-slate-900 dark:text-indigo-300 dark:border-indigo-800 px-3 py-1 text-xs font-bold gap-1.5 shadow-xs">
+        <Badge variant="secondary" className="bg-white text-primary border-primary/20 dark:bg-slate-900 dark:text-primary/30 dark:border-primary px-3 py-1 text-xs font-bold gap-1.5 shadow-xs">
           <Briefcase className="h-3.5 w-3.5" />
           <span>{empCount} رؤساء/مدراء في المستوى الأعلى</span>
         </Badge>
       </div>
 
       {isOpen && (
-        <div className="ms-4 border-s-2 border-indigo-300 ps-4 space-y-2.5 dark:border-indigo-800 rtl:ms-0 rtl:me-4 rtl:border-s-0 rtl:border-e-2 rtl:ps-0 rtl:pe-4 animate-in fade-in duration-200">
+        <div className="ms-4 border-s-2 border-primary/30 ps-4 space-y-2.5 dark:border-primary rtl:ms-0 rtl:me-4 rtl:border-s-0 rtl:border-e-2 rtl:ps-0 rtl:pe-4 animate-in fade-in duration-200">
           {loading ? (
             <div className="flex items-center gap-2.5 rounded-xl border border-dashed border-slate-300 bg-white p-4 text-xs font-medium text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
-              <Loader2 className="h-4 w-4 animate-spin text-indigo-600 dark:text-indigo-400" />
+              <Loader2 className="h-4 w-4 animate-spin text-primary dark:text-primary/50" />
               <span>جاري تحميل المستوى الأعلى للمدراء ورؤساء الفرق في ({department.name})...</span>
             </div>
           ) : roots && roots.length > 0 ? (
@@ -301,7 +301,7 @@ export function OrganizationHierarchyClient() {
   if (!payload || !store) {
     return (
       <div className="flex flex-col items-center justify-center rounded-3xl border border-slate-200/80 bg-white p-16 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <Loader2 className="h-10 w-10 animate-spin text-indigo-600 dark:text-indigo-400 mb-4" />
+        <Loader2 className="h-10 w-10 animate-spin text-primary dark:text-primary/50 mb-4" />
         <p className="text-base font-bold text-slate-900 dark:text-slate-100">جاري تحميل المستوى الأعلى للهيكل التنظيمي التفاعلي...</p>
         <p className="text-xs text-muted-foreground mt-1">يتم الآن تفعيل التحميل الكسول (Lazy Loading) لمنع تجمد المتصفح</p>
       </div>
@@ -312,7 +312,7 @@ export function OrganizationHierarchyClient() {
     <div className="space-y-6" dir="rtl">
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div>
-          <Badge className="bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800 mb-2 px-3 py-1 text-xs font-bold gap-1.5">
+          <Badge className="bg-primary/8 text-primary border-primary/20 dark:bg-primary/60 dark:text-primary/30 dark:border-primary mb-2 px-3 py-1 text-xs font-bold gap-1.5">
             <Network className="h-3.5 w-3.5" />
             <span>نظام الهيكل التنظيمي التدريجي (Lazy OrgChart)</span>
           </Badge>
@@ -322,7 +322,7 @@ export function OrganizationHierarchyClient() {
           </p>
         </div>
         <div className="flex items-center gap-3 self-end lg:self-auto">
-          <Button onClick={save} disabled={isPending} className="rounded-xl px-6 h-11 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md font-bold">
+          <Button onClick={save} disabled={isPending} className="rounded-xl px-6 h-11 gap-2 bg-primary hover:bg-primary text-white shadow-md font-bold">
             {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             <span>حفظ التعديلات</span>
           </Button>
@@ -330,26 +330,26 @@ export function OrganizationHierarchyClient() {
       </div>
 
       {message ? (
-        <div className="rounded-2xl border border-indigo-200 bg-indigo-50/80 p-4 text-sm font-semibold text-indigo-900 shadow-xs dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-200 animate-in fade-in">
+        <div className="rounded-2xl border border-primary/20 bg-primary/80 p-4 text-sm font-semibold text-primary shadow-xs dark:border-primary dark:bg-primary/40 dark:text-primary/20 animate-in fade-in">
           {message}
         </div>
       ) : null}
 
       <Tabs defaultValue="chart" className="w-full">
         <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 rounded-2xl bg-slate-100 p-1.5 h-auto dark:bg-slate-800">
-          <TabsTrigger value="chart" className="rounded-xl py-2.5 font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-indigo-400 gap-2">
+          <TabsTrigger value="chart" className="rounded-xl py-2.5 font-bold data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-primary/50 gap-2">
             <Network className="h-4 w-4" />
             <span>الهيكل الشجري التفاعلي</span>
           </TabsTrigger>
-          <TabsTrigger value="departments" className="rounded-xl py-2.5 font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-indigo-400 gap-2">
+          <TabsTrigger value="departments" className="rounded-xl py-2.5 font-bold data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-primary/50 gap-2">
             <Building2 className="h-4 w-4" />
             <span>مدراء الإدارات والأقسام</span>
           </TabsTrigger>
-          <TabsTrigger value="overrides" className="rounded-xl py-2.5 font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-indigo-400 gap-2">
+          <TabsTrigger value="overrides" className="rounded-xl py-2.5 font-bold data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-primary/50 gap-2">
             <Users className="h-4 w-4" />
             <span>المدراء المباشرون (استثناءات)</span>
           </TabsTrigger>
-          <TabsTrigger value="projects" className="rounded-xl py-2.5 font-bold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-indigo-400 gap-2">
+          <TabsTrigger value="projects" className="rounded-xl py-2.5 font-bold data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-primary/50 gap-2">
             <GitBranch className="h-4 w-4" />
             <span>مدراء الموارد البشرية والمشاريع</span>
           </TabsTrigger>
@@ -372,7 +372,7 @@ export function OrganizationHierarchyClient() {
               {/* Department level tree containers */}
               <div className="space-y-4">
                 <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                  <Building2 className="h-4 w-4 text-primary dark:text-primary/50" />
                   <span>الإدارات والأقسام الرئيسية ({payload.departments.length} قسم)</span>
                 </h3>
                 <div className="grid gap-3">
@@ -386,7 +386,7 @@ export function OrganizationHierarchyClient() {
               {payload.topRoots && payload.topRoots.length > 0 ? (
                 <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-800">
                   <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                    <Users className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                    <Users className="h-4 w-4 text-primary dark:text-primary/50" />
                     <span>القيادات ورؤساء الفرق الرئيسية (المستوى الأعلى - Top Level Roots)</span>
                   </h3>
                   <div className="space-y-2">
@@ -422,7 +422,7 @@ export function OrganizationHierarchyClient() {
                       if (event.target.value) draft.departmentManagers[department.id] = event.target.value;
                       else delete draft.departmentManagers[department.id];
                     })}
-                    className="h-10 w-full rounded-xl border bg-background px-3 text-xs font-medium focus:ring-2 focus:ring-indigo-500"
+                    className="h-10 w-full rounded-xl border bg-background px-3 text-xs font-medium focus:ring-2 focus:ring-primary"
                   >
                     <option value="">بدون مدير (غير محدد)</option>
                     {managersList.map((m) => (
@@ -471,7 +471,7 @@ export function OrganizationHierarchyClient() {
                         if (event.target.value) draft.directManagers[employee.id] = event.target.value;
                         else delete draft.directManagers[employee.id];
                       })}
-                      className="h-10 w-full rounded-xl border bg-background px-3 text-xs font-medium focus:ring-2 focus:ring-indigo-500"
+                      className="h-10 w-full rounded-xl border bg-background px-3 text-xs font-medium focus:ring-2 focus:ring-primary"
                     >
                       <option value="">تلقائي من Odoo / غير محدد</option>
                       {managersList.filter((m) => m.id !== employee.id).map((manager) => (
@@ -517,7 +517,7 @@ export function OrganizationHierarchyClient() {
                         ? Array.from(new Set([...draft.hrManagers, m.id]))
                         : draft.hrManagers.filter((id) => id !== m.id);
                     })}
-                    className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 shrink-0"
+                    className="h-4 w-4 rounded text-primary focus:ring-primary shrink-0"
                   />
                 </label>
               ))}

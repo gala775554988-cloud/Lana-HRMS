@@ -25,10 +25,10 @@ export function QuickActions() {
           const Icon = action.icon;
           return (
             <Link key={index} href={action.href}>
-              <Card className="border-slate-200 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-800 transition group h-full">
+              <Card className="border-slate-200 dark:border-slate-800 hover:border-primary/20 dark:hover:border-primary transition group h-full">
                 <CardContent className="p-4 flex flex-col items-start">
-                  <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 transition mb-3">
-                    <Icon className="h-5 w-5 text-indigo-600" />
+                  <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 group-hover:bg-primary/12 dark:group-hover:bg-primary/50 transition mb-3">
+                    <Icon className="h-5 w-5 text-primary" />
                   </div>
                   <div className="font-medium text-sm">{action.label}</div>
                   <div className="text-xs text-slate-500 mt-0.5">{action.desc}</div>

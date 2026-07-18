@@ -42,11 +42,11 @@ export function LanaAnalytics() {
   }, []);
 
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-900 via-purple-900 to-teal-900 p-6 text-white shadow-2xl transition-all duration-300 hover:shadow-indigo-950/50" dir="rtl">
+    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-primary via-purple-900 to-teal-900 p-6 text-white shadow-2xl transition-all duration-300 hover:shadow-primary/50" dir="rtl">
       {/* Background Decorative Grid and Glow */}
       <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
       <div className="absolute -left-12 -top-12 h-48 w-48 rounded-full bg-teal-400/20 blur-3xl pointer-events-none" />
-      <div className="absolute -right-12 -bottom-12 h-48 w-48 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none" />
+      <div className="absolute -right-12 -bottom-12 h-48 w-48 rounded-full bg-primary/20 blur-3xl pointer-events-none" />
 
       <div className="relative z-10 space-y-4">
         {/* Header Bar */}
@@ -98,7 +98,7 @@ export function LanaAnalytics() {
             </div>
             <div className="rounded-xl bg-black/20 border border-white/10 p-2.5 flex items-center justify-between">
               <span className="text-xs text-white/70">المستشفيات النشطة</span>
-              <span className="font-mono font-black text-sm text-indigo-300">{metrics.activeHospitals} موقع</span>
+              <span className="font-mono font-black text-sm text-primary/30">{metrics.activeHospitals} موقع</span>
             </div>
             <div className="rounded-xl bg-black/20 border border-white/10 p-2.5 flex items-center justify-between">
               <span className="text-xs text-white/70">حضور اليوم</span>

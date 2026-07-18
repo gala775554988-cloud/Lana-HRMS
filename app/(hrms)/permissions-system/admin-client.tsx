@@ -149,7 +149,7 @@ function RolesTab({ initialRoles }: { initialRoles: any[] }) {
             <button
               key={role.id}
               onClick={() => selectRole(role)}
-              className={`w-full rounded-lg border p-3 text-start text-sm transition ${selectedRoleId === role.id ? "border-indigo-500 bg-indigo-50" : "hover:bg-muted"}`}
+              className={`w-full rounded-lg border p-3 text-start text-sm transition ${selectedRoleId === role.id ? "border-primary bg-primary/8" : "hover:bg-muted"}`}
             >
               <div className="flex items-center justify-between">
                 <span className="font-semibold">{role.name}</span>
@@ -187,7 +187,7 @@ function RolesTab({ initialRoles }: { initialRoles: any[] }) {
                     <p className="mb-2 text-sm font-semibold">{category.title}</p>
                     <div className="flex flex-wrap gap-2">
                       {category.permissions.map((key) => (
-                        <label key={key} className={`flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${draftPermissions.has(key) ? "border-indigo-500 bg-indigo-50" : ""}`}>
+                        <label key={key} className={`flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${draftPermissions.has(key) ? "border-primary bg-primary/8" : ""}`}>
                           <input type="checkbox" checked={draftPermissions.has(key)} onChange={() => togglePermission(key)} className="h-3.5 w-3.5" />
                           {key}
                           <PermissionHint permission={key} />
@@ -364,7 +364,7 @@ export function PermissionsAdmin({ allRoles, branches, departments, hospitals = 
 
   return (
     <div className="space-y-6 p-4" dir="rtl">
-      <div className="flex items-center gap-3"><Shield className="h-8 w-8 text-indigo-600" /><h1 className="text-2xl font-black">نظام الصلاحيات المؤسسي</h1></div>
+      <div className="flex items-center gap-3"><Shield className="h-8 w-8 text-primary" /><h1 className="text-2xl font-black">نظام الصلاحيات المؤسسي</h1></div>
       {msg && <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-green-800 text-sm" onClick={()=>setMsg("")}>{msg}</div>}
       <div className="flex gap-2">
         <Button variant={tab==="roles"?"default":"outline"} onClick={()=>setTab("roles")}>الأدوار</Button>
@@ -401,9 +401,9 @@ export function PermissionsAdmin({ allRoles, branches, departments, hospitals = 
                 const scopeInfo = SCOPES.find(([k]) => k === s.scope)?.[1] || s.scope;
                 const targetDetails = s.branchName ? ` (فرع: ${s.branchName})` : s.departmentName ? ` (قسم: ${s.departmentName})` : s.hospitalName ? ` (مستشفى: ${s.hospitalName})` : "";
                 return (
-                  <div key={s.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border bg-card p-3.5 transition hover:border-indigo-500/30">
+                  <div key={s.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border bg-card p-3.5 transition hover:border-primary/30">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400 text-xs font-bold">
+                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/8 text-primary dark:bg-primary/50 dark:text-primary/50 text-xs font-bold">
                         {s.userLabel ? s.userLabel.charAt(0) : "👤"}
                       </div>
                       <div className="min-w-0">
@@ -412,10 +412,10 @@ export function PermissionsAdmin({ allRoles, branches, departments, hospitals = 
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5 shrink-0">
-                      <Badge variant="secondary" className="text-xs font-semibold bg-indigo-100/80 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
+                      <Badge variant="secondary" className="text-xs font-semibold bg-primary/80 text-primary dark:bg-primary/40 dark:text-primary/30">
                         {moduleLabel}
                       </Badge>
-                      <Badge variant="outline" className="text-xs font-semibold border-indigo-200 text-indigo-600 dark:border-indigo-800 dark:text-indigo-400">
+                      <Badge variant="outline" className="text-xs font-semibold border-primary/20 text-primary dark:border-primary dark:text-primary/50">
                         {scopeInfo}{targetDetails}
                       </Badge>
                       <Button size="icon" variant="ghost" className="h-7 w-7 text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/50" onClick={() => removeScope(s.id)} title="حذف نطاق الصلاحية">

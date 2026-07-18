@@ -215,14 +215,14 @@ export async function ModulePageBody({
       </div>
 
       {/* Compact single-row toolbar: search + filters on one side, import/export/reports tucked into a menu */}
-      <div className="flex flex-col gap-3 rounded-xl border bg-card px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-2xl border bg-card px-4 py-3 shadow-premium-sm sm:flex-row sm:items-center sm:justify-between">
         <form className="flex flex-1 flex-wrap items-center gap-2">
           {tabValue ? <input type="hidden" name="tab" value={tabValue} /> : null}
           <label className="relative min-w-[200px] flex-1 max-w-sm">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground rtl:left-auto rtl:right-3" />
-            <input name={paramKey("search")} defaultValue={search} placeholder={t.searchPlaceholder} className="h-9 w-full rounded-md border bg-background px-3 ps-9 text-sm rtl:ps-3 rtl:pe-9" />
+            <input name={paramKey("search")} defaultValue={search} placeholder={t.searchPlaceholder} className="h-9 w-full rounded-xl border bg-background px-3 ps-9 text-sm transition-all duration-300 ease-premium hover:border-primary/30 focus-visible:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rtl:ps-3 rtl:pe-9" />
           </label>
-          {resource.filterFields.slice(0, 2).map((field) => <input key={field} name={paramKey(field)} defaultValue={String(filters[field] ?? "")} placeholder={getFieldLabel(field)} className="h-9 w-36 rounded-md border bg-background px-3 text-sm" />)}
+          {resource.filterFields.slice(0, 2).map((field) => <input key={field} name={paramKey(field)} defaultValue={String(filters[field] ?? "")} placeholder={getFieldLabel(field)} className="h-9 w-36 rounded-xl border bg-background px-3 text-sm transition-all duration-300 ease-premium hover:border-primary/30 focus-visible:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />)}
           <Button type="submit" size="sm" variant="secondary"><SlidersHorizontal className="me-1.5 h-3.5 w-3.5" />{t.apply}</Button>
         </form>
         <div className="flex items-center gap-1">
@@ -392,7 +392,7 @@ async function ModuleDataSection({
   return (
     <div className="space-y-4">
       <ModuleTable resource={resource} records={data.records as (Record<string, unknown> & { id: string })[]} dictionary={dictionary} locale={locale} />
-      <div className="flex flex-col gap-3 rounded-lg border bg-card p-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-2xl border bg-card p-3 text-sm text-muted-foreground shadow-premium-sm sm:flex-row sm:items-center sm:justify-between">
         <span>{t.page} {data.page} {t.of} {data.pageCount} - {data.total} {t.records}</span>
         <div className="flex gap-2">
           <Button asChild variant="outline" size="sm"><Link href={buildQueryString(query, { [paramKey("page")]: String(Math.max(data.page - 1, 1)) })}>{t.previous}</Link></Button>
@@ -406,14 +406,14 @@ async function ModuleDataSection({
 function ImportPopover({ resourceKey, fieldNames }: { resourceKey: string; fieldNames: string }) {
   return (
     <details className="relative">
-      <summary className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground [&::-webkit-details-marker]:hidden" aria-label="استيراد بيانات">
+      <summary className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground [&::-webkit-details-marker]:hidden" aria-label="استيراد بيانات">
         <Upload className="h-4 w-4" />
       </summary>
-      <div className="absolute end-0 z-50 mt-2 w-80 rounded-lg border bg-popover p-4 text-popover-foreground shadow-md">
+      <div className="premium-pop-in absolute end-0 z-50 mt-2 w-80 rounded-2xl border border-border/70 bg-popover/95 p-4 text-popover-foreground shadow-premium-lg backdrop-blur-xl">
         <p className="mb-1 text-sm font-semibold">استيراد البيانات</p>
         <p className="mb-3 text-xs text-muted-foreground">ارفع ملف Excel أو CSV يحتوي على أعمدة مطابقة لحقول الوحدة: {fieldNames}</p>
         <form action={`/api/hr/${resourceKey}/import`} method="post" encType="multipart/form-data" className="flex flex-col gap-2">
-          <input name="file" type="file" accept=".xlsx,.xls,.csv" required className="h-9 w-full rounded-md border bg-background px-2 py-1.5 text-xs" />
+          <input name="file" type="file" accept=".xlsx,.xls,.csv" required className="h-9 w-full rounded-xl border bg-background px-2 py-1.5 text-xs" />
           <Button type="submit" size="sm"><Upload className="me-1.5 h-3.5 w-3.5" />استيراد</Button>
         </form>
       </div>

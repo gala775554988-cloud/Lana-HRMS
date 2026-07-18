@@ -36,18 +36,18 @@ export function OdooEmployeeMasterSyncButton() {
   }
 
   return (
-    <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-4 shadow-sm dark:border-indigo-900/50 dark:from-indigo-950/30 dark:to-slate-950">
+    <div className="rounded-2xl border border-primary/12 bg-gradient-to-br from-primary/8 to-white p-4 shadow-sm dark:border-primary/50 dark:from-primary/30 dark:to-slate-950">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <div className="flex items-center gap-2 font-black text-indigo-950 dark:text-indigo-100">
-            <Zap className="h-5 w-5 text-indigo-600" />
+          <div className="flex items-center gap-2 font-black text-primary dark:text-primary/12">
+            <Zap className="h-5 w-5 text-primary" />
             مزامنة الموظفين الدقيقة من Odoo
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             يزامن الاسم، رقم الهوية، الكود، الكفيل، والمدير مباشرة من Odoo. عند تعارض الكود يتم اعتماد كود Odoo ونقل الكود القديم مؤقتاً.
           </p>
         </div>
-        <Button onClick={runSync} disabled={pending} className="min-w-52 gap-2 bg-indigo-600 text-white hover:bg-indigo-700">
+        <Button onClick={runSync} disabled={pending} className="min-w-52 gap-2 bg-primary text-white hover:bg-primary">
           <RefreshCw className={pending ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
           {pending ? "جاري المزامنة..." : "مزامنة الموظفين الآن"}
         </Button>

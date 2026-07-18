@@ -1,14 +1,12 @@
 "use server";
 
 import { AuthError } from "next-auth";
-import { headers } from "next/headers";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { signIn, signOut, findUser } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { hashToken } from "@/lib/tokens";
 import { verifyOrBindEmployeeDevice } from "@/lib/cache/device-cache";
-import { verifyTurnstileToken } from "@/lib/security/turnstile";
 import {
   emailVerificationSchema,
   forgotPasswordSchema,
@@ -27,22 +25,7 @@ export async function loginAction(input: unknown): Promise<ActionState> {
   }
 
   try {
-    const { identifier, password, deviceId, turnstileToken } = parsed.data;
-
-    // 0. Turnstile bot-protection gate -- checked before any DB lookup so a
-    // failed/missing verification never even touches identity or password
-    // logic. Also independently re-enforced inside authorize() (see auth.ts),
-    // which is the actual boundary NextAuth calls -- this early check exists
-    // purely for a clear, dedicated error message instead of the generic
-    // AuthError catch-all below.
-    const remoteIp = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
-    const turnstileOk = await verifyTurnstileToken(turnstileToken, remoteIp);
-    if (!turnstileOk) {
-      return {
-        success: false,
-        message: "فشل التحقق الأمني (Turnstile). يرجى إعادة المحاولة."
-      };
-    }
+    const { identifier, password, deviceId } = parsed.data;
 
     // 1. Pre-verify identity & password with exact error diagnostics
     const user = await findUser(identifier);
@@ -101,7 +84,6 @@ export async function loginAction(input: unknown): Promise<ActionState> {
       identifier,
       password,
       deviceId,
-      turnstileToken,
       redirect: false,
     });
     return { success: true, message: "" };
