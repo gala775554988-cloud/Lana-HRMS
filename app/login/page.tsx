@@ -1,9 +1,8 @@
-import { Suspense } from "react";
 import { Activity, CalendarCheck2, FileText, Hospital, Smartphone, Users, WalletCards, LayoutGrid, Monitor, Video, ShieldCheck } from "lucide-react";
 import { getRequestDictionary } from "@/lib/i18n-server";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { ClientLanguageToggle } from "@/components/i18n/client-language-toggle";
-import { LoginForm } from "./login-form";
+import { LoginCard } from "@/components/auth/login-card";
 
 const stats = [
   { label: "عدد الموظفين", value: "4580", icon: Users },
@@ -162,21 +161,10 @@ export default async function LoginPage() {
   }));
   const isAr = locale === "ar";
   const loginPanel = (
-    <section className="relative flex min-h-screen items-center justify-center bg-slate-50/90 p-6 dark:bg-slate-950" dir={isAr ? "rtl" : "ltr"}>
+    <section className="relative flex min-h-screen items-center justify-center bg-white p-6 dark:bg-slate-950" dir={isAr ? "rtl" : "ltr"}>
       <div className="absolute end-4 top-4"><ClientLanguageToggle variant="outline" /></div>
-      <div className="w-full max-w-md">
-        <div className="mb-7 flex flex-col items-center text-center lg:items-start lg:text-start">
-          <div className="flex items-center gap-3">
-            <BrandLogo href="/" size="hero" showText={false} logoClassName="border-slate-300 shadow-2xl shadow-primary/10 ring-4 ring-white/80 dark:border-slate-700 dark:ring-slate-800" imageClassName="p-2" />
-            <h1 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 sm:text-3xl">Lana <span className="font-medium text-primary">HRMS</span></h1>
-          </div>
-          <p className="mt-3 text-sm font-medium text-slate-400 dark:text-slate-500">البوابة الموحدة لدخول الموظفين والمسؤولين</p>
-        </div>
-        <div className="rounded-2xl border border-slate-200/80 bg-white/70 p-8 shadow-glass backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/70">
-          <Suspense><LoginForm dictionary={dictionary} /></Suspense>
-        </div>
-      </div>
+      <LoginCard dictionary={dictionary} />
     </section>
   );
-  return (<main className="min-h-screen bg-slate-50 dark:bg-slate-950" dir="ltr"><div className="grid min-h-screen lg:grid-cols-[65fr_35fr]">{isAr ? (<><MarketingPanel />{loginPanel}</>) : (<>{loginPanel}<MarketingPanel /></>)}</div></main>);
+  return (<main className="min-h-screen bg-white dark:bg-slate-950" dir="ltr"><div className="grid min-h-screen lg:grid-cols-[65fr_35fr]">{isAr ? (<><MarketingPanel />{loginPanel}</>) : (<>{loginPanel}<MarketingPanel /></>)}</div></main>);
 }

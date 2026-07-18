@@ -39,7 +39,7 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
-          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://static.cloudflareinsights.com https://*.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com https://fonts.googleapis.com; connect-src 'self' https: wss: ws: https://challenges.cloudflare.com https://static.cloudflareinsights.com https://*.cloudflare.com; frame-src 'self' https://challenges.cloudflare.com https://*.cloudflare.com; child-src 'self' https://challenges.cloudflare.com https://*.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" },
+          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com https://fonts.googleapis.com; connect-src 'self' https: wss: ws:; frame-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" },
           { key: "X-XSS-Protection", value: "0" },
           { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
         ]
