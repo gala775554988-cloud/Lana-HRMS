@@ -76,6 +76,42 @@ export async function notifyAdminOnUnauthorizedDeviceAttempt(
   }
 }
 
+const MULTI_DEVICE_ROLES = new Set(["SUPER_ADMIN", "MANAGER"]);
+const MULTI_DEVICE_OVERRIDE_TTL_MS = 5 * 60 * 1000; // short TTL: an admin revoking the flag should take effect quickly
+const multiDeviceOverrideMemoryMap = new Map<string, { value: boolean; expiresAt: number }>();
+
+/**
+ * Request A: Permission Override for "تعدد الأجهزة" (multi-device access).
+ * SUPER_ADMIN / MANAGER roles, or a user explicitly flagged via
+ * `User.canUseMultipleDevices` (toggled from the Permissions admin
+ * dashboard), skip the single-device lock entirely below.
+ */
+async function hasMultiDeviceOverride(employeeId: string): Promise<boolean> {
+  const cacheKey = `multi_device_override:${employeeId}`;
+  const cached = multiDeviceOverrideMemoryMap.get(cacheKey);
+  if (cached && Date.now() <= cached.expiresAt) return cached.value;
+
+  try {
+    const employee = await prisma.employee.findUnique({
+      where: { id: employeeId },
+      select: {
+        user: {
+          select: {
+            canUseMultipleDevices: true,
+            roles: { select: { role: { select: { name: true } } } }
+          }
+        }
+      }
+    });
+    const user = employee?.user;
+    const override = Boolean(user?.canUseMultipleDevices) || Boolean(user?.roles.some((r) => MULTI_DEVICE_ROLES.has(r.role.name)));
+    multiDeviceOverrideMemoryMap.set(cacheKey, { value: override, expiresAt: Date.now() + MULTI_DEVICE_OVERRIDE_TTL_MS });
+    return override;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Ultra-fast Redis / In-Memory device binding verification & cache (`< 50ms`).
  * - First checks high-speed memory/Redis cache (`device_binding:${employeeId}`).
@@ -88,6 +124,10 @@ export async function verifyOrBindEmployeeDevice(employeeId: string, deviceId?: 
   const cleanDeviceId = (deviceId || "").trim();
   if (!cleanDeviceId || cleanDeviceId === "unknown" || cleanDeviceId === "server-side" || cleanDeviceId === "mobile-session-fallback") {
     return { allowed: true, reason: "WEB_OR_UNBOUND_SESSION" };
+  }
+
+  if (await hasMultiDeviceOverride(employeeId)) {
+    return { allowed: true, reason: "MULTI_DEVICE_OVERRIDE" };
   }
 
   const cacheKey = `device_binding:${employeeId}`;
@@ -153,6 +193,15 @@ export async function verifyOrBindEmployeeDevice(employeeId: string, deviceId?: 
   } catch (error) {
     return { allowed: true, reason: "DEVICE_CHECK_FAILSAFE_ALLOWED" };
   }
+}
+
+/**
+ * Called after an admin toggles `User.canUseMultipleDevices` (or a role
+ * assignment changes) so the in-memory override cache doesn't serve a stale
+ * decision for up to `MULTI_DEVICE_OVERRIDE_TTL_MS`.
+ */
+export function invalidateMultiDeviceOverrideCache(): void {
+  multiDeviceOverrideMemoryMap.clear();
 }
 
 /**

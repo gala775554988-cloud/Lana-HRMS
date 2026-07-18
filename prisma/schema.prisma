@@ -27,6 +27,7 @@ model User {
   lockedReason            String?
   lockedAt                DateTime?
   lockedById              String?
+  canUseMultipleDevices   Boolean                  @default(false)
   loginAttempts           Int                      @default(0)
   lastFailedLoginAt       DateTime?
   loginCount              Int                      @default(0)
