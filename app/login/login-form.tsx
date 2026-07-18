@@ -22,7 +22,6 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
   const [message, setMessage] = useState<string | null>(null);
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [shaking, setShaking] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const form = useForm<LoginInput>({
@@ -36,16 +35,6 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
     const id = window.localStorage.getItem("lana.hrms.rememberedIdentifier");
     if (id) { form.setValue("identifier", id); setRememberMe(true); }
   }, [form]);
-
-  // Re-triggers the shake on every failed submit (even repeat failures with
-  // the same message) without remounting the inputs -- onSubmit always
-  // resets message to null first, so this always sees a real transition.
-  useEffect(() => {
-    if (!message) return;
-    setShaking(true);
-    const timer = setTimeout(() => setShaking(false), 400);
-    return () => clearTimeout(timer);
-  }, [message]);
 
   function onSubmit(values: LoginInput) {
     setMessage(null);
@@ -77,12 +66,12 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
   return (
     <form className="space-y-7" onSubmit={form.handleSubmit(onSubmit)} noValidate>
       {message ? (
-        <Alert variant="destructive" className="animate-in fade-in slide-in-from-top-1 duration-300">
+        <Alert variant="destructive">
           <AlertDescription>{message}</AlertDescription>
         </Alert>
       ) : null}
       <div
-        className={`animate-in fade-in slide-in-from-bottom-2 relative border-b-2 pb-1.5 pt-3 duration-500 fill-mode-both focus-within:border-primary ${identifierError ? "border-destructive" : "border-slate-200 dark:border-slate-700"} ${shaking && identifierError ? "animate-shake" : ""}`}
+        className={`relative border-b-2 pb-1.5 pt-3 focus-within:border-primary ${identifierError ? "border-destructive" : "border-slate-200 dark:border-slate-700"}`}
       >
         <div className="relative">
           <Input
@@ -108,7 +97,7 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
         {form.formState.errors.identifier ? <p className="text-xs text-destructive" role="alert">{form.formState.errors.identifier.message}</p> : null}
       </div>
       <div
-        className={`animate-in fade-in slide-in-from-bottom-2 relative border-b-2 pb-1.5 pt-3 delay-100 duration-500 fill-mode-both focus-within:border-primary ${passwordError ? "border-destructive" : "border-slate-200 dark:border-slate-700"} ${shaking && passwordError ? "animate-shake" : ""}`}
+        className={`relative border-b-2 pb-1.5 pt-3 focus-within:border-primary ${passwordError ? "border-destructive" : "border-slate-200 dark:border-slate-700"}`}
       >
         <div className="flex items-center justify-end">
           <span className="text-xs font-medium text-primary">إذا نسيت كلمة المرور يرجى مراجعة إدارة الموارد البشرية</span>
@@ -132,17 +121,15 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
           <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute end-0 top-1.5 rounded p-1 text-muted-foreground transition-colors duration-300 ease-in-out hover:text-foreground">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
         </div>
       </div>
-      <label className="animate-in fade-in slide-in-from-bottom-2 flex cursor-pointer items-center gap-2.5 select-none delay-200 duration-500 fill-mode-both">
-        <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} className="h-4 w-4 rounded border-input text-primary transition-all duration-300 ease-in-out focus-visible:ring-primary" />
+      <label className="flex cursor-pointer items-center gap-2.5 select-none">
+        <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} className="h-4 w-4 rounded border-input text-primary focus-visible:ring-primary" />
         <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{dictionary.auth.rememberTitle}</span>
       </label>
       {TURNSTILE_SITE_KEY ? (
-        <div className="animate-in fade-in slide-in-from-bottom-2 delay-300 duration-500 fill-mode-both">
-          <TurnstileWidget siteKey={TURNSTILE_SITE_KEY} onVerify={setTurnstileToken} />
-        </div>
+        <TurnstileWidget siteKey={TURNSTILE_SITE_KEY} onVerify={setTurnstileToken} />
       ) : null}
       <Button
-        className="h-12 w-full animate-in fade-in slide-in-from-bottom-2 rounded-lg text-sm font-semibold shadow-lg shadow-primary/20 delay-300 duration-500 fill-mode-both active:scale-95"
+        className="h-12 w-full rounded-lg text-sm font-semibold shadow-lg shadow-primary/20 active:scale-95"
         type="submit"
         disabled={isPending || !turnstileToken}
       >

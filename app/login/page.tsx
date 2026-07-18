@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { Activity, CalendarCheck2, FileText, Hospital, Smartphone, Users, WalletCards, Play, LayoutGrid, Monitor, Video, ShieldCheck } from "lucide-react";
+import { Activity, CalendarCheck2, FileText, Hospital, Smartphone, Users, WalletCards, LayoutGrid, Monitor, Video, ShieldCheck } from "lucide-react";
 import { getRequestDictionary } from "@/lib/i18n-server";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { ClientLanguageToggle } from "@/components/i18n/client-language-toggle";
@@ -15,6 +15,22 @@ const stats = [
 ];
 
 const phoneSlides = ["Dashboard", "Employees", "Attendance", "Leaves", "Payroll", "Overtime"];
+
+const PHONE_VIDEO_POSTER = `data:image/svg+xml,${encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="220" viewBox="0 0 400 220">
+    <defs>
+      <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#00A896"/>
+        <stop offset="100%" stop-color="#028090"/>
+      </linearGradient>
+    </defs>
+    <rect width="400" height="220" fill="url(#g)"/>
+    <circle cx="200" cy="100" r="28" fill="rgba(255,255,255,0.2)"/>
+    <circle cx="200" cy="100" r="19" fill="#ffffff"/>
+    <path d="M193 89 L213 100 L193 111 Z" fill="#00A896"/>
+    <text x="200" y="155" font-family="Cairo, sans-serif" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">لانا الطبية</text>
+  </svg>`
+)}`;
 
 function MarketingPanel() {
   return (
@@ -77,15 +93,15 @@ function MarketingPanel() {
                     </span>
                     <span className="font-mono text-[8px] text-slate-400">02:45</span>
                   </div>
-                  <div className="relative h-28 w-full bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex flex-col items-center justify-center p-3 text-center">
-                    <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:8px_8px]" />
-                    <div className="grid h-10 w-10 place-items-center rounded-full bg-primary text-white shadow-lg shadow-primary/40 transition group-hover:scale-110 cursor-pointer z-10">
-                      <Play className="h-4 w-4 fill-white ms-0.5" />
-                    </div>
-                    <p className="mt-2 text-[10px] font-bold text-white/90 z-10 truncate max-w-full">
-                      لانا الطبية - جولة شاملة للمنصة
-                    </p>
-                  </div>
+                  <video
+                    className="h-28 w-full bg-slate-900 object-cover"
+                    controls
+                    playsInline
+                    preload="none"
+                    poster={PHONE_VIDEO_POSTER}
+                  >
+                    <source src="/lana-intro.mp4" type="video/mp4" />
+                  </video>
                 </div>
 
                 {/* 2-Column Grid of UI Screenshot Modules */}
@@ -146,14 +162,14 @@ export default async function LoginPage() {
     <section className="relative flex min-h-screen items-center justify-center bg-slate-50/90 p-6 dark:bg-slate-950" dir={isAr ? "rtl" : "ltr"}>
       <div className="absolute end-4 top-4"><ClientLanguageToggle variant="outline" /></div>
       <div className="w-full max-w-md">
-        <div className="mb-7 flex animate-in fade-in slide-in-from-bottom-2 flex-col items-center text-center duration-500 fill-mode-both lg:items-start lg:text-start">
+        <div className="mb-7 flex flex-col items-center text-center lg:items-start lg:text-start">
           <div className="flex items-center gap-3">
             <BrandLogo href="/" size="hero" showText={false} logoClassName="border-slate-300 shadow-2xl shadow-primary/10 ring-4 ring-white/80 dark:border-slate-700 dark:ring-slate-800" imageClassName="p-2" />
             <h1 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 sm:text-3xl">Lana <span className="font-medium text-primary">HRMS</span></h1>
           </div>
           <p className="mt-3 text-sm font-medium text-slate-400 dark:text-slate-500">البوابة الموحدة لدخول الموظفين والمسؤولين</p>
         </div>
-        <div className="animate-in fade-in slide-in-from-bottom-4 rounded-2xl border border-slate-200/80 bg-white/70 p-8 shadow-glass backdrop-blur-md duration-500 delay-150 fill-mode-both dark:border-slate-800 dark:bg-slate-900/70">
+        <div className="rounded-2xl border border-slate-200/80 bg-white/70 p-8 shadow-glass backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/70">
           <Suspense><LoginForm dictionary={dictionary} /></Suspense>
         </div>
       </div>
