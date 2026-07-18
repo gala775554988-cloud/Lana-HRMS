@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { OdooClient } from "@/lib/integrations/odoo/client";
-import { syncEmployeeDocuments } from "@/lib/integrations/odoo/documents";
+import { bulkSyncAllOdooDocuments } from "@/lib/integrations/odoo/documents";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,9 +10,9 @@ export const maxDuration = 300;
 
 /**
  * Dedicated high-speed Odoo Document Sync Endpoint (`/api/internal/sync-odoo-documents`).
- * Connects directly to Odoo API (`ir.attachment`) on Vercel to pull residency cards (`هوية مقيم`),
- * training certificates (`شهادة تدريب 39.pdf`), and ID copies (`1605.pdf`) across all employees
- * without requiring admin web permission.
+ * Connects directly to Odoo API (`ir.attachment`) in one single bulk search_read query
+ * on Vercel to pull residency cards (`هوية مقيم`), training certificates (`شهادة تدريب 39.pdf`),
+ * and ID copies (`1605.pdf`) across all employees inside ~3-4 seconds.
  */
 export async function GET(request: NextRequest) {
   return executeDocumentSync(request);
@@ -25,43 +25,20 @@ export async function POST(request: NextRequest) {
 async function executeDocumentSync(request: NextRequest) {
   try {
     const limitParam = request.nextUrl.searchParams.get("limit");
-    const limit = limitParam ? parseInt(limitParam, 10) : 2000;
+    const limit = limitParam ? parseInt(limitParam, 10) : 3000;
 
     const client = OdooClient.fromEnv();
     await client.connect();
 
-    const employees = await prisma.employee.findMany({
-      where: { odooId: { not: null } },
-      select: { id: true, odooId: true, firstName: true, lastName: true },
-      take: limit,
-      orderBy: { id: "asc" }
-    });
-
-    let totalImported = 0;
-    let totalSkipped = 0;
-    const allErrors: string[] = [];
-
-    for (const emp of employees) {
-      if (!emp.odooId) continue;
-      try {
-        const res = await syncEmployeeDocuments(client, emp.odooId, emp.id);
-        totalImported += res.imported;
-        totalSkipped += res.skipped;
-        for (const err of res.errors) {
-          allErrors.push(`[Emp #${emp.odooId}] ${err.attachmentName}: ${err.message}`);
-        }
-      } catch (err: any) {
-        allErrors.push(`[Emp #${emp.odooId}] ${err?.message || err}`);
-      }
-    }
+    const res = await bulkSyncAllOdooDocuments(client, limit);
 
     return NextResponse.json({
       success: true,
-      message: `تم سحب المرفقات والمستندات بنجاح (${totalImported} مستند جديد من أودو)`,
-      totalEmployeesChecked: employees.length,
-      imported: totalImported,
-      skipped: totalSkipped,
-      errors: allErrors.slice(0, 50)
+      message: `تم سحب وحفظ المرفقات والمستندات بنجاح (${res.imported} مستند جديد مضاف من أودو، ${res.skipped} متواجد مسبقاً)`,
+      imported: res.imported,
+      skipped: res.skipped,
+      errorsCount: res.errors.length,
+      errors: res.errors.slice(0, 50)
     });
   } catch (error: any) {
     const msg = error instanceof Error ? error.message : String(error);
