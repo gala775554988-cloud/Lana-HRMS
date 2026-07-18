@@ -10,8 +10,8 @@ export function resolveRoleDashboard(userRoles?: string[] | null): string {
   if (!userRoles || !Array.isArray(userRoles)) return DEFAULT_LOGIN_REDIRECT;
   const roleSet = new Set(userRoles);
 
-  // SUPER_ADMIN is always sent to the HR administration area.
-  if (roleSet.has("SUPER_ADMIN")) return "/employees";
+  // SUPER_ADMIN is always sent to the Central Executive Dashboard.
+  if (roleSet.has("SUPER_ADMIN")) return "/dashboard";
 
   // Any normal user that has EMPLOYEE must land in the Employee Portal, even if
   // a position-title inference added HR_MANAGER/DEPARTMENT_MANAGER. This was the
@@ -21,7 +21,7 @@ export function resolveRoleDashboard(userRoles?: string[] | null): string {
   const isAdminOrManager = userRoles.some((role) =>
     ["HR_MANAGER", "PAYROLL_MANAGER", "RECRUITER", "MANAGER", "HR", "DEPARTMENT_MANAGER", "BRANCH_MANAGER", "SUPERVISOR", "PROJECT_MANAGER"].includes(role)
   );
-  if (isAdminOrManager) return "/employees";
+  if (isAdminOrManager) return "/dashboard";
   return DEFAULT_LOGIN_REDIRECT;
 }
 
