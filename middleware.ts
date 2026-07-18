@@ -63,6 +63,10 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL(resolveRoleDashboard(roles), request.url));
     }
     if (!loggedIn) {
+      // "/" renders its own public landing page for signed-out visitors
+      // (app/page.tsx) and only redirects to /login from within the route
+      // itself for the authenticated branch, so don't force it here.
+      if (isRoot) return NextResponse.next();
       return NextResponse.redirect(new URL("/login", request.url));
     }
     return NextResponse.next();
