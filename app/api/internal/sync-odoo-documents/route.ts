@@ -13,6 +13,7 @@ export const maxDuration = 300;
  * Connects directly to Odoo API (`ir.attachment`) in one single bulk search_read query
  * on Vercel to pull residency cards (`هوية مقيم`), training certificates (`شهادة تدريب 39.pdf`),
  * and ID copies (`1605.pdf`) across all employees inside ~3-4 seconds.
+ * Supports pagination (`?limit=200&offset=0`) for automatic background batch extraction.
  */
 export async function GET(request: NextRequest) {
   return executeDocumentSync(request);
@@ -25,18 +26,21 @@ export async function POST(request: NextRequest) {
 async function executeDocumentSync(request: NextRequest) {
   try {
     const limitParam = request.nextUrl.searchParams.get("limit");
+    const offsetParam = request.nextUrl.searchParams.get("offset");
     const limit = limitParam ? parseInt(limitParam, 10) : 3000;
+    const offset = offsetParam ? parseInt(offsetParam, 10) : 0;
 
     const client = OdooClient.fromEnv();
     await client.connect();
 
-    const res = await bulkSyncAllOdooDocuments(client, limit);
+    const res = await bulkSyncAllOdooDocuments(client, limit, offset);
 
     return NextResponse.json({
       success: true,
       message: `تم سحب وحفظ المرفقات والمستندات بنجاح (${res.imported} مستند جديد مضاف من أودو، ${res.skipped} متواجد مسبقاً)`,
       imported: res.imported,
       skipped: res.skipped,
+      offset,
       errorsCount: res.errors.length,
       errors: res.errors.slice(0, 50)
     });

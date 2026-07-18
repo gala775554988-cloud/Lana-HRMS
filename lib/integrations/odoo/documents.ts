@@ -29,14 +29,14 @@ function sanitizeFileName(name: string) {
  * Fetches attachments directly from Odoo (`ir.attachment`) in one single bulk search_read
  * query without looping 1,620 times over individual employee IDs.
  */
-export async function bulkSyncAllOdooDocuments(client: OdooClient, limit = 2000): Promise<DocumentSyncResult> {
+export async function bulkSyncAllOdooDocuments(client: OdooClient, limit = 2000, offset = 0): Promise<DocumentSyncResult> {
   const result: DocumentSyncResult = { imported: 0, skipped: 0, errors: [] };
 
   const attachments = await client.search_read<OdooAttachment>(
     "ir.attachment",
     [["res_model", "in", ["hr.employee", "hr.contract"]]],
     ["id", "name", "mimetype", "file_size", "create_date", "res_id", "res_model"],
-    { limit, order: "id desc" }
+    { limit, offset, order: "id desc" }
   ).catch(() => []);
 
   if (!attachments || attachments.length === 0) return result;
@@ -92,7 +92,7 @@ export async function bulkSyncAllOdooDocuments(client: OdooClient, limit = 2000)
       result.skipped += 1;
       continue;
     }
-    if (processedNew >= 200) {
+    if (processedNew >= 300) {
       continue;
     }
 
