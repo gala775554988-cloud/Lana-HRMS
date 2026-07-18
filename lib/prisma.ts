@@ -115,7 +115,17 @@ const prismaClientSingleton = () => {
     },
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
-  if (process.env.NEXT_PHASE !== "phase-production-build" && process.env.SKIP_AUTO_DDL !== "true") {
+  // Production already gets this exact schema-heal DDL once, safely, at
+  // deploy time (scripts/ensure-db-schema.mjs runs in the vercel-build
+  // step before any traffic is served). Re-running it here on every cold
+  // serverless start in production is pure redundancy that only adds risk:
+  // concurrent "IF NOT EXISTS" ALTER TABLE/CREATE INDEX statements from
+  // multiple simultaneous cold starts can race for catalog locks on
+  // Postgres and error out -- a very plausible source of the intermittent,
+  // non-reproducible "Server Components render" crashes users have hit,
+  // since it fires on effectively every page that resolves a session.
+  // Keep it for local dev only, where there's no separate build step.
+  if (process.env.NODE_ENV !== "production" && process.env.NEXT_PHASE !== "phase-production-build" && process.env.SKIP_AUTO_DDL !== "true") {
     setTimeout(() => ensureSchemaReady(client).catch(() => {}), 100);
   }
   return client;
