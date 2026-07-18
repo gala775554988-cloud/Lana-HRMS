@@ -112,6 +112,18 @@ export async function buildEmployeeScopeWhere(profile: AccessProfile): Promise<P
     scopes.push({ id: { in: assigned.length ? assigned : ["__NO_PROJECT_EMPLOYEES__"] } });
   }
 
+  // Whoever is actually named as approver on a pending workflow step can see
+  // that request's employee, regardless of role -- this is what makes a
+  // DIRECT_MANAGER-resolved approver or a workflow-path CUSTOM_APPROVER able
+  // to see the requests routed to them in /approvals, not just people who
+  // additionally hold one of the hardcoded roles above.
+  const assignedInstances = await prisma.workflowInstance.findMany({
+    where: { steps: { some: { approverUserId: profile.userId, status: "PENDING" } } },
+    select: { employeeId: true },
+    distinct: ["employeeId"]
+  });
+  if (assignedInstances.length) scopes.push({ id: { in: assignedInstances.map((instance) => instance.employeeId) } });
+
   return { OR: scopes };
 }
 

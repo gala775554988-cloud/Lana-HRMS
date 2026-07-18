@@ -51,7 +51,7 @@ const navItems: Array<{ href: string; labelKey: NavKey; icon: typeof LayoutDashb
 
   { href: "/leaves", labelKey: "leave", icon: Calendar, group: "requestsLeave", resource: "leave" },
   { href: "/overtime", labelKey: "overtime", icon: Clock, group: "requestsLeave", resource: "overtime" },
-  { href: "/approvals", labelKey: "approvals", icon: GitPullRequest, group: "requestsLeave", resource: "leave" },
+  { href: "/approvals", labelKey: "approvals", icon: GitPullRequest, group: "requestsLeave", resource: ["leave", "requests"] },
 
   { href: "/payroll", labelKey: "payroll", icon: DollarSign, group: "financePayroll", resource: ["payroll", "allowances", "deductions"] },
   { href: "/loans", labelKey: "loans", icon: Wallet, group: "financePayroll", resource: "loans" },

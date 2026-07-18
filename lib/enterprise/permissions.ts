@@ -126,6 +126,19 @@ export async function getDirectUserPermissions(userId: string, now = new Date())
 export async function mergeEffectivePermissions(rolePermissions: string[] | undefined, userId?: string): Promise<string[]> {
   const base = new Set(rolePermissions ?? []);
   if (!userId) return Array.from(base).sort();
+
+  // Anyone currently named as a CUSTOM_APPROVER in an active approval-path
+  // template automatically gets "requests" access -- derived live from the
+  // path template, never written into the grants store below, so removing
+  // them from the path revokes it the instant this set no longer contains
+  // them (see getWorkflowPathApproverUserIds / saveWorkflowPath).
+  const { getWorkflowPathApproverUserIds } = await import("@/lib/enterprise/workflow-paths");
+  const approverIds = await getWorkflowPathApproverUserIds().catch(() => new Set<string>());
+  if (approverIds.has(userId)) {
+    base.add("read:requests");
+    base.add("manage:requests");
+  }
+
   const store = await getPermissionStore();
   const record = store.users[userId];
   if (!record) return Array.from(base).sort();

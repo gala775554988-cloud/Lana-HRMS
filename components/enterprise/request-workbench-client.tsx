@@ -114,6 +114,14 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
   const [message, setMessage] = useState("");
   const [messageTone, setMessageTone] = useState<"success" | "error">("success");
   const [timelineWorkflowId, setTimelineWorkflowId] = useState<string | null>(null);
+  // Rejection always requires a stated reason -- revealed inline in place of
+  // the row's action buttons (no modal), same for the bulk-reject toolbar
+  // button. Enforced again server-side in decideWorkflowStep, this is just
+  // the UX gate.
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [bulkRejecting, setBulkRejecting] = useState(false);
+  const [bulkRejectReason, setBulkRejectReason] = useState("");
 
   const selectedIds = useMemo(() => Array.from(selected), [selected]);
   const queryClient = useQueryClient();
@@ -240,6 +248,22 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
     bulkMutation.mutate({ ids: selectedIds, decision, extra });
   }
 
+  function confirmReject(id: string) {
+    const reason = rejectReason.trim();
+    if (!reason) return;
+    decide(id, "REJECT", { comments: reason });
+    setRejectingId(null);
+    setRejectReason("");
+  }
+
+  function confirmBulkReject() {
+    const reason = bulkRejectReason.trim();
+    if (!reason || !selectedIds.length) return;
+    bulkMutation.mutate({ ids: selectedIds, decision: "REJECT", extra: { comments: reason } });
+    setBulkRejecting(false);
+    setBulkRejectReason("");
+  }
+
   function note(id: string) {
     const comments = window.prompt("إضافة ملاحظة");
     if (comments !== null) decide(id, "NOTE", { comments });
@@ -294,7 +318,21 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
       <div className="rounded-xl border bg-card p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" size="sm" disabled={!selectedIds.length || isPending} onClick={() => bulk("APPROVE")}>اعتماد المحدد</Button>
-          <Button type="button" size="sm" variant="destructive" disabled={!selectedIds.length || isPending} onClick={() => bulk("REJECT")}>رفض المحدد</Button>
+          {bulkRejecting ? (
+            <div className="flex flex-1 min-w-[280px] items-center gap-2">
+              <Input
+                autoFocus
+                value={bulkRejectReason}
+                onChange={(event) => setBulkRejectReason(event.target.value)}
+                placeholder="سبب الرفض (إجباري)..."
+                className="h-9 flex-1"
+              />
+              <Button type="button" size="sm" variant="destructive" disabled={!bulkRejectReason.trim() || isPending} onClick={confirmBulkReject}>تأكيد الرفض</Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => { setBulkRejecting(false); setBulkRejectReason(""); }}>إلغاء</Button>
+            </div>
+          ) : (
+            <Button type="button" size="sm" variant="destructive" disabled={!selectedIds.length || isPending} onClick={() => setBulkRejecting(true)}>رفض المحدد</Button>
+          )}
           <select value={targetUserId} onChange={(event) => setTargetUserId(event.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm">
             <option value="">تحويل إلى...</option>
             {approvers.map((approver) => <option key={approver.userId} value={approver.userId}>{approver.label} - {approver.position}</option>)}
@@ -362,15 +400,29 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
                           and calling decideWorkflowStep on those always fails with
                           "No pending workflow step" (there's nothing left to decide),
                           which read as "the button does nothing" from the UI. */}
-                      {isActionable(request) ? (
+                      {isActionable(request) && rejectingId === request.id ? (
+                        <div className="flex flex-1 min-w-[260px] items-center gap-1.5">
+                          <Input
+                            autoFocus
+                            value={rejectReason}
+                            onChange={(event) => setRejectReason(event.target.value)}
+                            placeholder="سبب الرفض (إجباري)..."
+                            className="h-8 flex-1 text-xs"
+                          />
+                          <Button type="button" size="sm" variant="destructive" disabled={!rejectReason.trim() || isPending} onClick={() => confirmReject(request.id)}>
+                            {isActionPending(request.id, "REJECT") ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "تأكيد"}
+                          </Button>
+                          <Button type="button" size="sm" variant="outline" onClick={() => { setRejectingId(null); setRejectReason(""); }}>إلغاء</Button>
+                        </div>
+                      ) : isActionable(request) ? (
                         <>
                           <Button type="button" size="sm" onClick={() => decide(request.id, "APPROVE")} disabled={isPending}>
                             {isActionPending(request.id, "APPROVE") ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                             {isActionPending(request.id, "APPROVE") ? "جارٍ..." : "موافقة"}
                           </Button>
-                          <Button type="button" size="sm" variant="destructive" onClick={() => decide(request.id, "REJECT")} disabled={isPending}>
-                            {isActionPending(request.id, "REJECT") ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
-                            {isActionPending(request.id, "REJECT") ? "جارٍ..." : "رفض"}
+                          <Button type="button" size="sm" variant="destructive" onClick={() => { setRejectingId(request.id); setRejectReason(""); }} disabled={isPending}>
+                            <X className="h-3.5 w-3.5" />
+                            رفض
                           </Button>
                           <Button type="button" size="sm" variant="outline" onClick={() => decide(request.id, "RETURN")} disabled={isPending}>
                             {isActionPending(request.id, "RETURN") ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}

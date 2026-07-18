@@ -5,11 +5,12 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { EMPLOYEE_NAV_ITEMS } from '@/lib/employee/nav-items';
+import { useEmployeeNavItems } from '@/lib/employee/use-employee-nav-items';
 
 export function EmployeeMobileSidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const navItems = useEmployeeNavItems();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -65,7 +66,7 @@ export function EmployeeMobileSidebar() {
               </button>
             </div>
             <div className="grid grid-cols-3 gap-2">
-              {EMPLOYEE_NAV_ITEMS.map((item) => {
+              {navItems.map((item) => {
                 const Icon = item.icon;
                 const active = pathname === item.href || pathname.startsWith(item.href + '/');
                 return (
@@ -84,7 +85,18 @@ export function EmployeeMobileSidebar() {
                         : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
                     )}
                   >
-                    <Icon className="h-5 w-5" />
+                    <span className="relative inline-flex shrink-0">
+                      <Icon className="h-5 w-5" />
+                      {item.badge ? (
+                        <span
+                          key={item.badge}
+                          className="absolute -top-1.5 -end-2 flex h-4 w-4 items-center justify-center rounded-full bg-destructive px-0.5 text-[9px] font-bold leading-none text-destructive-foreground ring-2 ring-white dark:ring-slate-900"
+                          aria-label={`${item.badge} pending approvals`}
+                        >
+                          {item.badge > 99 ? "99+" : item.badge}
+                        </span>
+                      ) : null}
+                    </span>
                     <span className="leading-tight">{item.label}</span>
                   </Link>
                 );

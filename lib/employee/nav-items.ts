@@ -9,6 +9,7 @@ export type EmployeeNavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
+  badge?: number;
 };
 
 export const EMPLOYEE_NAV_ITEMS: EmployeeNavItem[] = [

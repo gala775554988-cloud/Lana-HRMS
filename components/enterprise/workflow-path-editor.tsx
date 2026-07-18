@@ -11,6 +11,7 @@ type StoredStep = {
   approverId: string;
   departmentId?: string | null;
   roleContext: string;
+  approverLabel?: string;
 };
 
 function toWorkflowSteps(steps: StoredStep[]): WorkflowStepItem[] {
@@ -21,7 +22,8 @@ function toWorkflowSteps(steps: StoredStep[]): WorkflowStepItem[] {
       id: index + 1,
       name: step.roleContext,
       role: step.roleContext,
-      approverIdentifier: step.roleContext === "CUSTOM_APPROVER" ? step.approverId : ""
+      approverIdentifier: step.roleContext === "CUSTOM_APPROVER" ? step.approverId : "",
+      approverLabel: step.roleContext === "CUSTOM_APPROVER" ? (step.approverLabel ?? "") : ""
     }));
 }
 
@@ -30,7 +32,8 @@ function toStoredSteps(steps: WorkflowStepItem[]): StoredStep[] {
     stepOrder: index + 1,
     approverId: step.role === "CUSTOM_APPROVER" ? (step.approverIdentifier || "") : step.role,
     departmentId: null,
-    roleContext: step.role
+    roleContext: step.role,
+    approverLabel: step.role === "CUSTOM_APPROVER" ? (step.approverLabel || "") : undefined
   }));
 }
 

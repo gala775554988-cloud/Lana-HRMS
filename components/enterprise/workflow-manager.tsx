@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { UserSearchSelect } from "@/components/hrms/user-search-select";
 
 export type WorkflowStepItem = {
   id: number | string;
   name: string;
   role: string;
   approverIdentifier?: string;
+  approverLabel?: string;
 };
 
 interface WorkflowManagerProps {
@@ -47,6 +49,12 @@ export function WorkflowManager({
   const updateStep = (id: number | string, field: keyof WorkflowStepItem, value: string) => {
     setSteps((current) =>
       current.map((s) => (s.id === id ? { ...s, [field]: value } : s))
+    );
+  };
+
+  const setApprover = (id: number | string, userId: string, label?: string) => {
+    setSteps((current) =>
+      current.map((s) => (s.id === id ? { ...s, approverIdentifier: userId, approverLabel: label ?? "" } : s))
     );
   };
 
@@ -157,11 +165,12 @@ export function WorkflowManager({
 
                 {step.role === "CUSTOM_APPROVER" && (
                   <div className="pt-1">
-                    <Input
+                    <label className="text-[10px] font-bold text-muted-foreground block mb-1">الموظف المُعتمِد (Approver)</label>
+                    <UserSearchSelect
                       value={step.approverIdentifier ?? ""}
-                      onChange={(e) => updateStep(step.id, "approverIdentifier", e.target.value)}
-                      placeholder="أدخل رقم الهوية أو الرقم الوظيفي للموظف المُعتمِد..."
-                      className="h-9 rounded-xl bg-white dark:bg-slate-900 text-xs font-mono"
+                      initialLabel={step.approverLabel ?? ""}
+                      onChange={(userId, label) => setApprover(step.id, userId, label)}
+                      placeholder="ابحث عن الموظف بالاسم أو الرقم الوظيفي أو الهوية..."
                     />
                   </div>
                 )}
