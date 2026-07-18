@@ -14,7 +14,10 @@ export async function GET() {
 
   const delegateIds = await getLanaDelegateIds();
   const employees = delegateIds.length
-    ? await prisma.employee.findMany({ where: { userId: { in: delegateIds } }, select: { userId: true, employeeNumber: true, firstName: true, lastName: true } })
+    ? await prisma.employee.findMany({
+        where: { userId: { in: delegateIds } },
+        select: { userId: true, employeeNumber: true, firstName: true, lastName: true, profilePhotoUrl: true, department: { select: { name: true } } }
+      })
     : [];
   return NextResponse.json({ success: true, delegateIds, employees });
 }
