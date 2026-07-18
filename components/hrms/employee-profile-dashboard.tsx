@@ -17,6 +17,15 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
+
+interface DeviceBinding {
+  bound: boolean;
+  deviceId?: string | null;
+  platform?: string | null;
+  lastSeenAt?: string | null;
+  boundSince?: string | null;
+}
 
 interface Props {
   employee: any;
@@ -34,6 +43,7 @@ interface Props {
   payrollItems: any[];
   auditLogs: any[];
   permissionsScopeContent?: React.ReactNode;
+  deviceBinding?: DeviceBinding | null;
   backHref?: string;
   dictionary: any;
   locale: string;
@@ -55,6 +65,7 @@ export function EmployeeProfileDashboard({
   payrollItems,
   auditLogs,
   permissionsScopeContent,
+  deviceBinding,
   backHref,
   dictionary,
   locale,
@@ -67,6 +78,9 @@ export function EmployeeProfileDashboard({
   const [folders, setFolders] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [deviceBound, setDeviceBound] = useState(deviceBinding?.bound ?? false);
+  const [showUnbindModal, setShowUnbindModal] = useState(false);
+  const [unbinding, setUnbinding] = useState(false);
 
   const fullName = `${employee.firstName} ${employee.lastName}`.trim();
   const initials = `${employee.firstName?.[0] || ""}${employee.lastName?.[0] || ""}`.toUpperCase();
@@ -111,8 +125,10 @@ export function EmployeeProfileDashboard({
     }
   };
 
-  const handleUnbindDevice = async () => {
-    if (!confirm(isAr ? `هل أنت متأكد من فك ارتباط جهاز الجوال للموظف (${fullName})؟ سيتمكن الموظف من تسجيل الدخول من جهاز جديد.` : `Unbind mobile device for ${fullName}?`)) return;
+  const handleUnbindDevice = () => setShowUnbindModal(true);
+
+  const confirmUnbindDevice = async () => {
+    setUnbinding(true);
     try {
       const res = await fetch("/api/employee/device/unbind", {
         method: "POST",
@@ -120,10 +136,14 @@ export function EmployeeProfileDashboard({
         body: JSON.stringify({ employeeId: employee.id }),
       });
       const json = await res.json();
+      if (json.success) setDeviceBound(false);
       alert(json.message || (isAr ? "تم فك ارتباط الجهاز بنجاح" : "Device unbound successfully"));
+      setShowUnbindModal(false);
       router.refresh();
     } catch (e) {
       alert(isAr ? "حدث خطأ أثناء فك ارتباط الجهاز" : "Error unbinding device");
+    } finally {
+      setUnbinding(false);
     }
   };
 
@@ -433,13 +453,23 @@ export function EmployeeProfileDashboard({
                   نظام حماية الحضور والانصراف والدخول الموحد المرتبط ببصمة جهاز الجوال (UUID)
                 </CardDescription>
               </div>
-              <Button size="sm" variant="outline" onClick={handleUnbindDevice} className="gap-1.5 border-amber-300 bg-white hover:bg-amber-100 text-amber-800 shadow-sm dark:bg-slate-900 dark:border-amber-800 dark:hover:bg-amber-950 dark:text-amber-300">
-                <Smartphone className="h-4 w-4" />
-                {isAr ? "إلغاء ربط الجهاز (Unbind Device)" : "Unbind Device"}
-              </Button>
+              <button
+                type="button"
+                onClick={() => deviceBound && setShowUnbindModal(true)}
+                disabled={!deviceBound}
+                title={deviceBound ? (isAr ? "اضغط لفك ارتباط الجهاز" : "Click to unbind device") : (isAr ? "لا يوجد جهاز مرتبط حالياً" : "No device currently bound")}
+                className={`flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-bold shadow-sm transition-all duration-200 ${
+                  deviceBound
+                    ? "border-emerald-300 bg-emerald-50 text-emerald-700 hover:-translate-y-0.5 hover:bg-emerald-100 hover:shadow-md dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+                    : "cursor-default border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-400"
+                }`}
+              >
+                <span className={`h-2.5 w-2.5 rounded-full ${deviceBound ? "bg-emerald-500 animate-pulse" : "bg-red-500"}`} />
+                {deviceBound ? (isAr ? "مرتبط بجهاز" : "Device bound") : (isAr ? "غير مرتبط" : "Not bound")}
+              </button>
             </CardHeader>
             <CardContent className="text-xs text-amber-800 dark:text-amber-300/90 leading-relaxed">
-              عند تسجيل دخول الموظف لأول مرة أو تسجيل الحضور من التطبيق، يقوم النظام تلقائياً بربط الحساب ببصمة الجهاز الفريدة (UUID). عند محاولة الدخول من جهاز جديد يتم حظر المحاولة وإرسال تنبيه أمني للمسؤول. للتمكين من الدخول من جهاز آخر يرجى الضغط على زر (إلغاء ربط الجهاز).
+              عند تسجيل دخول الموظف لأول مرة أو تسجيل الحضور من التطبيق، يقوم النظام تلقائياً بربط الحساب ببصمة الجهاز الفريدة (UUID). عند محاولة الدخول من جهاز جديد يتم حظر المحاولة وإرسال تنبيه أمني للمسؤول. للتمكين من الدخول من جهاز آخر اضغط على المؤشر أعلاه.
             </CardContent>
           </Card>
 
@@ -513,6 +543,38 @@ export function EmployeeProfileDashboard({
           </CardContent></Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={showUnbindModal} onOpenChange={setShowUnbindModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
+              <Smartphone className="h-5 w-5" />
+              {isAr ? "فك ارتباط جهاز الموظف" : "Unbind employee device"}
+            </DialogTitle>
+            <DialogClose onClick={() => setShowUnbindModal(false)} />
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {isAr
+              ? `هل أنت متأكد من فك ارتباط جهاز الجوال للموظف (${fullName})؟ سيتمكن الموظف من تسجيل الدخول من جهاز جديد بعد هذه العملية.`
+              : `Unbind the mobile device for ${fullName}? They will be able to sign in from a new device afterward.`}
+          </p>
+          {deviceBinding?.bound && (
+            <div className="mt-3 space-y-1 rounded-xl border bg-muted/30 p-3 text-xs text-muted-foreground">
+              {deviceBinding.platform && <p>{isAr ? "المنصة:" : "Platform:"} {deviceBinding.platform}</p>}
+              {deviceBinding.lastSeenAt && <p>{isAr ? "آخر ظهور:" : "Last seen:"} {new Date(deviceBinding.lastSeenAt).toLocaleString(isAr ? "ar-SA" : "en-US")}</p>}
+              {deviceBinding.boundSince && <p>{isAr ? "مرتبط منذ:" : "Bound since:"} {new Date(deviceBinding.boundSince).toLocaleDateString(isAr ? "ar-SA" : "en-US")}</p>}
+            </div>
+          )}
+          <div className="mt-5 flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowUnbindModal(false)} disabled={unbinding}>
+              {isAr ? "إلغاء" : "Cancel"}
+            </Button>
+            <Button variant="destructive" onClick={confirmUnbindDevice} disabled={unbinding}>
+              {unbinding ? (isAr ? "جارٍ الفك..." : "Unbinding...") : (isAr ? "تأكيد فك الارتباط" : "Confirm unbind")}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

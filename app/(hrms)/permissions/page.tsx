@@ -6,7 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { MergedModuleTabs } from "@/components/hrms/merged-module-tabs";
 import { PermissionsAdmin } from "@/app/(hrms)/permissions-system/admin-client";
 import { WorkflowPathsTabs } from "@/components/enterprise/workflow-paths-tabs";
-import { KeyRound, Shield, Workflow } from "lucide-react";
+import { MultiDeviceAccessClient } from "@/components/enterprise/multi-device-access-client";
+import { KeyRound, Shield, Workflow, Smartphone } from "lucide-react";
 
 const PermissionsManagementClient = dynamicImport(() =>
   import("@/components/enterprise/permissions-management-client").then((mod) => mod.PermissionsManagementClient)
@@ -43,6 +44,33 @@ export default async function PermissionsPage({ searchParams }: { searchParams: 
     );
   }
 
+  let devicesContent: React.ReactNode = null;
+  if (activeTab === "devices") {
+    const admins = await prisma.user.findMany({
+      where: { roles: { some: { role: { name: { in: ["SUPER_ADMIN", "MANAGER"] } } } } },
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        email: true,
+        canUseMultipleDevices: true,
+        roles: { select: { role: { select: { name: true } } } },
+        employeeProfile: { select: { employeeNumber: true, firstName: true, lastName: true } }
+      },
+      orderBy: { name: "asc" }
+    });
+    const users = admins.map((u) => ({
+      id: u.id,
+      name: u.name,
+      username: u.username,
+      email: u.email,
+      canUseMultipleDevices: u.canUseMultipleDevices,
+      roleNames: Array.from(new Set(u.roles.map((r) => r.role.name))),
+      employeeLabel: u.employeeProfile ? `${u.employeeProfile.firstName} ${u.employeeProfile.lastName} (${u.employeeProfile.employeeNumber})` : null
+    }));
+    devicesContent = <MultiDeviceAccessClient users={users} />;
+  }
+
   return (
     <MergedModuleTabs
       defaultValue="management"
@@ -73,6 +101,12 @@ export default async function PermissionsPage({ searchParams }: { searchParams: 
               <WorkflowPathsTabs />
             </div>
           ) : null
+        },
+        {
+          value: "devices",
+          label: "تعدد الأجهزة",
+          icon: <Smartphone className="h-4 w-4" />,
+          content: devicesContent
         }
       ]}
     />
