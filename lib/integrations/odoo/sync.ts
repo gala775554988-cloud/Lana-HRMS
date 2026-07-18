@@ -199,8 +199,25 @@ export async function syncEmployeeFromOdoo(odooRecord: any) {
   const nameParts = rawName.split(" ");
   const firstName = cleanOdooString(nameParts[0] || rawName);
   const lastName = cleanOdooString(nameParts.slice(1).join(" ") || "");
-  const nationalId = String(sanitizedData.identification_id || sanitizedData.registration_number || `ODOO-${sanitizedData.id}`).trim();
-  const rawEmpCode = sanitizedData.registration_number || sanitizedData.employee_code || sanitizedData.barcode || sanitizedData.id;
+  // 1. National ID (Iqama / الهوية الوطنية)
+  const nationalId = String(
+    sanitizedData.identification_id ||
+    sanitizedData.l10n_sa_iqama_number ||
+    sanitizedData.national_id ||
+    sanitizedData.registration_number ||
+    `ODOO-${sanitizedData.id}`
+  ).trim();
+
+  // 2. Employee Number (الرقم الوظيفي في أودو)
+  // Prioritize barcode, employee_code, pin, or Odoo ID — DO NOT use registration_number here if it matches nationalId or is over 8 digits!
+  let rawEmpCode = sanitizedData.barcode || sanitizedData.employee_code || sanitizedData.pin || sanitizedData.x_studio_employee_number || sanitizedData.x_employee_code;
+  if (!rawEmpCode || rawEmpCode === nationalId || String(rawEmpCode).length > 8) {
+    if (sanitizedData.registration_number && sanitizedData.registration_number !== nationalId && String(sanitizedData.registration_number).length <= 8) {
+      rawEmpCode = sanitizedData.registration_number;
+    } else {
+      rawEmpCode = sanitizedData.id;
+    }
+  }
   const employeeNumber = formatEmployeeCode(rawEmpCode);
 
   // استخراج النصوص الصافية من الكائنات العلائقية (Many2one tuples [id, "Name"])
@@ -391,7 +408,12 @@ export async function fullResyncFromOdoo(options: { wipeAndSync?: boolean; conne
     let syncedCount = 0;
     for (const record of allRecords) {
       try {
-        await syncEmployeeFromOdoo(record);
+        const syncedEmp = await syncEmployeeFromOdoo(record);
+        try {
+          if (syncedEmp?.id && record.id) {
+            await syncEmployeeDocuments(client, Number(record.id), syncedEmp.id);
+          }
+        } catch (docErr) {}
         syncedCount++;
       } catch (err) {
         console.error(`[FullResync] Error syncing employee ${record.id}:`, err);

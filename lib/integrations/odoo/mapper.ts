@@ -1,5 +1,15 @@
 import type { LanaAttendance, LanaContract, LanaDepartment, LanaEmployee, LanaLeave, LanaPayrollItem, MapperDefinition, OdooRecord, OdooWriteValues, SyncConflict, SyncEntity } from "./types";
 
+function formatEmployeeCodeHelper(code?: string | number | null): string {
+  if (!code) return `00ODOO-${Date.now()}`;
+  const clean = String(code).trim();
+  if (clean.startsWith("ODOO-") || clean.startsWith("00ODOO-")) {
+    return clean.startsWith("00") ? clean : `00${clean}`;
+  }
+  const digits = clean.replace(/^[0]+/, "");
+  return `00${digits || clean}`;
+}
+
 export const ODOO_MAPPERS: Record<string, MapperDefinition> = {
   employees: {
     entity: "employees",
@@ -234,11 +244,23 @@ export function mapOdooEmployeeToLana(record: OdooRecord): Record<string, unknow
   const archivedAt = record.active === false ? (departureDate || writeDate || undefined) : undefined;
   const archiveReason = textValue(record.departure_description);
 
+  // 1. National ID (Iqama / الهوية الوطنية)
+  const nationalIdStr = String(record.identification_id || record.l10n_sa_iqama_number || record.national_id || record.registration_number || `ODOO-${record.id}`).trim();
+
+  // 2. Employee Number (الرقم الوظيفي المعتمد من أودو)
+  let rawEmpCode = record.barcode || record.employee_code || record.pin || record.x_studio_employee_number || record.x_employee_code;
+  if (!rawEmpCode || rawEmpCode === nationalIdStr || String(rawEmpCode).length > 8) {
+    if (record.registration_number && record.registration_number !== nationalIdStr && String(record.registration_number).length <= 8) {
+      rawEmpCode = record.registration_number;
+    } else {
+      rawEmpCode = record.id;
+    }
+  }
+  const formattedCode = formatEmployeeCodeHelper(rawEmpCode);
+
   return stripEmpty({
-    // كود الموظف = barcode (هذا هو الرقم الوظيفي المعتمد من العميل)
-    // id هو الرقم التسلسلي لقاعدة بيانات Odoo فقط — لا يستخدم كرقم وظيفي
-    employeeNumber: String(record.barcode || record.id || `ODOO-${record.id}`),
-    nationalId: String(record.identification_id || `ODOO-${record.id}`),
+    employeeNumber: formattedCode,
+    nationalId: nationalIdStr,
     firstName: names.firstName,
     lastName: names.lastName,
     email: workEmail,
