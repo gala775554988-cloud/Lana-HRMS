@@ -171,6 +171,20 @@ export default async function EmployeeProfilePage({
     }).catch(() => []),
   ]);
 
+  const boundDevice = await prisma.employeeMobileDevice.findUnique({
+    where: { employeeId: id },
+    select: { deviceId: true, platform: true, lastSeenAt: true, createdAt: true },
+  }).catch(() => null);
+  const deviceBinding = boundDevice
+    ? {
+        bound: true,
+        deviceId: boundDevice.deviceId,
+        platform: boundDevice.platform,
+        lastSeenAt: boundDevice.lastSeenAt ? boundDevice.lastSeenAt.toISOString() : null,
+        boundSince: boundDevice.createdAt.toISOString(),
+      }
+    : { bound: false };
+
   // Server-side redaction: a HIDDEN field is nulled out here, before it ever
   // reaches the client bundle -- not just visually hidden in the dashboard
   // component, which would still leak the real value over the network.
@@ -193,6 +207,7 @@ export default async function EmployeeProfilePage({
       payrollItems={payrollItems as any}
       auditLogs={auditLogs as any}
       permissionsScopeContent={<PermissionsScope employeeId={id} />}
+      deviceBinding={deviceBinding}
       backHref={backHref}
       dictionary={dictionary}
       locale={locale}
