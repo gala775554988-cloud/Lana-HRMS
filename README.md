@@ -51,9 +51,58 @@ Security note: the service worker does not cache authenticated HTML pages or API
 
 ## Required Environment Variables
 
-DATABASE_URL, DIRECT_URL, AUTH_SECRET, NEXTAUTH_URL, NEXTAUTH_SECRET, APP_URL, SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY.
+See `.env.example` for a copy-pasteable template with placeholder values and inline comments.
+
+**Core (required in every environment):**
+
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | Pooled Postgres connection string (Prisma runtime queries). |
+| `DIRECT_URL` | Direct (non-pooled) Postgres connection string (Prisma migrations). |
+| `AUTH_SECRET` / `NEXTAUTH_SECRET` | Secure random secrets for NextAuth v5 JWT signing. Set both to the same value. |
+| `NEXTAUTH_URL` | Public URL of the deployment, e.g. `https://hrms.example.com`. |
+| `APP_URL` | Public URL used for PWA metadata and absolute links. |
+| `CRON_SECRET` | Bearer token Vercel Cron sends to authenticate the hourly Odoo sync route (no user session exists for cron runs). |
+
+**Supabase (required if using Supabase for Postgres and/or file storage):**
+
+| Variable | Purpose |
+| --- | --- |
+| `SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-side key used by `/api/uploads` to store profile photos and documents (employee documents, contracts, insurance policies) in Supabase Storage. Falls back to local filesystem, then inline data URLs, if unset. |
+| `SUPABASE_EMPLOYEE_BUCKET` | Optional. Storage bucket name for uploads; defaults to `employee-files`. |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Optional. Client-side Supabase key, if client-side Supabase access is added later. |
+
+**Odoo integration (required only if Odoo sync is used):**
+
+| Variable | Purpose |
+| --- | --- |
+| `ODOO_URL` | Base URL of the Odoo instance. |
+| `ODOO_DATABASE` | Odoo database name. |
+| `ODOO_USERNAME` | Odoo integration user. |
+| `ODOO_PASSWORD` | Odoo integration user's password. |
+| `ODOO_API_KEY` | Optional. Preferred over `ODOO_PASSWORD` in production when set. |
+| `ODOO_PROTOCOL` | Optional. `auto` (default), `json-rpc`, or `xml-rpc`. |
+
+**Lana AI (required only if the AI Assistant / AI System Manager is enabled):**
+
+| Variable | Purpose |
+| --- | --- |
+| `OPENAI_API_KEY` | API key for the Lana AI chat/copilot routes. |
+| `OPENAI_MODEL` | Optional. Overrides the default model. |
+
+**Biometric / attendance bridge integrations (optional, only if those devices are deployed):**
+
+`BIOTIME_URL`, `BIOTIME_USERNAME`, `BIOTIME_PASSWORD`, `ZKTECO_IP`, `ZKTECO_PORT`, `ZKTECO_DEVICE_NAME`, `ATTENDANCE_BRIDGE_TOKEN`, `INTEGRATION_SECRET`, `INTERNAL_SYNC_TOKEN`.
+
+**Push notifications (optional):**
+
+`FCM_SERVER_KEY`, `NEXT_PUBLIC_FIREBASE_VAPID_KEY`, `NEXT_PUBLIC_WEB_PUSH_VAPID_KEY`.
+
+**Seed data (optional, local/dev only):**
+
+`SEED_ADMIN_EMAIL` — overrides the default seeded admin email (`admin@lana.local`).
 
 ## Production Checks
 
-Run npm run lint and npm run build before deployment.
-Test commit from Arena Agent
+Run `npm run lint`, `npm run typecheck`, and `npm run build` before deployment. Run `npm run test:smoke` against a running instance to cover login/logout, per-role dashboard load, a full HR module CRUD cycle, and the Odoo sync auth boundary (see `tests/smoke/`).
