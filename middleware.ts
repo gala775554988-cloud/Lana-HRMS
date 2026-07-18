@@ -31,11 +31,26 @@ function isPublicApiRoute(pathname: string) {
   return PUBLIC_API_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
+// Static files served straight out of /public (logos, icons, the landing
+// page's intro video, etc.) aren't per-user data and the matcher below only
+// exempts a handful of Next-internal paths, so without this every asset
+// request from a signed-out visitor was being redirected to /login same as
+// a real page -- silently breaking images/video on any public-facing page.
+const PUBLIC_ASSET_EXTENSIONS = /\.(?:png|jpe?g|gif|svg|webp|ico|mp4|webm|mp3|css|js|map|woff2?|ttf|eot|txt|json|xml)$/i;
+
+function isPublicStaticAsset(pathname: string) {
+  return PUBLIC_ASSET_EXTENSIONS.test(pathname);
+}
+
 export async function middleware(request: NextRequest) {
   try {
     const p = request.nextUrl.pathname;
     const isRoot = p === "/";
     const isApi = p.startsWith("/api");
+
+    if (!isApi && isPublicStaticAsset(p)) {
+      return NextResponse.next();
+    }
 
     // Skip getToken for public pages — no JWT verify needed
     if (!isApi && !isRoot && (p.startsWith("/login") || p.startsWith("/forgot-password") || p.startsWith("/reset-password") || p.startsWith("/verify-email"))) {

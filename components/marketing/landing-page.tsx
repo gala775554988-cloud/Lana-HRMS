@@ -203,11 +203,14 @@ export function LandingPage({ locale }: { locale: Locale }) {
               <video
                 className="aspect-video w-full bg-slate-900 object-cover"
                 controls
+                autoPlay
+                muted
+                loop
                 playsInline
-                preload="none"
+                preload="auto"
                 poster={VIDEO_POSTER}
               >
-                <source src="/media/lana-medical-intro.mp4" type="video/mp4" />
+                <source src="/lana-intro.mp4" type="video/mp4" />
               </video>
             </div>
           </div>
