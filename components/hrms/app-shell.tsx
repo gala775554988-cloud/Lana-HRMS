@@ -143,7 +143,7 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
   if (status === "loading") {
     return (
       <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
-        <div className="hidden h-screen w-[280px] shrink-0 border-e border-slate-200/80 bg-white lg:block dark:border-slate-800 dark:bg-slate-950" />
+        <div className="hidden h-screen w-[280px] shrink-0 border-e border-slate-200/80 bg-white/70 backdrop-blur-md lg:block dark:border-slate-800 dark:bg-slate-950/70" />
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="h-16 shrink-0 border-b border-border/80 bg-white/90 dark:bg-slate-950/90" />
           <main className="min-w-0 flex-1 overflow-y-auto p-4 lg:p-8">{children}</main>
@@ -167,7 +167,7 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
 
       <aside
         className={cn(
-          "fixed inset-y-0 start-0 z-50 flex h-screen flex-col border-e border-slate-200/80 bg-white shadow-xl transition-transform duration-300 ease-in-out lg:sticky lg:top-0 lg:z-auto lg:shadow-none lg:!translate-x-0 dark:border-slate-800 dark:bg-slate-950",
+          "fixed inset-y-0 start-0 z-50 flex h-screen flex-col border-e border-slate-200/80 bg-white/70 shadow-glass backdrop-blur-md transition-transform duration-300 ease-in-out lg:sticky lg:top-0 lg:z-auto lg:shadow-none lg:!translate-x-0 dark:border-slate-800 dark:bg-slate-950/70",
           sidebarCollapsed ? "lg:w-[76px]" : "lg:w-[280px]",
           "w-[280px]",
           // !important on the lg override above is required: the bare (no

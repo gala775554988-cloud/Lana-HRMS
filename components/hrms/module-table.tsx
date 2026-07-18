@@ -28,6 +28,39 @@ function formatHeader(field: string, fieldsDict: Record<string, string>) {
   return field.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
 }
 
+const INSURANCE_EXPIRY_SCALE_DAYS = 60;
+
+/** Renewal-status bar for the insurance module's endDate column: green when
+ * comfortably far from renewal (>30 days), amber in the 10-30 day window,
+ * red inside 10 days or already expired -- mirrors the sidebar's 30-day
+ * "renewal due soon" badge threshold from use-expiring-insurance-count.ts. */
+function InsuranceExpiryBar({ endDate }: { endDate: unknown }) {
+  const parsed = typeof endDate === "string" || endDate instanceof Date ? new Date(endDate) : null;
+  if (!parsed || Number.isNaN(parsed.getTime())) return <span>-</span>;
+
+  const daysLeft = Math.ceil((parsed.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  const percent = Math.max(0, Math.min(100, (daysLeft / INSURANCE_EXPIRY_SCALE_DAYS) * 100));
+  const tone = daysLeft < 0
+    ? { bar: "bg-destructive", text: "text-destructive", label: "منتهية" }
+    : daysLeft < 10
+    ? { bar: "bg-destructive", text: "text-destructive", label: `${daysLeft} يوم متبقي` }
+    : daysLeft <= 30
+    ? { bar: "bg-warning", text: "text-warning-foreground", label: `${daysLeft} يوم متبقي` }
+    : { bar: "bg-success", text: "text-emerald-700 dark:text-emerald-400", label: `${daysLeft} يوم متبقي` };
+
+  return (
+    <div className="min-w-[140px] space-y-1">
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <span className="text-muted-foreground">{parsed.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</span>
+        <span className={cn("font-semibold", tone.text)}>{tone.label}</span>
+      </div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+        <div className={cn("h-full rounded-full transition-all duration-500 ease-in-out", tone.bar)} style={{ width: `${percent}%` }} />
+      </div>
+    </div>
+  );
+}
+
 export function ModuleTable({ resource, records, dictionary, locale = "en", fromHref }: { resource: HrmsModule; records: Row[]; dictionary: Dictionary; locale?: Locale; fromHref?: string }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -55,7 +88,13 @@ export function ModuleTable({ resource, records, dictionary, locale = "en", from
   }, [router]);
 
   const columns = useMemo(() => [
-    ...resource.tableFields.map((field) => helper.accessor((row) => row[field], { id: field, header: formatHeader(field, fieldsDict), cell: (info) => display(info.getValue(), yesLabel, noLabel) })),
+    ...resource.tableFields.map((field) => helper.accessor((row) => row[field], {
+      id: field,
+      header: formatHeader(field, fieldsDict),
+      cell: (info) => resource.key === "insurance" && field === "endDate"
+        ? <InsuranceExpiryBar endDate={info.getValue()} />
+        : display(info.getValue(), yesLabel, noLabel)
+    })),
     helper.display({ id: "actions", header: dictionary.table.actions, cell: ({ row }) => {
       const workflowId = typeof row.original._workflowId === "string" ? row.original._workflowId : "";
       const canAct = Boolean(row.original._canAct && workflowId);

@@ -71,7 +71,7 @@ export default async function EmployeeLayout({ children }: { children: ReactNode
       <EmployeeTopBar user={session.user} employee={employee} />
 
       <div className="flex">
-        <div className="hidden lg:block w-64 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto">
+        <div className="hidden lg:block w-64 border-l border-slate-200 dark:border-slate-800 bg-white/70 backdrop-blur-md shadow-glass dark:bg-slate-900/70 sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto">
           <EmployeeDesktopSidebar />
         </div>
 
