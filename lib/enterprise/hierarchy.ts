@@ -112,6 +112,29 @@ export async function buildEmployeeScopeWhere(profile: AccessProfile): Promise<P
     scopes.push({ id: { in: assigned.length ? assigned : ["__NO_PROJECT_EMPLOYEES__"] } });
   }
 
+  // Whoever is actually named as approver on a pending workflow step can see
+  // that request's employee, regardless of role -- this is what makes a
+  // DIRECT_MANAGER-resolved approver or a workflow-path CUSTOM_APPROVER able
+  // to see the requests routed to them in /approvals, not just people who
+  // additionally hold one of the hardcoded roles above.
+  const assignedInstances = await prisma.workflowInstance.findMany({
+    where: { steps: { some: { approverUserId: profile.userId, status: "PENDING" } } },
+    select: { employeeId: true },
+    distinct: ["employeeId"]
+  });
+  if (assignedInstances.length) scopes.push({ id: { in: assignedInstances.map((instance) => instance.employeeId) } });
+
+  // Anyone named as approver at some level in the workflow-path editor
+  // (محرر مسارات الموافقات) can see every employee belonging to the org unit
+  // that level names -- this is what makes the scope chosen there actually
+  // control /approvals visibility, not just grant a blanket "requests"
+  // permission with nothing behind it. See getWorkflowPathOrgScopeForUser.
+  const { getWorkflowPathOrgScopeForUser } = await import("@/lib/enterprise/workflow-paths");
+  const pathScope = await getWorkflowPathOrgScopeForUser(profile.userId).catch(() => ({ departmentIds: [], branchIds: [], hospitalIds: [] }));
+  if (pathScope.departmentIds.length) scopes.push({ departmentId: { in: pathScope.departmentIds } });
+  if (pathScope.branchIds.length) scopes.push({ branchId: { in: pathScope.branchIds } });
+  if (pathScope.hospitalIds.length) scopes.push({ hospitalId: { in: pathScope.hospitalIds } });
+
   return { OR: scopes };
 }
 

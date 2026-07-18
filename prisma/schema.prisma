@@ -218,6 +218,12 @@ enum ContractStatus {
   TERMINATED
 }
 
+enum InsuranceStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
 model Department {
   id            String     @id @default(cuid())
   name          String
@@ -359,6 +365,7 @@ model Employee {
   shiftAssignments       ShiftAssignment[]
   documents              EmployeeDocument[]
   contracts              EmployeeContract[]
+  insurancePolicies      InsurancePolicy[]
   assignedAssets         Asset[]
   trainingEnrollments    TrainingEnrollment[]
   evaluations            PerformanceEvaluation[]
@@ -453,6 +460,27 @@ model EmployeeContract {
   @@index([status])
   @@index([odooId])
   @@index([odooEmployeeId])
+}
+
+model InsurancePolicy {
+  id           String          @id @default(cuid())
+  employeeId   String
+  policyNumber String          @unique
+  provider     String
+  coverageType String?
+  startDate    DateTime
+  endDate      DateTime
+  status       InsuranceStatus @default(ACTIVE)
+  documentUrl  String?
+  documentName String?
+  notes        String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  employee     Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  // Backs the "policy renewal due soon" badge: status = ACTIVE AND endDate <= cutoff.
+  @@index([status, endDate])
 }
 
 model SalaryStructure {
@@ -949,6 +977,8 @@ model WorkflowStep {
   viewedAt           DateTime?
   capabilities       String[]         @default(["APPROVE", "REJECT"]) // Snapshot of what this step's approver may do, resolved from HrApprovalChain at creation time
   workflowInstance   WorkflowInstance @relation(fields: [workflowInstanceId], references: [id], onDelete: Cascade)
+
+  @@index([approverUserId, status])
 }
 
 // ====================== ENTERPRISE UPGRADE MODELS ======================
@@ -2213,4 +2243,25 @@ model HrPermissionAudit {
 
   @@index([userId])
   @@index([createdAt])
+}
+
+enum WorkflowPathType {
+  HOSPITAL_PATH
+  GENERAL_ADMIN_PATH
+}
+
+// One configurable named approval path per type (محرر مسارات الموافقات) --
+// @unique on workflowType makes each type a single, replaceable record ("المسار
+// الأول" / "المسار الثاني"). `steps` holds the ordered chain as JSON:
+// [{ stepOrder, approverId, departmentId, roleContext }, ...].
+model WorkflowPathTemplate {
+  id           String           @id @default(cuid())
+  workflowType WorkflowPathType @unique
+  workflowName String
+  steps        Json
+  updatedById  String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([workflowType])
 }

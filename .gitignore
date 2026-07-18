@@ -34,6 +34,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# local filesystem fallback for /api/uploads when Supabase Storage isn't configured
+/public/uploads/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

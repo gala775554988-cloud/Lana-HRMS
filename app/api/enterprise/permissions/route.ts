@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { ALL_ENTERPRISE_PERMISSIONS, PERMISSION_CATEGORIES, PERMISSION_TEMPLATES, getPermissionStore, setUserPermissions, type PermissionKey } from "@/lib/enterprise/permissions";
+import { ALL_ENTERPRISE_PERMISSIONS, PERMISSION_CATEGORIES, PERMISSION_TEMPLATES, buildPermissionTree, getPermissionStore, setUserPermissions, type PermissionKey } from "@/lib/enterprise/permissions";
 import { autoHealPendingWorkflowsForEmployee } from "@/lib/enterprise/workflow";
 
 function isSuperAdmin(roles: string[] | undefined) {
@@ -24,6 +24,7 @@ export async function GET() {
     employees: [],
     permissions: ALL_ENTERPRISE_PERMISSIONS,
     categories: PERMISSION_CATEGORIES,
+    tree: buildPermissionTree(PERMISSION_CATEGORIES),
     templates: PERMISSION_TEMPLATES,
     userPermissions: store.users
   });

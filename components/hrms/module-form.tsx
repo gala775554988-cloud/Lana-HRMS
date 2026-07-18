@@ -22,6 +22,8 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [isPending, startTransition] = useTransition();
   const isEmployeeForm = resource.key === "employees";
+  const isInsuranceForm = resource.key === "insurance";
+  const [selectedDocumentFile, setSelectedDocumentFile] = useState<File | null>(null);
   const initialFullName = `${String(initialValues?.firstName ?? "")} ${String(initialValues?.lastName ?? "")}`.trim();
   const [fullName, setFullName] = useState(initialFullName);
   const initialSalaryValues = useMemo(
@@ -71,10 +73,25 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
         } else if (isEmployeeForm && photoRemoved) {
           submitValues.profilePhotoUrl = "";
         }
+        if (isInsuranceForm && selectedDocumentFile) {
+          const formData = new FormData();
+          formData.append("file", selectedDocumentFile);
+          formData.append("kind", "document");
+          const uploadResponse = await fetch("/api/uploads", { method: "POST", body: formData });
+          if (!uploadResponse.ok) {
+            const errorData = await uploadResponse.json().catch(() => ({ message: "فشل رفع المستند" }));
+            throw new Error(errorData.message || "فشل رفع المستند");
+          }
+          const uploadData = await uploadResponse.json();
+          if (!uploadData.url) throw new Error(uploadData.message || "فشل رفع المستند");
+          submitValues.documentUrl = uploadData.url;
+          submitValues.documentName = uploadData.fileName;
+        }
         const result = recordId ? await updateModuleRecord({ resourceKey: resource.key, id: recordId, values: submitValues }) : await createModuleRecord({ resourceKey: resource.key, values: submitValues });
         if (result.success) {
           setSelectedPhotoFile(null);
           setPhotoRemoved(false);
+          setSelectedDocumentFile(null);
           setMessage({ text: result.message, type: 'success' });
           router.refresh();
         } else {
@@ -85,7 +102,7 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
         setMessage({ text: error?.message || "حدث خطأ غير متوقع", type: 'error' });
       }
     });
-  }, [costValues, fullName, isEmployeeForm, photoRemoved, recordId, resource.key, router, salaryValues, selectedPhotoFile]);
+  }, [costValues, fullName, isEmployeeForm, isInsuranceForm, photoRemoved, recordId, resource.key, router, salaryValues, selectedDocumentFile, selectedPhotoFile]);
 
   const fieldsDict = dictionary.fields as Record<string, string>;
   const getFieldLabel = (name: string, fallback: string) => fieldsDict[name] ?? fallback;
@@ -139,13 +156,36 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2">
-        {resource.fields.filter((field) => !(isEmployeeForm && ["profilePhotoUrl", "firstName", "lastName"].includes(field.name))).map((field) => {
+        {resource.fields
+          .filter((field) => !(isEmployeeForm && ["profilePhotoUrl", "firstName", "lastName"].includes(field.name)))
+          .filter((field) => !(isInsuranceForm && field.name === "documentName"))
+          .map((field) => {
           const error = form.formState.errors[field.name]?.message as string | undefined;
           const label = getFieldLabel(field.name, field.label);
           return (
             <div key={field.name} className={field.type === "textarea" ? "space-y-2 md:col-span-2" : "space-y-2"}>
               <Label htmlFor={field.name}>{label}{field.required && <span className="text-destructive mr-1">*</span>}</Label>
-              {isEmployeeForm && field.name === "positionId" ? (
+              {isInsuranceForm && field.name === "documentUrl" ? (
+                <div className="space-y-2">
+                  <input
+                    id={field.name}
+                    type="file"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg"
+                    className="block w-full text-sm file:me-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-primary-foreground"
+                    onChange={(event) => setSelectedDocumentFile(event.target.files?.[0] ?? null)}
+                  />
+                  {selectedDocumentFile ? (
+                    <p className="text-xs text-muted-foreground">{selectedDocumentFile.name}</p>
+                  ) : form.watch("documentUrl") ? (
+                    <a href={String(form.watch("documentUrl"))} target="_blank" rel="noreferrer" className="text-xs font-semibold text-primary underline underline-offset-2">
+                      {String(form.watch("documentName") || "تنزيل المستند الحالي")}
+                    </a>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">لا يوجد مستند مرفوع بعد</p>
+                  )}
+                  <input type="hidden" {...form.register("documentUrl")} />
+                </div>
+              ) : isEmployeeForm && field.name === "positionId" ? (
                 <div className="space-y-2">
                   <select id={field.name} className={`h-10 w-full rounded-md border bg-background px-3 py-2 text-sm ${error ? 'border-destructive' : 'border-input'}`} {...form.register(field.name)}>
                     <option value="">{dictionary.form.select}</option>

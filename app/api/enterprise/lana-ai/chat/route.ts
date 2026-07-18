@@ -52,6 +52,14 @@ async function executeAiFirstSemanticOrchestrator(
     }
   }
 
+  // Direct single-fact lookup ("كم رقم هوية عبد الرحمن الجماعي؟", "ما هو الرقم الوظيفي لسارة").
+  // Answers with ONLY the requested value -- no greeting, no profile card,
+  // no proactive-suggestion footer -- per the direct-answer requirement.
+  const nationalIdMatch = text.match(/رقم\s*(?:ال)?(?:هوي[ةه]|اقام[ةه])\s+(?:ال)?(?:موظف\s+)?(.+?)\s*[\?؟]?\s*$/i)
+    || text.match(/national\s*id\s+(?:of\s+)?(.+?)\s*\??\s*$/i);
+  const employeeNumberMatch = nationalIdMatch ? null : (text.match(/الرقم\s*الوظيفي\s+(?:ل|لل)?(?:ال)?(?:موظف\s+)?(.+?)\s*[\?؟]?\s*$/i)
+    || text.match(/employee\s*number\s+(?:of\s+)?(.+?)\s*\??\s*$/i));
+
   try {
     // 1. Headcount question ("كم عدد الموظفين؟" / "عدد الموظفين")
     if (/كم\s+عدد\s+الموظف|عدد\s+الموظفين|headcount|how\s+many\s+employees/i.test(text)) {
@@ -61,6 +69,22 @@ async function executeAiFirstSemanticOrchestrator(
       replyText = isAr
         ? `يبلغ إجمالي عدد الموظفين النشطين في المؤسسة حالياً ${totalEmp || "1205"} موظفاً موزعين على ${deptsRes.count} إدارات وأقسام رسمية.\n\n💡 مبادرة لانا: هل ترغب في الاطلاع على الإدارات الأكثر كثافة أو تقرير توزيع الموظفين حسب الفروع والمستشفيات؟`
         : `The organization currently has ${totalEmp || "1205"} active employees across ${deptsRes.count} departments.\n\n💡 Proactive Suggestion: Would you like a breakdown by branch or hospital allocation?`;
+    }
+    // 1b. Direct single-fact lookup
+    else if (nationalIdMatch || employeeNumberMatch) {
+      const nameQuery = (nationalIdMatch ? nationalIdMatch[1] : employeeNumberMatch![1]).trim();
+      const searchRes = await tools.searchEmployeeData.execute({ query: nameQuery });
+      executedTools.push({ tool: "searchEmployeeData", result: searchRes });
+      if (searchRes.error || !searchRes.employees?.length) {
+        replyText = isAr ? `لم يتم العثور على موظف باسم "${nameQuery}".` : `No employee found matching "${nameQuery}".`;
+      } else {
+        const emp = searchRes.employees[0];
+        if (nationalIdMatch) {
+          replyText = isAr ? `رقم هوية ${emp.name}: ${emp.nationalId}` : `${emp.name}'s national ID: ${emp.nationalId}`;
+        } else {
+          replyText = isAr ? `الرقم الوظيفي لـ ${emp.name}: ${emp.employeeNumber}` : `${emp.name}'s employee number: ${emp.employeeNumber}`;
+        }
+      }
     }
     // 2. Grant permission / role ("أعطه صلاحيات الرواتب", "منحه صلاحية")
     else if (/أعطه\s+صلاحي|اعطه\s+صلاحي|منحه\s+صلاحي|صلاحيات\s+الرواتب|grant.*permission|assign.*permission/i.test(text)) {

@@ -11,13 +11,16 @@ import {
   DollarSign, GraduationCap, Package, Megaphone, BarChart3, Settings,
   Shield, GitPullRequest, Sparkles, Bot, Menu, X, PlugZap,
   Wallet,
-  ClipboardCheck, UserPlus, CalendarClock, Fingerprint, BarChart4
+  ClipboardCheck, UserPlus, CalendarClock, Fingerprint, BarChart4,
+  Umbrella
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { ClientLanguageToggle } from "@/components/i18n/client-language-toggle";
 import { NotificationBell } from "@/components/enterprise/notification-bell";
 import { isEnterpriseResourceAllowed } from "@/lib/enterprise/resource-access";
+import { usePendingApprovalsCount } from "@/lib/hooks/use-pending-approvals-count";
+import { useExpiringInsuranceCount } from "@/lib/hooks/use-expiring-insurance-count";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/hrms/theme-toggle";
 import { QuickSearchModal } from "@/components/hrms/quick-search-modal";
@@ -42,6 +45,7 @@ const navItems: Array<{ href: string; labelKey: NavKey; icon: typeof LayoutDashb
   { href: "/branches", labelKey: "departments-branches", icon: MapPin, group: "peopleContracts", resource: ["departments", "branches"] },
   { href: "/hospitals", labelKey: "hospitals", icon: Building2, group: "peopleContracts", resource: ["hospitals", "branches"] },
   { href: "/contracts", labelKey: "contracts", icon: FileText, group: "peopleContracts", resource: ["contracts", "documents"] },
+  { href: "/insurance", labelKey: "insurance", icon: Umbrella, group: "peopleContracts", resource: "insurance" },
   { href: "/setup", labelKey: "setup", icon: Briefcase, group: "peopleContracts", resource: ["positions", "employment-types", "nationalities"] },
 
   { href: "/attendance", labelKey: "attendance", icon: Clock, group: "attendanceShifts", resource: "attendance" },
@@ -50,7 +54,7 @@ const navItems: Array<{ href: string; labelKey: NavKey; icon: typeof LayoutDashb
 
   { href: "/leaves", labelKey: "leave", icon: Calendar, group: "requestsLeave", resource: "leave" },
   { href: "/overtime", labelKey: "overtime", icon: Clock, group: "requestsLeave", resource: "overtime" },
-  { href: "/approvals", labelKey: "approvals", icon: GitPullRequest, group: "requestsLeave", resource: "leave" },
+  { href: "/approvals", labelKey: "approvals", icon: GitPullRequest, group: "requestsLeave", resource: ["leave", "requests"] },
 
   { href: "/payroll", labelKey: "payroll", icon: DollarSign, group: "financePayroll", resource: ["payroll", "allowances", "deductions"] },
   { href: "/loans", labelKey: "loans", icon: Wallet, group: "financePayroll", resource: "loans" },
@@ -97,6 +101,9 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
 
   const userRoles = useMemo(() => (session?.user?.roles as string[]) || [], [session?.user?.roles]);
   const userPermissions = useMemo(() => (session?.user?.permissions as string[]) || [], [session?.user?.permissions]);
+  const { data: pendingApprovalsCount } = usePendingApprovalsCount(status === "authenticated");
+  const canViewInsurance = userRoles.includes("SUPER_ADMIN") || userRoles.includes("HR_MANAGER") || userPermissions.includes("read:insurance") || userPermissions.includes("manage:insurance");
+  const { data: expiringInsuranceCount } = useExpiringInsuranceCount(status === "authenticated" && canViewInsurance);
 
   // REMOVED: useEffect that redirects to /login on unauthenticated.
   // Rely on middleware.ts for auth protection — it redirects to /login
@@ -136,7 +143,7 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
   if (status === "loading") {
     return (
       <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
-        <div className="hidden h-screen w-[280px] shrink-0 border-e border-slate-200/80 bg-white lg:block dark:border-slate-800 dark:bg-slate-950" />
+        <div className="hidden h-screen w-[280px] shrink-0 border-e border-slate-200/80 bg-white/70 backdrop-blur-md lg:block dark:border-slate-800 dark:bg-slate-950/70" />
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="h-16 shrink-0 border-b border-border/80 bg-white/90 dark:bg-slate-950/90" />
           <main className="min-w-0 flex-1 overflow-y-auto p-4 lg:p-8">{children}</main>
@@ -160,7 +167,7 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
 
       <aside
         className={cn(
-          "fixed inset-y-0 start-0 z-50 flex h-screen flex-col border-e border-slate-200/80 bg-white shadow-xl transition-transform duration-300 ease-in-out lg:sticky lg:top-0 lg:z-auto lg:shadow-none lg:!translate-x-0 dark:border-slate-800 dark:bg-slate-950",
+          "fixed inset-y-0 start-0 z-50 flex h-screen flex-col border-e border-slate-200/80 bg-white/70 shadow-glass backdrop-blur-md transition-transform duration-300 ease-in-out lg:sticky lg:top-0 lg:z-auto lg:shadow-none lg:!translate-x-0 dark:border-slate-800 dark:bg-slate-950/70",
           sidebarCollapsed ? "lg:w-[76px]" : "lg:w-[280px]",
           "w-[280px]",
           // !important on the lg override above is required: the bare (no
@@ -214,10 +221,30 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
                       )}
                       title={sidebarCollapsed ? label : undefined}
                     >
-                      <Icon className={cn(
-                        "h-5 w-5 shrink-0 transition-transform group-hover:scale-110",
-                        active ? "text-white dark:text-slate-950" : "text-slate-400 group-hover:text-indigo-600 dark:text-slate-500 dark:group-hover:text-indigo-400"
-                      )} />
+                      <span className="relative inline-flex shrink-0">
+                        <Icon className={cn(
+                          "h-5 w-5 shrink-0 transition-transform group-hover:scale-110",
+                          active ? "text-white dark:text-slate-950" : "text-slate-400 group-hover:text-indigo-600 dark:text-slate-500 dark:group-hover:text-indigo-400"
+                        )} />
+                        {item.href === "/approvals" && pendingApprovalsCount ? (
+                          <span
+                            key={pendingApprovalsCount}
+                            className="absolute -top-1.5 -end-2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive px-0.5 text-[10px] font-bold leading-none text-destructive-foreground ring-2 ring-white dark:ring-slate-950"
+                            aria-label={`${pendingApprovalsCount} pending approvals`}
+                          >
+                            {pendingApprovalsCount > 99 ? "99+" : pendingApprovalsCount}
+                          </span>
+                        ) : null}
+                        {item.href === "/insurance" && expiringInsuranceCount ? (
+                          <span
+                            key={expiringInsuranceCount}
+                            className="absolute -top-1.5 -end-2 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 px-0.5 text-[10px] font-bold leading-none text-white ring-2 ring-white dark:ring-slate-950"
+                            aria-label={`${expiringInsuranceCount} insurance policies renewing soon`}
+                          >
+                            {expiringInsuranceCount > 99 ? "99+" : expiringInsuranceCount}
+                          </span>
+                        ) : null}
+                      </span>
                       {(!sidebarCollapsed || mobileMenuOpen) && (
                         <span className="truncate">{label}</span>
                       )}

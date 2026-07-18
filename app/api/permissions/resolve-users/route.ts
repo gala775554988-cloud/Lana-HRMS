@@ -20,12 +20,12 @@ export async function POST(request: NextRequest) {
 
   const employees = await prisma.employee.findMany({
     where: { userId: { in: userIds } },
-    select: { userId: true, employeeNumber: true, firstName: true, lastName: true }
+    select: { userId: true, employeeNumber: true, firstName: true, lastName: true, profilePhotoUrl: true, department: { select: { name: true } } }
   });
 
   const labels: Record<string, string> = {};
   for (const employee of employees) {
     if (employee.userId) labels[employee.userId] = `${employee.firstName} ${employee.lastName} - ${employee.employeeNumber}`;
   }
-  return NextResponse.json({ success: true, labels });
+  return NextResponse.json({ success: true, labels, employees });
 }

@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { MergedModuleTabs } from "@/components/hrms/merged-module-tabs";
 import { PermissionsAdmin } from "@/app/(hrms)/permissions-system/admin-client";
-import { KeyRound, Shield } from "lucide-react";
+import { WorkflowPathsTabs } from "@/components/enterprise/workflow-paths-tabs";
+import { KeyRound, Shield, Workflow } from "lucide-react";
 
 const PermissionsManagementClient = dynamicImport(() =>
   import("@/components/enterprise/permissions-management-client").then((mod) => mod.PermissionsManagementClient)
@@ -61,6 +62,17 @@ export default async function PermissionsPage({ searchParams }: { searchParams: 
           label: "نطاقات الصلاحيات",
           icon: <KeyRound className="h-4 w-4" />,
           content: scopesContent
+        },
+        {
+          value: "workflow-paths",
+          label: "محرر مسارات الموافقات",
+          icon: <Workflow className="h-4 w-4" />,
+          content: activeTab === "workflow-paths" ? (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">اضبط سلسلة الاعتماد لكل مسار؛ يتم حفظ كل مسار كاملاً عند الضغط على "حفظ".</p>
+              <WorkflowPathsTabs />
+            </div>
+          ) : null
         }
       ]}
     />

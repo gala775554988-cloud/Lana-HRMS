@@ -12,7 +12,7 @@ export function isEnterpriseResourceAllowed(roles: string[] | undefined, resourc
   }
 
   if (roleSet.has("INSURANCE_OFFICER")) {
-    return ["dashboard", "documents", "reports"].includes(resource);
+    return ["dashboard", "documents", "reports", "insurance"].includes(resource);
   }
 
   if (roleSet.has("RESIDENCY_OFFICER")) {

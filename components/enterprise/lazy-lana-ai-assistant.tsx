@@ -9,11 +9,6 @@ const LanaAiAssistant = dynamic(
   { ssr: false }
 );
 
-const LanaExecutiveAgent = dynamic(
-  () => import("@/components/enterprise/lana-executive-agent").then((mod) => mod.LanaExecutiveAgent),
-  { ssr: false }
-);
-
 export function LazyLanaAiAssistant() {
   const { data: session } = useSession();
   const [enabled, setEnabled] = useState(false);
@@ -31,13 +26,5 @@ export function LazyLanaAiAssistant() {
   // لا يظهر المكون إلا إذا وُجدت جلسة نشطة
   if (!session || !enabled) return null;
 
-  const roles = (session.user as any)?.roles || [];
-  const isExecutiveOrHR = roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER") || Boolean((session.user as any)?.isDelegate);
-
-  return (
-    <>
-      <LanaAiAssistant />
-      {isExecutiveOrHR ? <LanaExecutiveAgent /> : null}
-    </>
-  );
+  return <LanaAiAssistant />;
 }

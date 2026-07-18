@@ -146,14 +146,14 @@ export default async function LoginPage() {
     <section className="relative flex min-h-screen items-center justify-center bg-slate-50/90 p-6 dark:bg-slate-950" dir={isAr ? "rtl" : "ltr"}>
       <div className="absolute end-4 top-4"><ClientLanguageToggle variant="outline" /></div>
       <div className="w-full max-w-md">
-        <div className="mb-7 flex flex-col items-center text-center lg:items-start lg:text-start">
+        <div className="mb-7 flex animate-in fade-in slide-in-from-bottom-2 flex-col items-center text-center duration-500 fill-mode-both lg:items-start lg:text-start">
           <div className="flex items-center gap-3">
             <BrandLogo href="/" size="hero" showText={false} logoClassName="border-slate-300 shadow-2xl shadow-primary/10 ring-4 ring-white/80 dark:border-slate-700 dark:ring-slate-800" imageClassName="p-2" />
             <h1 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 sm:text-3xl">Lana <span className="font-medium text-primary">HRMS</span></h1>
           </div>
           <p className="mt-3 text-sm font-medium text-slate-400 dark:text-slate-500">البوابة الموحدة لدخول الموظفين والمسؤولين</p>
         </div>
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-8 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+        <div className="animate-in fade-in slide-in-from-bottom-4 rounded-2xl border border-slate-200/80 bg-white/70 p-8 shadow-glass backdrop-blur-md duration-500 delay-150 fill-mode-both dark:border-slate-800 dark:bg-slate-900/70">
           <Suspense><LoginForm dictionary={dictionary} /></Suspense>
         </div>
       </div>

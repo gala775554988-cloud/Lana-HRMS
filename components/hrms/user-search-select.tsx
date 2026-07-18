@@ -10,23 +10,38 @@ type EmployeeSearchResult = {
   firstName: string;
   lastName: string;
   nationalId: string;
+  profilePhotoUrl?: string | null;
   department?: { name: string } | null;
+  position?: { title: string } | null;
 };
 
 export function UserSearchSelect({
   value,
   onChange,
-  placeholder = "بحث بالاسم أو الرقم الوظيفي أو الهوية..."
+  placeholder = "بحث بالاسم أو الرقم الوظيفي أو الهوية...",
+  initialLabel = ""
 }: {
   value: string;
   onChange: (userId: string, label?: string, employee?: any) => void;
   placeholder?: string;
+  initialLabel?: string;
 }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<EmployeeSearchResult[]>([]);
   const [open, setOpen] = useState(false);
-  const [selectedLabel, setSelectedLabel] = useState("");
+  const [selectedLabel, setSelectedLabel] = useState(initialLabel);
   const containerRef = useRef<HTMLDivElement>(null);
+  const hydratedRef = useRef(false);
+
+  useEffect(() => {
+    // Only hydrate the label from the parent-supplied initialLabel once, the
+    // first time a real value shows up (e.g. loading a saved workflow step) --
+    // never again afterward, so it doesn't clobber the label select() just set.
+    if (!hydratedRef.current && value && initialLabel) {
+      setSelectedLabel(initialLabel);
+      hydratedRef.current = true;
+    }
+  }, [value, initialLabel]);
 
   useEffect(() => {
     if (query.trim().length < 2) { setResults([]); return; }
@@ -92,12 +107,21 @@ export function UserSearchSelect({
             <button
               key={employee.id}
               type="button"
-              className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-start text-sm hover:bg-accent"
+              className="flex w-full items-center gap-2.5 px-3 py-2 text-start text-sm hover:bg-accent"
               onClick={() => select(employee)}
             >
-              <span className="font-medium">{employee.firstName} {employee.lastName}</span>
-              <span className="text-xs text-muted-foreground">
-                {employee.employeeNumber} · {employee.nationalId}{employee.department?.name ? ` · ${employee.department.name}` : ""}
+              {employee.profilePhotoUrl ? (
+                <img src={employee.profilePhotoUrl} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
+              ) : (
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-[11px] font-bold text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400">
+                  {employee.firstName.charAt(0)}{employee.lastName.charAt(0)}
+                </span>
+              )}
+              <span className="flex min-w-0 flex-col items-start gap-0.5">
+                <span className="font-medium">{employee.firstName} {employee.lastName}</span>
+                <span className="text-xs text-muted-foreground">
+                  {employee.employeeNumber} · {employee.nationalId}{employee.department?.name ? ` · ${employee.department.name}` : ""}
+                </span>
               </span>
             </button>
           ))}

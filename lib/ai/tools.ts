@@ -143,6 +143,64 @@ export function createScopedHrTools(context: ToolAuthContext) {
       }
     }),
 
+    searchEmployeeData: makeTool({
+      description: "أداة البحث المباشر في قاعدة بيانات الموظفين (Prisma/Neon) بالاسم أو الرقم الوظيفي لاستخراج بيانات دقيقة مثل رقم الهوية أو القسم أو المسمى الوظيفي. Direct Prisma-backed lookup by name or employee number -- use this whenever the user asks for a specific fact about a named employee (e.g. their national ID).",
+      parameters: z.object({
+        query: z.string().describe("Employee full/partial name or employee number to search for.")
+      }) as any,
+      execute: async ({ query }: any) => {
+        const trimmed = (query || "").trim();
+        if (!trimmed) return { error: "يرجى تحديد اسم أو رقم الموظف للبحث." };
+        if (!canViewAllEmployees(context) && !context.employeeId) {
+          return { error: "Access Denied: Insufficient permissions to search employees." };
+        }
+
+        return memoryCache(`tool:search_emp_data:${trimmed}:${context.userId}`, 30_000, async () => {
+          // Multi-word Arabic names often span both firstName and lastName
+          // (e.g. "عبد الرحمن الجماعي") -- require every word to independently
+          // match one of the two fields rather than a single contiguous
+          // substring, so compound first names still resolve precisely.
+          const words = trimmed.split(/\s+/).filter(Boolean);
+          const multiWordCondition = words.length > 1
+            ? [{ AND: words.map((word: string) => ({ OR: [{ firstName: { contains: word, mode: "insensitive" } }, { lastName: { contains: word, mode: "insensitive" } }] })) }]
+            : [];
+
+          const employees = await prisma.employee.findMany({
+            where: {
+              OR: [
+                { employeeNumber: { contains: trimmed, mode: "insensitive" } },
+                { nationalId: trimmed },
+                { firstName: { contains: trimmed, mode: "insensitive" } },
+                { lastName: { contains: trimmed, mode: "insensitive" } },
+                ...multiWordCondition
+              ]
+            },
+            take: 5,
+            include: {
+              department: { select: { name: true } },
+              position: { select: { title: true } }
+            }
+          });
+
+          if (!employees.length) return { error: `لم يتم العثور على موظف مطابق لـ "${trimmed}".`, employees: [] };
+
+          const canSeeSensitive = canManageHr(context);
+          return {
+            count: employees.length,
+            employees: employees.map((e) => ({
+              id: e.id,
+              employeeNumber: e.employeeNumber,
+              name: `${e.firstName} ${e.lastName}`.trim(),
+              nationalId: canSeeSensitive || e.id === context.employeeId ? e.nationalId : "REDACTED",
+              department: e.department?.name || "بدون قسم",
+              position: e.position?.title || "بدون مسمى",
+              status: e.status
+            }))
+          };
+        });
+      }
+    }),
+
     searchEmployees: makeTool({
       description: "Search for employees by name, number, department, or status. Returns a scoped list based on the caller's permissions.",
       parameters: z.object({

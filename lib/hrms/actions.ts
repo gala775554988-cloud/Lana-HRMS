@@ -145,11 +145,25 @@ async function resolveEmployeePositionId(value: unknown) {
   return record.id;
 }
 
-async function requireModulePermission(resource: HrmsModule, action: "read" | "manage") {
+type ModuleAction = "read" | "manage" | "create" | "edit" | "delete";
+
+// Resources with real, separately-enforced create/edit/delete permissions
+// (see PERMISSION_CATEGORIES / GRANULAR_RESOURCES in lib/enterprise/permissions.ts).
+// Every other module keeps checking the single broad "manage" action for all
+// mutations, unchanged -- this list is deliberately small so as not to lock
+// out anyone currently relying on a plain "manage:X" grant for a module that
+// hasn't been split into granular actions yet.
+const GRANULAR_MUTATION_RESOURCES = new Set(["employees", "contracts", "attendance", "insurance"]);
+
+function mutationAction(resource: HrmsModule, kind: "create" | "edit" | "delete"): ModuleAction {
+  return GRANULAR_MUTATION_RESOURCES.has(resource.permissionResource) ? kind : "manage";
+}
+
+async function requireModulePermission(resource: HrmsModule, action: ModuleAction) {
   return withQueryTiming(`rbac.requireModulePermission(${resource.key}:${action})`, () => requireModulePermissionUntimed(resource, action));
 }
 
-async function requireModulePermissionUntimed(resource: HrmsModule, action: "read" | "manage") {
+async function requireModulePermissionUntimed(resource: HrmsModule, action: ModuleAction) {
   const session = await auth();
   const requiredPermission = `${action}:${resource.permissionResource}`;
   if (!session?.user) {
@@ -519,7 +533,7 @@ export async function createModuleRecord(input: MutationInput) {
   const resource = getHrmsModule(input.resourceKey);
   if (!resource) return { success: false, message: "Unknown module." };
   if (resource.key === "audit-logs") return { success: false, message: "Audit log entries are immutable and cannot be created manually." };
-  const session = await requireModulePermission(resource, "manage");
+  const session = await requireModulePermission(resource, mutationAction(resource, "create"));
   const salaryProfile = resource.key === "employees" ? extractSalaryProfile(input.values) : {};
   const parsed = buildModuleSchema(resource).safeParse(input.values);
   if (!parsed.success) return { success: false, message: parsed.error.errors[0]?.message ?? "Invalid input." };
@@ -652,7 +666,7 @@ export async function updateModuleRecord(input: MutationInput) {
   const resource = getHrmsModule(input.resourceKey);
   if (!resource || !input.id) return { success: false, message: "Unknown record." };
   if (resource.key === "audit-logs") return { success: false, message: "Audit log entries are immutable and cannot be edited." };
-  const session = await requireModulePermission(resource, "manage");
+  const session = await requireModulePermission(resource, mutationAction(resource, "edit"));
   const existingRecord = await delegateFor(resource.model).findUnique({ where: { id: input.id } });
   await assertRecordVisible(resource, existingRecord, session);
   const salaryProfile = resource.key === "employees" ? extractSalaryProfile(input.values) : {};
@@ -691,7 +705,7 @@ export async function deleteModuleRecord(resourceKey: string, id: string) {
   const resource = getHrmsModule(resourceKey);
   if (!resource) return { success: false, message: "Unknown module." };
   if (resource.key === "audit-logs") return { success: false, message: "Audit log entries are immutable and cannot be deleted." };
-  const session = await requireModulePermission(resource, "manage");
+  const session = await requireModulePermission(resource, mutationAction(resource, "delete"));
   const existingRecord = await delegateFor(resource.model).findUnique({ where: { id } });
   await assertRecordVisible(resource, existingRecord, session);
   await delegateFor(resource.model).delete({ where: { id } });

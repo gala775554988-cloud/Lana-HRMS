@@ -196,7 +196,8 @@ export const dictionaries = {
       permissions: "Permissions",
       "ai-assistant": "Lana AI Assistant",
       "lana-ai": "AI System Manager",
-      "departments-branches": "Departments & Branches"
+      "departments-branches": "Departments & Branches",
+      insurance: "Insurance"
     },
     navGroups: {
       dashboardAnalytics: "Dashboard & Analytics",
@@ -590,7 +591,8 @@ export const dictionaries = {
       permissions: "إدارة الصلاحيات والأدوار",
       "ai-assistant": "المساعد الذكي Lana",
       "lana-ai": "مدير النظام الذكي",
-      "departments-branches": "الإدارات والفروع"
+      "departments-branches": "الإدارات والفروع",
+      insurance: "التأمين"
     },
     navGroups: {
       dashboardAnalytics: "لوحة المعلومات والتحليلات",
