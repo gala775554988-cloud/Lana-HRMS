@@ -1,20 +1,24 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Plus, X, Pencil, Check, CheckCircle2, Shield, Loader2, GitPullRequest } from "lucide-react";
+import { Plus, Pencil, Check, X, CheckCircle2, Shield, Loader2, GitPullRequest, Eye, Trash2, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { UserSearchSelect } from "@/components/hrms/user-search-select";
 
 export type WorkflowStepItem = {
   id: number | string;
   approverId: string;
   approverLabel?: string;
+  approverPosition?: string;
   orgUnitId: string;
   orgUnitLabel?: string;
-  roleContext: string;
+  /** Legacy free-text field, no longer editable via the UI (superseded by
+   * approverPosition) -- kept only so paths saved before the redesign keep
+   * round-tripping their existing value instead of losing it on next save. */
+  roleContext?: string;
 };
 
 type OrgUnit = { id: string; name: string };
@@ -59,7 +63,60 @@ interface WorkflowManagerProps {
 }
 
 function emptyStep(): WorkflowStepItem {
-  return { id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, approverId: "", orgUnitId: "", roleContext: "" };
+  return { id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, approverId: "", orgUnitId: "" };
+}
+
+/** Small "i" trigger for a guiding tooltip -- same interaction pattern as
+ * PermissionHint in the Permissions system (click-to-toggle, not just
+ * hover), for visual/behavioral harmony between the two admin surfaces. */
+function StepHint({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <TooltipProvider delayDuration={100}>
+      <Tooltip open={open} onOpenChange={setOpen}>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={(event) => { event.preventDefault(); setOpen((v) => !v); }}
+            className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800"
+            aria-label={text}
+          >
+            <HelpCircle className="h-3 w-3" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top" align="start" className="w-56 p-2.5 text-[11px]">{text}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+/** Dedicated "View" control -- read-only approver details (name + job title +
+ * org unit), separate from Edit so opening it never risks changing data. */
+function ApproverViewButton({ step, orgUnits }: { step: WorkflowStepItem; orgUnits: OrgUnits }) {
+  const [open, setOpen] = useState(false);
+  if (!step.approverId) return null;
+  return (
+    <TooltipProvider delayDuration={100}>
+      <Tooltip open={open} onOpenChange={setOpen}>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+            title="عرض تفاصيل المسؤول"
+            aria-label="View"
+          >
+            <Eye className="h-4 w-4" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top" align="start" className="w-60 p-3">
+          <strong className="mb-1 block font-bold text-slate-100">{step.approverLabel || "—"}</strong>
+          <span className="block text-slate-300">{step.approverPosition || "بدون مسمى وظيفي"}</span>
+          <span className="mt-1 block border-t border-slate-700 pt-1 text-slate-400">{step.orgUnitLabel || orgUnitLabelFor(step.orgUnitId, orgUnits) || "بدون جهة"}</span>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
 }
 
 export function WorkflowManager({
@@ -70,6 +127,7 @@ export function WorkflowManager({
 }: WorkflowManagerProps) {
   const [steps, setSteps] = useState<WorkflowStepItem[]>(initialSteps);
   const [editingIds, setEditingIds] = useState<Set<string | number>>(new Set());
+  const [confirmingDeleteIds, setConfirmingDeleteIds] = useState<Set<string | number>>(new Set());
   const [orgUnits, setOrgUnits] = useState<OrgUnits>(EMPTY_ORG_UNITS);
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState("");
@@ -99,7 +157,19 @@ export function WorkflowManager({
     });
   }
 
+  function setConfirmingDelete(id: number | string, value: boolean) {
+    setConfirmingDeleteIds((current) => {
+      const next = new Set(current);
+      if (value) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  const hasIncompleteStep = steps.some((step) => !step.approverId || !step.orgUnitId);
+
   function addStepAfter(id: number | string | null) {
+    if (hasIncompleteStep) return;
     const step = emptyStep();
     setSteps((current) => {
       if (id === null) return [...current, step];
@@ -113,18 +183,17 @@ export function WorkflowManager({
   function removeStep(id: number | string) {
     setSteps((current) => current.filter((s) => s.id !== id));
     setEditing(id, false);
+    setConfirmingDelete(id, false);
   }
 
   function updateStep(id: number | string, patch: Partial<WorkflowStepItem>) {
     setSteps((current) => current.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   }
 
-  const hasIncompleteStep = steps.some((step) => !step.approverId || !step.orgUnitId);
-
   const handleSave = () => {
     setMessage("");
     if (hasIncompleteStep) {
-      setMessage("أكمل اختيار الموظف والجهة لكل المستويات قبل الحفظ");
+      setMessage("أكمل اختيار الجهة والمسؤول لكل المستويات قبل الحفظ");
       return;
     }
     startTransition(async () => {
@@ -139,7 +208,7 @@ export function WorkflowManager({
   };
 
   return (
-    <Card className="mx-auto w-full max-w-3xl overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900" dir="rtl">
+    <Card className="mx-auto w-full max-w-3xl overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900" dir="rtl">
       <CardHeader className="border-b border-slate-100 bg-slate-50/70 pb-5 dark:border-slate-800 dark:bg-slate-900/50">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -177,6 +246,7 @@ export function WorkflowManager({
           <div className="space-y-3">
             {steps.map((step, index) => {
               const editing = editingIds.has(step.id);
+              const confirmingDelete = confirmingDeleteIds.has(step.id);
               const canConfirm = Boolean(step.approverId && step.orgUnitId);
               return (
                 <div key={step.id} className="flex flex-col items-stretch">
@@ -189,71 +259,77 @@ export function WorkflowManager({
                         <span key={`label-${index}`} className="text-xs font-bold text-slate-700 dark:text-slate-300">المستوى {index + 1}</span>
                       </div>
                       <div className="flex items-center gap-1">
+                        <ApproverViewButton step={step} orgUnits={orgUnits} />
                         <button
                           type="button"
                           onClick={() => setEditing(step.id, !editing)}
                           className="rounded-lg p-1.5 text-slate-400 transition hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/40"
-                          title="تعديل الموظف/الجهة"
+                          title="تعديل الجهة أو المسؤول لهذا المستوى"
                           aria-label="Edit"
                         >
                           {editing ? <Check className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => removeStep(step.id)}
-                          className="rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
-                          title="حذف هذه الخطوة"
-                          aria-label="Delete"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
+                        {confirmingDelete ? (
+                          <div className="flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-1 py-0.5 dark:border-rose-900 dark:bg-rose-950/30">
+                            <span className="px-1 text-[10px] font-semibold text-rose-700 dark:text-rose-300">تأكيد؟</span>
+                            <button type="button" onClick={() => removeStep(step.id)} className="rounded-lg p-1 text-rose-700 hover:bg-rose-100 dark:text-rose-300 dark:hover:bg-rose-900/40" aria-label="Confirm delete"><Check className="h-3.5 w-3.5" /></button>
+                            <button type="button" onClick={() => setConfirmingDelete(step.id, false)} className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Cancel"><X className="h-3.5 w-3.5" /></button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmingDelete(step.id, true)}
+                            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                            title="حذف هذا المستوى"
+                            aria-label="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
 
                     {editing ? (
                       <div className="space-y-3">
                         <div>
-                          <label className="mb-1 block text-[10px] font-bold text-muted-foreground">الموظف المُعتمِد (Approver)</label>
-                          <UserSearchSelect
-                            value={step.approverId}
-                            initialLabel={step.approverLabel ?? ""}
-                            onChange={(userId, label) => updateStep(step.id, { approverId: userId, approverLabel: label ?? "" })}
-                            placeholder="ابحث عن الموظف بالاسم أو الرقم الوظيفي أو الهوية..."
-                          />
-                        </div>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          <div>
-                            <label className="mb-1 block text-[10px] font-bold text-muted-foreground">الجهة (إدارة / فرع / مستشفى)</label>
-                            <select
-                              value={step.orgUnitId}
-                              onChange={(e) => updateStep(step.id, { orgUnitId: e.target.value, orgUnitLabel: orgUnitLabelFor(e.target.value, orgUnits) })}
-                              className={`h-9 w-full rounded-xl border border-input bg-white px-3 text-xs font-medium dark:bg-slate-900 focus:ring-2 ${theme.focus}`}
-                            >
-                              <option value="">اختر الجهة...</option>
-                              {orgUnits.departments.length ? (
-                                <optgroup label="الإدارات">
-                                  {orgUnits.departments.map((d) => <option key={d.id} value={`department:${d.id}`}>{d.name}</option>)}
-                                </optgroup>
-                              ) : null}
-                              {orgUnits.branches.length ? (
-                                <optgroup label="الفروع">
-                                  {orgUnits.branches.map((b) => <option key={b.id} value={`branch:${b.id}`}>{b.name}</option>)}
-                                </optgroup>
-                              ) : null}
-                              {orgUnits.hospitals.length ? (
-                                <optgroup label="المستشفيات">
-                                  {orgUnits.hospitals.map((h) => <option key={h.id} value={`hospital:${h.id}`}>{h.name}</option>)}
-                                </optgroup>
-                              ) : null}
-                            </select>
+                          <div className="mb-1 flex items-center gap-1.5">
+                            <label className="block text-[10px] font-bold text-muted-foreground">١. الجهة (النطاق الرئيسي)</label>
+                            {!step.orgUnitId ? <StepHint text="اختر الجهة أولاً -- هي المفتاح الرئيسي لهذا المستوى، ويُحدَّد المسؤول بعدها." /> : null}
                           </div>
-                          <div>
-                            <label className="mb-1 block text-[10px] font-bold text-muted-foreground">الدور / المسمى (اختياري)</label>
-                            <Input
-                              value={step.roleContext}
-                              onChange={(e) => updateStep(step.id, { roleContext: e.target.value })}
-                              placeholder="مثلاً: مدير الموارد البشرية"
-                              className="h-9 rounded-xl bg-white text-xs font-semibold dark:bg-slate-900"
+                          <select
+                            value={step.orgUnitId}
+                            onChange={(e) => updateStep(step.id, { orgUnitId: e.target.value, orgUnitLabel: orgUnitLabelFor(e.target.value, orgUnits) })}
+                            className={`h-9 w-full rounded-xl border border-input bg-white px-3 text-xs font-medium dark:bg-slate-900 focus:ring-2 ${theme.focus}`}
+                          >
+                            <option value="">اختر الجهة...</option>
+                            {orgUnits.departments.length ? (
+                              <optgroup label="الإدارات">
+                                {orgUnits.departments.map((d) => <option key={d.id} value={`department:${d.id}`}>{d.name}</option>)}
+                              </optgroup>
+                            ) : null}
+                            {orgUnits.branches.length ? (
+                              <optgroup label="الفروع">
+                                {orgUnits.branches.map((b) => <option key={b.id} value={`branch:${b.id}`}>{b.name}</option>)}
+                              </optgroup>
+                            ) : null}
+                            {orgUnits.hospitals.length ? (
+                              <optgroup label="المستشفيات">
+                                {orgUnits.hospitals.map((h) => <option key={h.id} value={`hospital:${h.id}`}>{h.name}</option>)}
+                              </optgroup>
+                            ) : null}
+                          </select>
+                        </div>
+                        <div>
+                          <div className="mb-1 flex items-center gap-1.5">
+                            <label className="block text-[10px] font-bold text-muted-foreground">٢. المسؤول (المعتمِد)</label>
+                            {step.orgUnitId && !step.approverId ? <StepHint text="اختر الموظف الذي سيعتمد طلبات هذه الجهة." /> : null}
+                          </div>
+                          <div className={!step.orgUnitId ? "pointer-events-none opacity-50" : ""}>
+                            <UserSearchSelect
+                              value={step.approverId}
+                              initialLabel={step.approverLabel ?? ""}
+                              onChange={(userId, label, employee) => updateStep(step.id, { approverId: userId, approverLabel: label ?? "", approverPosition: employee?.position?.title ?? "" })}
+                              placeholder={step.orgUnitId ? "ابحث عن الموظف بالاسم أو الرقم الوظيفي أو الهوية..." : "اختر الجهة أولاً"}
                             />
                           </div>
                         </div>
@@ -262,30 +338,41 @@ export function WorkflowManager({
                             <Check className="h-3.5 w-3.5" /> تم
                           </Button>
                         ) : (
-                          <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">أكمل اختيار الموظف والجهة لهذا المستوى.</p>
+                          <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">أكمل اختيار الجهة والمسؤول لهذا المستوى.</p>
                         )}
                       </div>
                     ) : (
                       <div className="flex flex-wrap items-center gap-2 text-xs">
-                        <span className="font-bold text-slate-800 dark:text-slate-200">{step.approverLabel || "لم يتم اختيار موظف"}</span>
                         {step.orgUnitLabel || step.orgUnitId ? (
                           <Badge variant="outline" className="rounded-lg text-[11px] font-semibold">{step.orgUnitLabel || orgUnitLabelFor(step.orgUnitId, orgUnits)}</Badge>
                         ) : null}
-                        {step.roleContext ? <span className="text-muted-foreground">{step.roleContext}</span> : null}
+                        <span className="font-bold text-slate-800 dark:text-slate-200">{step.approverLabel || "لم يتم اختيار المسؤول"}</span>
+                        {step.approverPosition ? <span className="text-muted-foreground">{step.approverPosition}</span> : null}
                       </div>
                     )}
                   </div>
 
                   <div className="flex items-center justify-center py-1.5">
-                    <button
-                      type="button"
-                      onClick={() => addStepAfter(step.id)}
-                      className={`flex h-7 w-7 items-center justify-center rounded-full shadow-2xs transition hover:scale-110 ${theme.connector}`}
-                      title="إضافة مستوى بعد هذه الخطوة"
-                      aria-label="Add step after"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </button>
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <button
+                              type="button"
+                              onClick={() => addStepAfter(step.id)}
+                              disabled={hasIncompleteStep}
+                              className={`flex h-7 w-7 items-center justify-center rounded-full shadow-2xs transition hover:scale-110 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100 ${theme.connector}`}
+                              aria-label="Add step after"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </button>
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-[11px]">
+                          {hasIncompleteStep ? "أكمل المستوى الحالي أولاً قبل إضافة مستوى جديد" : "إضافة مستوى اعتماد جديد بعد هذا المستوى"}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 </div>
               );

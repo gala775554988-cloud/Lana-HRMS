@@ -124,6 +124,17 @@ export async function buildEmployeeScopeWhere(profile: AccessProfile): Promise<P
   });
   if (assignedInstances.length) scopes.push({ id: { in: assignedInstances.map((instance) => instance.employeeId) } });
 
+  // Anyone named as approver at some level in the workflow-path editor
+  // (محرر مسارات الموافقات) can see every employee belonging to the org unit
+  // that level names -- this is what makes the scope chosen there actually
+  // control /approvals visibility, not just grant a blanket "requests"
+  // permission with nothing behind it. See getWorkflowPathOrgScopeForUser.
+  const { getWorkflowPathOrgScopeForUser } = await import("@/lib/enterprise/workflow-paths");
+  const pathScope = await getWorkflowPathOrgScopeForUser(profile.userId).catch(() => ({ departmentIds: [], branchIds: [], hospitalIds: [] }));
+  if (pathScope.departmentIds.length) scopes.push({ departmentId: { in: pathScope.departmentIds } });
+  if (pathScope.branchIds.length) scopes.push({ branchId: { in: pathScope.branchIds } });
+  if (pathScope.hospitalIds.length) scopes.push({ hospitalId: { in: pathScope.hospitalIds } });
+
   return { OR: scopes };
 }
 

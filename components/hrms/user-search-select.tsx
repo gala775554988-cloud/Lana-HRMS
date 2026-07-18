@@ -12,6 +12,7 @@ type EmployeeSearchResult = {
   nationalId: string;
   profilePhotoUrl?: string | null;
   department?: { name: string } | null;
+  position?: { title: string } | null;
 };
 
 export function UserSearchSelect({

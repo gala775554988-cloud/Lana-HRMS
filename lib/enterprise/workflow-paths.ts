@@ -14,11 +14,15 @@ const stepSchema = z.object({
   // "<department|branch|hospital>:<id>" -- which org unit this approval
   // level applies to.
   departmentId: z.string().min(1, "يجب اختيار الجهة (إدارة/فرع/مستشفى) لكل مستوى"),
-  // Free-text role/title label, purely cosmetic display context.
+  // Free-text role/title label -- kept optional for backward compatibility
+  // with paths saved before the editor redesign; no longer collected via the
+  // UI (superseded by approverPosition, auto-derived from the selected
+  // employee's real position instead of manual entry).
   roleContext: z.string().optional().default(""),
   // Denormalized display names, purely cosmetic -- approval routing always
   // resolves via approverId/departmentId, never these labels.
   approverLabel: z.string().optional(),
+  approverPosition: z.string().optional(),
   orgUnitLabel: z.string().optional()
 });
 
@@ -61,6 +65,35 @@ export async function getWorkflowPathApproverUserIds(): Promise<Set<string>> {
     for (const id of approverIdsOf(record.steps as unknown as WorkflowPathStep[])) ids.add(id);
   }
   return ids;
+}
+
+export type WorkflowPathOrgScope = { departmentIds: string[]; branchIds: string[]; hospitalIds: string[] };
+
+/**
+ * Every org unit (department/branch/hospital) `userId` is named as approver
+ * for, across every workflow path step -- makes the scope chosen in the path
+ * editor actually control what this approver can see (buildEmployeeScopeWhere
+ * in lib/enterprise/hierarchy.ts), independent of whether any workflow
+ * instance currently has a pending step routed to them. Without this, being
+ * named in a path only granted generic read:requests/manage:requests with no
+ * employees actually visible under it -- a functional dead end.
+ */
+export async function getWorkflowPathOrgScopeForUser(userId: string): Promise<WorkflowPathOrgScope> {
+  const records = await prisma.workflowPathTemplate.findMany({ select: { steps: true } });
+  const departmentIds = new Set<string>();
+  const branchIds = new Set<string>();
+  const hospitalIds = new Set<string>();
+  for (const record of records) {
+    for (const step of record.steps as unknown as WorkflowPathStep[]) {
+      if (step.approverId !== userId || !step.departmentId) continue;
+      const [type, id] = step.departmentId.split(":");
+      if (!id) continue;
+      if (type === "department") departmentIds.add(id);
+      else if (type === "branch") branchIds.add(id);
+      else if (type === "hospital") hospitalIds.add(id);
+    }
+  }
+  return { departmentIds: Array.from(departmentIds), branchIds: Array.from(branchIds), hospitalIds: Array.from(hospitalIds) };
 }
 
 /**

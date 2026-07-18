@@ -12,6 +12,7 @@ type StoredStep = {
   departmentId?: string | null;
   roleContext: string;
   approverLabel?: string;
+  approverPosition?: string;
   orgUnitLabel?: string;
 };
 
@@ -23,6 +24,7 @@ function toWorkflowSteps(steps: StoredStep[]): WorkflowStepItem[] {
       id: index + 1,
       approverId: step.approverId,
       approverLabel: step.approverLabel ?? "",
+      approverPosition: step.approverPosition ?? "",
       orgUnitId: step.departmentId ?? "",
       orgUnitLabel: step.orgUnitLabel ?? "",
       roleContext: step.roleContext ?? ""
@@ -36,6 +38,7 @@ function toStoredSteps(steps: WorkflowStepItem[]): StoredStep[] {
     departmentId: step.orgUnitId || null,
     roleContext: step.roleContext || "",
     approverLabel: step.approverLabel || "",
+    approverPosition: step.approverPosition || "",
     orgUnitLabel: step.orgUnitLabel || ""
   }));
 }
