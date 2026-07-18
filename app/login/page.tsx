@@ -156,7 +156,10 @@ function MarketingPanel() {
 }
 
 export default async function LoginPage() {
-  const { locale, dictionary } = await getRequestDictionary();
+  const { locale, dictionary } = await getRequestDictionary().catch(() => ({
+    locale: "ar" as const,
+    dictionary: {} as any
+  }));
   const isAr = locale === "ar";
   const loginPanel = (
     <section className="relative flex min-h-screen items-center justify-center bg-slate-50/90 p-6 dark:bg-slate-950" dir={isAr ? "rtl" : "ltr"}>

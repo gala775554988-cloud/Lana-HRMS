@@ -57,10 +57,10 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const requestHeaders = await headers();
-  const cookieStore = await cookies();
-  const headerLocale = requestHeaders.get("x-lana-locale");
-  const cookieLocale = cookieStore.get("lana-locale")?.value;
+  const requestHeaders = await headers().catch(() => null);
+  const cookieStore = await cookies().catch(() => null);
+  const headerLocale = requestHeaders?.get("x-lana-locale");
+  const cookieLocale = cookieStore?.get("lana-locale")?.value;
   const locale = normalizeLocale(headerLocale ?? cookieLocale);
 
   return (

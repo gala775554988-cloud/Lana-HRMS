@@ -44,15 +44,6 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
     startTransition(async () => {
       const result = await loginAction({ ...values, deviceId, turnstileToken });
       if (result.success) {
-        // A hard navigation here, not router.push(). A soft/transition-based
-        // push landed users on a permanently blank page whenever the
-        // destination route hit a (separately real, since-fixed) hydration
-        // mismatch: React can abandon a transition's pending render on error
-        // without falling back to anything, leaving the URL updated but the
-        // DOM never actually replaced. A full navigation re-does the whole
-        // request/hydration cycle from scratch the same way a fresh page
-        // load does, which the same mismatch only ever produced a
-        // recoverable console warning for, not a blank screen.
         window.location.href = "/";
       } else {
         setMessage(result.message);
@@ -116,14 +107,14 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
             htmlFor="password"
             className="pointer-events-none absolute start-0 top-1 origin-left rtl:origin-right -translate-y-5 scale-75 text-xs font-bold uppercase tracking-wider text-slate-500 transition-all duration-300 ease-in-out peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100 peer-placeholder-shown:text-sm peer-placeholder-shown:font-medium peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-placeholder-shown:text-slate-400 peer-focus:-translate-y-5 peer-focus:scale-75 peer-focus:text-xs peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-primary dark:text-slate-400 dark:peer-placeholder-shown:text-slate-500"
           >
-            {dictionary.auth.password}
+            {dictionary?.auth?.password || "كلمة المرور"}
           </Label>
           <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute end-0 top-1.5 rounded p-1 text-muted-foreground transition-colors duration-300 ease-in-out hover:text-foreground">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
         </div>
       </div>
       <label className="flex cursor-pointer items-center gap-2.5 select-none">
         <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} className="h-4 w-4 rounded border-input text-primary focus-visible:ring-primary" />
-        <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{dictionary.auth.rememberTitle}</span>
+        <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{dictionary?.auth?.rememberTitle || "تذكر مساحة العمل"}</span>
       </label>
       {TURNSTILE_SITE_KEY ? (
         <TurnstileWidget siteKey={TURNSTILE_SITE_KEY} onVerify={setTurnstileToken} />
@@ -133,7 +124,7 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
         type="submit"
         disabled={isPending || !turnstileToken}
       >
-        {isPending ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : null}{dictionary.auth.submit}
+        {isPending ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : null}{dictionary?.auth?.submit || "تسجيل الدخول"}
       </Button>
     </form>
   );
