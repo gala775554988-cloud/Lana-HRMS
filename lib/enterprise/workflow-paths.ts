@@ -8,19 +8,25 @@ export type WorkflowPathTypeValue = (typeof WORKFLOW_PATH_TYPES)[number];
 
 const stepSchema = z.object({
   stepOrder: z.number().int().positive(),
-  approverId: z.string().min(1, "approverId is required"),
-  departmentId: z.string().nullable().optional(),
-  roleContext: z.string().min(1, "roleContext is required"),
-  // Denormalized display name for CUSTOM_APPROVER steps, purely cosmetic --
-  // approval routing always resolves via approverId, never this label.
-  approverLabel: z.string().optional()
+  // Real, resolvable Employee.userId -- every level names a specific person,
+  // selected via UserSearchSelect in the workflow builder.
+  approverId: z.string().min(1, "يجب اختيار الموظف المُعتمِد لكل مستوى"),
+  // "<department|branch|hospital>:<id>" -- which org unit this approval
+  // level applies to.
+  departmentId: z.string().min(1, "يجب اختيار الجهة (إدارة/فرع/مستشفى) لكل مستوى"),
+  // Free-text role/title label, purely cosmetic display context.
+  roleContext: z.string().optional().default(""),
+  // Denormalized display names, purely cosmetic -- approval routing always
+  // resolves via approverId/departmentId, never these labels.
+  approverLabel: z.string().optional(),
+  orgUnitLabel: z.string().optional()
 });
 
 export const workflowPathInputSchema = z.object({
   workflowType: z.enum(WORKFLOW_PATH_TYPES),
   workflowName: z.string().min(1, "workflowName is required"),
   // At least one approval level is required -- an empty path can never be saved.
-  steps: z.array(stepSchema).min(1, "at least one approval level is required")
+  steps: z.array(stepSchema).min(1, "يجب أن يحتوي المسار على مستوى موافقة واحد على الأقل")
 });
 
 export type WorkflowPathInput = z.infer<typeof workflowPathInputSchema>;
@@ -33,25 +39,26 @@ export async function getWorkflowPath(workflowType: WorkflowPathTypeValue) {
   return { id: record.id, workflowType: record.workflowType, workflowName: record.workflowName, steps, updatedAt: record.updatedAt };
 }
 
-function customApproverIds(steps: WorkflowPathStep[]): string[] {
-  return steps.filter((step) => step.roleContext === "CUSTOM_APPROVER" && step.approverId).map((step) => step.approverId);
+function approverIdsOf(steps: WorkflowPathStep[]): string[] {
+  return steps.filter((step) => step.approverId).map((step) => step.approverId);
 }
 
 /**
- * Every userId currently named as a CUSTOM_APPROVER in any active workflow
- * path, across both path types. This is the live source of truth for
- * "requests" access derived from workflow-path membership -- see
- * mergeEffectivePermissions in lib/enterprise/permissions.ts, which grants
- * read:requests/manage:requests to anyone in this set without writing
- * anything into the general per-user grants store. Removing someone from a
- * path takes effect the moment this set no longer contains them -- no
+ * Every userId currently named as an approver in any active workflow path,
+ * across both path types -- every level names a real, specific employee now
+ * (see stepSchema), so this is simply every step's approverId. This is the
+ * live source of truth for "requests" access derived from workflow-path
+ * membership -- see mergeEffectivePermissions in lib/enterprise/permissions.ts,
+ * which grants read:requests/manage:requests to anyone in this set without
+ * writing anything into the general per-user grants store. Removing someone
+ * from a path takes effect the moment this set no longer contains them -- no
  * separate revoke bookkeeping needed.
  */
 export async function getWorkflowPathApproverUserIds(): Promise<Set<string>> {
   const records = await prisma.workflowPathTemplate.findMany({ select: { steps: true } });
   const ids = new Set<string>();
   for (const record of records) {
-    for (const id of customApproverIds(record.steps as unknown as WorkflowPathStep[])) ids.add(id);
+    for (const id of approverIdsOf(record.steps as unknown as WorkflowPathStep[])) ids.add(id);
   }
   return ids;
 }
@@ -66,7 +73,7 @@ export async function saveWorkflowPath(input: WorkflowPathInput, actorUserId: st
   const sortedSteps = parsed.steps.slice().sort((a, b) => a.stepOrder - b.stepOrder);
 
   const existing = await prisma.workflowPathTemplate.findUnique({ where: { workflowType: parsed.workflowType } });
-  const previousApproverIds = existing ? customApproverIds(existing.steps as unknown as WorkflowPathStep[]) : [];
+  const previousApproverIds = existing ? approverIdsOf(existing.steps as unknown as WorkflowPathStep[]) : [];
 
   const saved = await prisma.$transaction(async (tx) => {
     await tx.workflowPathTemplate.deleteMany({ where: { workflowType: parsed.workflowType } });
@@ -85,7 +92,7 @@ export async function saveWorkflowPath(input: WorkflowPathInput, actorUserId: st
   // "requests" access) are stale the moment this transaction commits --
   // invalidate immediately instead of waiting out the 30s cache TTL, so grant
   // and revoke both take effect on their very next request.
-  const newApproverIds = customApproverIds(sortedSteps);
+  const newApproverIds = approverIdsOf(sortedSteps);
   const affectedUserIds = new Set([...previousApproverIds, ...newApproverIds]);
   for (const userId of affectedUserIds) invalidateEffectivePermissions(userId);
 

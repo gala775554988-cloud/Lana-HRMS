@@ -12,6 +12,7 @@ type StoredStep = {
   departmentId?: string | null;
   roleContext: string;
   approverLabel?: string;
+  orgUnitLabel?: string;
 };
 
 function toWorkflowSteps(steps: StoredStep[]): WorkflowStepItem[] {
@@ -20,24 +21,26 @@ function toWorkflowSteps(steps: StoredStep[]): WorkflowStepItem[] {
     .sort((a, b) => a.stepOrder - b.stepOrder)
     .map((step, index) => ({
       id: index + 1,
-      name: step.roleContext,
-      role: step.roleContext,
-      approverIdentifier: step.roleContext === "CUSTOM_APPROVER" ? step.approverId : "",
-      approverLabel: step.roleContext === "CUSTOM_APPROVER" ? (step.approverLabel ?? "") : ""
+      approverId: step.approverId,
+      approverLabel: step.approverLabel ?? "",
+      orgUnitId: step.departmentId ?? "",
+      orgUnitLabel: step.orgUnitLabel ?? "",
+      roleContext: step.roleContext ?? ""
     }));
 }
 
 function toStoredSteps(steps: WorkflowStepItem[]): StoredStep[] {
   return steps.map((step, index) => ({
     stepOrder: index + 1,
-    approverId: step.role === "CUSTOM_APPROVER" ? (step.approverIdentifier || "") : step.role,
-    departmentId: null,
-    roleContext: step.role,
-    approverLabel: step.role === "CUSTOM_APPROVER" ? (step.approverLabel || "") : undefined
+    approverId: step.approverId,
+    departmentId: step.orgUnitId || null,
+    roleContext: step.roleContext || "",
+    approverLabel: step.approverLabel || "",
+    orgUnitLabel: step.orgUnitLabel || ""
   }));
 }
 
-export function WorkflowPathEditor({ workflowType, defaultName }: { workflowType: WorkflowPathType; defaultName: string }) {
+export function WorkflowPathEditor({ workflowType, defaultName, accent = "teal" }: { workflowType: WorkflowPathType; defaultName: string; accent?: "teal" | "violet" }) {
   const [loading, setLoading] = useState(true);
   const [initialSteps, setInitialSteps] = useState<WorkflowStepItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -91,7 +94,8 @@ export function WorkflowPathEditor({ workflowType, defaultName }: { workflowType
     <WorkflowManager
       key={workflowType}
       moduleName={defaultName}
-      initialSteps={initialSteps && initialSteps.length ? initialSteps : [{ id: 1, name: "المدير المباشر", role: "DIRECT_MANAGER" }]}
+      accent={accent}
+      initialSteps={initialSteps ?? []}
       onSave={handleSave}
     />
   );
