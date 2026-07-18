@@ -63,6 +63,7 @@ See `.env.example` for a copy-pasteable template with placeholder values and inl
 | `NEXTAUTH_URL` | Public URL of the deployment, e.g. `https://hrms.example.com`. |
 | `APP_URL` | Public URL used for PWA metadata and absolute links. |
 | `CRON_SECRET` | Bearer token Vercel Cron sends to authenticate the hourly Odoo sync route (no user session exists for cron runs). |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile bot-protection on the login form. Both are required -- login is rejected server-side if either is missing (fail closed, see `lib/security/turnstile.ts`). Get both from the Cloudflare dashboard (Turnstile). |
 
 **Supabase (required if using Supabase for Postgres and/or file storage):**
 

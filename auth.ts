@@ -7,6 +7,7 @@ import { loginSchema } from "@/lib/validations/auth";
 import { verifyPassword, hashPassword } from "@/lib/password";
 import { getCachedEffectivePermissions } from "@/lib/enterprise/permissions";
 import { verifyOrBindEmployeeDevice } from "@/lib/cache/device-cache";
+import { verifyTurnstileToken } from "@/lib/security/turnstile";
 
 async function getAuthorization(userId: string) {
   const assignments = await prisma.userRole.findMany({
@@ -128,11 +129,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         identifier: { label: "Username", type: "text" },
         password: { label: "Password", type: "password" },
         deviceId: { label: "Device ID", type: "text" },
+        turnstileToken: { label: "Turnstile Token", type: "text" },
       },
       async authorize(credentials) {
         try {
           const parsed = loginSchema.safeParse(credentials);
           if (!parsed.success) return null;
+
+          // The real enforcement boundary: NextAuth calls authorize() no
+          // matter which code path triggered signIn(), so a Turnstile check
+          // living only in loginAction's pre-checks could be bypassed by
+          // any other caller of signIn("credentials", ...). No session is
+          // ever issued without an actively-verified token.
+          const turnstileOk = await verifyTurnstileToken(parsed.data.turnstileToken);
+          if (!turnstileOk) return null;
+
           const user = await findUser(parsed.data.identifier);
           if (!user?.passwordHash || !user.isActive) return null;
           const ok = await verifyPassword(parsed.data.password, user.passwordHash);

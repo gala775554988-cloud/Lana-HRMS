@@ -15,7 +15,14 @@ export const loginSchema = z.object({
     .max(64, "Identifier is too long.")
     .trim(),
   password: z.string().min(1, "Password is required."),
-  deviceId: z.string().optional()
+  deviceId: z.string().optional(),
+  // Validated separately in loginAction/authorize (not via zod) so a missing
+  // or failed Turnstile check surfaces its own dedicated Arabic message
+  // instead of a generic field-validation error. Nullable because the
+  // client's initial widget state is null (no token yet), not undefined --
+  // without .nullable() a plain .optional() rejects an explicit null with a
+  // raw untranslated Zod error instead of ever reaching the Turnstile check.
+  turnstileToken: z.string().nullable().optional()
 });
 
 export const forgotPasswordSchema = z.object({

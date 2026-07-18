@@ -11,8 +11,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TurnstileWidget } from "@/components/auth/turnstile-widget";
 import type { Dictionary } from "@/lib/i18n";
 import { getOrCreateMobileDeviceUUID } from "@/lib/employee/device-uuid";
+
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
 export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
   const router = useRouter();
@@ -20,6 +23,7 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [shaking, setShaking] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -49,7 +53,7 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
     else window.localStorage.removeItem("lana.hrms.rememberedIdentifier");
     const deviceId = getOrCreateMobileDeviceUUID();
     startTransition(async () => {
-      const result = await loginAction({ ...values, deviceId });
+      const result = await loginAction({ ...values, deviceId, turnstileToken });
       if (result.success) {
         // A hard navigation here, not router.push(). A soft/transition-based
         // push landed users on a permanently blank page whenever the
@@ -132,10 +136,15 @@ export function LoginForm({ dictionary }: { dictionary: Dictionary }) {
         <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} className="h-4 w-4 rounded border-input text-primary transition-all duration-300 ease-in-out focus-visible:ring-primary" />
         <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{dictionary.auth.rememberTitle}</span>
       </label>
+      {TURNSTILE_SITE_KEY ? (
+        <div className="animate-in fade-in slide-in-from-bottom-2 delay-300 duration-500 fill-mode-both">
+          <TurnstileWidget siteKey={TURNSTILE_SITE_KEY} onVerify={setTurnstileToken} />
+        </div>
+      ) : null}
       <Button
         className="h-12 w-full animate-in fade-in slide-in-from-bottom-2 rounded-lg text-sm font-semibold shadow-lg shadow-primary/20 delay-300 duration-500 fill-mode-both active:scale-95"
         type="submit"
-        disabled={isPending}
+        disabled={isPending || !turnstileToken}
       >
         {isPending ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : null}{dictionary.auth.submit}
       </Button>
