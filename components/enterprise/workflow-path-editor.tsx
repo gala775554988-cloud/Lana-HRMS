@@ -1,0 +1,95 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
+import { WorkflowManager, type WorkflowStepItem } from "@/components/enterprise/workflow-manager";
+
+type WorkflowPathType = "HOSPITAL_PATH" | "GENERAL_ADMIN_PATH";
+
+type StoredStep = {
+  stepOrder: number;
+  approverId: string;
+  departmentId?: string | null;
+  roleContext: string;
+};
+
+function toWorkflowSteps(steps: StoredStep[]): WorkflowStepItem[] {
+  return steps
+    .slice()
+    .sort((a, b) => a.stepOrder - b.stepOrder)
+    .map((step, index) => ({
+      id: index + 1,
+      name: step.roleContext,
+      role: step.roleContext,
+      approverIdentifier: step.roleContext === "CUSTOM_APPROVER" ? step.approverId : ""
+    }));
+}
+
+function toStoredSteps(steps: WorkflowStepItem[]): StoredStep[] {
+  return steps.map((step, index) => ({
+    stepOrder: index + 1,
+    approverId: step.role === "CUSTOM_APPROVER" ? (step.approverIdentifier || "") : step.role,
+    departmentId: null,
+    roleContext: step.role
+  }));
+}
+
+export function WorkflowPathEditor({ workflowType, defaultName }: { workflowType: WorkflowPathType; defaultName: string }) {
+  const [loading, setLoading] = useState(true);
+  const [initialSteps, setInitialSteps] = useState<WorkflowStepItem[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/enterprise/workflow-paths?workflowType=${workflowType}`, { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data.success && data.path) {
+          setInitialSteps(toWorkflowSteps(data.path.steps));
+        } else {
+          setInitialSteps([]);
+        }
+      })
+      .catch(() => { if (!cancelled) setError("تعذر تحميل المسار الحالي."); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [workflowType]);
+
+  async function handleSave(steps: WorkflowStepItem[]) {
+    const response = await fetch("/api/enterprise/workflow-paths", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        workflowType,
+        workflowName: defaultName,
+        steps: toStoredSteps(steps)
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || "فشل حفظ المسار");
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex h-40 items-center justify-center rounded-3xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="rounded-3xl border border-rose-200 bg-rose-50 p-6 text-center text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300">{error}</div>;
+  }
+
+  return (
+    <WorkflowManager
+      key={workflowType}
+      moduleName={defaultName}
+      initialSteps={initialSteps && initialSteps.length ? initialSteps : [{ id: 1, name: "المدير المباشر", role: "DIRECT_MANAGER" }]}
+      onSave={handleSave}
+    />
+  );
+}

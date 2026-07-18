@@ -2214,3 +2214,24 @@ model HrPermissionAudit {
   @@index([userId])
   @@index([createdAt])
 }
+
+enum WorkflowPathType {
+  HOSPITAL_PATH
+  GENERAL_ADMIN_PATH
+}
+
+// One configurable named approval path per type (محرر مسارات الموافقات) --
+// @unique on workflowType makes each type a single, replaceable record ("المسار
+// الأول" / "المسار الثاني"). `steps` holds the ordered chain as JSON:
+// [{ stepOrder, approverId, departmentId, roleContext }, ...].
+model WorkflowPathTemplate {
+  id           String           @id @default(cuid())
+  workflowType WorkflowPathType @unique
+  workflowName String
+  steps        Json
+  updatedById  String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([workflowType])
+}
