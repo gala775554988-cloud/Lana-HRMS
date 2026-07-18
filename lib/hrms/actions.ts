@@ -153,7 +153,7 @@ type ModuleAction = "read" | "manage" | "create" | "edit" | "delete";
 // mutations, unchanged -- this list is deliberately small so as not to lock
 // out anyone currently relying on a plain "manage:X" grant for a module that
 // hasn't been split into granular actions yet.
-const GRANULAR_MUTATION_RESOURCES = new Set(["employees", "contracts", "attendance"]);
+const GRANULAR_MUTATION_RESOURCES = new Set(["employees", "contracts", "attendance", "insurance"]);
 
 function mutationAction(resource: HrmsModule, kind: "create" | "edit" | "delete"): ModuleAction {
   return GRANULAR_MUTATION_RESOURCES.has(resource.permissionResource) ? kind : "manage";

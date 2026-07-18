@@ -11,7 +11,8 @@ import {
   DollarSign, GraduationCap, Package, Megaphone, BarChart3, Settings,
   Shield, GitPullRequest, Sparkles, Bot, Menu, X, PlugZap,
   Wallet,
-  ClipboardCheck, UserPlus, CalendarClock, Fingerprint, BarChart4
+  ClipboardCheck, UserPlus, CalendarClock, Fingerprint, BarChart4,
+  Umbrella
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/brand/brand-logo";
@@ -19,6 +20,7 @@ import { ClientLanguageToggle } from "@/components/i18n/client-language-toggle";
 import { NotificationBell } from "@/components/enterprise/notification-bell";
 import { isEnterpriseResourceAllowed } from "@/lib/enterprise/resource-access";
 import { usePendingApprovalsCount } from "@/lib/hooks/use-pending-approvals-count";
+import { useExpiringInsuranceCount } from "@/lib/hooks/use-expiring-insurance-count";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/hrms/theme-toggle";
 import { QuickSearchModal } from "@/components/hrms/quick-search-modal";
@@ -43,6 +45,7 @@ const navItems: Array<{ href: string; labelKey: NavKey; icon: typeof LayoutDashb
   { href: "/branches", labelKey: "departments-branches", icon: MapPin, group: "peopleContracts", resource: ["departments", "branches"] },
   { href: "/hospitals", labelKey: "hospitals", icon: Building2, group: "peopleContracts", resource: ["hospitals", "branches"] },
   { href: "/contracts", labelKey: "contracts", icon: FileText, group: "peopleContracts", resource: ["contracts", "documents"] },
+  { href: "/insurance", labelKey: "insurance", icon: Umbrella, group: "peopleContracts", resource: "insurance" },
   { href: "/setup", labelKey: "setup", icon: Briefcase, group: "peopleContracts", resource: ["positions", "employment-types", "nationalities"] },
 
   { href: "/attendance", labelKey: "attendance", icon: Clock, group: "attendanceShifts", resource: "attendance" },
@@ -99,6 +102,8 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
   const userRoles = useMemo(() => (session?.user?.roles as string[]) || [], [session?.user?.roles]);
   const userPermissions = useMemo(() => (session?.user?.permissions as string[]) || [], [session?.user?.permissions]);
   const { data: pendingApprovalsCount } = usePendingApprovalsCount(status === "authenticated");
+  const canViewInsurance = userRoles.includes("SUPER_ADMIN") || userRoles.includes("HR_MANAGER") || userPermissions.includes("read:insurance") || userPermissions.includes("manage:insurance");
+  const { data: expiringInsuranceCount } = useExpiringInsuranceCount(status === "authenticated" && canViewInsurance);
 
   // REMOVED: useEffect that redirects to /login on unauthenticated.
   // Rely on middleware.ts for auth protection — it redirects to /login
@@ -228,6 +233,15 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
                             aria-label={`${pendingApprovalsCount} pending approvals`}
                           >
                             {pendingApprovalsCount > 99 ? "99+" : pendingApprovalsCount}
+                          </span>
+                        ) : null}
+                        {item.href === "/insurance" && expiringInsuranceCount ? (
+                          <span
+                            key={expiringInsuranceCount}
+                            className="absolute -top-1.5 -end-2 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 px-0.5 text-[10px] font-bold leading-none text-white ring-2 ring-white dark:ring-slate-950"
+                            aria-label={`${expiringInsuranceCount} insurance policies renewing soon`}
+                          >
+                            {expiringInsuranceCount > 99 ? "99+" : expiringInsuranceCount}
                           </span>
                         ) : null}
                       </span>

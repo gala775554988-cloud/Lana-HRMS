@@ -6,6 +6,9 @@ import { auth } from "@/auth";
 
 const allowedExtensions = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff", ".tif", ".svg", ".heic", ".heif", ".avif"]);
 const allowedMimePrefixes = ["image/"];
+// Non-image document uploads (insurance policies, etc.) -- same allowlist as
+// the employee-documents endpoint, stored as-is (no image optimization).
+const allowedDocumentExtensions = new Set([".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".png", ".jpg", ".jpeg"]);
 
 type OptimizedImage = {
   buffer: Buffer;
@@ -32,12 +35,12 @@ async function optimizeImage(bytes: Buffer, fileName: string, mimeType: string):
 }
 
 
-async function uploadToSupabaseStorage(buffer: Buffer, fileName: string, contentType: string) {
+async function uploadToSupabaseStorage(buffer: Buffer, fileName: string, contentType: string, folder = "profile-photos") {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   const bucket = process.env.SUPABASE_EMPLOYEE_BUCKET || 'employee-files';
   if (!supabaseUrl || !key) return null;
-  const objectPath = `profile-photos/${new Date().toISOString().slice(0,10)}/${fileName}`;
+  const objectPath = `${folder}/${new Date().toISOString().slice(0,10)}/${fileName}`;
   const endpoint = `${supabaseUrl.replace(/\/$/, '')}/storage/v1/object/${bucket}/${objectPath}`;
   const response = await fetch(endpoint, {
     method: 'POST',
@@ -66,6 +69,30 @@ export async function POST(request: NextRequest) {
     }
 
     const extension = path.extname(file.name).toLowerCase();
+    const kind = String(formData.get("kind") || "image");
+
+    if (kind === "document") {
+      if (!allowedDocumentExtensions.has(extension)) {
+        return NextResponse.json({ success: false, message: "Unsupported document file" }, { status: 400 });
+      }
+      const rawBytes = Buffer.from(await file.arrayBuffer());
+      const fileName = randomUUID() + extension;
+      const contentType = file.type || "application/octet-stream";
+
+      const supabaseUrl = await uploadToSupabaseStorage(rawBytes, fileName, contentType, "documents/insurance");
+      if (supabaseUrl) {
+        return NextResponse.json({ success: true, url: supabaseUrl, fileName: file.name, size: rawBytes.length, type: contentType, storage: "supabase-storage" });
+      }
+      try {
+        const uploadDir = path.join(process.cwd(), "public", "uploads");
+        await mkdir(uploadDir, { recursive: true });
+        await writeFile(path.join(uploadDir, fileName), rawBytes);
+        return NextResponse.json({ success: true, url: "/uploads/" + fileName, fileName: file.name, size: rawBytes.length, type: contentType, storage: "public-uploads" });
+      } catch {
+        return NextResponse.json({ success: true, url: `data:${contentType};base64,${rawBytes.toString("base64")}`, fileName: file.name, size: rawBytes.length, type: contentType, storage: "inline-data-url" });
+      }
+    }
+
     const looksLikeImage = allowedMimePrefixes.some((prefix) => file.type.startsWith(prefix)) || allowedExtensions.has(extension);
     if (!looksLikeImage) {
       return NextResponse.json({ success: false, message: "Unsupported image file" }, { status: 400 });

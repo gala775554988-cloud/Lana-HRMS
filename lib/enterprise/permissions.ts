@@ -40,7 +40,7 @@ export type UserPermissionStore = {
 // enforcement point. A plain "manage:X" grant from before this existed still
 // implies all four (hasPermission in lib/rbac.ts), so nothing already
 // configured breaks; these are additive, finer-grained keys.
-export const GRANULAR_RESOURCES = ["employees", "contracts", "attendance"] as const;
+export const GRANULAR_RESOURCES = ["employees", "contracts", "attendance", "insurance"] as const;
 
 function granularPermissions(resource: string): PermissionKey[] {
   return [`read:${resource}`, `create:${resource}`, `edit:${resource}`, `delete:${resource}`] as PermissionKey[];
@@ -51,7 +51,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
   { key: "attendance", title: "Attendance", permissions: [...granularPermissions("attendance"), "manage:attendance"] },
   { key: "leaves", title: "Leaves", permissions: ["read:leave", "manage:leave"] },
   { key: "payroll", title: "Payroll", permissions: ["read:payroll", "manage:payroll", "read:loans", "manage:loans", "read:allowances", "manage:allowances", "read:deductions", "manage:deductions"] },
-  { key: "insurance", title: "Insurance", permissions: ["read:insurance", "manage:insurance"] },
+  { key: "insurance", title: "Insurance", permissions: [...granularPermissions("insurance"), "manage:insurance"] },
   { key: "residency", title: "Residency", permissions: ["read:residency", "manage:residency"] },
   { key: "requests", title: "Requests", permissions: ["read:requests", "manage:requests", "read:overtime", "manage:overtime"] },
   { key: "projects", title: "Projects", permissions: ["read:projects", "manage:projects"] },
