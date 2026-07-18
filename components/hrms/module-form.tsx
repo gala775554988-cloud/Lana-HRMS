@@ -187,7 +187,7 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
                 </div>
               ) : isEmployeeForm && field.name === "positionId" ? (
                 <div className="space-y-2">
-                  <select id={field.name} className={`h-10 w-full rounded-md border bg-background px-3 py-2 text-sm ${error ? 'border-destructive' : 'border-input'}`} {...form.register(field.name)}>
+                  <select id={field.name} className={`h-10 w-full rounded-xl border bg-background px-3 py-2 text-sm transition-all duration-300 ease-premium hover:border-primary/30 focus-visible:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${error ? 'border-destructive' : 'border-input'}`} {...form.register(field.name)}>
                     <option value="">{dictionary.form.select}</option>
                     {[...(field.options ?? []), ...customPositionOptions].map((option) => <option key={option} value={option}>{option}</option>)}
                   </select>
@@ -200,14 +200,14 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
                   }}>إضافة منصب جديد</Button>
                 </div>
               ) : field.type === "textarea" ? (
-                <textarea id={field.name} className={`min-h-24 w-full rounded-md border bg-background px-3 py-2 text-sm ${error ? 'border-destructive' : 'border-input'}`} {...form.register(field.name)} />
+                <textarea id={field.name} className={`min-h-24 w-full rounded-xl border bg-background px-3 py-2 text-sm transition-all duration-300 ease-premium hover:border-primary/30 focus-visible:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${error ? 'border-destructive' : 'border-input'}`} {...form.register(field.name)} />
               ) : field.type === "select" ? (
-                <select id={field.name} className={`h-10 w-full rounded-md border bg-background px-3 py-2 text-sm ${error ? 'border-destructive' : 'border-input'}`} {...form.register(field.name)}>
+                <select id={field.name} className={`h-10 w-full rounded-xl border bg-background px-3 py-2 text-sm transition-all duration-300 ease-premium hover:border-primary/30 focus-visible:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${error ? 'border-destructive' : 'border-input'}`} {...form.register(field.name)}>
                   <option value="">{dictionary.form.select}</option>
                   {field.options?.map((option) => <option key={option} value={option}>{option}</option>)}
                 </select>
               ) : field.type === "boolean" ? (
-                <input id={field.name} type="checkbox" className="h-4 w-4" {...form.register(field.name)} />
+                <input id={field.name} type="checkbox" className="h-5 w-5 rounded-md border-input accent-primary transition-colors" {...form.register(field.name)} />
               ) : (
                 <Input id={field.name} type={field.type === "date" ? "date" : field.type === "number" ? "number" : field.type} step={field.type === "number" ? "0.01" : undefined} className={error ? 'border-destructive' : ''} {...form.register(field.name)} />
               )}

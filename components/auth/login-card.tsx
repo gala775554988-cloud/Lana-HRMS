@@ -25,7 +25,7 @@ export function LoginCard({ dictionary }: { dictionary: Dictionary }) {
     <div className="w-full max-w-md">
       <div
         className={cn(
-          "mb-7 flex flex-col items-center text-center transition-all duration-500 ease-out lg:items-start lg:text-start",
+          "lana-slide-up mb-7 flex flex-col items-center text-center transition-all duration-500 ease-premium lg:items-start lg:text-start",
           exiting ? "translate-x-16 opacity-0 rtl:-translate-x-16" : "translate-x-0 opacity-100"
         )}
       >
@@ -44,8 +44,9 @@ export function LoginCard({ dictionary }: { dictionary: Dictionary }) {
         <p className="mt-3 text-sm font-medium text-slate-400 dark:text-slate-500">البوابة الموحدة لدخول الموظفين والمسؤولين</p>
       </div>
       <div
+        style={{ animationDelay: "90ms" }}
         className={cn(
-          "rounded-2xl border border-slate-200/80 bg-white p-8 shadow-glass transition-all duration-500 ease-out dark:border-slate-800 dark:bg-slate-900/70",
+          "lana-slide-up relative rounded-3xl border border-slate-200/80 bg-white p-8 shadow-glass transition-all duration-500 ease-premium before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:shadow-[inset_0_1px_0_0_rgb(255_255_255_/_0.6)] dark:border-slate-800 dark:bg-slate-900/70",
           exiting ? "scale-95 opacity-0" : "scale-100 opacity-100"
         )}
       >

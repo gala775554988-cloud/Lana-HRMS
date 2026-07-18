@@ -37,7 +37,18 @@ const config: Config = {
         }
       },
       borderRadius: { lg: "var(--radius)", md: "calc(var(--radius) - 2px)", sm: "calc(var(--radius) - 4px)", xl: "calc(var(--radius) + 4px)", "2xl": "calc(var(--radius) + 8px)" },
-      boxShadow: { xs: "var(--shadow-xs)", card: "var(--shadow-card)", "card-hover": "var(--shadow-card-hover)", drawer: "var(--shadow-drawer)", glass: "0 8px 30px rgba(0,0,0,0.06)" },
+      boxShadow: {
+        xs: "var(--shadow-xs)",
+        card: "var(--shadow-card)",
+        "card-hover": "var(--shadow-card-hover)",
+        drawer: "var(--shadow-drawer)",
+        glass: "var(--shadow-premium-md)",
+        "premium-sm": "var(--shadow-premium-sm)",
+        "premium-md": "var(--shadow-premium-md)",
+        "premium-lg": "var(--shadow-premium-lg)",
+        "premium-xl": "var(--shadow-premium-xl)"
+      },
+      transitionTimingFunction: { premium: "cubic-bezier(0.16, 1, 0.3, 1)" },
       backdropBlur: { xs: "2px" },
       keyframes: {
         "slide-in-right": { from: { transform: "translateX(100%)" }, to: { transform: "translateX(0)" } },

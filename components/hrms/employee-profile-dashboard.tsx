@@ -214,7 +214,7 @@ export function EmployeeProfileDashboard({
     <div className="space-y-6" dir={isAr ? "rtl" : "ltr"}>
       {backHref && (
         <div className="flex items-center">
-          <Button asChild variant="outline" size="sm" className="gap-2 border-primary/20 text-primary hover:bg-primary/8 shadow-sm dark:border-primary dark:bg-slate-900 dark:text-primary/30 dark:hover:bg-primary/50 rounded-xl px-4 py-2 font-semibold">
+          <Button asChild variant="outline" size="sm" className="gap-2 border-primary/20 text-primary hover:bg-primary/10 shadow-premium-sm dark:border-primary/40 dark:bg-slate-900 dark:text-primary dark:hover:bg-primary/15 rounded-xl px-4 py-2 font-semibold">
             <Link href={backHref}>
               <span className="text-base leading-none">←</span>
               {isAr ? "العودة إلى صفحة المستشفى والموظفين" : "Back to Hospital Employees"}
@@ -283,7 +283,7 @@ export function EmployeeProfileDashboard({
 
       {/* Tabs - Modern, not long page */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border rounded-2xl p-2 shadow-sm">
+        <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border rounded-2xl p-2 shadow-premium-sm">
           <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 xl:grid-cols-12 gap-1 h-auto bg-transparent">
             <TabsTrigger value="personal" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><User className="h-4 w-4 ml-1" />الشخصية</TabsTrigger>
             <TabsTrigger value="job" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Briefcase className="h-4 w-4 ml-1" />الوظيفة</TabsTrigger>
