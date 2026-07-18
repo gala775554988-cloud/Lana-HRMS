@@ -6,6 +6,7 @@ import { LandingPage } from "@/components/marketing/landing-page";
 
 export default async function HomePage() {
   const session = await auth();
+
   if (session?.user) {
     const roles = (session.user.roles as string[]) || [];
     redirect(resolveRoleDashboard(roles));
