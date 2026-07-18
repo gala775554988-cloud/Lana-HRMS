@@ -40,6 +40,16 @@ export function hasPermission(
     return ["manage", "edit", "create", "update", "delete", "approve", "reject"].some((alias) => normalized.has(`${alias}:${resource}`));
   }
 
+  // Granular create/edit/delete checks (see lib/enterprise/permissions.ts's
+  // GRANULAR_RESOURCES): a broad "manage:resource" grant still implies all of
+  // these, so anyone already holding manage:X from before this action set
+  // existed keeps working exactly as before.
+  if (["create", "edit", "update", "delete"].includes(action)) {
+    if (normalized.has(`manage:${resource}`)) return true;
+    if (action === "update" && normalized.has(`edit:${resource}`)) return true;
+    if (action === "edit" && normalized.has(`update:${resource}`)) return true;
+  }
+
   return false;
 }
 

@@ -1,11 +1,48 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Crown, Pencil, Trash2, Check, X, ShieldCheck } from "lucide-react";
+import { Crown, Pencil, Trash2, Check, X, ShieldCheck, ChevronDown, CheckSquare } from "lucide-react";
 import { UserSearchSelect } from "@/components/hrms/user-search-select";
 import { getPermissionHint } from "@/lib/enterprise/permission-hints";
 
 type PermissionCategory = { key: string; title: string; permissions: string[] };
+type PermissionTreeAction = { key: string; action: string; label: string };
+type PermissionTreeFeature = { resource: string; label: string; granular: boolean; actions: PermissionTreeAction[] };
+type PermissionTreeCategory = { key: string; title: string; features: PermissionTreeFeature[]; allPermissions: string[] };
+
+const RESOURCE_LABELS_AR: Record<string, string> = {
+  employees: "الموظفون",
+  contracts: "العقود",
+  attendance: "الحضور",
+  leave: "الإجازات",
+  payroll: "الرواتب",
+  loans: "السلف",
+  allowances: "البدلات",
+  deductions: "الاستقطاعات",
+  insurance: "التأمين",
+  residency: "الإقامات",
+  requests: "الطلبات",
+  overtime: "العمل الإضافي",
+  projects: "المشاريع",
+  warehouse: "المستودع",
+  assets: "العهد",
+  reports: "التقارير",
+  documents: "المستندات",
+  dashboard: "لوحة التحكم",
+  "audit-logs": "سجل التدقيق",
+  announcements: "الإعلانات",
+  notifications: "الإشعارات",
+  settings: "الإعدادات",
+  permissions: "الصلاحيات"
+};
+
+const ACTION_LABELS_AR: Record<string, string> = {
+  read: "مشاهدة",
+  create: "إضافة",
+  edit: "تعديل",
+  delete: "حذف",
+  manage: "إدارة"
+};
 
 const CATEGORY_LABELS_AR: Record<string, string> = {
   employees: "الموظفون",
@@ -38,6 +75,7 @@ type ActiveEntry = EmployeeLite & {
   isDelegate: boolean;
   editingGranular: boolean;
   saving: boolean;
+  justSaved: boolean;
   confirmingDelete: boolean;
 };
 
@@ -54,6 +92,8 @@ function Avatar({ employee, size = "h-11 w-11" }: { employee: EmployeeLite; size
 
 export function PermissionManagementDashboard() {
   const [categories, setCategories] = useState<PermissionCategory[]>([]);
+  const [tree, setTree] = useState<PermissionTreeCategory[]>([]);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [entries, setEntries] = useState<ActiveEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -68,6 +108,7 @@ export function PermissionManagementDashboard() {
         ]);
         if (!permsRes.success) throw new Error(permsRes.message || "Failed to load permissions");
         setCategories(permsRes.categories ?? []);
+        setTree(permsRes.tree ?? []);
 
         const delegateIds: string[] = delegatesRes.success ? (delegatesRes.delegateIds ?? []) : [];
         const delegateEmployees: EmployeeLite[] = delegatesRes.success ? (delegatesRes.employees ?? []) : [];
@@ -101,6 +142,7 @@ export function PermissionManagementDashboard() {
             isDelegate: delegateIds.includes(emp.userId),
             editingGranular: false,
             saving: false,
+            justSaved: false,
             confirmingDelete: false
           }));
         setEntries(nextEntries);
@@ -132,6 +174,7 @@ export function PermissionManagementDashboard() {
         isDelegate: false,
         editingGranular: false,
         saving: false,
+        justSaved: false,
         confirmingDelete: false
       };
       return [newEntry, ...current];
@@ -148,7 +191,8 @@ export function PermissionManagementDashboard() {
       });
       const data = await response.json();
       if (!data.success) { setMessage(data.message || "فشل حفظ الصلاحيات"); return; }
-      updateEntry(userId, { grants: new Set(data.permissions?.grants ?? Array.from(grants)) });
+      updateEntry(userId, { grants: new Set(data.permissions?.grants ?? Array.from(grants)), justSaved: true });
+      setTimeout(() => updateEntry(userId, { justSaved: false }), 2000);
     } finally {
       updateEntry(userId, { saving: false });
     }
@@ -169,6 +213,25 @@ export function PermissionManagementDashboard() {
     else nextGrants.add(permission);
     updateEntry(entry.userId, { grants: nextGrants });
     startTransition(() => savePermissions(entry.userId, nextGrants));
+  }
+
+  function toggleFeatureAll(entry: ActiveEntry, feature: PermissionTreeFeature) {
+    const keys = feature.actions.map((a) => a.key);
+    const allGranted = keys.every((k) => entry.grants.has(k));
+    const nextGrants = new Set(entry.grants);
+    if (allGranted) keys.forEach((k) => nextGrants.delete(k));
+    else keys.forEach((k) => nextGrants.add(k));
+    updateEntry(entry.userId, { grants: nextGrants });
+    startTransition(() => savePermissions(entry.userId, nextGrants));
+  }
+
+  function toggleCategoryExpanded(key: string) {
+    setExpandedCategories((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   }
 
   async function toggleLana(entry: ActiveEntry) {
@@ -302,29 +365,82 @@ export function PermissionManagementDashboard() {
               </div>
 
               {entry.editingGranular ? (
-                <div className="space-y-3 border-t border-slate-100 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-                  <div className="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                    <span>التحكم التفصيلي بكل صلاحية / Granular permission control</span>
+                <div className="space-y-2.5 border-t border-slate-100 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      <span>هيكل الصلاحيات التفصيلي / Hierarchical permission tree</span>
+                    </div>
+                    {entry.saving ? (
+                      <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">جارٍ الحفظ...</span>
+                    ) : entry.justSaved ? (
+                      <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400"><Check className="h-3 w-3" /> تم حفظ التغييرات بنجاح</span>
+                    ) : null}
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                    {categories.map((category) => (
-                      <div key={category.key} className="rounded-2xl border border-slate-100 bg-slate-50/50 p-3 dark:border-slate-800 dark:bg-slate-950/30">
-                        <p className="mb-2 text-xs font-bold text-slate-700 dark:text-slate-300">{CATEGORY_LABELS_AR[category.key] ?? category.key} / {category.title}</p>
-                        <div className="space-y-1.5">
-                          {category.permissions.map((permission) => {
-                            const hint = getPermissionHint(permission);
-                            const checked = entry.grants.has(permission);
-                            return (
-                              <label key={permission} className="flex items-center justify-between gap-2 rounded-xl bg-white px-2.5 py-1.5 text-xs dark:bg-slate-900">
-                                <span className="truncate text-slate-600 dark:text-slate-300" title={hint.effect}>{hint.title}</span>
-                                <input type="checkbox" checked={checked} onChange={() => toggleSinglePermission(entry, permission)} disabled={entry.saving} className="h-4 w-4 shrink-0 accent-indigo-600" />
-                              </label>
-                            );
-                          })}
+
+                  <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+                    {tree.map((category) => {
+                      const matchingCategory = categories.find((c) => c.key === category.key);
+                      const allGranted = category.allPermissions.every((p) => entry.grants.has(p));
+                      const someGranted = category.allPermissions.some((p) => entry.grants.has(p));
+                      const isOpen = expandedCategories.has(category.key);
+                      return (
+                        <div key={category.key} className="bg-white dark:bg-slate-900">
+                          <div className="flex items-center gap-3 bg-slate-50/70 px-4 py-2.5 dark:bg-slate-950/40">
+                            <button
+                              type="button"
+                              onClick={() => toggleCategoryExpanded(category.key)}
+                              className="flex flex-1 items-center gap-2 text-start"
+                            >
+                              <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform ${isOpen ? "rotate-0" : "-rotate-90"}`} />
+                              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{CATEGORY_LABELS_AR[category.key] ?? category.key}</span>
+                              <span className="text-[11px] text-muted-foreground">{category.title}</span>
+                            </button>
+                            <label className={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-semibold ${allGranted ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300" : someGranted ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" : "text-slate-500"}`}>
+                              <input
+                                type="checkbox"
+                                checked={allGranted}
+                                ref={(el) => { if (el) el.indeterminate = someGranted && !allGranted; }}
+                                onChange={() => matchingCategory && toggleCategory(entry, matchingCategory)}
+                                disabled={entry.saving}
+                                className="h-3.5 w-3.5 accent-indigo-600"
+                              />
+                              <CheckSquare className="h-3 w-3" />
+                              <span>تحديد الكل</span>
+                            </label>
+                          </div>
+
+                          {isOpen ? (
+                            <div className="space-y-1.5 p-3">
+                              {category.features.map((feature) => {
+                                const keys = feature.actions.map((a) => a.key);
+                                const featureAllGranted = keys.every((k) => entry.grants.has(k));
+                                return (
+                                  <div key={feature.resource} className="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl bg-slate-50/60 px-3 py-2 dark:bg-slate-950/30">
+                                    <label className="flex min-w-[110px] cursor-pointer items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                                      <input type="checkbox" checked={featureAllGranted} onChange={() => toggleFeatureAll(entry, feature)} disabled={entry.saving} className="h-3.5 w-3.5 accent-indigo-600" />
+                                      <span>{RESOURCE_LABELS_AR[feature.resource] ?? feature.resource}</span>
+                                    </label>
+                                    <div className="flex flex-wrap items-center gap-3">
+                                      {feature.actions.map((permissionAction) => {
+                                        const hint = getPermissionHint(permissionAction.key);
+                                        const checked = entry.grants.has(permissionAction.key);
+                                        return (
+                                          <label key={permissionAction.key} className="flex cursor-pointer items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400" title={hint.effect}>
+                                            <input type="checkbox" checked={checked} onChange={() => toggleSinglePermission(entry, permissionAction.key)} disabled={entry.saving} className="h-3.5 w-3.5 accent-indigo-600" />
+                                            <span>{ACTION_LABELS_AR[permissionAction.action] ?? permissionAction.label}</span>
+                                          </label>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : null}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               ) : null}

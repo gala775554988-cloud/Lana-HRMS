@@ -35,9 +35,20 @@ export type UserPermissionStore = {
   }>;
 };
 
+// Resources with real, separately-enforced create/edit/delete permissions --
+// see GRANULAR_MUTATION_RESOURCES in lib/hrms/actions.ts, which is the actual
+// enforcement point. A plain "manage:X" grant from before this existed still
+// implies all four (hasPermission in lib/rbac.ts), so nothing already
+// configured breaks; these are additive, finer-grained keys.
+export const GRANULAR_RESOURCES = ["employees", "contracts", "attendance"] as const;
+
+function granularPermissions(resource: string): PermissionKey[] {
+  return [`read:${resource}`, `create:${resource}`, `edit:${resource}`, `delete:${resource}`] as PermissionKey[];
+}
+
 export const PERMISSION_CATEGORIES: PermissionCategory[] = [
-  { key: "employees", title: "Employees", permissions: ["read:employees", "manage:employees"] },
-  { key: "attendance", title: "Attendance", permissions: ["read:attendance", "manage:attendance"] },
+  { key: "employees", title: "Employees", permissions: [...granularPermissions("employees"), "manage:employees"] },
+  { key: "attendance", title: "Attendance", permissions: [...granularPermissions("attendance"), "manage:attendance"] },
   { key: "leaves", title: "Leaves", permissions: ["read:leave", "manage:leave"] },
   { key: "payroll", title: "Payroll", permissions: ["read:payroll", "manage:payroll", "read:loans", "manage:loans", "read:allowances", "manage:allowances", "read:deductions", "manage:deductions"] },
   { key: "insurance", title: "Insurance", permissions: ["read:insurance", "manage:insurance"] },
@@ -47,12 +58,54 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
   { key: "warehouse", title: "Warehouse", permissions: ["read:warehouse", "manage:warehouse"] },
   { key: "assets", title: "Assets", permissions: ["read:assets", "manage:assets"] },
   { key: "reports", title: "Reports", permissions: ["read:reports", "manage:reports"] },
-  { key: "documents", title: "Documents", permissions: ["read:documents", "manage:documents", "read:contracts", "manage:contracts"] },
+  { key: "documents", title: "Documents", permissions: ["read:documents", "manage:documents", ...granularPermissions("contracts"), "manage:contracts"] },
   { key: "administration", title: "Administration", permissions: ["read:dashboard", "read:audit-logs", "manage:audit-logs", "read:announcements", "manage:announcements", "read:notifications", "manage:notifications"] },
   { key: "settings", title: "Settings", permissions: ["read:settings", "manage:settings", "read:permissions", "manage:permissions"] }
 ];
 
 export const ALL_ENTERPRISE_PERMISSIONS = Array.from(new Set(PERMISSION_CATEGORIES.flatMap((category) => category.permissions))).sort() as PermissionKey[];
+
+export type PermissionTreeAction = { key: PermissionKey; action: string; label: string };
+export type PermissionTreeFeature = { resource: string; label: string; granular: boolean; actions: PermissionTreeAction[] };
+export type PermissionTreeCategory = { key: string; title: string; features: PermissionTreeFeature[]; allPermissions: PermissionKey[] };
+
+const ACTION_LABELS_EN: Record<string, string> = {
+  read: "View",
+  create: "Create",
+  edit: "Edit",
+  delete: "Delete",
+  manage: "Manage"
+};
+
+/**
+ * Groups each category's flat permission list into per-resource "features"
+ * for the hierarchical permission tree UI (module -> feature -> actions).
+ * Resources in GRANULAR_RESOURCES show real View/Create/Edit/Delete
+ * checkboxes; every other resource still only has View/Manage, honestly,
+ * since that's genuinely all that's enforced for it today.
+ */
+export function buildPermissionTree(categories: PermissionCategory[]): PermissionTreeCategory[] {
+  return categories.map((category) => {
+    const byResource = new Map<string, PermissionKey[]>();
+    for (const key of category.permissions) {
+      const [, resource] = key.split(":");
+      if (!resource) continue;
+      const list = byResource.get(resource) ?? [];
+      list.push(key);
+      byResource.set(resource, list);
+    }
+    const features: PermissionTreeFeature[] = Array.from(byResource.entries()).map(([resource, keys]) => ({
+      resource,
+      label: resource,
+      granular: (GRANULAR_RESOURCES as readonly string[]).includes(resource),
+      actions: keys.map((key) => {
+        const action = key.split(":")[0];
+        return { key, action, label: ACTION_LABELS_EN[action] ?? action };
+      })
+    }));
+    return { key: category.key, title: category.title, features, allPermissions: category.permissions };
+  });
+}
 
 export const PERMISSION_TEMPLATES: Record<PermissionTemplateKey, PermissionKey[]> = {
   SUPER_ADMIN: ALL_ENTERPRISE_PERMISSIONS,
