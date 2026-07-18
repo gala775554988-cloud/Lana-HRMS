@@ -74,7 +74,7 @@ function LanaMarkdownRenderer({ content }: { content: string }) {
               if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
                 return (
                   <div key={lIdx} className="flex items-start gap-2.5 ms-3 my-1">
-                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500" />
+                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-secondary" />
                     <span>{trimmed.slice(2)}</span>
                   </div>
                 );
@@ -83,7 +83,7 @@ function LanaMarkdownRenderer({ content }: { content: string }) {
                 const numMatch = trimmed.match(/^(\d+\.)\s+(.*)/);
                 return (
                   <div key={lIdx} className="flex items-start gap-2.5 ms-3 my-1">
-                    <span className="font-bold text-indigo-600 dark:text-indigo-400 shrink-0">{numMatch?.[1]}</span>
+                    <span className="font-bold text-secondary dark:text-secondary/50 shrink-0">{numMatch?.[1]}</span>
                     <span>{numMatch?.[2] || trimmed}</span>
                   </div>
                 );
@@ -307,7 +307,7 @@ export function LanaAiFullPageClient() {
   function getFileIcon(type: string) {
     if (type.includes("pdf") || type.includes("word")) return <FileText className="h-4 w-4 text-rose-500" />;
     if (type.includes("sheet") || type.includes("excel") || type.includes("csv")) return <FileSpreadsheet className="h-4 w-4 text-emerald-500" />;
-    return <ImageIcon className="h-4 w-4 text-indigo-500" />;
+    return <ImageIcon className="h-4 w-4 text-secondary" />;
   }
 
   return (
@@ -317,7 +317,7 @@ export function LanaAiFullPageClient() {
         <button
           type="button"
           onClick={startNewChat}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:bg-indigo-700 active:scale-98"
+          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-secondary px-4 py-3 font-semibold text-white shadow-lg shadow-secondary/25 transition hover:bg-secondary active:scale-98"
         >
           <Plus className="h-5 w-5" />
           <span>محادثة جديدة</span>
@@ -341,12 +341,12 @@ export function LanaAiFullPageClient() {
                   onClick={() => loadConversation(conv.id)}
                   className={`group flex items-center justify-between gap-2 rounded-2xl px-3 py-2.5 text-xs transition-all cursor-pointer ${
                     conversationId === conv.id
-                      ? "bg-indigo-50 text-indigo-700 font-bold border border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800"
+                      ? "bg-secondary/8 text-secondary font-bold border border-secondary/20 dark:bg-secondary/60 dark:text-secondary/30 dark:border-secondary"
                       : "text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800/60"
                   }`}
                 >
                   <div className="flex items-center gap-2 truncate">
-                    <MessageSquare className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
+                    <MessageSquare className="h-3.5 w-3.5 shrink-0 text-secondary" />
                     <span className="truncate">{conv.title}</span>
                   </div>
                   <button
@@ -367,7 +367,7 @@ export function LanaAiFullPageClient() {
       {/* Main Chat Area */}
       <div
         className={`flex flex-1 flex-col overflow-hidden relative ${
-          isDragging ? "ring-4 ring-indigo-500 bg-indigo-50/20" : ""
+          isDragging ? "ring-4 ring-secondary bg-secondary/20" : ""
         }`}
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
         onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
@@ -376,7 +376,7 @@ export function LanaAiFullPageClient() {
         {/* Top bar */}
         <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white/80 backdrop-blur-md px-6 py-4 dark:border-slate-800 dark:bg-slate-900/80">
           <div className="flex items-center gap-3">
-            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 text-white shadow-md">
+            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-secondary to-purple-600 text-white shadow-md">
               <Sparkles className="h-6 w-6 text-amber-300" />
             </div>
             <div>
@@ -400,7 +400,7 @@ export function LanaAiFullPageClient() {
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {messages.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center text-center max-w-xl mx-auto py-12">
-              <div className="grid h-20 w-20 place-items-center rounded-3xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400 mb-6 shadow-md">
+              <div className="grid h-20 w-20 place-items-center rounded-3xl bg-secondary/8 text-secondary dark:bg-secondary/50 dark:text-secondary/50 mb-6 shadow-md">
                 <Sparkles className="h-10 w-10" />
               </div>
               <h3 className="text-2xl font-black mb-2 text-slate-900 dark:text-slate-100">كيف أستطيع مساعدتك اليوم؟</h3>
@@ -418,7 +418,7 @@ export function LanaAiFullPageClient() {
                     key={i}
                     type="button"
                     onClick={() => send(sug)}
-                    className="rounded-2xl border border-slate-200 bg-white p-4 text-xs font-medium text-slate-700 transition hover:border-indigo-500 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-indigo-500/50"
+                    className="rounded-2xl border border-slate-200 bg-white p-4 text-xs font-medium text-slate-700 transition hover:border-secondary hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-secondary/50"
                   >
                     {sug}
                   </button>
@@ -434,14 +434,14 @@ export function LanaAiFullPageClient() {
                 <div
                   className={`rounded-3xl px-5 py-4 shadow-sm ${
                     msg.role === "user"
-                      ? "bg-indigo-600 text-white rounded-br-none"
+                      ? "bg-secondary text-white rounded-br-none"
                       : "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-bl-none border border-slate-200 dark:border-slate-800"
                   }`}
                 >
                   {msg.files && msg.files.length > 0 && (
-                    <div className="mb-3 flex flex-wrap gap-2 border-b border-indigo-500/30 pb-2.5">
+                    <div className="mb-3 flex flex-wrap gap-2 border-b border-secondary/30 pb-2.5">
                       {msg.files.map((f, i) => (
-                        <div key={i} className="flex items-center gap-2 rounded-xl bg-indigo-700 px-3 py-1.5 text-xs text-white">
+                        <div key={i} className="flex items-center gap-2 rounded-xl bg-secondary px-3 py-1.5 text-xs text-white">
                           {getFileIcon(f.type)}
                           <span className="max-w-[160px] truncate">{f.name}</span>
                         </div>
@@ -453,11 +453,11 @@ export function LanaAiFullPageClient() {
                     msg.content ? (
                       <LanaMarkdownRenderer content={msg.content} />
                     ) : (
-                      <div className="flex items-center gap-2 py-2 text-indigo-600 dark:text-indigo-400">
+                      <div className="flex items-center gap-2 py-2 text-secondary dark:text-secondary/50">
                         <span className="flex gap-1.5">
-                          <span className="h-2 w-2 rounded-full bg-indigo-600 dark:bg-indigo-400 animate-bounce" />
-                          <span className="h-2 w-2 rounded-full bg-indigo-600 dark:bg-indigo-400 animate-bounce [animation-delay:0.2s]" />
-                          <span className="h-2 w-2 rounded-full bg-indigo-600 dark:bg-indigo-400 animate-bounce [animation-delay:0.4s]" />
+                          <span className="h-2 w-2 rounded-full bg-secondary dark:bg-secondary/50 animate-bounce" />
+                          <span className="h-2 w-2 rounded-full bg-secondary dark:bg-secondary/50 animate-bounce [animation-delay:0.2s]" />
+                          <span className="h-2 w-2 rounded-full bg-secondary dark:bg-secondary/50 animate-bounce [animation-delay:0.4s]" />
                         </span>
                         <span className="text-xs font-semibold">Lana يكتب الآن...</span>
                       </div>
@@ -518,7 +518,7 @@ export function LanaAiFullPageClient() {
 
         {/* Input area */}
         <div className="shrink-0 border-t border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-          <div className="max-w-4xl mx-auto flex items-end gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-2 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 dark:border-slate-800 dark:bg-slate-950">
+          <div className="max-w-4xl mx-auto flex items-end gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-2 focus-within:border-secondary focus-within:ring-2 focus-within:ring-secondary/20 dark:border-slate-800 dark:bg-slate-950">
             <input
               ref={fileInputRef}
               type="file"
@@ -565,7 +565,7 @@ export function LanaAiFullPageClient() {
                 onClick={() => send()}
                 disabled={(!input.trim() && files.length === 0) || isStreaming}
                 title="إرسال"
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-indigo-600 text-white shadow-md transition hover:bg-indigo-700 disabled:opacity-40 disabled:pointer-events-none active:scale-95"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-secondary text-white shadow-md transition hover:bg-secondary disabled:opacity-40 disabled:pointer-events-none active:scale-95"
               >
                 <Send className="h-5 w-5 -rotate-90" />
               </button>

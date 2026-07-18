@@ -180,7 +180,7 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
   if (activeTab === "archived") {
     return (
       <section className="space-y-6" dir={isAr ? "rtl" : "ltr"}>
-        {isPending && <div className="h-1 w-full bg-indigo-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-600 animate-pulse w-full"></div></div>}
+        {isPending && <div className="h-1 w-full bg-primary/12 rounded-full overflow-hidden"><div className="h-full bg-primary animate-pulse w-full"></div></div>}
       <div className="flex flex-wrap gap-2 border-b pb-4">
           <Button variant={(activeTab as string) === "all" ? "default" : "outline"} size="sm" onClick={() => switchTab("all")}><Users className="h-4 w-4 ml-1" />جميع الموظفين ({totalCount})</Button>
           <Button variant={(activeTab as string) === "archived" ? "default" : "outline"} size="sm" onClick={() => switchTab("archived")}><Archive className="h-4 w-4 ml-1" />الموظفون المؤرشفون / غير النشطين</Button>
@@ -194,7 +194,7 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
   if (activeTab === "duplicates") {
     return (
       <section className="space-y-6" dir={isAr ? "rtl" : "ltr"}>
-        {isPending && <div className="h-1 w-full bg-indigo-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-600 animate-pulse w-full"></div></div>}
+        {isPending && <div className="h-1 w-full bg-primary/12 rounded-full overflow-hidden"><div className="h-full bg-primary animate-pulse w-full"></div></div>}
       <div className="flex flex-wrap gap-2 border-b pb-4">
           <Button variant={(activeTab as string) === "all" ? "default" : "outline"} size="sm" onClick={() => switchTab("all")}><Users className="h-4 w-4 ml-1" />جميع الموظفين ({totalCount})</Button>
           <Button variant={(activeTab as string) === "archived" ? "default" : "outline"} size="sm" onClick={() => switchTab("archived")}><Archive className="h-4 w-4 ml-1" />الموظفون المؤرشفون</Button>
@@ -207,7 +207,7 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
 
   return (
     <section className="space-y-6" dir={isAr ? "rtl" : "ltr"}>
-      {isPending && <div className="h-1 w-full bg-indigo-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-600 animate-pulse w-full"></div></div>}
+      {isPending && <div className="h-1 w-full bg-primary/12 rounded-full overflow-hidden"><div className="h-full bg-primary animate-pulse w-full"></div></div>}
       <div className="flex flex-wrap gap-2 border-b pb-4">
         <Button variant={(activeTab as string) === "all" ? "default" : "outline"} size="sm" onClick={() => switchTab("all")}><Users className="h-4 w-4 ml-1" />جميع الموظفين ({totalCount})</Button>
         <Button variant={(activeTab as string) === "archived" ? "default" : "outline"} size="sm" onClick={() => switchTab("archived")}><Archive className="h-4 w-4 ml-1" />الموظفون المؤرشفون</Button>
@@ -228,8 +228,8 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
               <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input type="text" placeholder={isAr ? "بحث بالاسم أو الرقم الوظيفي..." : "Search by name or ID..."} value={search} onChange={(e) => setSearch(e.target.value)} className="pr-9" />
             </div>
-            <Button type="submit" size="sm" className="bg-indigo-600 text-white shadow-sm shadow-indigo-200 hover:bg-indigo-700 dark:shadow-indigo-950/30"><Search className="h-4 w-4 ml-1.5" />{isAr ? "بحث" : "Search"}</Button>
-            <Button type="button" size="sm" variant="outline" onClick={() => setFiltersOpen((value) => !value)} className="border-indigo-100 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800 dark:border-indigo-900/50 dark:text-indigo-300 dark:hover:bg-indigo-950/30"><SlidersHorizontal className="h-4 w-4 ml-1.5" />الفلاتر</Button>
+            <Button type="submit" size="sm" className="bg-primary text-white shadow-sm shadow-primary/20 hover:bg-primary dark:shadow-primary/30"><Search className="h-4 w-4 ml-1.5" />{isAr ? "بحث" : "Search"}</Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => setFiltersOpen((value) => !value)} className="border-primary/12 text-primary hover:bg-primary/8 hover:text-primary dark:border-primary/50 dark:text-primary/30 dark:hover:bg-primary/30"><SlidersHorizontal className="h-4 w-4 ml-1.5" />الفلاتر</Button>
           </form>
           <div className="flex flex-wrap items-center gap-2">
             <select value={pageSize} onChange={(event) => { const val = event.target.value; startTransition(() => { router.push(`/employees?${buildQuery({ pageSize: val, page: 1 })}`); }); }} className="h-9 rounded-md border bg-background px-3 text-sm" disabled={isPending}>
@@ -246,7 +246,7 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
           </div>
         </div>
         {filtersOpen ? (
-          <form onSubmit={handleApplyFilters} className="mt-4 rounded-2xl border border-indigo-100/80 bg-indigo-50/30 p-4 shadow-inner shadow-white/60 dark:border-indigo-900/40 dark:bg-indigo-950/10">
+          <form onSubmit={handleApplyFilters} className="mt-4 rounded-2xl border border-primary/80 bg-primary/30 p-4 shadow-inner shadow-white/60 dark:border-primary/40 dark:bg-primary/10">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
               {filterFields.map(([name, label]) => (
                 <label key={name} className="grid gap-1 text-sm">

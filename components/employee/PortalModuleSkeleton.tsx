@@ -7,7 +7,7 @@ export function PortalModuleSkeleton({ title }: { title: string }) {
           <div className="h-4 w-72 animate-pulse rounded-xl bg-slate-200/70 dark:bg-slate-800" />
           <span className="sr-only">تحميل {title}</span>
         </div>
-        <div className="h-11 w-36 animate-pulse rounded-2xl bg-indigo-200/70 dark:bg-indigo-950" />
+        <div className="h-11 w-36 animate-pulse rounded-2xl bg-primary/70 dark:bg-primary" />
       </div>
       <section className="grid gap-4 md:grid-cols-4">
         {Array.from({ length: 4 }).map((_, index) => (

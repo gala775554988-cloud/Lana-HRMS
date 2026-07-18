@@ -43,8 +43,8 @@ export default async function CentralDashboardPage() {
       href: "/hospitals",
       icon: Hospital,
       badge: "القطاع الطبي",
-      gradient: "from-indigo-600 via-purple-600 to-pink-600",
-      bgLight: "bg-indigo-50/70 border-indigo-200/80 hover:border-indigo-400 dark:bg-indigo-950/30 dark:border-indigo-800/60"
+      gradient: "from-primary via-purple-600 to-pink-600",
+      bgLight: "bg-primary/70 border-primary/80 hover:border-primary/50 dark:bg-primary/30 dark:border-primary/60"
     },
     {
       title: "مسير الرواتب والمالية",
@@ -75,7 +75,7 @@ export default async function CentralDashboardPage() {
               </span>
             </div>
             <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-slate-100">
-              أهلاً بك، <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 via-emerald-600 to-indigo-600">{session?.user?.name || "الإدارة التنفيذية"}</span>
+              أهلاً بك، <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 via-emerald-600 to-primary">{session?.user?.name || "الإدارة التنفيذية"}</span>
             </h1>
             <p className="text-sm font-semibold text-slate-600 dark:text-slate-300 max-w-2xl leading-relaxed">
               مركز التحكم التنفيذي Pro Max لمنصة لانا الطبية؛ رصد لحظي لحركة الكوادر، الاعتمادات، الرواتب، وتكامل بيانات Odoo لحظياً.

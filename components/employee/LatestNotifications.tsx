@@ -38,7 +38,7 @@ export function LatestNotifications({ notifications = [] }: Props) {
             );
           })
         )}
-        <Link href="/employee/notifications" className="text-xs text-indigo-600 hover:underline block mt-2">
+        <Link href="/employee/notifications" className="text-xs text-primary hover:underline block mt-2">
           عرض كل الإشعارات →
         </Link>
       </CardContent>

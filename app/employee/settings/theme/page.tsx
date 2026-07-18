@@ -34,7 +34,7 @@ export default function ThemeSettings() {
         {themes.map(theme => (
           <Card 
             key={theme.id} 
-            className="cursor-pointer hover:border-indigo-300"
+            className="cursor-pointer hover:border-primary/30"
             onClick={() => changeTheme(theme.id)}
           >
             <CardContent className="p-4">

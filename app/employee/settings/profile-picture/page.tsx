@@ -100,7 +100,7 @@ export default function ProfilePicturePage() {
 
         <div className="flex flex-wrap justify-center gap-2">
           <label className="inline-block">
-            <div className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl cursor-pointer transition">
+            <div className="flex items-center gap-2 px-6 py-2.5 bg-primary hover:bg-primary text-white rounded-2xl cursor-pointer transition">
               <ImagePlus className="h-4 w-4" />
               اختر صورة جديدة
             </div>

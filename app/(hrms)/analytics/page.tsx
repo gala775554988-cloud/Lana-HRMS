@@ -248,8 +248,8 @@ export async function CompanyOverview({ locale, dictionary, showCharts = true }:
   const currencyLocale = { en: "en-US", ar: "ar-SA" } as const;
   const d = dictionary?.dashboard || {};
   const cards: Array<{ title: string; value: number | string; icon: LucideIcon; hint: string; tone: string; badgeText?: string }> = [
-    { title: d.kpiActiveEmployees || "الموظفون النشطون", value: employees, icon: Users, hint: d.kpiActiveEmployeesHint || "حالة رأس المال البشري", tone: "from-indigo-600 to-purple-600", badgeText: d.kpiLiveBadge || "مباشر" },
-    { title: d.kpiDepartments || "الإدارات", value: departments, icon: Building2, hint: d.kpiDepartmentsHint || "إجمالي الإدارات النشطة", tone: "from-blue-600 to-indigo-600" },
+    { title: d.kpiActiveEmployees || "الموظفون النشطون", value: employees, icon: Users, hint: d.kpiActiveEmployeesHint || "حالة رأس المال البشري", tone: "from-primary to-purple-600", badgeText: d.kpiLiveBadge || "مباشر" },
+    { title: d.kpiDepartments || "الإدارات", value: departments, icon: Building2, hint: d.kpiDepartmentsHint || "إجمالي الإدارات النشطة", tone: "from-blue-600 to-primary" },
     { title: d.kpiBranches || "الفروع", value: branches, icon: Building2, hint: d.kpiBranchesHint || "المواقع التشغيلية", tone: "from-purple-600 to-pink-600" },
     { title: d.kpiHospitals || "المستشفيات", value: hospitals, icon: Hospital, hint: d.kpiHospitalsHint || "توزيع الكوادر الطبية", tone: "from-emerald-600 to-teal-600", badgeText: d.kpiMedicalBadge || "القطاع الطبي" },
     { title: d.kpiContracts || "العقود", value: contracts, icon: FileText, hint: d.kpiContractsHint || "العقود السارية حالياً", tone: "from-cyan-600 to-blue-600" },
@@ -258,7 +258,7 @@ export async function CompanyOverview({ locale, dictionary, showCharts = true }:
     { title: d.kpiPendingLeave || "طلبات الإجازة المعلقة", value: pendingLeave, icon: Calendar, hint: d.kpiPendingLeaveHint || "في انتظار موافقة المدير", tone: "from-orange-500 to-red-600" },
     { title: d.kpiAttendanceToday || "حضور اليوم", value: attendanceToday, icon: Clock3, hint: d.kpiAttendanceTodayHint || "إجمالي سجلات الدخول اليوم", tone: "from-teal-600 to-emerald-600" },
     { title: d.kpiLateToday || "المتأخرون اليوم", value: lateToday, icon: TimerReset, hint: d.kpiLateTodayHint || "حالات التأخر المسجلة", tone: "from-rose-600 to-red-600" },
-    { title: d.kpiTotalPayroll || "إجمالي مسير الرواتب", value: new Intl.NumberFormat(currencyLocale[locale || "ar"], { style: "currency", currency: "SAR", maximumFractionDigits: 0 }).format(payrollSum), icon: WalletCards, hint: d.kpiTotalPayrollHint || "الرواتب المدفوعة حتى الآن", tone: "from-indigo-700 to-slate-900" },
+    { title: d.kpiTotalPayroll || "إجمالي مسير الرواتب", value: new Intl.NumberFormat(currencyLocale[locale || "ar"], { style: "currency", currency: "SAR", maximumFractionDigits: 0 }).format(payrollSum), icon: WalletCards, hint: d.kpiTotalPayrollHint || "الرواتب المدفوعة حتى الآن", tone: "from-primary to-slate-900" },
     { title: d.kpiOvertimePending || "طلبات الإضافي المعلقة", value: overtimePending, icon: TimerReset, hint: d.kpiOvertimePendingHint || "ساعات إضافية بانتظار الاعتماد", tone: "from-fuchsia-600 to-purple-600" }
   ];
 
@@ -279,7 +279,7 @@ function KpiCard({
   title: string; value: number | string; icon: LucideIcon; hint: string; tone: string; badgeText?: string; index: number;
 }) {
   return (
-    <Card className="group relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-md shadow-slate-200/40 transition-all duration-300 hover:-translate-y-1 hover:border-indigo-500/40 hover:shadow-xl dark:border-slate-800 dark:bg-slate-900 dark:shadow-none" style={{ animationDelay: `${index * 35}ms` }}>
+    <Card className="group relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-md shadow-slate-200/40 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl dark:border-slate-800 dark:bg-slate-900 dark:shadow-none" style={{ animationDelay: `${index * 35}ms` }}>
       <CardContent className="relative p-6 lana-slide-up">
         <div className={`absolute -left-10 -top-10 h-32 w-32 rounded-full bg-gradient-to-br ${tone} opacity-10 blur-2xl transition-opacity duration-300 group-hover:opacity-25 pointer-events-none`} />
         <div className="relative flex items-start justify-between gap-4">
@@ -287,7 +287,7 @@ function KpiCard({
             <div className="flex items-center gap-2">
               <p className="text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wide truncate">{title}</p>
               {badgeText && (
-                <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300">
+                <span className="rounded-full bg-primary/8 px-2 py-0.5 text-[10px] font-bold text-primary dark:bg-primary/80 dark:text-primary/30">
                   {badgeText}
                 </span>
               )}
@@ -295,7 +295,7 @@ function KpiCard({
             <div className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-slate-100 truncate">{value}</div>
             <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 truncate">{hint}</p>
           </div>
-          <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br ${tone} text-white shadow-lg shadow-indigo-500/15 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3`}>
+          <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br ${tone} text-white shadow-lg shadow-primary/15 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3`}>
             <Icon className="h-5 w-5" />
           </div>
         </div>

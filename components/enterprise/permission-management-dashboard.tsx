@@ -84,7 +84,7 @@ function Avatar({ employee, size = "h-11 w-11" }: { employee: EmployeeLite; size
   return employee.profilePhotoUrl ? (
     <img src={employee.profilePhotoUrl} alt="" className={`${size} shrink-0 rounded-2xl object-cover ring-2 ring-white shadow-sm dark:ring-slate-900`} />
   ) : (
-    <div className={`${size} flex shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-50 to-violet-50 text-sm font-bold text-primary ring-2 ring-white shadow-sm dark:from-indigo-950/50 dark:to-violet-950/40 dark:ring-slate-900`}>
+    <div className={`${size} flex shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/8 to-violet-50 text-sm font-bold text-primary ring-2 ring-white shadow-sm dark:from-primary/50 dark:to-violet-950/40 dark:ring-slate-900`}>
       {initials}
     </div>
   );
@@ -318,7 +318,7 @@ export function PermissionManagementDashboard() {
                   <button
                     type="button"
                     onClick={() => updateEntry(entry.userId, { editingGranular: !entry.editingGranular })}
-                    className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 transition hover:bg-indigo-50 hover:text-indigo-700 dark:text-slate-400 dark:hover:bg-indigo-950/40"
+                    className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 transition hover:bg-primary/8 hover:text-primary dark:text-slate-400 dark:hover:bg-primary/40"
                     title="تعديل تفصيلي / Edit granular permissions"
                     aria-label="Edit"
                   >
@@ -355,9 +355,9 @@ export function PermissionManagementDashboard() {
                   return (
                     <label
                       key={category.key}
-                      className={`flex cursor-pointer items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-semibold transition ${checked ? "border-indigo-400 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300" : "border-slate-200 bg-white text-slate-600 hover:border-indigo-300 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"}`}
+                      className={`flex cursor-pointer items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-semibold transition ${checked ? "border-primary/50 bg-primary/8 text-primary dark:border-primary dark:bg-primary/40 dark:text-primary/30" : "border-slate-200 bg-white text-slate-600 hover:border-primary/30 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"}`}
                     >
-                      <input type="checkbox" checked={checked} onChange={() => toggleCategory(entry, category)} disabled={entry.saving} className="h-4 w-4 accent-indigo-600" />
+                      <input type="checkbox" checked={checked} onChange={() => toggleCategory(entry, category)} disabled={entry.saving} className="h-4 w-4 accent-primary" />
                       <span>{CATEGORY_LABELS_AR[category.key] ?? category.key} / {category.title}</span>
                     </label>
                   );
@@ -372,7 +372,7 @@ export function PermissionManagementDashboard() {
                       <span>هيكل الصلاحيات التفصيلي / Hierarchical permission tree</span>
                     </div>
                     {entry.saving ? (
-                      <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">جارٍ الحفظ...</span>
+                      <span className="text-[11px] font-semibold text-primary dark:text-primary/50">جارٍ الحفظ...</span>
                     ) : entry.justSaved ? (
                       <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400"><Check className="h-3 w-3" /> تم حفظ التغييرات بنجاح</span>
                     ) : null}
@@ -396,14 +396,14 @@ export function PermissionManagementDashboard() {
                               <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{CATEGORY_LABELS_AR[category.key] ?? category.key}</span>
                               <span className="text-[11px] text-muted-foreground">{category.title}</span>
                             </button>
-                            <label className={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-semibold ${allGranted ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300" : someGranted ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" : "text-slate-500"}`}>
+                            <label className={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-semibold ${allGranted ? "bg-primary/12 text-primary dark:bg-primary/50 dark:text-primary/30" : someGranted ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" : "text-slate-500"}`}>
                               <input
                                 type="checkbox"
                                 checked={allGranted}
                                 ref={(el) => { if (el) el.indeterminate = someGranted && !allGranted; }}
                                 onChange={() => matchingCategory && toggleCategory(entry, matchingCategory)}
                                 disabled={entry.saving}
-                                className="h-3.5 w-3.5 accent-indigo-600"
+                                className="h-3.5 w-3.5 accent-primary"
                               />
                               <CheckSquare className="h-3 w-3" />
                               <span>تحديد الكل</span>
@@ -418,7 +418,7 @@ export function PermissionManagementDashboard() {
                                 return (
                                   <div key={feature.resource} className="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl bg-slate-50/60 px-3 py-2 dark:bg-slate-950/30">
                                     <label className="flex min-w-[110px] cursor-pointer items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
-                                      <input type="checkbox" checked={featureAllGranted} onChange={() => toggleFeatureAll(entry, feature)} disabled={entry.saving} className="h-3.5 w-3.5 accent-indigo-600" />
+                                      <input type="checkbox" checked={featureAllGranted} onChange={() => toggleFeatureAll(entry, feature)} disabled={entry.saving} className="h-3.5 w-3.5 accent-primary" />
                                       <span>{RESOURCE_LABELS_AR[feature.resource] ?? feature.resource}</span>
                                     </label>
                                     <div className="flex flex-wrap items-center gap-3">
@@ -427,7 +427,7 @@ export function PermissionManagementDashboard() {
                                         const checked = entry.grants.has(permissionAction.key);
                                         return (
                                           <label key={permissionAction.key} className="flex cursor-pointer items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400" title={hint.effect}>
-                                            <input type="checkbox" checked={checked} onChange={() => toggleSinglePermission(entry, permissionAction.key)} disabled={entry.saving} className="h-3.5 w-3.5 accent-indigo-600" />
+                                            <input type="checkbox" checked={checked} onChange={() => toggleSinglePermission(entry, permissionAction.key)} disabled={entry.saving} className="h-3.5 w-3.5 accent-primary" />
                                             <span>{ACTION_LABELS_AR[permissionAction.action] ?? permissionAction.label}</span>
                                           </label>
                                         );

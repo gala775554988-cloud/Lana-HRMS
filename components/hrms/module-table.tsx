@@ -143,11 +143,11 @@ export function ModuleTable({ resource, records, dictionary, locale = "en", from
     <div className={cn("overflow-hidden border bg-background shadow-sm", polished ? "rounded-2xl border-slate-200/80 bg-white shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900 dark:shadow-slate-950/30" : "rounded-lg")} dir={locale === "ar" ? "rtl" : "ltr"}>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className={polished ? "bg-indigo-50/70 text-indigo-950 dark:bg-indigo-950/20 dark:text-indigo-100" : "bg-muted/70"}>
+          <thead className={polished ? "bg-primary/70 text-primary dark:bg-primary/20 dark:text-primary/12" : "bg-muted/70"}>
             {table.getHeaderGroups().map((group) => <tr key={group.id}>{group.headers.map((header) => <th key={header.id} className="px-4 py-3 text-start font-semibold text-muted-foreground">{flexRender(header.column.columnDef.header, header.getContext())}</th>)}</tr>)}
           </thead>
           <tbody>
-            {table.getRowModel().rows.map((row) => <tr key={row.id} className={polished ? "border-t border-slate-100 transition-colors hover:bg-indigo-50/40 dark:border-slate-800 dark:hover:bg-indigo-950/20" : "border-t transition-colors hover:bg-muted/40"}>{row.getVisibleCells().map((cell) => <td key={cell.id} className="px-4 py-3 align-top">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}
+            {table.getRowModel().rows.map((row) => <tr key={row.id} className={polished ? "border-t border-slate-100 transition-colors hover:bg-primary/40 dark:border-slate-800 dark:hover:bg-primary/20" : "border-t transition-colors hover:bg-muted/40"}>{row.getVisibleCells().map((cell) => <td key={cell.id} className="px-4 py-3 align-top">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}
           </tbody>
         </table>
       </div>

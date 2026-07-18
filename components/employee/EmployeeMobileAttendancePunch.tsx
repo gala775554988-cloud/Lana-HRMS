@@ -67,8 +67,8 @@ export function EmployeeMobileAttendancePunch() {
   }
 
   return (
-    <Card className="rounded-3xl border-indigo-100 bg-gradient-to-br from-indigo-50 to-white dark:border-indigo-900/50 dark:from-indigo-950/30 dark:to-slate-950">
-      <CardHeader><CardTitle className="flex items-center gap-2"><LocateFixed className="h-5 w-5 text-indigo-600" />بصمة الجوال حسب الموقع</CardTitle></CardHeader>
+    <Card className="rounded-3xl border-primary/12 bg-gradient-to-br from-primary/8 to-white dark:border-primary/50 dark:from-primary/30 dark:to-slate-950">
+      <CardHeader><CardTitle className="flex items-center gap-2"><LocateFixed className="h-5 w-5 text-primary" />بصمة الجوال حسب الموقع</CardTitle></CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">يتم السماح بالتسجيل فقط إذا كنت داخل نطاق موقع مربوط بك حسب المستشفى/الفرع/الإدارة/الكفيل.</p>
         <div className="flex flex-wrap gap-2">

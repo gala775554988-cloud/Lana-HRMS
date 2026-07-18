@@ -47,7 +47,7 @@ export function EmployeeMobileSidebar() {
         className={cn(
           'flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3 text-center text-[11px] font-medium transition-colors',
           active
-            ? 'bg-indigo-600 text-white shadow'
+            ? 'bg-primary text-white shadow'
             : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
         )}
       >
@@ -75,7 +75,7 @@ export function EmployeeMobileSidebar() {
         onClick={() => setOpen(true)}
         aria-label="فتح قائمة التنقل"
         aria-expanded={open}
-        className="fixed bottom-5 right-5 z-[60] grid h-14 w-14 place-items-center rounded-2xl bg-indigo-600 text-white shadow-xl shadow-indigo-600/30 transition-transform active:scale-95"
+        className="fixed bottom-5 right-5 z-[60] grid h-14 w-14 place-items-center rounded-2xl bg-primary text-white shadow-xl shadow-primary/30 transition-transform active:scale-95"
       >
         <Menu className="h-6 w-6" />
       </button>

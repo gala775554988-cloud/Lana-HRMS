@@ -19,20 +19,20 @@ export default async function EmployeeDashboard() {
     const nextSalary = data.payroll ? `${asNumber(data.payroll.netPay || data.payroll.baseSalary).toLocaleString('ar-SA')} ${data.payroll.currency}` : 'غير مسجل';
     return (
       <main className="space-y-6" dir="rtl">
-      <section className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-indigo-700 via-violet-700 to-slate-950 text-white shadow-2xl">
+      <section className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-primary via-violet-700 to-slate-950 text-white shadow-2xl">
         <div className="grid gap-6 p-6 lg:grid-cols-[1.2fr_.8fr] lg:p-8">
           <div className="flex flex-col gap-5 md:flex-row md:items-center">
             <div className="h-28 w-28 overflow-hidden rounded-3xl bg-white/15 ring-4 ring-white/20">
               {employee.profilePhotoUrl ? <img src={employee.profilePhotoUrl} alt={fullName} className="h-full w-full object-cover" /> : <div className="grid h-full w-full place-items-center text-4xl font-black">{employee.firstName?.[0]}{employee.lastName?.[0]}</div>}
             </div>
             <div className="min-w-0 space-y-3">
-              <div><p className="text-sm text-indigo-100">مرحباً بك</p><h1 className="text-3xl font-black tracking-tight md:text-4xl">{fullName}</h1></div>
+              <div><p className="text-sm text-primary/12">مرحباً بك</p><h1 className="text-3xl font-black tracking-tight md:text-4xl">{fullName}</h1></div>
               <div className="flex flex-wrap gap-2 text-sm">
                 <Badge className="bg-white/15 text-white hover:bg-white/20"><IdCard className="ml-1 h-3.5 w-3.5" />{employee.employeeNumber}</Badge>
                 <Badge className="bg-white/15 text-white hover:bg-white/20">هوية: {employee.nationalId}</Badge>
                 <Badge className="bg-emerald-400/20 text-emerald-50 hover:bg-emerald-400/30">{employee.status}</Badge>
               </div>
-              <div className="grid gap-2 text-sm text-indigo-50 sm:grid-cols-2">
+              <div className="grid gap-2 text-sm text-primary/8 sm:grid-cols-2">
                 <span className="flex items-center gap-2"><Briefcase className="h-4 w-4" />{employee.position?.title ?? 'غير محدد'}</span>
                 <span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4" />{employee.department?.name ?? 'لا يوجد قسم'}</span>
                 <span className="flex items-center gap-2"><MapPin className="h-4 w-4" />{employee.branch?.name ?? 'لا يوجد فرع'}</span>
@@ -44,8 +44,8 @@ export default async function EmployeeDashboard() {
             <div className="flex items-center justify-between"><span>اكتمال الملف</span><span className="text-2xl font-black">{completion}%</span></div>
             <div className="mt-3 h-3 rounded-full bg-white/15"><div className="h-3 rounded-full bg-emerald-300" style={{ width: `${completion}%` }} /></div>
             <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-2xl bg-white/10 p-3"><p className="text-indigo-100">حالة الحساب</p><p className="font-bold">{employee.user?.isActive ? 'نشط' : 'غير نشط'}</p></div>
-              <div className="rounded-2xl bg-white/10 p-3"><p className="text-indigo-100">آخر دخول</p><p className="font-bold">{employee.user?.lastLoginAt ? fmtDate(employee.user.lastLoginAt) : 'لم يسجل'}</p></div>
+              <div className="rounded-2xl bg-white/10 p-3"><p className="text-primary/12">حالة الحساب</p><p className="font-bold">{employee.user?.isActive ? 'نشط' : 'غير نشط'}</p></div>
+              <div className="rounded-2xl bg-white/10 p-3"><p className="text-primary/12">آخر دخول</p><p className="font-bold">{employee.user?.lastLoginAt ? fmtDate(employee.user.lastLoginAt) : 'لم يسجل'}</p></div>
             </div>
           </div>
         </div>
@@ -56,15 +56,15 @@ export default async function EmployeeDashboard() {
         <Stat title="الطلبات المعلقة" value={data.leaves.filter(l => l.status === 'PENDING').length} icon={Clock} tone="bg-amber-50 text-amber-700" />
         <Stat title="الحضور هذا الشهر" value={`${data.presentDays} يوم`} icon={CheckCircle2} tone="bg-blue-50 text-blue-700" />
         <Stat title="ساعات العمل" value={`${Math.round(data.monthHours)} ساعة`} icon={Clock} tone="bg-violet-50 text-violet-700" />
-        <Stat title="الراتب القادم" value={nextSalary} icon={WalletCards} tone="bg-indigo-50 text-indigo-700" />
+        <Stat title="الراتب القادم" value={nextSalary} icon={WalletCards} tone="bg-primary/8 text-primary" />
         <Stat title="المستندات" value={data.documents} icon={FileText} tone="bg-sky-50 text-sky-700" />
         <Stat title="العهد" value={data.assets} icon={Laptop} tone="bg-slate-100 text-slate-700" />
         <Stat title="الإشعارات الجديدة" value={data.notifications.length} icon={Bell} tone="bg-rose-50 text-rose-700" />
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[1fr_360px]">
-        <Card className="rounded-3xl"><CardHeader><CardTitle>Timeline آخر الأحداث</CardTitle></CardHeader><CardContent className="space-y-3">{data.timeline.length ? data.timeline.map((item, i) => <div key={i} className="flex gap-3 rounded-2xl border p-4"><div className="mt-1 h-3 w-3 rounded-full bg-indigo-600" /><div><p className="font-bold">{item.title}</p><p className="text-xs text-muted-foreground">{item.type} · {fmtDate(item.date)} · {item.status}</p></div></div>) : <div className="rounded-2xl border border-dashed p-6 text-muted-foreground">لا توجد أحداث حديثة مرتبطة بحسابك.</div>}</CardContent></Card>
-        <Card className="rounded-3xl"><CardHeader><CardTitle>إجراءات سريعة</CardTitle></CardHeader><CardContent className="grid grid-cols-2 gap-3"><Link className="flex items-center justify-center rounded-2xl bg-indigo-600 px-3 py-4 text-center text-sm font-bold text-white transition-colors hover:bg-indigo-700" href="/employee/leave/new">طلب إجازة</Link><Link className="flex items-center justify-center rounded-2xl border px-3 py-4 text-center text-sm font-bold transition-colors hover:bg-muted" href="/employee/documents">مستنداتي</Link><Link className="col-span-2 flex items-center justify-center rounded-2xl border px-3 py-4 text-center text-sm font-bold transition-colors hover:bg-muted" href="/employee/salary">الرواتب</Link></CardContent></Card>
+        <Card className="rounded-3xl"><CardHeader><CardTitle>Timeline آخر الأحداث</CardTitle></CardHeader><CardContent className="space-y-3">{data.timeline.length ? data.timeline.map((item, i) => <div key={i} className="flex gap-3 rounded-2xl border p-4"><div className="mt-1 h-3 w-3 rounded-full bg-primary" /><div><p className="font-bold">{item.title}</p><p className="text-xs text-muted-foreground">{item.type} · {fmtDate(item.date)} · {item.status}</p></div></div>) : <div className="rounded-2xl border border-dashed p-6 text-muted-foreground">لا توجد أحداث حديثة مرتبطة بحسابك.</div>}</CardContent></Card>
+        <Card className="rounded-3xl"><CardHeader><CardTitle>إجراءات سريعة</CardTitle></CardHeader><CardContent className="grid grid-cols-2 gap-3"><Link className="flex items-center justify-center rounded-2xl bg-primary px-3 py-4 text-center text-sm font-bold text-white transition-colors hover:bg-primary" href="/employee/leave/new">طلب إجازة</Link><Link className="flex items-center justify-center rounded-2xl border px-3 py-4 text-center text-sm font-bold transition-colors hover:bg-muted" href="/employee/documents">مستنداتي</Link><Link className="col-span-2 flex items-center justify-center rounded-2xl border px-3 py-4 text-center text-sm font-bold transition-colors hover:bg-muted" href="/employee/salary">الرواتب</Link></CardContent></Card>
       </section>
 
       <EmployeeRequestCategories />

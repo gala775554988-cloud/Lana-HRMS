@@ -231,9 +231,9 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
   return (
     <div className="space-y-6">
       {hospitalName && (
-        <div className="flex items-center justify-between rounded-2xl border border-indigo-200 bg-indigo-50/80 p-4 text-indigo-900 shadow-sm dark:border-indigo-900/60 dark:bg-indigo-950/40 dark:text-indigo-200">
+        <div className="flex items-center justify-between rounded-2xl border border-primary/20 bg-primary/80 p-4 text-primary shadow-sm dark:border-primary/60 dark:bg-primary/40 dark:text-primary/20">
           <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-600 text-white shadow-md">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary text-white shadow-md">
               <Building2 className="h-5 w-5" />
             </div>
             <div>
@@ -241,7 +241,7 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
               <p className="text-xs opacity-80 mt-0.5">يتم عرض الموظفين المربوطين بهذا المستشفى فقط</p>
             </div>
           </div>
-          <Link href="/employees" className="rounded-xl border border-indigo-300 bg-white px-3.5 py-1.5 text-xs font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-100 dark:border-indigo-800 dark:bg-slate-900 dark:text-indigo-300">
+          <Link href="/employees" className="rounded-xl border border-primary/30 bg-white px-3.5 py-1.5 text-xs font-bold text-primary shadow-sm transition hover:bg-primary/12 dark:border-primary dark:bg-slate-900 dark:text-primary/30">
             إلغاء الفلترة • عرض الكل
           </Link>
         </div>

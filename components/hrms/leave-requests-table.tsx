@@ -79,7 +79,7 @@ export function LeaveRequestsTable({
       <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="overflow-x-auto">
           <table className="w-full text-sm" dir="rtl">
-            <thead className="bg-indigo-50/70 text-indigo-950 dark:bg-indigo-950/20 dark:text-indigo-100">
+            <thead className="bg-primary/70 text-primary dark:bg-primary/20 dark:text-primary/12">
               <tr>
                 <th className="px-4 py-3 text-start font-semibold">الموظف</th>
                 <th className="px-4 py-3 text-start font-semibold">نوع الإجازة</th>
@@ -95,7 +95,7 @@ export function LeaveRequestsTable({
                 const meta = statusMeta[record.status] ?? statusMeta.DRAFT;
                 const employeeName = record.employee ? `${record.employee.firstName ?? ""} ${record.employee.lastName ?? ""}`.trim() : "-";
                 return (
-                  <tr key={record.id} className="border-t border-slate-100 transition-colors hover:bg-indigo-50/40 dark:border-slate-800 dark:hover:bg-indigo-950/20">
+                  <tr key={record.id} className="border-t border-slate-100 transition-colors hover:bg-primary/40 dark:border-slate-800 dark:hover:bg-primary/20">
                     <td className="px-4 py-3 align-top">
                       <div className="font-medium text-foreground">{employeeName || "-"}</div>
                       <div className="text-xs text-muted-foreground">{record.employee?.employeeNumber ?? "-"}</div>

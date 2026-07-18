@@ -21,7 +21,7 @@ export default async function ModuleReportsPage({ params }: { params: Promise<{ 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card className="hover:border-primary/50 transition-colors">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-indigo-500" /> تقرير القائمة الشامل</CardTitle>
+            <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-primary" /> تقرير القائمة الشامل</CardTitle>
             <CardDescription>تصدير جميع بيانات {resource.title} حسب الصلاحيات الحالية</CardDescription>
           </CardHeader>
           <CardContent className="flex gap-2">

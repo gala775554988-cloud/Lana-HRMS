@@ -146,7 +146,7 @@ export function PermissionsManagementClient() {
           {previewMessage ? <div className="text-sm text-muted-foreground">{previewMessage}</div> : null}
 
           {preview ? (
-            <div className="rounded-2xl border border-indigo-200 bg-indigo-50/40 p-4 dark:border-indigo-900 dark:bg-indigo-950/20">
+            <div className="rounded-2xl border border-primary/20 bg-primary/40 p-4 dark:border-primary dark:bg-primary/20">
               <div className="mb-3 flex items-center justify-between">
                 <p className="font-semibold">{preview.employee?.name ?? "—"}</p>
                 <button type="button" onClick={() => setPreview(null)} aria-label="Close preview" className="rounded-lg p-1.5 hover:bg-background/60">
@@ -196,7 +196,7 @@ export function PermissionsManagementClient() {
                     onClick={() => setFieldLevel(field, level)}
                     className={`rounded-lg border px-2.5 py-1 text-xs transition ${
                       (fieldAccess[field] ?? "EDIT") === level
-                        ? level === "HIDDEN" ? "border-rose-500 bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400" : "border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300"
+                        ? level === "HIDDEN" ? "border-rose-500 bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400" : "border-primary bg-primary/8 text-primary dark:bg-primary/40 dark:text-primary/30"
                         : "hover:bg-muted"
                     }`}
                   >

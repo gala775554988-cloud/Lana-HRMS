@@ -6,10 +6,10 @@ import {
   Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis 
 } from "recharts";
 
-const palette = ["#00A896", "#028090", "#22C55E", "#F59E0B", "#EF4444", "#06B6D4"];
+const palette = ["#2ED3C6", "#7C6CF8", "#22C55E", "#F59E0B", "#EF4444", "#19BFAF"];
 
 function cardClass(extra = "") {
-  return `rounded-3xl border border-slate-200/80 bg-white p-6 shadow-md shadow-slate-200/40 transition-all duration-300 hover:-translate-y-1 hover:border-indigo-500/40 hover:shadow-xl dark:border-slate-800 dark:bg-slate-900 dark:shadow-none ${extra}`;
+  return `rounded-3xl border border-slate-200/80 bg-white p-6 shadow-md shadow-slate-200/40 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl dark:border-slate-800 dark:bg-slate-900 dark:shadow-none ${extra}`;
 }
 
 type Series = { months: string[]; employeeGrowth: number[]; requests: number[]; payroll: number[] };
@@ -75,8 +75,8 @@ export function DashboardCharts({ metrics, series }: { metrics: Record<string, u
             <AreaChart data={growth} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="lanaEmployees" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#00A896" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="#00A896" stopOpacity={0.0} />
+                  <stop offset="5%" stopColor="#2ED3C6" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="#2ED3C6" stopOpacity={0.0} />
                 </linearGradient>
               </defs>
               <CartesianGrid stroke={gridColor} strokeDasharray="3 3" vertical={false} />
@@ -93,7 +93,7 @@ export function DashboardCharts({ metrics, series }: { metrics: Record<string, u
                   fontWeight: "bold"
                 }}
               />
-              <Area type="monotone" dataKey="الموظفون" stroke="#00A896" strokeWidth={3} fill="url(#lanaEmployees)" />
+              <Area type="monotone" dataKey="الموظفون" stroke="#2ED3C6" strokeWidth={3} fill="url(#lanaEmployees)" />
               <Line type="monotone" dataKey="الطلبات" stroke="#38bdf8" strokeWidth={2.5} dot={false} />
             </AreaChart>
           </ResponsiveContainer>

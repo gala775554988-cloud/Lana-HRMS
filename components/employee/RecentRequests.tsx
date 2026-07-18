@@ -48,7 +48,7 @@ export function RecentRequests({ requests = [] }: Props) {
                     }>
                       {req.status || "غير معروف"}
                     </Badge>
-                    <Link href="/employee/requests/tracker" className="text-xs text-indigo-600 hover:underline">عرض</Link>
+                    <Link href="/employee/requests/tracker" className="text-xs text-primary hover:underline">عرض</Link>
                   </div>
                 </div>
               );
@@ -56,7 +56,7 @@ export function RecentRequests({ requests = [] }: Props) {
           </div>
         )}
         <div className="mt-3 pt-3 border-t">
-          <Link href="/employee/requests/tracker" className="text-xs text-indigo-600 hover:underline">
+          <Link href="/employee/requests/tracker" className="text-xs text-primary hover:underline">
             تتبع كل الطلبات →
           </Link>
         </div>

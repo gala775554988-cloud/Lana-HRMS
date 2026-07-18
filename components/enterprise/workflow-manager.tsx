@@ -263,7 +263,7 @@ export function WorkflowManager({
                         <button
                           type="button"
                           onClick={() => setEditing(step.id, !editing)}
-                          className="rounded-lg p-1.5 text-slate-400 transition hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/40"
+                          className="rounded-lg p-1.5 text-slate-400 transition hover:bg-primary/8 hover:text-primary dark:hover:bg-primary/40"
                           title="تعديل الجهة أو المسؤول لهذا المستوى"
                           aria-label="Edit"
                         >

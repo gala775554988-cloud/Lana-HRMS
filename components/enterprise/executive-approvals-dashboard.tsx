@@ -76,7 +76,7 @@ export function ExecutiveApprovalsDashboard() {
       {/* Page Title & Status */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex items-center gap-3">
-          <div className="h-12 w-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shadow-xs shrink-0">
+          <div className="h-12 w-12 rounded-2xl bg-primary/8 dark:bg-primary/60 text-primary dark:text-primary/50 flex items-center justify-center shadow-xs shrink-0">
             <ShieldCheck className="h-6 w-6" />
           </div>
           <div>
@@ -122,7 +122,7 @@ export function ExecutiveApprovalsDashboard() {
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
               <span>إجمالي الطلبات المعلقة</span>
-              <Clock3 className="h-4 w-4 text-indigo-500" />
+              <Clock3 className="h-4 w-4 text-primary" />
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -180,7 +180,7 @@ export function ExecutiveApprovalsDashboard() {
         <CardContent className="p-0">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground space-y-3">
-              <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <p className="text-xs font-bold">جاري سحب الطلبات المعلقة مباشرة من قاعدة بيانات Neon...</p>
             </div>
           ) : requests.length === 0 ? (
@@ -202,7 +202,7 @@ export function ExecutiveApprovalsDashboard() {
                   >
                     <div className="space-y-1 min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <Badge className="bg-indigo-600 text-white text-[10px] font-mono px-2 py-0">
+                        <Badge className="bg-primary text-white text-[10px] font-mono px-2 py-0">
                           {req.type}
                         </Badge>
                         <span className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate">

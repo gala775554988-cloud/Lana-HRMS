@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,78 +6,80 @@
 
 @layer base {
   :root {
-    /* Brand teal (from the approved visual direction: #00A896) replaces the
-       previous indigo across both themes; light mode keeps its existing
-       light surfaces since no light-mode design was provided. */
-    --primary: 174 100% 33%;
+    /* Brand refresh: mint (#2ED3C6 / #19BFAF) replaces the previous teal as
+       the primary accent, with violet (#7C6CF8) as the secondary accent for
+       AI/highlight moments. Neutrals carry a faint mint hue bias instead of
+       flat grey so the palette reads as one considered system. */
+    --primary: 174 70% 42%;
     --primary-foreground: 0 0% 100%;
-    --background: 220 43% 97%;
+    --background: 168 32% 97%;
     --foreground: 221 39% 11%;
     --card: 0 0% 100%;
     --card-foreground: 221 39% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 221 39% 11%;
-    --secondary: 187 97% 29%;
+    --secondary: 247 85% 66%;
     --secondary-foreground: 0 0% 100%;
-    --muted: 220 14% 96%;
+    --muted: 168 15% 95%;
     --muted-foreground: 220 9% 46%;
-    --accent: 174 100% 33%;
+    --accent: 174 70% 42%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 174 100% 33%;
+    --border: 168 14% 90%;
+    --input: 168 14% 90%;
+    --ring: 174 70% 42%;
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 221 39% 11%;
-    --info: 174 100% 33%;
+    --info: 174 70% 42%;
     --info-foreground: 0 0% 100%;
-    --radius: 0.875rem;
+    --radius: 1rem;
     --sidebar-bg: 0 0% 100%;
     --sidebar-foreground: 221 39% 11%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-accent: 174 100% 33%;
+    --sidebar-border: 168 14% 90%;
+    --sidebar-accent: 174 70% 42%;
     --sidebar-accent-foreground: 0 0% 100%;
     --shadow-xs: 0 1px 2px 0 rgb(17 24 39 / 0.05);
-    --shadow-card: 0 10px 30px -24px rgb(0 168 150 / 0.42), 0 1px 2px 0 rgb(17 24 39 / 0.05);
-    --shadow-card-hover: 0 22px 50px -28px rgb(0 168 150 / 0.36), 0 10px 18px -16px rgb(17 24 39 / 0.18);
+    --shadow-card: 0 10px 30px -24px rgb(46 211 198 / 0.42), 0 1px 2px 0 rgb(17 24 39 / 0.05);
+    --shadow-card-hover: 0 22px 50px -28px rgb(46 211 198 / 0.36), 0 10px 18px -16px rgb(17 24 39 / 0.18);
     --shadow-drawer: 0 24px 70px -28px rgb(17 24 39 / 0.35);
   }
   .dark {
-    /* Deep navy + teal from the approved dark-mode mockup
-       (#0B132B background, #1C2541 cards, #00A896/#028090 accent). */
-    --primary: 174 100% 33%;
-    --primary-foreground: 0 0% 100%;
+    /* Deep navy stays as-is; mint brightens slightly and violet lightens for
+       AA contrast against the dark surfaces (#0B132B background, #1C2541
+       cards, #2ED3C6 / #7C6CF8 accents). */
+    --primary: 174 70% 50%;
+    --primary-foreground: 220 55% 9%;
     --background: 225 59% 11%;
     --foreground: 220 43% 97%;
     --card: 225 40% 18%;
     --card-foreground: 220 43% 97%;
     --popover: 225 40% 18%;
     --popover-foreground: 220 43% 97%;
-    --secondary: 187 97% 29%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 247 80% 72%;
+    --secondary-foreground: 225 55% 10%;
     --muted: 225 45% 15%;
     --muted-foreground: 220 13% 72%;
-    --accent: 187 97% 29%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 174 70% 50%;
+    --accent-foreground: 220 55% 9%;
     --destructive: 0 72% 58%;
     --destructive-foreground: 0 0% 100%;
     --border: 225 30% 22%;
     --input: 225 30% 22%;
-    --ring: 174 100% 33%;
+    --ring: 174 70% 50%;
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 55%;
     --warning-foreground: 221 39% 11%;
-    --info: 174 100% 33%;
-    --info-foreground: 0 0% 100%;
+    --info: 174 70% 50%;
+    --info-foreground: 220 55% 9%;
     --sidebar-bg: 225 40% 18%;
     --sidebar-foreground: 220 43% 97%;
     --sidebar-border: 225 30% 22%;
-    --sidebar-accent: 174 100% 33%;
-    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-accent: 174 70% 50%;
+    --sidebar-accent-foreground: 220 55% 9%;
   }
   * { @apply border-border; }
   html { scroll-behavior: smooth; }
@@ -112,7 +114,7 @@
     @apply glass-surface relative overflow-hidden rounded-2xl border border-slate-200/90 p-0 dark:border-slate-800;
     transition: border-color 300ms ease-in-out, box-shadow 300ms ease-in-out, transform 300ms ease-in-out, background 300ms ease-in-out;
   }
-  .employee-card:hover { box-shadow: 0 22px 50px -28px rgb(0 168 150 / 0.36), 0 10px 18px -16px rgb(17 24 39 / 0.18); transform: translateY(-3px); border-color: hsl(var(--primary) / 0.45); }
+  .employee-card:hover { box-shadow: 0 22px 50px -28px rgb(46 211 198 / 0.36), 0 10px 18px -16px rgb(17 24 39 / 0.18); transform: translateY(-3px); border-color: hsl(var(--primary) / 0.45); }
   .stat-card { @apply glass-surface rounded-2xl border border-slate-200/90 p-5 dark:border-slate-800; }
   .drawer-overlay { @apply fixed inset-0 bg-black/50 backdrop-blur-sm; z-index: 40; }
   .sidebar-link { @apply flex items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-sm font-semibold text-muted-foreground transition-all duration-300 ease-in-out; }

@@ -214,7 +214,7 @@ export function EmployeeProfileDashboard({
     <div className="space-y-6" dir={isAr ? "rtl" : "ltr"}>
       {backHref && (
         <div className="flex items-center">
-          <Button asChild variant="outline" size="sm" className="gap-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50 shadow-sm dark:border-indigo-800 dark:bg-slate-900 dark:text-indigo-300 dark:hover:bg-indigo-950/50 rounded-xl px-4 py-2 font-semibold">
+          <Button asChild variant="outline" size="sm" className="gap-2 border-primary/20 text-primary hover:bg-primary/8 shadow-sm dark:border-primary dark:bg-slate-900 dark:text-primary/30 dark:hover:bg-primary/50 rounded-xl px-4 py-2 font-semibold">
             <Link href={backHref}>
               <span className="text-base leading-none">←</span>
               {isAr ? "العودة إلى صفحة المستشفى والموظفين" : "Back to Hospital Employees"}
@@ -224,7 +224,7 @@ export function EmployeeProfileDashboard({
       )}
       {/* Header - Glassmorphism, Rounded XL */}
       <Card className="overflow-hidden border-0 shadow-2xl bg-white/80 backdrop-blur-xl dark:bg-slate-900/80">
-        <div className="h-32 bg-gradient-to-r from-indigo-600 via-violet-600 to-blue-600 relative">
+        <div className="h-32 bg-gradient-to-r from-primary via-violet-600 to-blue-600 relative">
           <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.1)_1px,transparent_1px)] bg-[size:20px_20px] opacity-30" />
         </div>
         <CardContent className="p-0">
@@ -234,7 +234,7 @@ export function EmployeeProfileDashboard({
                 {employee.profilePhotoUrl ? (
                   <AvatarImage src={employee.profilePhotoUrl} alt={fullName} className="object-cover" />
                 ) : (
-                  <AvatarFallback className="text-3xl font-black bg-gradient-to-br from-indigo-500 to-violet-500 text-white">{initials}</AvatarFallback>
+                  <AvatarFallback className="text-3xl font-black bg-gradient-to-br from-primary to-violet-500 text-white">{initials}</AvatarFallback>
                 )}
               </Avatar>
               <div className="flex-1 min-w-0 pt-4 lg:pt-16">
@@ -285,18 +285,18 @@ export function EmployeeProfileDashboard({
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border rounded-2xl p-2 shadow-sm">
           <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 xl:grid-cols-12 gap-1 h-auto bg-transparent">
-            <TabsTrigger value="personal" className="rounded-xl data-[state=active]:bg-indigo-600 data-[state=active]:text-white"><User className="h-4 w-4 ml-1" />الشخصية</TabsTrigger>
-            <TabsTrigger value="job" className="rounded-xl data-[state=active]:bg-indigo-600 data-[state=active]:text-white"><Briefcase className="h-4 w-4 ml-1" />الوظيفة</TabsTrigger>
-            <TabsTrigger value="salary" className="rounded-xl data-[state=active]:bg-indigo-600 data-[state=active]:text-white"><Wallet className="h-4 w-4 ml-1" />الرواتب</TabsTrigger>
-            <TabsTrigger value="attendance" className="rounded-xl data-[state=active]:bg-indigo-600 data-[state=active]:text-white"><Clock className="h-4 w-4 ml-1" />الحضور</TabsTrigger>
-            <TabsTrigger value="leaves" className="rounded-xl data-[state=active]:bg-indigo-600 data-[state=active]:text-white"><Calendar className="h-4 w-4 ml-1" />الإجازات</TabsTrigger>
-            <TabsTrigger value="documents" className="rounded-xl data-[state=active]:bg-indigo-600 data-[state=active]:text-white"><FileText className="h-4 w-4 ml-1" />المستندات</TabsTrigger>
-            <TabsTrigger value="contracts" className="rounded-xl data-[state=active]:bg-indigo-600 data-[state=active]:text-white"><FileCheck className="h-4 w-4 ml-1" />العقود</TabsTrigger>
-            <TabsTrigger value="performance" className="rounded-xl data-[state=active]:bg-indigo-600 data-[state=active]:text-white"><BarChart3 className="h-4 w-4 ml-1" />الأداء</TabsTrigger>
-            <TabsTrigger value="assets" className="rounded-xl data-[state=active]:bg-indigo-600 data-[state=active]:text-white"><Laptop className="h-4 w-4 ml-1" />الأصول</TabsTrigger>
-            <TabsTrigger value="permissions" className="rounded-xl data-[state=active]:bg-indigo-600 data-[state=active]:text-white"><Shield className="h-4 w-4 ml-1" />الصلاحيات</TabsTrigger>
-            <TabsTrigger value="activity" className="rounded-xl data-[state=active]:bg-indigo-600 data-[state=active]:text-white"><Activity className="h-4 w-4 ml-1" />النشاط</TabsTrigger>
-            <TabsTrigger value="ai" className="rounded-xl data-[state=active]:bg-indigo-600 data-[state=active]:text-white"><Brain className="h-4 w-4 ml-1" />AI</TabsTrigger>
+            <TabsTrigger value="personal" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><User className="h-4 w-4 ml-1" />الشخصية</TabsTrigger>
+            <TabsTrigger value="job" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Briefcase className="h-4 w-4 ml-1" />الوظيفة</TabsTrigger>
+            <TabsTrigger value="salary" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Wallet className="h-4 w-4 ml-1" />الرواتب</TabsTrigger>
+            <TabsTrigger value="attendance" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Clock className="h-4 w-4 ml-1" />الحضور</TabsTrigger>
+            <TabsTrigger value="leaves" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Calendar className="h-4 w-4 ml-1" />الإجازات</TabsTrigger>
+            <TabsTrigger value="documents" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><FileText className="h-4 w-4 ml-1" />المستندات</TabsTrigger>
+            <TabsTrigger value="contracts" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><FileCheck className="h-4 w-4 ml-1" />العقود</TabsTrigger>
+            <TabsTrigger value="performance" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><BarChart3 className="h-4 w-4 ml-1" />الأداء</TabsTrigger>
+            <TabsTrigger value="assets" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Laptop className="h-4 w-4 ml-1" />الأصول</TabsTrigger>
+            <TabsTrigger value="permissions" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Shield className="h-4 w-4 ml-1" />الصلاحيات</TabsTrigger>
+            <TabsTrigger value="activity" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Activity className="h-4 w-4 ml-1" />النشاط</TabsTrigger>
+            <TabsTrigger value="ai" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Brain className="h-4 w-4 ml-1" />AI</TabsTrigger>
           </TabsList>
         </div>
 
@@ -396,7 +396,7 @@ export function EmployeeProfileDashboard({
             </CardHeader>
             <CardContent>
               <div
-                className="border-2 border-dashed rounded-2xl p-12 text-center hover:border-indigo-300 transition-colors"
+                className="border-2 border-dashed rounded-2xl p-12 text-center hover:border-primary/30 transition-colors"
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={(event) => { event.preventDefault(); uploadDocuments(event.dataTransfer.files); }}
               >
@@ -408,7 +408,7 @@ export function EmployeeProfileDashboard({
               <div className="mt-6 space-y-2">
                 {filteredDocs.map((doc: any) => (
                   <div key={doc.id} className="flex items-center justify-between border rounded-xl p-3 hover:bg-muted/30">
-                    <div className="flex items-center gap-3"><File className="h-8 w-8 text-indigo-500" /><div><p className="font-medium text-sm">{doc.name}</p><p className="text-xs text-muted-foreground">{doc.fileName} - {(doc.sizeBytes ? (Number(doc.sizeBytes)/1024).toFixed(1)+'KB' : '')} - {doc.type} - {doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString() : ''}</p></div></div>
+                    <div className="flex items-center gap-3"><File className="h-8 w-8 text-primary" /><div><p className="font-medium text-sm">{doc.name}</p><p className="text-xs text-muted-foreground">{doc.fileName} - {(doc.sizeBytes ? (Number(doc.sizeBytes)/1024).toFixed(1)+'KB' : '')} - {doc.type} - {doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString() : ''}</p></div></div>
                     <div className="flex gap-1"><Button size="sm" variant="ghost" onClick={() => doc.fileUrl ? window.open(doc.fileUrl, "_blank") : featureDone("عرض المستند")}><Eye className="h-4 w-4" /></Button><Button size="sm" variant="ghost" onClick={() => doc.fileUrl ? window.open(doc.fileUrl, "_blank") : featureDone("تحميل المستند")}><Download className="h-4 w-4" /></Button><Button size="sm" variant="ghost" onClick={() => doc.id && deleteDocument(doc.id)}><Trash2 className="h-4 w-4" /></Button></div>
                   </div>
                 ))}
@@ -429,7 +429,7 @@ export function EmployeeProfileDashboard({
         <TabsContent value="performance" className="space-y-4 mt-6">
           <div className="grid gap-4 md:grid-cols-3">
             <Card className="rounded-2xl"><CardContent className="p-6 text-center"><Award className="h-12 w-12 mx-auto text-amber-500 mb-2" /><p className="text-3xl font-black">{evaluations[0]?.score?.toString() || "-"}</p><p className="text-xs">آخر تقييم</p></CardContent></Card>
-            <Card className="rounded-2xl"><CardContent className="p-6"><p className="text-sm font-bold">KPI</p><div className="mt-2 h-2 bg-slate-100 rounded-full"><div className="h-2 bg-indigo-600 rounded-full" style={{width:"78%"}} /></div><p className="text-xs mt-1">78% - جيد جداً</p></CardContent></Card>
+            <Card className="rounded-2xl"><CardContent className="p-6"><p className="text-sm font-bold">KPI</p><div className="mt-2 h-2 bg-slate-100 rounded-full"><div className="h-2 bg-primary rounded-full" style={{width:"78%"}} /></div><p className="text-xs mt-1">78% - جيد جداً</p></CardContent></Card>
             <Card className="rounded-2xl"><CardContent className="p-6"><p className="text-sm font-bold">الأهداف</p><p className="text-2xl font-bold mt-2">{evaluations.length} أهداف</p></CardContent></Card>
           </div>
           <Card className="rounded-2xl"><CardHeader><CardTitle>التقييمات</CardTitle></CardHeader><CardContent>{evaluations.map((ev: any) => (<div key={ev.id} className="border rounded-xl p-4 mb-3"><p className="font-bold">{ev.period} - {ev.score?.toString()} - {ev.status}</p><p className="text-sm text-muted-foreground mt-1">{ev.summary || ""}</p><p className="text-xs mt-2">ملاحظات المدير: {ev.goals || "-"}</p></div>))}</CardContent></Card>
@@ -473,9 +473,9 @@ export function EmployeeProfileDashboard({
             </CardContent>
           </Card>
 
-          <Card className="rounded-3xl border-indigo-100 dark:border-indigo-950/50 shadow-sm">
+          <Card className="rounded-3xl border-primary/12 dark:border-primary/50 shadow-sm">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-indigo-700 dark:text-indigo-300">
+              <CardTitle className="flex items-center gap-2 text-primary dark:text-primary/30">
                 <Shield className="h-5 w-5" />
                 نطاقات الصلاحيات المحددة للموظف
               </CardTitle>
@@ -518,7 +518,7 @@ export function EmployeeProfileDashboard({
             <div className="space-y-4 relative before:absolute before:inset-y-0 before:left-4 before:w-0.5 before:bg-slate-200 dark:before:bg-slate-800">
               {auditLogs.map((log: any, i: number) => (
                 <div key={log.id || i} className="relative flex gap-4">
-                  <div className="h-8 w-8 rounded-full bg-indigo-600 text-white grid place-items-center text-xs font-bold relative z-10">{i+1}</div>
+                  <div className="h-8 w-8 rounded-full bg-primary text-white grid place-items-center text-xs font-bold relative z-10">{i+1}</div>
                   <div className="flex-1 border rounded-xl p-4 bg-white dark:bg-slate-900">
                     <p className="font-bold text-sm">{log.action} - {log.entity}</p>
                     <p className="text-xs text-muted-foreground mt-1">{log.createdAt ? new Date(log.createdAt).toLocaleString() : ""} - IP: {(log.metadata as any)?.ip || "192.168.1.1"} - جهاز: {(log.metadata as any)?.device || "Chrome Windows"}</p>
@@ -533,7 +533,7 @@ export function EmployeeProfileDashboard({
 
         {/* 12- AI */}
         <TabsContent value="ai" className="space-y-4 mt-6">
-          <Card className="rounded-2xl bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-indigo-950/20 dark:to-violet-950/20 border-0 shadow-xl"><CardHeader><CardTitle className="flex items-center gap-2"><Brain className="h-6 w-6 text-indigo-600" />Lana AI - تحليل الموظف</CardTitle></CardHeader><CardContent className="grid gap-4 md:grid-cols-3">
+          <Card className="rounded-2xl bg-gradient-to-br from-primary/8 to-violet-50 dark:from-primary/20 dark:to-violet-950/20 border-0 shadow-xl"><CardHeader><CardTitle className="flex items-center gap-2"><Brain className="h-6 w-6 text-primary" />Lana AI - تحليل الموظف</CardTitle></CardHeader><CardContent className="grid gap-4 md:grid-cols-3">
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border"><p className="text-xs">أداء الموظف</p><p className="text-3xl font-black mt-2 text-green-600">87%</p><p className="text-xs mt-1">ممتاز - فوق المتوسط</p></div>
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border"><p className="text-xs">تحليل الغياب</p><p className="text-3xl font-black mt-2 text-amber-600">3 أيام</p><p className="text-xs mt-1">أقل من المتوسط (5)</p></div>
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border"><p className="text-xs">نسبة الاستقرار</p><p className="text-3xl font-black mt-2 text-blue-600">92%</p><p className="text-xs mt-1">مستقر جداً</p></div>
