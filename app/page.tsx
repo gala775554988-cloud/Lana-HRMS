@@ -1,12 +1,15 @@
-import { auth } from "@/auth";
-import { redirect } from "next/navigation";
-import { resolveRoleDashboard } from "@/config/auth";
-// test
 export default async function HomePage() {
   const session = await auth();
+
   if (session?.user) {
     const roles = (session.user.roles as string[]) || [];
     redirect(resolveRoleDashboard(roles));
   }
-  redirect("/login");
+  
+  // يتم عرض هذا الجزء فقط إذا لم يكن المستخدم مسجلاً للدخول
+  return (
+    <div>
+      <h1>مرحباً بكم في لانا الطبية</h1>
+    </div>
+  );
 }
