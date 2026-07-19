@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import dynamic from "next/dynamic";
+import nextDynamic from "next/dynamic";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { listHospitals } from "@/lib/enterprise/hospitals";
@@ -15,7 +15,7 @@ import { LanaAnalytics } from "@/components/enterprise/lana-analytics";
 
 export const dynamic = "force-dynamic";
 
-const DashboardCharts = dynamic(() => import("@/components/hrms/dashboard-charts").then((mod) => mod.DashboardCharts), {
+const DashboardCharts = nextDynamic(() => import("@/components/hrms/dashboard-charts").then((mod) => mod.DashboardCharts), {
   loading: () => <div className="h-64 animate-pulse rounded-2xl bg-muted" />,
 });
 
