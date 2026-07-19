@@ -3,7 +3,6 @@
 import { Suspense, useState } from "react";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { LoginForm } from "@/app/login/login-form";
-import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { Dictionary } from "@/lib/i18n";
 
