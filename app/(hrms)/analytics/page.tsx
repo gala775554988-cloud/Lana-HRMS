@@ -145,45 +145,49 @@ export default async function AnalyticsPage() {
 }
 
 async function BranchHospitalBreakdown() {
-  const [branchStats, hospitalStats] = await Promise.all([getBranchStats(), getHospitalStats()]);
-  const maxBranchHeadcount = Math.max(1, ...branchStats.map((b) => b.headcount));
-  const maxHospitalHeadcount = Math.max(1, ...hospitalStats.map((h) => h.headcount));
+  try {
+    const [branchStats, hospitalStats] = await Promise.all([getBranchStats().catch(() => []), getHospitalStats().catch(() => [])]);
+    const maxBranchHeadcount = Math.max(1, ...branchStats.map((b) => b.headcount));
+    const maxHospitalHeadcount = Math.max(1, ...hospitalStats.map((h) => h.headcount));
 
-  return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <Card>
-        <CardHeader><CardTitle>حسب الفرع</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          {branchStats.map((branch) => (
-            <div key={branch.id} className="space-y-2 rounded-xl border p-3">
-              <BarRow label={`${branch.name} (${branch.code})`} value={branch.headcount} max={maxBranchHeadcount} />
-              <div className="flex gap-4 text-xs text-muted-foreground">
-                <span>حضور اليوم: {branch.attendanceToday}</span>
-                <span>إجازات معلقة: {branch.pendingLeave}</span>
+    return (
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader><CardTitle>حسب الفرع</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            {branchStats.map((branch) => (
+              <div key={branch.id} className="space-y-2 rounded-xl border p-3">
+                <BarRow label={`${branch.name} (${branch.code})`} value={branch.headcount} max={maxBranchHeadcount} />
+                <div className="flex gap-4 text-xs text-muted-foreground">
+                  <span>حضور اليوم: {branch.attendanceToday}</span>
+                  <span>إجازات معلقة: {branch.pendingLeave}</span>
+                </div>
               </div>
-            </div>
-          ))}
-          {!branchStats.length && <div className="rounded-xl border border-dashed p-6 text-center text-muted-foreground">لا توجد فروع نشطة.</div>}
-        </CardContent>
-      </Card>
+            ))}
+            {!branchStats.length && <div className="rounded-xl border border-dashed p-6 text-center text-muted-foreground">لا توجد فروع نشطة.</div>}
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader><CardTitle>حسب المستشفى</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          {hospitalStats.map((hospital) => (
-            <div key={hospital.id} className="space-y-2 rounded-xl border p-3">
-              <BarRow label={`${hospital.name} (${hospital.code})`} value={hospital.headcount} max={maxHospitalHeadcount} />
-              <div className="flex gap-4 text-xs text-muted-foreground">
-                <span>حضور اليوم: {hospital.attendanceToday}</span>
-                <span>إجازات معلقة: {hospital.pendingLeave}</span>
+        <Card>
+          <CardHeader><CardTitle>حسب المستشفى</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            {hospitalStats.map((hospital) => (
+              <div key={hospital.id} className="space-y-2 rounded-xl border p-3">
+                <BarRow label={`${hospital.name} (${hospital.code})`} value={hospital.headcount} max={maxHospitalHeadcount} />
+                <div className="flex gap-4 text-xs text-muted-foreground">
+                  <span>حضور اليوم: {hospital.attendanceToday}</span>
+                  <span>إجازات معلقة: {hospital.pendingLeave}</span>
+                </div>
               </div>
-            </div>
-          ))}
-          {!hospitalStats.length && <div className="rounded-xl border border-dashed p-6 text-center text-muted-foreground">لا توجد مستشفيات مرتبطة بموظفين بعد.</div>}
-        </CardContent>
-      </Card>
-    </div>
-  );
+            ))}
+            {!hospitalStats.length && <div className="rounded-xl border border-dashed p-6 text-center text-muted-foreground">لا توجد مستشفيات مرتبطة بموظفين بعد.</div>}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  } catch (err: any) {
+    return <DiagnosticConfessionBox err={err} location="BranchHospitalBreakdown (/analytics)" />;
+  }
 }
 
 export async function CompanyOverview({ locale, dictionary, showCharts = true }: { locale: Locale; dictionary: Dictionary; showCharts?: boolean }) {
