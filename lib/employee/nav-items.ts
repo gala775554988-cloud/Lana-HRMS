@@ -56,7 +56,6 @@ export const EMPLOYEE_NAV_GROUPS: EmployeeNavGroup[] = [
       { href: "/employee/salary", label: "الرواتب", icon: DollarSign },
       { href: "/employee/assets", label: "العهد", icon: Package },
       { href: "/employee/documents", label: "المستندات", icon: FolderOpen },
-      { href: "/employee/profile", label: "ملفي الشخصي (إعدادات الحساب)", icon: User },
     ],
   },
   {
