@@ -123,7 +123,15 @@ async function getPortalDashboardUncached(employeeId: string, userId?: string) {
   const notifications = await dbQuery<any[]>('dashboard.notifications', () => prisma.notification.findMany({ where: { OR: [{ userId }, { userId: null }], readAt: null }, select: { title: true, type: true, createdAt: true }, take: 10, orderBy: { createdAt: 'desc' } }), []);
   const portalTaskCount = await dbQuery<number>('dashboard.tasks.count', () => (prisma as any).employeePortalTask?.count?.({ where: { employeeId, status: { not: 'COMPLETED' } } }) ?? Promise.resolve(0), 0);
 
-  const leaveUsed = leaves.filter((l: any) => l.status === 'APPROVED').reduce((s: number,l: any)=>s+asNumber(l.days),0);
+  const empRawRecord = await dbQuery<any | null>('dashboard.employee.raw', () => prisma.employee.findUnique({ where: { id: employeeId }, select: { odooRawData: true } }), null);
+  const raw = empRawRecord?.odooRawData as any || {};
+  const csv = raw._csvLeaveData || {};
+
+  const leaveEntitlement = Number(csv.daysAccrued ?? raw.leaveBalance ?? 30);
+  const leaveUsed = typeof csv.daysUsed === "number" || typeof raw.leaveUsed === "number" ? Number(csv.daysUsed ?? raw.leaveUsed) : leaves.filter((l: any) => l.status === 'APPROVED').reduce((s: number,l: any)=>s+asNumber(l.days),0);
+  const leaveRemaining = typeof csv.daysRemaining === "number" || typeof raw.leaveRemaining === "number" ? Number(csv.daysRemaining ?? raw.leaveRemaining) : Math.max(leaveEntitlement - leaveUsed, 0);
+  const leaveMonthsAccrued = Number(csv.monthsAccrued ?? raw.leaveMonthsAccrued ?? 0);
+
   const monthHours = attendanceMonth.reduce((sum: number, r: any) => r.checkIn && r.checkOut ? sum + Math.max(0, (r.checkOut.getTime() - r.checkIn.getTime()) / 36e5) : sum, 0);
   const presentDays = attendanceMonth.filter((r: any) => ['PRESENT','LATE','REMOTE'].includes(r.status)).length;
   const latestAttendance = attendanceMonth.at(-1);
@@ -134,7 +142,7 @@ async function getPortalDashboardUncached(employeeId: string, userId?: string) {
     notifications[0] && { type: 'إشعار', title: notifications[0].title, date: notifications[0].createdAt, status: notifications[0].type },
     latestAttendance && { type: 'حضور', title: `آخر حضور: ${latestAttendance.status}`, date: latestAttendance.workDate, status: latestAttendance.checkOut ? 'مكتمل' : 'مفتوح' },
   ].filter(Boolean) as Array<{type:string;title:string;date:Date;status:string}>;
-  return { attendanceToday, attendanceMonth, leaves, permissionRequests, payroll, documents, assets, notifications, leaveUsed, leaveRemaining: Math.max(30 - leaveUsed, 0), monthHours, presentDays, timeline, taskCount: portalTaskCount };
+  return { attendanceToday, attendanceMonth, leaves, permissionRequests, payroll, documents, assets, notifications, leaveUsed, leaveRemaining, leaveEntitlement, leaveMonthsAccrued, monthHours, presentDays, timeline, taskCount: portalTaskCount };
 }
 
 export function profileCompletion(employee: any) {

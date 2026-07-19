@@ -190,6 +190,19 @@ export default async function EmployeeProfilePage({
   // component, which would still leak the real value over the network.
   const visibleEmployee = redactHiddenFields(employee as unknown as Record<string, unknown>, viewerFieldAccess);
 
+  const raw = (employee.odooRawData as any) || {};
+  const csv = raw._csvLeaveData || {};
+  const modifiedLeaveBalance = (typeof csv.daysRemaining === "number" || typeof raw.leaveRemaining === "number") ? [
+    {
+      id: "annual",
+      name: "إجازة سنوية (حسب رصيد الموارد البشرية المعتمد)",
+      annualLimit: Number(csv.daysAccrued ?? raw.leaveBalance ?? 30),
+      remaining: Number(csv.daysRemaining ?? raw.leaveRemaining ?? 0),
+      used: Number(csv.daysUsed ?? raw.leaveUsed ?? 0),
+      monthsAccrued: Number(csv.monthsAccrued ?? raw.leaveMonthsAccrued ?? 0)
+    }
+  ] : leaveBalance;
+
   return (
     <EmployeeProfileDashboard
       employee={visibleEmployee as any}
@@ -198,7 +211,7 @@ export default async function EmployeeProfilePage({
       lastSync={lastSync}
       attendanceStats={attendanceStats as any}
       attendanceCount={attendanceCount}
-      leaveBalance={leaveBalance as any}
+      leaveBalance={modifiedLeaveBalance as any}
       leaveRequests={leaveRequests as any}
       contracts={contracts as any}
       documents={documents as any}

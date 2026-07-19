@@ -440,7 +440,26 @@ export function createScopedHrTools(context: ToolAuthContext) {
           if (!canManageHr(context) && targetId !== context.employeeId) {
             return { error: "عذراً: ليس لديك صلاحية للاستعلام عن رصيد إجازة هذا الموظف." };
           }
-          if (!targetEmp) targetEmp = await prisma.employee.findUnique({ where: { id: targetId }, select: { firstName: true, lastName: true, employeeNumber: true, odooId: true } });
+          if (!targetEmp) targetEmp = await prisma.employee.findUnique({ where: { id: targetId }, select: { firstName: true, lastName: true, employeeNumber: true, odooId: true, odooRawData: true } });
+          const raw = targetEmp?.odooRawData as any || {};
+          const csv = raw._csvLeaveData || {};
+
+          if (typeof csv.daysRemaining === "number" || typeof raw.leaveRemaining === "number") {
+            const annualEntitlement = Number(csv.daysAccrued ?? raw.leaveBalance ?? 30);
+            const effectiveUsed = Number(csv.daysUsed ?? raw.leaveUsed ?? 0);
+            const remainingDays = Number(csv.daysRemaining ?? raw.leaveRemaining ?? 0);
+            return {
+              employeeName: targetEmp ? `${targetEmp.firstName} ${targetEmp.lastName}` : targetId,
+              employeeNumber: targetEmp?.employeeNumber || "-",
+              annualEntitlement,
+              usedDays: effectiveUsed,
+              remainingDays,
+              monthsAccrued: Number(csv.monthsAccrued ?? raw.leaveMonthsAccrued ?? 0),
+              source: "سجل الأرصدة المعتمد من الموارد البشرية (CSV Leave Master)",
+              pendingRequestsCount: await prisma.leaveRequest.count({ where: { employeeId: targetId, status: "PENDING" } })
+            };
+          }
+
           const requests = await prisma.leaveRequest.findMany({
             where: { employeeId: targetId, status: "APPROVED" }
           });
