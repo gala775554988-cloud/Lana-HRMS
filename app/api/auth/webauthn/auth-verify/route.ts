@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
       expectedOrigin: origin,
       expectedRPID: rpID,
       authenticator: {
-        credentialID: credential.credentialID,
+        credentialID: Buffer.from(credential.credentialID, "base64url"),
         credentialPublicKey: new Uint8Array(credential.publicKey),
         counter: Number(credential.counter)
       }
@@ -69,19 +69,13 @@ export async function POST(req: NextRequest) {
         where: { deviceId },
         update: {
           employeeId: employee.id,
-          isBlocked: false,
-          lastActiveAt: new Date(),
-          deviceName: body.deviceName || "Verified PWA / Hardware Device"
+          lastSeenAt: new Date()
         },
         create: {
           employeeId: employee.id,
           deviceId,
-          deviceHash: credentialID,
-          deviceName: body.deviceName || "Verified PWA / Hardware Device",
           platform: "WebAuthn Biometric PWA",
-          isBlocked: false,
-          verifiedAt: new Date(),
-          lastActiveAt: new Date()
+          lastSeenAt: new Date()
         }
       }).catch(() => null);
     }

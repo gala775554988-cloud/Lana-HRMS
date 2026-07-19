@@ -28,13 +28,13 @@ export async function POST(req: NextRequest) {
     const options = await generateRegistrationOptions({
       rpName: "Lana Medical HRMS",
       rpID,
-      userID: Uint8Array.from(Buffer.from(user.id)),
+      userID: user.id,
       userName: user.email || user.username || user.name || "Employee",
       userDisplayName: user.name || "Lana Employee",
       attestationType: "none",
       excludeCredentials: user.biometricCredentials.map((cred) => ({
-        id: cred.credentialID,
-        type: "public-key"
+        id: Buffer.from(cred.credentialID, "base64url"),
+        type: "public-key" as const
       })),
       authenticatorSelection: {
         residentKey: "preferred",
