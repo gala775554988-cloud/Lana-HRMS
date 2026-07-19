@@ -44,6 +44,7 @@ interface Props {
   auditLogs: any[];
   permissionsScopeContent?: React.ReactNode;
   deviceBinding?: DeviceBinding | null;
+  canEditLeaveBalance?: boolean;
   backHref?: string;
   dictionary: any;
   locale: string;
@@ -66,6 +67,7 @@ export function EmployeeProfileDashboard({
   auditLogs,
   permissionsScopeContent,
   deviceBinding,
+  canEditLeaveBalance,
   backHref,
   dictionary,
   locale,
@@ -83,6 +85,36 @@ export function EmployeeProfileDashboard({
   const [deviceBound, setDeviceBound] = useState(deviceBinding?.bound ?? false);
   const [showUnbindModal, setShowUnbindModal] = useState(false);
   const [unbinding, setUnbinding] = useState(false);
+  const [leaveBalanceState, setLeaveBalanceState] = useState(leaveBalance);
+  const [editingBalanceId, setEditingBalanceId] = useState<string | null>(null);
+  const [balanceDraft, setBalanceDraft] = useState("");
+  const [savingBalance, setSavingBalance] = useState(false);
+
+  const handleSaveLeaveBalance = async () => {
+    const accrued = Number(balanceDraft);
+    if (!Number.isFinite(accrued)) {
+      alert(isAr ? "قيمة الرصيد غير صالحة" : "Invalid balance value");
+      return;
+    }
+    setSavingBalance(true);
+    try {
+      const res = await fetch("/api/employees/leave-balance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeeId: employee.id, accrued }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.message || "فشل التحديث");
+      setLeaveBalanceState((prev) =>
+        prev.map((lt: any) => (lt.id === "annual" ? { ...lt, annualLimit: json.data.accrued, used: json.data.used, remaining: json.data.remaining } : lt))
+      );
+      setEditingBalanceId(null);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "فشل تحديث الرصيد");
+    } finally {
+      setSavingBalance(false);
+    }
+  };
 
   const fullName = `${employee.firstName} ${employee.lastName}`.trim();
   const initials = `${employee.firstName?.[0] || ""}${employee.lastName?.[0] || ""}`.toUpperCase();
@@ -400,36 +432,68 @@ export function EmployeeProfileDashboard({
         {/* 5- Leaves */}
         <TabsContent value="leaves" className="space-y-4 mt-6">
           <div className="grid gap-4 md:grid-cols-3">
-            {leaveBalance.map((lt: any) => (
-              <Card key={lt.id} className="rounded-3xl border border-teal-200/80 bg-gradient-to-br from-white to-teal-50/40 shadow-sm dark:border-slate-800 dark:from-slate-900 dark:to-slate-900/90">
-                <CardContent className="p-5 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-base font-extrabold text-slate-900 dark:text-slate-100">{lt.name}</p>
-                    {lt.monthsAccrued > 0 ? (
-                      <Badge className="bg-teal-600 text-white font-bold text-[10px]">عن {lt.monthsAccrued} أشهر</Badge>
-                    ) : null}
-                  </div>
-                  {lt.remaining !== undefined ? (
-                    <div className="grid grid-cols-3 gap-2 text-center pt-1 border-t border-slate-200/60 dark:border-slate-800">
-                      <div className="rounded-xl bg-emerald-50 p-2 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/60">
-                        <p className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300">المدة المتبقية</p>
-                        <p className="text-xl font-black text-emerald-800 dark:text-emerald-200 mt-0.5">{lt.remaining} <span className="text-[10px]">يوم</span></p>
-                      </div>
-                      <div className="rounded-xl bg-amber-50 p-2 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/60">
-                        <p className="text-[10px] font-bold text-amber-700 dark:text-amber-300">المدة المقطوعة</p>
-                        <p className="text-xl font-black text-amber-800 dark:text-amber-200 mt-0.5">{lt.used} <span className="text-[10px]">يوم</span></p>
-                      </div>
-                      <div className="rounded-xl bg-slate-50 p-2 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700">
-                        <p className="text-[10px] font-bold text-slate-600 dark:text-slate-400">الرصيد التراكمي</p>
-                        <p className="text-xl font-black text-slate-800 dark:text-slate-200 mt-0.5">{lt.annualLimit} <span className="text-[10px]">يوم</span></p>
+            {leaveBalanceState.map((lt: any) => {
+              const isOverdrawn = lt.remaining !== undefined && Number(lt.remaining) < 0;
+              const isEditing = editingBalanceId === lt.id;
+              return (
+                <Card key={lt.id} className="rounded-3xl border border-teal-200/80 bg-gradient-to-br from-white to-teal-50/40 shadow-sm dark:border-slate-800 dark:from-slate-900 dark:to-slate-900/90">
+                  <CardContent className="p-5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-base font-extrabold text-slate-900 dark:text-slate-100">{lt.name}</p>
+                      <div className="flex items-center gap-2">
+                        {lt.monthsAccrued > 0 ? (
+                          <Badge className="bg-teal-600 text-white font-bold text-[10px]">عن {lt.monthsAccrued} أشهر</Badge>
+                        ) : null}
+                        {canEditLeaveBalance && lt.id === "annual" && !isEditing ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-[11px]"
+                            onClick={() => { setEditingBalanceId(lt.id); setBalanceDraft(String(lt.annualLimit ?? "")); }}
+                          >
+                            <Edit className="h-3 w-3 ml-1" />تعديل
+                          </Button>
+                        ) : null}
                       </div>
                     </div>
-                  ) : (
-                    <p className="text-xs font-semibold text-muted-foreground">الحد السنوي المعتمد: {lt.annualLimit || "-"} يوم</p>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+                    {isEditing ? (
+                      <div className="flex items-center gap-2 pt-1 border-t border-slate-200/60 dark:border-slate-800">
+                        <Input
+                          type="number"
+                          value={balanceDraft}
+                          onChange={(e) => setBalanceDraft(e.target.value)}
+                          className="h-9 text-sm"
+                          placeholder="الرصيد الكلي (أيام)"
+                        />
+                        <Button size="sm" disabled={savingBalance} onClick={handleSaveLeaveBalance}>
+                          <Save className="h-3.5 w-3.5 ml-1" />حفظ
+                        </Button>
+                        <Button size="sm" variant="outline" disabled={savingBalance} onClick={() => setEditingBalanceId(null)}>إلغاء</Button>
+                      </div>
+                    ) : lt.remaining !== undefined ? (
+                      <div className="grid grid-cols-3 gap-2 text-center pt-1 border-t border-slate-200/60 dark:border-slate-800">
+                        <div className={`rounded-xl p-2 border ${isOverdrawn ? "bg-red-50 border-red-200/60 dark:bg-red-950/40 dark:border-red-800/60" : "bg-emerald-50 border-emerald-200/60 dark:bg-emerald-950/40 dark:border-emerald-800/60"}`}>
+                          <p className={`text-[10px] font-bold ${isOverdrawn ? "text-red-700 dark:text-red-300" : "text-emerald-700 dark:text-emerald-300"}`}>المدة المتبقية</p>
+                          <p className={`text-xl font-black mt-0.5 ${isOverdrawn ? "text-red-700 dark:text-red-300" : "text-emerald-800 dark:text-emerald-200"}`}>
+                            {isOverdrawn ? `-${Math.abs(Number(lt.remaining))}` : lt.remaining} <span className="text-[10px]">يوم</span>
+                          </p>
+                        </div>
+                        <div className="rounded-xl bg-amber-50 p-2 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/60">
+                          <p className="text-[10px] font-bold text-amber-700 dark:text-amber-300">المدة المقطوعة</p>
+                          <p className="text-xl font-black text-amber-800 dark:text-amber-200 mt-0.5">{lt.used} <span className="text-[10px]">يوم</span></p>
+                        </div>
+                        <div className="rounded-xl bg-slate-50 p-2 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700">
+                          <p className="text-[10px] font-bold text-slate-600 dark:text-slate-400">الرصيد التراكمي</p>
+                          <p className="text-xl font-black text-slate-800 dark:text-slate-200 mt-0.5">{lt.annualLimit} <span className="text-[10px]">يوم</span></p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs font-semibold text-muted-foreground">الحد السنوي المعتمد: {lt.annualLimit || "-"} يوم</p>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
           <Card className="rounded-2xl"><CardHeader><CardTitle>طلبات الإجازة</CardTitle></CardHeader><CardContent><div className="space-y-2">{leaveRequests.map((lr: any) => (<div key={lr.id} className="flex justify-between border rounded-xl p-3"><span>{lr.leaveType?.name} - {lr.days?.toString()} يوم</span><Badge variant="outline">{lr.status}</Badge></div>))}{leaveRequests.length===0 && <p className="text-center text-muted-foreground py-8">لا يوجد إجازات</p>}</div></CardContent></Card>
         </TabsContent>

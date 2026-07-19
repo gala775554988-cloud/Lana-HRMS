@@ -6,8 +6,10 @@ import { getModuleRecord } from "@/lib/hrms/actions";
 import { getEmployeeSalaryProfile } from "@/lib/employee/salary-profile-store";
 import { getEmployeeFieldAccess, redactHiddenFields } from "@/lib/enterprise/employee-field-access";
 import { memoryCache } from "@/lib/cache/memory-cache";
+import { getEffectiveLeaveBalance } from "@/lib/employee/leave-balance";
 import { EmployeeProfileDashboard } from "@/components/hrms/employee-profile-dashboard";
 import { PermissionsScope } from "@/components/hrms/permissions-scope";
+import { hasAnyRole } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
 
@@ -194,13 +196,14 @@ export default async function EmployeeProfilePage({
 
   const raw = (employee.odooRawData as any) || {};
   const csv = raw._csvLeaveData || {};
-  const modifiedLeaveBalance = (typeof csv.daysRemaining === "number" || typeof raw.leaveRemaining === "number") ? [
+  const effectiveBalance = await getEffectiveLeaveBalance(id).catch(() => null);
+  const modifiedLeaveBalance = effectiveBalance ? [
     {
       id: "annual",
       name: "إجازة سنوية (حسب رصيد الموارد البشرية المعتمد)",
-      annualLimit: Number(csv.daysAccrued ?? raw.leaveBalance ?? 30),
-      remaining: Number(csv.daysRemaining ?? raw.leaveRemaining ?? 0),
-      used: Number(csv.daysUsed ?? raw.leaveUsed ?? 0),
+      annualLimit: effectiveBalance.accrued,
+      remaining: effectiveBalance.remaining,
+      used: effectiveBalance.used,
       monthsAccrued: Number(csv.monthsAccrued ?? raw.leaveMonthsAccrued ?? 0)
     }
   ] : leaveBalance;
@@ -223,6 +226,7 @@ export default async function EmployeeProfilePage({
       auditLogs={auditLogs as any}
       permissionsScopeContent={<PermissionsScope employeeId={id} />}
       deviceBinding={deviceBinding}
+      canEditLeaveBalance={hasAnyRole(session, ["SUPER_ADMIN", "HR_MANAGER"])}
       backHref={backHref}
       dictionary={dictionary}
       locale={locale}

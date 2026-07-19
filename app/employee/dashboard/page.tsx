@@ -66,7 +66,12 @@ export default async function EmployeeDashboard() {
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat title="رصيد الإجازات" value={`${data.leaveRemaining} يوم`} icon={Calendar} tone="bg-emerald-50 text-emerald-700" />
+        <Stat
+          title="رصيد الإجازات"
+          value={`${data.leaveRemaining < 0 ? `-${Math.abs(data.leaveRemaining)}` : data.leaveRemaining} يوم`}
+          icon={Calendar}
+          tone={data.leaveRemaining < 0 ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}
+        />
         <Stat title="الطلبات المعلقة" value={data.leaves.filter(l => l.status === 'PENDING').length} icon={Clock} tone="bg-amber-50 text-amber-700" />
         <Stat title="الحضور هذا الشهر" value={`${data.presentDays} يوم`} icon={CheckCircle2} tone="bg-blue-50 text-blue-700" />
         <Stat title="ساعات العمل" value={`${Math.round(data.monthHours)} ساعة`} icon={Clock} tone="bg-violet-50 text-violet-700" />

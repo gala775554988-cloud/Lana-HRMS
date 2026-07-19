@@ -2,6 +2,7 @@ import { cache } from 'react';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { memoryCache } from '@/lib/cache/memory-cache';
+import { getEffectiveLeaveBalance } from '@/lib/employee/leave-balance';
 
 function isPoolTimeout(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
@@ -127,9 +128,12 @@ async function getPortalDashboardUncached(employeeId: string, userId?: string) {
   const raw = empRawRecord?.odooRawData as any || {};
   const csv = raw._csvLeaveData || {};
 
-  const leaveEntitlement = Number(csv.daysAccrued ?? raw.leaveBalance ?? 30);
-  const leaveUsed = typeof csv.daysUsed === "number" || typeof raw.leaveUsed === "number" ? Number(csv.daysUsed ?? raw.leaveUsed) : leaves.filter((l: any) => l.status === 'APPROVED').reduce((s: number,l: any)=>s+asNumber(l.days),0);
-  const leaveRemaining = typeof csv.daysRemaining === "number" || typeof raw.leaveRemaining === "number" ? Number(csv.daysRemaining ?? raw.leaveRemaining) : Math.max(leaveEntitlement - leaveUsed, 0);
+  const leaveBalance = await dbQuery('dashboard.leaveBalance', () => getEffectiveLeaveBalance(employeeId), { accrued: 30, used: 0, remaining: 30 });
+  const leaveEntitlement = leaveBalance.accrued;
+  const leaveUsed = leaveBalance.used;
+  // Intentionally not clamped to zero -- a real overdraft (approved past the
+  // employee's balance) must render as a negative number, not silently hide.
+  const leaveRemaining = leaveBalance.remaining;
   const leaveMonthsAccrued = Number(csv.monthsAccrued ?? raw.leaveMonthsAccrued ?? 0);
 
   const monthHours = attendanceMonth.reduce((sum: number, r: any) => r.checkIn && r.checkOut ? sum + Math.max(0, (r.checkOut.getTime() - r.checkIn.getTime()) / 36e5) : sum, 0);
