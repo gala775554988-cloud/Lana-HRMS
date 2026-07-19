@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Info, CheckCircle2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UserSearchSelect } from "@/components/hrms/user-search-select";
 
@@ -17,7 +17,7 @@ export type WorkflowStepItem = {
 
 type OrgUnit = { id: string; name: string };
 type OrgUnits = { departments: OrgUnit[]; branches: OrgUnit[]; hospitals: OrgUnit[] };
-type DynamicRequestType = { code: string; label: string };
+type DynamicRequestType = { id: string; code: string; label: string };
 
 const EMPTY_ORG_UNITS: OrgUnits = { departments: [], branches: [], hospitals: [] };
 
@@ -35,8 +35,8 @@ function emptyStep(defaultOrgType = "", orgId = ""): WorkflowStepItem {
     id: `step-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     approverId: "",
     orgUnitId: orgId || (defaultOrgType ? `${defaultOrgType}:all` : ""),
-    approverPosition: "معتمِد",
-    orgUnitLabel: defaultOrgType === "hospital" ? "المستشفيات" : "الإدارة أو الفروع",
+    approverPosition: "الموظف المعتمد",
+    orgUnitLabel: defaultOrgType === "hospital" ? "المستشفى" : "الإدارة / الفرع",
     roleContext: "APPROVER"
   };
 }
@@ -58,12 +58,15 @@ export function WorkflowManager({
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  // Initialize steps or orgUnit on mount/prop change without State sync errors
   useEffect(() => {
     if (!initialSteps || initialSteps.length === 0) {
       setSteps([emptyStep(defaultOrgScopeType)]);
     } else {
-      setSteps(initialSteps);
-      const firstWithOrg = initialSteps.find((s) => s.orgUnitId);
+      // Filter out any hidden system steps when rendering in UI editor
+      const visibleSteps = initialSteps.filter((s) => s.roleContext !== "RESUMPTION_STAGE");
+      setSteps(visibleSteps.length > 0 ? visibleSteps : [emptyStep(defaultOrgScopeType)]);
+      const firstWithOrg = visibleSteps.find((s) => s.orgUnitId);
       if (firstWithOrg && firstWithOrg.orgUnitId) {
         setSelectedOrgUnitId(firstWithOrg.orgUnitId);
       }
@@ -74,7 +77,7 @@ export function WorkflowManager({
     if (moduleName) setWorkflowName(moduleName);
   }, [moduleName]);
 
-  // Fetch dynamic request types and org units from Prisma database
+  // Dynamic Prisma Request Types & Org Units fetching
   useEffect(() => {
     let cancelled = false;
     fetch("/api/enterprise/request-types", { cache: "no-store" })
@@ -110,10 +113,14 @@ export function WorkflowManager({
     setSteps((current) => current.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   };
 
-  // Cascading Select handler: updating Hospital / Branch cascades to every step in the state
+  // Cascading Selects handler: when Hospital or Branch/Department changes, cascade immediately to all approver steps
   const handleOrgUnitChange = (val: string) => {
     setSelectedOrgUnitId(val);
     setSteps((current) => current.map((s) => ({ ...s, orgUnitId: val })));
+  };
+
+  const handleRequestTypeChange = (val: string) => {
+    setWorkflowName(val);
   };
 
   const handleSave = () => {
@@ -121,7 +128,7 @@ export function WorkflowManager({
     startTransition(async () => {
       try {
         if (onSave) await onSave(steps, sendToDirectManagerFirst, workflowName);
-        setMessage("✓ تم حفظ إعدادات سير الطلبات والمعتمدين بنجاح 100%");
+        setMessage("✓ تم حفظ إعدادات المسار والمعتمدين وتفعيل الترابط المنطقي للطلبات بنجاح 100%");
       } catch (err: any) {
         setMessage(`⚠️ ${err.message || "حدث خطأ أثناء حفظ الإعدادات"}`);
       }
@@ -129,11 +136,16 @@ export function WorkflowManager({
   };
 
   const handleCancel = () => {
-    if (initialSteps && initialSteps.length > 0) setSteps(initialSteps);
+    if (initialSteps && initialSteps.length > 0) {
+      const visibleSteps = initialSteps.filter((s) => s.roleContext !== "RESUMPTION_STAGE");
+      setSteps(visibleSteps.length > 0 ? visibleSteps : [emptyStep(defaultOrgScopeType)]);
+    }
     setSendToDirectManagerFirst(initialSendToDirectManagerFirst);
     setWorkflowName(moduleName);
     setMessage("ℹ️ تم إلغاء التغييرات واستعادة الإعدادات الأصلية");
   };
+
+  const isLeaveSelected = workflowName.includes("إجازة") || workflowName.includes("LEAVE");
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6 text-right font-sans p-2" dir="rtl">
@@ -149,15 +161,15 @@ export function WorkflowManager({
         </div>
       ) : null}
 
-      {/* Card 1: الاسم - بالعربية (قائمة منسدلة تجلب أنواع الطلبات ديناميكياً) + المستشفى / الإدارة والفروع */}
+      {/* Card 1: أنواع الطلبات (Select Dynamic from Prisma) + اختيار المستشفى/الإدارة والفروع (Cascading Selects) */}
       <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-5">
         <div className="grid gap-6 sm:grid-cols-2">
-          {/* الاسم - بالعربية (Select Dynamic from Prisma) */}
+          {/* 1. قائمة أنواع الطلبات (Select Component تجلب أنواع الطلبات ديناميكياً بدون كل الأنواع) */}
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">الاسم - بالعربية (`أنواع الطلبات`)</label>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">أنواع الطلبات (`الاسم - بالعربية`)</label>
             <select
               value={workflowName}
-              onChange={(e) => setWorkflowName(e.target.value)}
+              onChange={(e) => handleRequestTypeChange(e.target.value)}
               className="w-full h-11 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-3.5 text-sm font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-2xs transition"
             >
               <option value="">-- اختر نوع الطلب من قاعدة البيانات --</option>
@@ -166,14 +178,14 @@ export function WorkflowManager({
                   {rt.label}
                 </option>
               ))}
-              {/* Ensure current workflowName is selectable even if custom/not directly in list */}
+              {/* Ensure fallback display if workflowName loaded from DB is custom */}
               {workflowName && !requestTypes.some((rt) => rt.label === workflowName) ? (
                 <option value={workflowName}>{workflowName}</option>
               ) : null}
             </select>
           </div>
 
-          {/* المستشفى أو الإدارة والفروع (Cascading Select) */}
+          {/* 2. المستشفى أو الإدارة والفروع (Cascading Select) */}
           <div className="space-y-2">
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               {isHospital ? "المستشفى" : "الإدارة أو الفروع"}
@@ -183,7 +195,7 @@ export function WorkflowManager({
               onChange={(e) => handleOrgUnitChange(e.target.value)}
               className="w-full h-11 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-3.5 text-sm font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-2xs transition"
             >
-              <option value="">{isHospital ? "جميع المستشفيات (All Hospitals)" : "جميع الإدارات والفروع (All Branches)"}</option>
+              <option value="">{isHospital ? "اختر المستشفى من القائمة..." : "اختر الإدارة أو الفرع من القائمة..."}</option>
               {isHospital ? (
                 orgUnits.hospitals.map((h) => <option key={h.id} value={`hospital:${h.id}`}>{h.name}</option>)
               ) : (
@@ -197,7 +209,7 @@ export function WorkflowManager({
         </div>
       </div>
 
-      {/* Card 2: توجيه الطلب للمدير المباشر أولا */}
+      {/* Card 2: توجيه الطلب للمدير المباشر أولا (مطابق للصورة المرجعية تماماً) */}
       <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
           <h3 className="text-base font-black text-slate-800 dark:text-slate-100">توجيه الطلب للمدير المباشر أولا</h3>
@@ -259,7 +271,7 @@ export function WorkflowManager({
               const canRemove = steps.length > 1;
               return (
                 <div key={step.id} className="flex items-center gap-3">
-                  {/* إزالة button exactly as shown in Screenshot 2026-07-19 123046.png */}
+                  {/* إزالة button exactly matching reference picture */}
                   {canRemove ? (
                     <button
                       type="button"
@@ -271,7 +283,7 @@ export function WorkflowManager({
                     </button>
                   ) : null}
 
-                  {/* Approver Selection Field (UserSearchSelect exactly matching image) */}
+                  {/* Approver Selection Field (UserSearchSelect matching reference image exactly) */}
                   <div className="flex-1">
                     <UserSearchSelect
                       value={step.approverId}
@@ -280,7 +292,7 @@ export function WorkflowManager({
                         updateApprover(step.id, {
                           approverId: userId,
                           approverLabel: label ?? "",
-                          approverPosition: employee?.position?.title || step.approverPosition || ""
+                          approverPosition: employee?.position?.title || step.approverPosition || "الموظف المعتمد"
                         });
                       }}
                       placeholder="اختر الموظف المعتمد بالاسم أو الرقم الوظيفي..."
@@ -290,6 +302,20 @@ export function WorkflowManager({
               );
             })}
           </div>
+
+          {/* منطق المباشرة بعد الإجازة (Requirement 3): مرحلة إضافية Hidden Step عند اختيار طلبات الإجازات */}
+          {isLeaveSelected ? (
+            <div className="mt-4 p-3.5 bg-sky-50/80 dark:bg-sky-950/40 rounded-xl border border-sky-200 dark:border-sky-800 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <span className="grid h-6 w-6 place-items-center rounded-lg bg-sky-600 text-white font-bold text-xs">✓</span>
+                <div>
+                  <p className="text-xs font-black text-sky-950 dark:text-sky-200">تطبيق منطق المباشرة بعد الإجازة (Hidden Resumption Step)</p>
+                  <p className="text-[10px] font-semibold text-sky-800 dark:text-sky-300 mt-0.5">يتم تلقائياً إدراج مرحلة إضافية مدمجة باسم &apos;مباشرة بعد الإجازة&apos; ضمن تسلسل الاعتمادات لضمان تأكيد العودة للعمل.</p>
+                </div>
+              </div>
+              <span className="px-2.5 py-1 rounded-md bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200 text-[10px] font-extrabold shrink-0">مرحلة مدمجة برمجياً</span>
+            </div>
+          ) : null}
         </div>
       </div>
 

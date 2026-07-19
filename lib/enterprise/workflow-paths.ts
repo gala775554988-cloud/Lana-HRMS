@@ -93,7 +93,26 @@ export async function getWorkflowPathOrgScopeForUser(userId: string): Promise<Wo
  */
 export async function saveWorkflowPath(input: WorkflowPathInput, actorUserId: string) {
   const parsed = workflowPathInputSchema.parse(input);
-  const sortedSteps = parsed.steps.slice().sort((a, b) => a.stepOrder - b.stepOrder);
+  let sortedSteps = parsed.steps.slice().sort((a, b) => a.stepOrder - b.stepOrder);
+
+  // Requirement 3: منطق المباشرة بعد الإجازة
+  // عند اختيار 'طلبات الإجازات' (LEAVE)، يجب أن يقوم النظام تلقائياً بإنشاء 'مرحلة إضافية' (Hidden step) في سير العمل تسمى 'مباشرة بعد الإجازة' لضمان إدراجها ضمن تسلسل الاعتمادات
+  const isLeaveWorkflow = parsed.workflowName.includes("إجازة") || parsed.workflowName.includes("LEAVE");
+  if (isLeaveWorkflow) {
+    const hasResumptionStep = sortedSteps.some((s) => s.roleContext === "RESUMPTION_STAGE" || s.approverPosition?.includes("مباشرة بعد الإجازة"));
+    if (!hasResumptionStep) {
+      const lastStep = sortedSteps[sortedSteps.length - 1];
+      sortedSteps.push({
+        stepOrder: sortedSteps.length + 1,
+        approverId: lastStep?.approverId || "DIRECT_MANAGER",
+        departmentId: lastStep?.departmentId || (parsed.workflowType === "HOSPITAL_PATH" ? "hospital:all" : "branch:all"),
+        roleContext: "RESUMPTION_STAGE",
+        approverLabel: lastStep?.approverLabel || "مدير الموظف / المعتمِد",
+        approverPosition: "مباشرة بعد الإجازة (Hidden Resumption Step)",
+        orgUnitLabel: lastStep?.orgUnitLabel || "جميع النطاقات"
+      });
+    }
+  }
 
   const existing = await prisma.workflowPathTemplate.findUnique({ where: { workflowType: parsed.workflowType } });
   const previousApproverIds = existing ? approverIdsOf(existing.steps as unknown as WorkflowPathStep[]) : [];
