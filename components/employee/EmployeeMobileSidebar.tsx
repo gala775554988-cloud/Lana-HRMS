@@ -16,6 +16,8 @@ export function EmployeeMobileSidebar() {
   const { home, groups } = useEmployeeNavItems();
   const [open, setOpen] = useState(false);
 
+  const userRoles = (session?.user?.roles as string[]) || [];
+  const isExecutiveOrManager = userRoles.some((r) => ["SUPER_ADMIN", "HR_MANAGER", "DIRECT_MANAGER", "DEPARTMENT_MANAGER", "BRANCH_MANAGER", "PAYROLL_OFFICER"].includes(r));
   const topGroups = groups.filter((g) => g.key !== "myData");
   const myDataGroup = groups.find((g) => g.key === "myData");
 
@@ -101,14 +103,26 @@ export function EmployeeMobileSidebar() {
                   <span className="h-2.5 w-2.5 rounded-full bg-primary" />
                   <span className="text-sm font-black text-slate-800 dark:text-slate-200">بوابة عمليات الموظف</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  aria-label="إغلاق"
-                  className="grid h-8 w-8 place-items-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                <div className="flex items-center gap-2">
+                  {isExecutiveOrManager ? (
+                    <Link
+                      href="/dashboard"
+                      className="text-[10px] font-black text-primary hover:underline flex items-center gap-1 bg-primary/10 px-2.5 py-1 rounded-xl"
+                      title="المرجع الأساسي لصلاحيات الإدارة"
+                    >
+                      <LayoutDashboard className="h-3.5 w-3.5" />
+                      <span>الإدارة العليا</span>
+                    </Link>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => setOpen(false)}
+                    aria-label="إغلاق"
+                    className="grid h-8 w-8 place-items-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-3 gap-2.5">

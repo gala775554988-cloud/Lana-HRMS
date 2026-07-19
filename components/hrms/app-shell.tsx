@@ -116,7 +116,9 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
     const result: Record<string, typeof navItems> = {};
     const roleSet = new Set(userRoles);
     const isSuperAdmin = roleSet.has("SUPER_ADMIN");
-    const isSuperAdminOrHR = isSuperAdmin || roleSet.has("HR_MANAGER");
+    const isSuperAdminOrHR = isSuperAdmin || userRoles.some((r) => 
+      r.includes("HR") || r.includes("ADMIN") || r.includes("MANAGER") || r.includes("PAYROLL") || r.includes("SUPER") || r.includes("OFFICER") || r.includes("EXECUTIVE")
+    );
 
     navItems
       .filter((item) => {
@@ -361,7 +363,7 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
               { href: "/employee/salary", label: "الرواتب والمستحقات", icon: DollarSign, desc: "قسائم الراتب" },
               { href: "/employee/assets", label: "عهد ممتلكاتي", icon: Package, desc: "العهد والمعدات" },
               { href: "/employee/documents", label: "مستنداتي ووثائقي", icon: FileText, desc: "المستندات والعقود" },
-              { href: "/employee/profile", label: "ملفي (`تفعيل ProfileMenu`)", icon: Users, desc: "عرض القائمة الشخصية أعلى" },
+              { href: "/employee/profile", label: "ملفي الشخصي (`مخفي آخر خانة`)", icon: Users, desc: "فتح إعدادات الحساب" },
             ].map((pItem) => {
               const PIcon = pItem.icon;
               const pActive = isActive(pItem.href);
