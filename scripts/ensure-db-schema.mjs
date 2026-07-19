@@ -75,6 +75,7 @@ async function ensureDbSchema() {
     `CREATE INDEX IF NOT EXISTS "EmployeeMobileDevice_employeeId_deviceId_idx" ON "EmployeeMobileDevice"("employeeId", "deviceId");`,
     `CREATE INDEX IF NOT EXISTS "EmployeeMobileDevice_deviceId_idx" ON "EmployeeMobileDevice"("deviceId");`,
     `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "canUseMultipleDevices" BOOLEAN NOT NULL DEFAULT false;`,
+    `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "sidebarHue" INTEGER NOT NULL DEFAULT 270;`,
     `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "currentChallenge" TEXT;`,
     `CREATE TABLE IF NOT EXISTS "BiometricCredential" ("id" TEXT NOT NULL, "userId" TEXT NOT NULL, "credentialID" TEXT NOT NULL, "publicKey" BYTEA NOT NULL, "counter" BIGINT NOT NULL DEFAULT 0, "deviceType" TEXT, "backedUp" BOOLEAN NOT NULL DEFAULT false, "transports" TEXT[], "deviceName" TEXT, "lastUsedAt" TIMESTAMP(3), "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "BiometricCredential_pkey" PRIMARY KEY ("id"));`,
     `CREATE UNIQUE INDEX IF NOT EXISTS "BiometricCredential_credentialID_key" ON "BiometricCredential"("credentialID");`,

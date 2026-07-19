@@ -54,6 +54,10 @@
     --shadow-premium-lg: 0 8px 16px -6px rgb(17 24 39 / 0.1), 0 24px 48px -16px rgb(46 211 198 / 0.22);
     --shadow-premium-xl: 0 12px 24px -8px rgb(17 24 39 / 0.14), 0 32px 64px -20px rgb(46 211 198 / 0.28);
     --ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
+    --primary-gradient-start: #311158;
+    --primary-gradient-mid: #4c1d95;
+    --primary-gradient-end: #0f172a;
+    --sidebar-gradient: linear-gradient(180deg, var(--primary-gradient-start) 0%, var(--primary-gradient-mid) 50%, var(--primary-gradient-end) 100%);
   }
   .dark {
     /* Deep navy stays as-is; mint brightens slightly and violet lightens for
@@ -93,6 +97,10 @@
     --shadow-premium-md: 0 4px 10px -4px rgb(0 0 0 / 0.4), 0 12px 24px -12px rgb(46 211 198 / 0.14);
     --shadow-premium-lg: 0 8px 16px -6px rgb(0 0 0 / 0.5), 0 24px 48px -16px rgb(46 211 198 / 0.18);
     --shadow-premium-xl: 0 12px 24px -8px rgb(0 0 0 / 0.55), 0 32px 64px -20px rgb(46 211 198 / 0.22);
+    --primary-gradient-start: #1e1b4b;
+    --primary-gradient-mid: #3b0764;
+    --primary-gradient-end: #020617;
+    --sidebar-gradient: linear-gradient(180deg, var(--primary-gradient-start) 0%, var(--primary-gradient-mid) 50%, var(--primary-gradient-end) 100%);
   }
   * { @apply border-border; }
   html { scroll-behavior: smooth; }
@@ -234,5 +242,21 @@
   
   .animate-pulse-fast {
     animation: pulse-fast 0.8s ease-in-out infinite;
+  }
+
+  .glass-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 24px;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+  }
+  .dark .glass-card {
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
   }
 }

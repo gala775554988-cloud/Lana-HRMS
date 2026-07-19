@@ -28,6 +28,7 @@ model User {
   lockedAt                DateTime?
   lockedById              String?
   canUseMultipleDevices   Boolean                  @default(false)
+  sidebarHue              Int                      @default(270) // درجة وتدرج ألوان الـ Sidebar التفاعلي (Range Slider)
   currentChallenge        String?                  @db.Text // FIDO2 / WebAuthn Challenge
   loginAttempts           Int                      @default(0)
   lastFailedLoginAt       DateTime?

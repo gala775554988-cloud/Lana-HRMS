@@ -91,7 +91,7 @@ export default async function CentralDashboardPage() {
     return (
       <div className="space-y-8 pb-10">
         {/* Pro Max Executive Header Card */}
-        <div className="relative overflow-hidden rounded-3xl border border-teal-200/80 bg-gradient-to-br from-white via-teal-50/40 to-emerald-50/60 p-6 sm:p-8 shadow-xl shadow-teal-900/5 dark:border-slate-800 dark:from-slate-900 dark:via-slate-900/90 dark:to-teal-950/30">
+        <div className="relative overflow-hidden rounded-3xl border border-teal-200/80 bg-gradient-to-br from-white via-teal-50/40 to-emerald-50/60 p-6 sm:p-8 shadow-xl shadow-teal-900/5 dark:border-slate-800 dark:from-slate-900 dark:via-slate-900/90 dark:to-teal-950/30 glass-card">
           <div className="absolute -left-12 -top-12 h-48 w-48 rounded-full bg-gradient-to-br from-teal-500/15 to-emerald-500/10 blur-3xl pointer-events-none" />
           
           <div className="relative flex flex-col justify-between gap-6 md:flex-row md:items-center">
@@ -148,7 +148,7 @@ export default async function CentralDashboardPage() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`group relative overflow-hidden rounded-3xl border p-5 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl ${item.bgLight}`}
+                  className={`group relative overflow-hidden rounded-3xl border p-5 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl ${item.bgLight} glass-card`}
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
                   <div className="flex items-start justify-between gap-3 mb-3">

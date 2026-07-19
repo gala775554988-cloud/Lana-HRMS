@@ -1,18 +1,21 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useEmployeeNavItems } from '@/lib/employee/use-employee-nav-items';
 import type { EmployeeNavItem } from '@/lib/employee/nav-items';
-import { LayoutDashboard, Sparkles, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Sparkles, ShieldCheck, ChevronRight, User, FileText, Calendar, FolderOpen } from 'lucide-react';
 
 export function EmployeeDesktopSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { data: session } = useSession();
   const { home, groups } = useEmployeeNavItems();
+  const [sidebarMode, setSidebarMode] = useState<"main" | "profile">("main");
 
   const handleIntent = (href: string) => router.prefetch(href);
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
@@ -65,40 +68,104 @@ export function EmployeeDesktopSidebar() {
       {/* =========================================================================================
           1. الوضع الافتراضي (الإداري والعمليات): القسم الأساسي والعلوي في القائمة دائماً
           ========================================================================================= */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-5">
-        <div className="flex items-center justify-between px-2 pb-2 border-b border-primary/10">
-          <span className="text-xs font-black tracking-wider text-slate-700 dark:text-slate-300 uppercase flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-primary inline-block" />
-            <span>بوابة عمليات الموظف</span>
-          </span>
-          {isExecutiveOrManager ? (
-            <Link
-              href="/dashboard"
-              className="text-[10px] font-black text-primary hover:underline flex items-center gap-1 bg-primary/10 px-2.5 py-1 rounded-xl"
-              title="المرجع الأساسي لصلاحيات الإدارة"
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-5 relative">
+        <AnimatePresence mode="wait">
+          {sidebarMode === "main" ? (
+            <motion.div
+              key="main-menu-emp"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.25 }}
+              className="space-y-5"
             >
-              <LayoutDashboard className="h-3 w-3" />
-              <span>الإدارة العليا</span>
-            </Link>
-          ) : null}
-        </div>
+              <div className="flex items-center justify-between px-2 pb-2 border-b border-primary/10">
+                <span className="text-xs font-black tracking-wider text-slate-700 dark:text-slate-300 uppercase flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-primary inline-block" />
+                  <span>بوابة عمليات الموظف (`MainMenu`)</span>
+                </span>
+                {isExecutiveOrManager ? (
+                  <Link
+                    href="/dashboard"
+                    className="text-[10px] font-black text-primary hover:underline flex items-center gap-1 bg-primary/10 px-2.5 py-1 rounded-xl"
+                    title="المرجع الأساسي لصلاحيات الإدارة"
+                  >
+                    <LayoutDashboard className="h-3 w-3" />
+                    <span>الإدارة العليا</span>
+                  </Link>
+                ) : null}
+              </div>
 
-        <nav className="space-y-1">
-          <NavLink item={home} emphasized />
-        </nav>
-
-        <div className="space-y-4 pt-1">
-          {topGroups.map((group) => (
-            <div key={group.key}>
-              <p className="px-3 mb-1.5 text-[11px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                {group.label}
-              </p>
               <nav className="space-y-1">
-                {group.items.map((item) => <NavLink key={item.href} item={item} />)}
+                <NavLink item={home} emphasized />
               </nav>
-            </div>
-          ))}
-        </div>
+
+              <div className="space-y-4 pt-1">
+                {topGroups.map((group) => (
+                  <div key={group.key}>
+                    <p className="px-3 mb-1.5 text-[11px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                      {group.label}
+                    </p>
+                    <nav className="space-y-1">
+                      {group.items.map((item) => <NavLink key={item.href} item={item} />)}
+                    </nav>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="profile-menu-emp"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.25 }}
+              className="space-y-4"
+            >
+              <button
+                type="button"
+                onClick={() => setSidebarMode("main")}
+                className="w-full flex items-center gap-2.5 p-3 rounded-2xl bg-primary/10 hover:bg-primary/20 text-primary font-black text-xs transition border border-primary/30 shadow-2xs"
+              >
+                <ChevronRight className="h-4.5 w-4.5 shrink-0" />
+                <span>🔙 رجوع للقائمة الرئيسية (`MainMenu`)</span>
+              </button>
+
+              <div className="px-2 pt-2">
+                <p className="text-[11px] font-black text-primary uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-primary inline-block" />
+                  <span>قائمة ملفي الشخصي (`ProfileMenu`)</span>
+                </p>
+                <div className="space-y-1.5">
+                  {[
+                    { href: "/employee/profile", label: "📋 البيانات الوظيفية", desc: "المعلومات والسجل الوظيفي" },
+                    { href: "/employee/documents", label: "📄 الوثائق والمستندات", desc: "الهوية، الشهادات والمرفقات" },
+                    { href: "/employee/profile?tab=contracts", label: "📝 سجل العقود", desc: "العقود والرواتب السابقة" },
+                    { href: "/employee/leave", label: "🌴 سجل الإجازات", desc: "أرصدة الإجازات والطلبات" },
+                  ].map((pItem) => {
+                    const pActive = pathname.startsWith(pItem.href.split("?")[0]);
+                    return (
+                      <Link
+                        key={pItem.href}
+                        href={pItem.href}
+                        prefetch={false}
+                        className={cn(
+                          "group flex flex-col gap-0.5 rounded-2xl px-3.5 py-3 text-xs font-black transition border",
+                          pActive
+                            ? "bg-primary text-white shadow-sm border-primary"
+                            : "border-slate-200/80 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 hover:bg-primary/10 hover:text-primary hover:border-primary/30"
+                        )}
+                      >
+                        <span className="text-sm font-black">{pItem.label}</span>
+                        <span className={cn("text-[10px] font-semibold", pActive ? "text-white/80" : "text-muted-foreground")}>{pItem.desc}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* =========================================================================================
@@ -126,7 +193,27 @@ export function EmployeeDesktopSidebar() {
           <span className="text-[9px] font-semibold text-muted-foreground">(مستقل وثابت)</span>
         </p>
         <nav className="space-y-1">
-          {myDataGroup?.items.map((item) => <NavLink key={item.href} item={item} />)}
+          {myDataGroup?.items.map((item) => {
+            if (item.href === "/employee/profile") {
+              return (
+                <button
+                  key={item.href}
+                  type="button"
+                  onClick={() => setSidebarMode("profile")}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-sm font-bold transition-all duration-200 border",
+                    sidebarMode === "profile"
+                      ? "bg-primary text-white shadow font-black border-primary"
+                      : "border-transparent text-slate-600 hover:bg-primary/10 hover:text-primary dark:text-slate-400 dark:hover:bg-slate-800"
+                  )}
+                >
+                  <User className="h-4.5 w-4.5 shrink-0" />
+                  <span>ملفي (`تفعيل ProfileMenu`)</span>
+                </button>
+              );
+            }
+            return <NavLink key={item.href} item={item} />;
+          })}
         </nav>
       </div>
     </div>

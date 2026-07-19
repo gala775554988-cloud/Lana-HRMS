@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
+import { AnimatePresence, motion } from "framer-motion";
 import type { ReactNode } from "react";
 import {
   LayoutDashboard, LogOut, ChevronLeft, ChevronRight, Search,
@@ -93,6 +94,7 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
   const sidebarCollapsed = _hasHydrated ? storedSidebarCollapsed : false;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [sidebarMode, setSidebarMode] = useState<"main" | "profile">("main");
 
   const prefetchRoute = useCallback((href: string) => {
     router.prefetch(href);
@@ -179,75 +181,140 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
           </button>
         </div>
 
-        <div className="flex-1 py-5 px-3 overflow-y-auto overflow-x-hidden space-y-6">
-          {groupOrder.filter((groupKey) => groupedNav[groupKey]?.length).map((groupKey) => {
-            const items = groupedNav[groupKey]!;
-            return (
-            <div key={groupKey} className="space-y-1.5">
-              {!sidebarCollapsed && (
-                <div className="flex items-center gap-2 px-3 mb-2 pt-1">
-                  <span className="flex h-1.5 w-1.5 rounded-full bg-primary/80 shadow-2xs shadow-primary" />
-                  <p className="text-[11px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                    {dictionary.navGroups[groupKey]} {groupEmoji[groupKey]}
-                  </p>
-                </div>
-              )}
-              <div className="space-y-1.5">
-                {items.map((item) => {
-                  const Icon = item.icon;
-                  const active = isActive(item.href);
-                  const label = dictionary.nav[item.labelKey];
+        <div className="flex-1 py-5 px-3 overflow-y-auto overflow-x-hidden space-y-6 relative">
+          <AnimatePresence mode="wait">
+            {sidebarMode === "main" ? (
+              <motion.div
+                key="main-menu"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                transition={{ duration: 0.25 }}
+                className="space-y-6"
+              >
+                {groupOrder.filter((groupKey) => groupedNav[groupKey]?.length).map((groupKey) => {
+                  const items = groupedNav[groupKey]!;
                   return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      prefetch={false}
-                      onMouseEnter={() => prefetchRoute(item.href)}
-                      onFocus={() => prefetchRoute(item.href)}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className={cn(
-                        "group relative flex items-center gap-3.5 rounded-2xl px-3.5 py-3 text-sm font-bold transition-all duration-300 ease-premium border",
-                        sidebarCollapsed ? "lg:justify-center lg:px-2.5 lg:py-3" : "",
-                        active
-                          ? "bg-gradient-to-l from-primary to-secondary text-white font-black shadow-premium-md border-primary/40 dark:text-slate-950"
-                          : "border-transparent text-slate-600 hover:translate-x-0.5 rtl:hover:-translate-x-0.5 hover:bg-primary/8 hover:text-primary hover:border-primary/15 hover:shadow-premium-sm dark:text-slate-400 dark:hover:bg-primary/10 dark:hover:text-primary dark:hover:border-primary/20"
+                    <div key={groupKey} className="space-y-1.5">
+                      {!sidebarCollapsed && (
+                        <div className="flex items-center gap-2 px-3 mb-2 pt-1">
+                          <span className="flex h-1.5 w-1.5 rounded-full bg-primary/80 shadow-2xs shadow-primary" />
+                          <p className="text-[11px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                            {dictionary.navGroups[groupKey]} {groupEmoji[groupKey]}
+                          </p>
+                        </div>
                       )}
-                      title={sidebarCollapsed ? label : undefined}
-                    >
-                      <span className="relative inline-flex shrink-0">
-                        <Icon className={cn(
-                          "h-5 w-5 shrink-0 transition-transform duration-300 ease-premium group-hover:scale-110",
-                          active ? "text-white dark:text-slate-950 drop-shadow-xs" : "text-slate-400 group-hover:text-primary dark:text-slate-500 dark:group-hover:text-primary"
-                        )} />
-                        {item.href === "/approvals" && pendingApprovalsCount ? (
-                          <span
-                            key={pendingApprovalsCount}
-                            className="absolute -top-1.5 -end-2 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 px-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white dark:ring-slate-950 shadow-sm"
-                            aria-label={`${pendingApprovalsCount} طلبات موافقة معلقة`}
-                          >
-                            {pendingApprovalsCount > 99 ? "99+" : pendingApprovalsCount}
-                          </span>
-                        ) : null}
-                        {item.href === "/insurance" && expiringInsuranceCount ? (
-                          <span
-                            key={expiringInsuranceCount}
-                            className="absolute -top-1.5 -end-2 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 px-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white dark:ring-slate-950 shadow-sm"
-                            aria-label={`${expiringInsuranceCount} وثيقة تأمين على وشك الانتهاء`}
-                          >
-                            {expiringInsuranceCount > 99 ? "99+" : expiringInsuranceCount}
-                          </span>
-                        ) : null}
-                      </span>
-                      {(!sidebarCollapsed || mobileMenuOpen) && (
-                        <span className="truncate">{label}</span>
-                      )}
-                    </Link>
+                      <div className="space-y-1.5">
+                        {items.map((item) => {
+                          const Icon = item.icon;
+                          const active = isActive(item.href);
+                          const label = dictionary.nav[item.labelKey];
+                          return (
+                            <Link
+                              key={item.href}
+                              href={item.href}
+                              prefetch={false}
+                              onMouseEnter={() => prefetchRoute(item.href)}
+                              onFocus={() => prefetchRoute(item.href)}
+                              onClick={() => setMobileMenuOpen(false)}
+                              className={cn(
+                                "group relative flex items-center gap-3.5 rounded-2xl px-3.5 py-3 text-sm font-bold transition-all duration-300 ease-premium border",
+                                sidebarCollapsed ? "lg:justify-center lg:px-2.5 lg:py-3" : "",
+                                active
+                                  ? "bg-gradient-to-l from-primary to-secondary text-white font-black shadow-premium-md border-primary/40 dark:text-slate-950"
+                                  : "border-transparent text-slate-600 hover:translate-x-0.5 rtl:hover:-translate-x-0.5 hover:bg-primary/8 hover:text-primary hover:border-primary/15 hover:shadow-premium-sm dark:text-slate-400 dark:hover:bg-primary/10 dark:hover:text-primary dark:hover:border-primary/20"
+                              )}
+                              title={sidebarCollapsed ? label : undefined}
+                            >
+                              <span className="relative inline-flex shrink-0">
+                                <Icon className={cn(
+                                  "h-5 w-5 shrink-0 transition-transform duration-300 ease-premium group-hover:scale-110",
+                                  active ? "text-white dark:text-slate-950 drop-shadow-xs" : "text-slate-400 group-hover:text-primary dark:text-slate-500 dark:group-hover:text-primary"
+                                )} />
+                                {item.href === "/approvals" && pendingApprovalsCount ? (
+                                  <span
+                                    key={pendingApprovalsCount}
+                                    className="absolute -top-1.5 -end-2 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 px-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white dark:ring-slate-950 shadow-sm"
+                                    aria-label={`${pendingApprovalsCount} طلبات موافقة معلقة`}
+                                  >
+                                    {pendingApprovalsCount > 99 ? "99+" : pendingApprovalsCount}
+                                  </span>
+                                ) : null}
+                                {item.href === "/insurance" && expiringInsuranceCount ? (
+                                  <span
+                                    key={expiringInsuranceCount}
+                                    className="absolute -top-1.5 -end-2 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 px-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white dark:ring-slate-950 shadow-sm"
+                                    aria-label={`${expiringInsuranceCount} وثيقة تأمين على وشك الانتهاء`}
+                                  >
+                                    {expiringInsuranceCount > 99 ? "99+" : expiringInsuranceCount}
+                                  </span>
+                                ) : null}
+                              </span>
+                              {(!sidebarCollapsed || mobileMenuOpen) && (
+                                <span className="truncate">{label}</span>
+                              )}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
                   );
                 })}
-              </div>
-            </div>
-            );
-          })}
+              </motion.div>
+            ) : (
+              <motion.div
+                key="profile-menu"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.25 }}
+                className="space-y-4"
+              >
+                <button
+                  type="button"
+                  onClick={() => setSidebarMode("main")}
+                  className="w-full flex items-center gap-2.5 p-3 rounded-2xl bg-primary/10 hover:bg-primary/20 text-primary font-black text-xs transition border border-primary/30 shadow-2xs"
+                >
+                  <ChevronRight className="h-4.5 w-4.5 shrink-0" />
+                  <span>🔙 رجوع للقائمة الرئيسية (`MainMenu`)</span>
+                </button>
+
+                <div className="px-2 pt-2">
+                  <p className="text-[11px] font-black text-primary uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-primary inline-block" />
+                    <span>قائمة ملفي الشخصي (`ProfileMenu`)</span>
+                  </p>
+                  <div className="space-y-1.5">
+                    {[
+                      { href: "/employee/profile", label: "📋 البيانات الوظيفية", desc: "المعلومات والسجل الوظيفي" },
+                      { href: "/employee/documents", label: "📄 الوثائق والمستندات", desc: "الهوية، الشهادات والمرفقات" },
+                      { href: "/employee/profile?tab=contracts", label: "📝 سجل العقود", desc: "العقود والرواتب السابقة" },
+                      { href: "/employee/leave", label: "🌴 سجل الإجازات", desc: "أرصدة الإجازات والطلبات" },
+                    ].map((pItem) => {
+                      const pActive = pathname.startsWith(pItem.href.split("?")[0]);
+                      return (
+                        <Link
+                          key={pItem.href}
+                          href={pItem.href}
+                          prefetch={false}
+                          onClick={() => setMobileMenuOpen(false)}
+                          className={cn(
+                            "group flex flex-col gap-0.5 rounded-2xl px-3.5 py-3 text-xs font-black transition border",
+                            pActive
+                              ? "bg-primary text-white shadow-sm border-primary"
+                              : "border-slate-200/80 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 hover:bg-primary/10 hover:text-primary hover:border-primary/30"
+                          )}
+                        >
+                          <span className="text-sm font-black">{pItem.label}</span>
+                          <span className={cn("text-[10px] font-semibold", pActive ? "text-white/80" : "text-muted-foreground")}>{pItem.desc}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {(!sidebarCollapsed || mobileMenuOpen) && (
@@ -294,10 +361,35 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
               { href: "/employee/salary", label: "الرواتب والمستحقات", icon: DollarSign, desc: "قسائم الراتب" },
               { href: "/employee/assets", label: "عهد ممتلكاتي", icon: Package, desc: "العهد والمعدات" },
               { href: "/employee/documents", label: "مستنداتي ووثائقي", icon: FileText, desc: "المستندات والعقود" },
-              { href: "/employee/profile", label: "ملفي الشخصي (إعدادات الحساب)", icon: Users, desc: "بياناتي مخفية بالأسفل" },
+              { href: "/employee/profile", label: "ملفي (`تفعيل ProfileMenu`)", icon: Users, desc: "عرض القائمة الشخصية أعلى" },
             ].map((pItem) => {
               const PIcon = pItem.icon;
               const pActive = isActive(pItem.href);
+              if (pItem.href === "/employee/profile") {
+                return (
+                  <button
+                    key={pItem.href}
+                    type="button"
+                    onClick={() => { setSidebarMode("profile"); setMobileMenuOpen(false); }}
+                    className={cn(
+                      "w-full group flex items-center gap-3 rounded-xl px-3 py-2 text-xs font-black transition-all duration-200 border",
+                      sidebarCollapsed ? "lg:justify-center lg:px-2 lg:py-2.5" : "",
+                      sidebarMode === "profile"
+                        ? "bg-primary text-white shadow-sm border-primary"
+                        : "border-transparent text-slate-700 dark:text-slate-300 hover:bg-primary/10 hover:text-primary hover:border-primary/20 hover:translate-x-0.5 rtl:hover:-translate-x-0.5"
+                    )}
+                    title={sidebarCollapsed ? `${pItem.label} - ${pItem.desc}` : undefined}
+                  >
+                    <PIcon className={cn("h-4 w-4 shrink-0 transition-transform duration-200 group-hover:scale-110", sidebarMode === "profile" ? "text-white" : "text-primary/80 group-hover:text-primary")} />
+                    {(!sidebarCollapsed || mobileMenuOpen) && (
+                      <div className="flex items-center justify-between flex-1 min-w-0">
+                        <span className="truncate">{pItem.label}</span>
+                        <span className="text-[9px] font-bold text-muted-foreground/80 group-hover:text-primary/70 truncate ms-1 hidden xl:inline">{pItem.desc}</span>
+                      </div>
+                    )}
+                  </button>
+                );
+              }
               return (
                 <Link
                   key={pItem.href}
