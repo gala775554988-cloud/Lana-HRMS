@@ -26,7 +26,7 @@ export async function createEnterpriseWorkflow(employeeId: string, type: string,
         capabilities: approver.capabilities
       }))
     });
-    await notifyUsers([approvers[0].userId], "وصول طلب جديد", `New ${type} request is waiting for your approval.`, "INFO");
+    await notifyUsers([approvers[0].userId], "وصول طلب جديد", `New ${type} request is waiting for your approval.`, "INFO", `/approvals?tab=inbox&highlight=${instance.id}`);
   }
 
   const employee = await prisma.employee.findUnique({ where: { id: employeeId }, select: { userId: true } });
@@ -35,7 +35,8 @@ export async function createEnterpriseWorkflow(employeeId: string, type: string,
       userId: employee.userId,
       title: approvers.length ? "تم إرسال الطلب" : "تم اعتماد الطلب",
       body: approvers.length ? `Your ${type} request has been submitted.` : `Your ${type} request was approved automatically.`,
-      type: approvers.length ? "INFO" : "SUCCESS"
+      type: approvers.length ? "INFO" : "SUCCESS",
+      link: `/approvals?tab=outbox&highlight=${instance.id}`
     });
   }
 
@@ -160,12 +161,13 @@ export async function decideWorkflowStep({
       userId: employee.userId,
       title: decision === "APPROVE" ? "اعتماد طلب" : decision === "REJECT" ? "رفض طلب" : "إرجاع طلب",
       body: `Your ${instance.type} request status is now ${workflowStatus}.`,
-      type: decision === "APPROVE" ? "SUCCESS" : decision === "REJECT" ? "ERROR" : "WARNING"
+      type: decision === "APPROVE" ? "SUCCESS" : decision === "REJECT" ? "ERROR" : "WARNING",
+      link: `/approvals?tab=outbox&highlight=${workflowInstanceId}`
     });
   }
   const nextPendingStep = await prisma.workflowStep.findFirst({ where: { workflowInstanceId, status: "PENDING" }, select: { approverUserId: true } });
   if (nextPendingStep?.approverUserId) {
-    await createEnterpriseNotification({ userId: nextPendingStep.approverUserId, title: "وصول طلب جديد", body: `A ${instance.type} request is waiting for your approval.`, type: "INFO" });
+    await createEnterpriseNotification({ userId: nextPendingStep.approverUserId, title: "وصول طلب جديد", body: `A ${instance.type} request is waiting for your approval.`, type: "INFO", link: `/approvals?tab=inbox&highlight=${workflowInstanceId}` });
   }
 
   return updated;

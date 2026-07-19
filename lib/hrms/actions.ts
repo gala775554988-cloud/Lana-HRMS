@@ -632,7 +632,7 @@ export async function createModuleRecord(input: MutationInput) {
       await requirePasswordChange(String(result.user.id));
       revalidatePath("/" + resource.key);
       revalidatePath("/");
-      await notifyRole(["SUPER_ADMIN", "HR_MANAGER"], "إضافة موظف", `Employee ${fullName} was added.`, "SUCCESS").catch(() => null);
+      await notifyRole(["SUPER_ADMIN", "HR_MANAGER"], "إضافة موظف", `Employee ${fullName} was added.`, "SUCCESS", `/employees/${result.employee.id}`).catch(() => null);
 
       return {
         success: true,
@@ -687,7 +687,7 @@ export async function updateModuleRecord(input: MutationInput) {
     await saveEmployeeSalaryProfile(input.id, salaryProfile);
 
     await writeAuditLog({ actorUserId: session.user.id, action: "update", entity: resource.model, entityId: input.id, metadata: { before: serialize(existingRecord), after: serialize({ ...allowedData, salaryProfileUpdated: true }), blockedFields: blockedFields.length ? blockedFields : undefined } });
-    await notifyRole(["SUPER_ADMIN", "HR_MANAGER"], "تعديل موظف", `Employee record ${input.id} was updated.`, "INFO").catch(() => null);
+    await notifyRole(["SUPER_ADMIN", "HR_MANAGER"], "تعديل موظف", `Employee record ${input.id} was updated.`, "INFO", `/employees/${input.id}`).catch(() => null);
     revalidatePath("/" + resource.key);
     revalidatePath("/" + resource.key + "/" + input.id);
     return { success: true, message: resource.title + " record updated.", id: String(record.id) };

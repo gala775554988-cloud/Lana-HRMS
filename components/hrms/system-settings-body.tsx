@@ -5,6 +5,7 @@ import { getAppSetting, setAppSetting } from "@/lib/settings";
 import { LogoUploadField } from "@/components/hrms/logo-upload-field";
 import { SettingsFormClient } from "@/components/hrms/settings-form-client";
 import { SidebarColorSliderClient } from "@/components/hrms/sidebar-color-slider";
+import { ThemeModeCard } from "@/components/hrms/theme-mode-card";
 import type { ToastState } from "@/components/ui/toast-message";
 
 function scalarSetting(value: unknown, fallback = "") {
@@ -77,6 +78,7 @@ export async function SystemSettingsBody() {
 
   return (
     <div className="space-y-6">
+      <ThemeModeCard />
       <SidebarColorSliderClient />
       <SettingsFormClient action={saveSystemSettings}>
         <Card className="lg:col-span-2">

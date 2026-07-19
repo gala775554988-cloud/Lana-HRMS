@@ -82,7 +82,7 @@ export const getRecentNotifications = cache(async (employeeId: string) => {
   const employee = await prisma.employee.findUnique({ where: { id: employeeId }, select: { userId: true } });
   return prisma.notification.findMany({
     where: { OR: [{ userId: employee?.userId ?? undefined }, { userId: null }] },
-    select: { id: true, title: true, body: true, type: true, readAt: true, createdAt: true },
+    select: { id: true, title: true, body: true, type: true, link: true, readAt: true, createdAt: true },
     orderBy: { createdAt: 'desc' },
     take: 50,
   });

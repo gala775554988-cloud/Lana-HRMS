@@ -98,7 +98,8 @@ export async function createRequest(data: {
         title: `طلب جديد: ${cleanType}`,
         body: `قام الموظف بتقديم طلب جديد في انتظار اعتمادك المباشر: "${requestSummary}"`,
         type: "INFO",
-        pushToMobile: true // Trigger live mobile PWA & FCM/OneSignal push
+        pushToMobile: true, // Trigger live mobile PWA & FCM/OneSignal push
+        link: `/approvals?tab=inbox&highlight=${workflowInstance.id}`
       });
     } else {
       // Fallback: Notify HR Managers if no direct approver was resolved
@@ -109,7 +110,7 @@ export async function createRequest(data: {
       });
       const hrUserIds = hrAdmins.map((r) => r.userId).filter(Boolean);
       if (hrUserIds.length > 0) {
-        await notifyUsers(hrUserIds, `طلب جديد: ${cleanType}`, `طلب جديد ينتظر الاعتماد الإداري: "${requestSummary}"`, "INFO");
+        await notifyUsers(hrUserIds, `طلب جديد: ${cleanType}`, `طلب جديد ينتظر الاعتماد الإداري: "${requestSummary}"`, "INFO", `/approvals?tab=inbox&highlight=${workflowInstance.id}`);
       }
     }
 

@@ -65,7 +65,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         where: { id: currentStep.id },
         data: { approverUserId: body.targetUserId, status: "PENDING", comments: JSON.stringify({ transferred: true, by: session.user.id, note: body.comments ?? "" }) }
       });
-      await createEnterpriseNotification({ userId: body.targetUserId, title: "تحويل طلب", body: `A ${instance.type} request has been transferred to you.`, type: "INFO" }).catch(() => null);
+      await createEnterpriseNotification({ userId: body.targetUserId, title: "تحويل طلب", body: `A ${instance.type} request has been transferred to you.`, type: "INFO", link: `/approvals?tab=inbox&highlight=${instance.id}` }).catch(() => null);
     }
 
     if (body.decision === "DEFER") {

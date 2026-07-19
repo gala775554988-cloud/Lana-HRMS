@@ -81,7 +81,7 @@ async function createHrOnlyWorkflow(employeeId: string, entityId: string, actorU
         status: index === 0 ? "PENDING" : "WAITING"
       }))
     });
-    await Promise.all(approverUserIds.slice(0, 1).map((userId) => createEnterpriseNotification({ userId, title: "طلب أوفر تايم جديد", body: "يوجد طلب أوفر تايم بانتظار اعتمادك.", type: "INFO" })));
+    await Promise.all(approverUserIds.slice(0, 1).map((userId) => createEnterpriseNotification({ userId, title: "طلب أوفر تايم جديد", body: "يوجد طلب أوفر تايم بانتظار اعتمادك.", type: "INFO", link: `/approvals?tab=inbox&highlight=${instance.id}` })));
   } else {
     await prisma.overtimeRequest.update({ where: { id: entityId }, data: { status: "APPROVED" } }).catch(() => null);
   }
