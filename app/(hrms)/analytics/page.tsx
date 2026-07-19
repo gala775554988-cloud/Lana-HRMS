@@ -99,33 +99,49 @@ function lastNMonthRanges(n: number) {
   return ranges;
 }
 
-export default async function AnalyticsPage() {
-  const session = await auth().catch(() => null);
-  const roles = (session?.user?.roles as string[]) || [];
-  const isAdmin = roles.some((role) =>
-    ["SUPER_ADMIN", "HR_MANAGER", "PAYROLL_MANAGER", "RECRUITER", "MANAGER", "HR", "DEPARTMENT_MANAGER", "BRANCH_MANAGER", "SUPERVISOR", "PROJECT_MANAGER"].includes(role)
-  );
-  const { locale, dictionary } = await getRequestDictionary().catch(() => ({ locale: "ar" as const, dictionary: {} as any }));
-
+function DiagnosticConfessionBox({ err, location }: { err: any; location: string }) {
+  const errMsg = err?.message || String(err || "Unknown error");
+  const stack = err?.stack || "";
   return (
-    <section className="space-y-8">
-      <div className="rounded-2xl border bg-card p-6 shadow-sm">
-        <p className="text-sm font-medium text-muted-foreground">التحليلات</p>
-        <h1 className="text-3xl font-semibold tracking-tight">نظرة عامة وتحليلات الفروع والمستشفيات</h1>
-        <p className="mt-2 text-muted-foreground">مؤشرات الأداء الرئيسية، الاتجاهات الشهرية، وتوزيع الموظفين حسب الفرع والمستشفى.</p>
-      </div>
-
-      {isAdmin && dictionary?.dashboard ? (
-        <Suspense fallback={<OverviewSkeleton />}>
-          <CompanyOverview locale={locale} dictionary={dictionary} showCharts />
-        </Suspense>
-      ) : null}
-
-      <Suspense fallback={<BreakdownSkeleton />}>
-        <BranchHospitalBreakdown />
-      </Suspense>
-    </section>
+    <div className="rounded-3xl border border-rose-300 bg-rose-50/95 p-6 shadow-xl dark:border-rose-800 dark:bg-rose-950/80 text-rose-900 dark:text-rose-100" dir="rtl">
+      <h2 className="text-lg font-black">اعتراف النظام بالخطأ التقني المباشر (`{location}`)</h2>
+      <p className="font-mono text-xs p-3 bg-white dark:bg-slate-900 rounded-xl mt-2 text-rose-600">{errMsg}</p>
+      {stack ? <pre className="font-mono text-[11px] p-3 bg-slate-100 dark:bg-slate-950 rounded-xl mt-2 overflow-auto max-h-64">{stack}</pre> : null}
+    </div>
   );
+}
+
+export default async function AnalyticsPage() {
+  try {
+    const session = await auth().catch(() => null);
+    const roles = (session?.user?.roles as string[]) || [];
+    const isAdmin = roles.some((role) =>
+      ["SUPER_ADMIN", "HR_MANAGER", "PAYROLL_MANAGER", "RECRUITER", "MANAGER", "HR", "DEPARTMENT_MANAGER", "BRANCH_MANAGER", "SUPERVISOR", "PROJECT_MANAGER"].includes(role)
+    );
+    const { locale, dictionary } = await getRequestDictionary().catch(() => ({ locale: "ar" as const, dictionary: {} as any }));
+
+    return (
+      <section className="space-y-8">
+        <div className="rounded-2xl border bg-card p-6 shadow-sm">
+          <p className="text-sm font-medium text-muted-foreground">التحليلات</p>
+          <h1 className="text-3xl font-semibold tracking-tight">نظرة عامة وتحليلات الفروع والمستشفيات</h1>
+          <p className="mt-2 text-muted-foreground">مؤشرات الأداء الرئيسية، الاتجاهات الشهرية، وتوزيع الموظفين حسب الفرع والمستشفى.</p>
+        </div>
+
+        {isAdmin && dictionary?.dashboard ? (
+          <Suspense fallback={<OverviewSkeleton />}>
+            <CompanyOverview locale={locale} dictionary={dictionary} showCharts />
+          </Suspense>
+        ) : null}
+
+        <Suspense fallback={<BreakdownSkeleton />}>
+          <BranchHospitalBreakdown />
+        </Suspense>
+      </section>
+    );
+  } catch (err: any) {
+    return <DiagnosticConfessionBox err={err} location="AnalyticsPage (/analytics)" />;
+  }
 }
 
 async function BranchHospitalBreakdown() {

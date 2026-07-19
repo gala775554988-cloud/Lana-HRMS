@@ -12,6 +12,18 @@ function Stat({ title, value, icon: Icon, tone }: { title: string; value: string
   return <Card className="overflow-hidden rounded-3xl border-0 bg-white/90 shadow-sm dark:bg-slate-900/80"><CardContent className="p-5"><div className="flex items-center justify-between gap-4"><div><p className="text-sm text-muted-foreground">{title}</p><p className="mt-2 text-2xl font-black">{value}</p></div><div className={`grid h-12 w-12 place-items-center rounded-2xl ${tone}`}><Icon className="h-6 w-6" /></div></div></CardContent></Card>;
 }
 
+function DiagnosticConfessionBox({ err, location }: { err: any; location: string }) {
+  const errMsg = err?.message || String(err || "Unknown error");
+  const stack = err?.stack || "";
+  return (
+    <div className="rounded-3xl border border-rose-300 bg-rose-50/95 p-6 shadow-xl dark:border-rose-800 dark:bg-rose-950/80 text-rose-900 dark:text-rose-100" dir="rtl">
+      <h2 className="text-lg font-black">اعتراف النظام بالخطأ التقني المباشر (`{location}`)</h2>
+      <p className="font-mono text-xs p-3 bg-white dark:bg-slate-900 rounded-xl mt-2 text-rose-600">{errMsg}</p>
+      {stack ? <pre className="font-mono text-[11px] p-3 bg-slate-100 dark:bg-slate-950 rounded-xl mt-2 overflow-auto max-h-64">{stack}</pre> : null}
+    </div>
+  );
+}
+
 export default async function EmployeeDashboard() {
   try {
     const { employee, session } = await requireEmployee();
@@ -74,6 +86,6 @@ export default async function EmployeeDashboard() {
   );
   } catch (err: any) {
     console.error("[EmployeeDashboard][FATAL_ERROR] Stack trace:", err?.stack || err);
-    throw err;
+    return <DiagnosticConfessionBox err={err} location="EmployeeDashboard (/employee/dashboard)" />;
   }
 }
