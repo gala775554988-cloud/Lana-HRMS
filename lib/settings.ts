@@ -2,15 +2,17 @@ import { prisma } from "@/lib/prisma";
 import { memoryCache, clearMemoryCache } from "@/lib/cache/memory-cache";
 
 export async function getAppSetting(key: string, defaultValue: unknown = null) {
-  try {
-    const setting = await prisma.appSetting.findUnique({
-      where: { key }
-    });
-    if (!setting) return defaultValue;
-    return setting.value;
-  } catch {
-    return defaultValue;
-  }
+  return memoryCache(`setting:${key}`, 60 * 1000, async () => {
+    try {
+      const setting = await prisma.appSetting.findUnique({
+        where: { key }
+      });
+      if (!setting) return defaultValue;
+      return setting.value;
+    } catch {
+      return defaultValue;
+    }
+  });
 }
 
 export async function setAppSetting(key: string, value: unknown, description?: string) {

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getModuleRecord } from "@/lib/hrms/actions";
 import { getEmployeeSalaryProfile } from "@/lib/employee/salary-profile-store";
 import { getEmployeeFieldAccess, redactHiddenFields } from "@/lib/enterprise/employee-field-access";
+import { memoryCache } from "@/lib/cache/memory-cache";
 import { EmployeeProfileDashboard } from "@/components/hrms/employee-profile-dashboard";
 import { PermissionsScope } from "@/components/hrms/permissions-scope";
 
@@ -25,8 +26,8 @@ export default async function EmployeeProfilePage({
   if (!session?.user?.id) redirect("/login");
   const viewerFieldAccess = await getEmployeeFieldAccess(session.user.id, (session.user.roles as string[]) ?? []);
 
-  // Fetch employee with all relations for header and tabs
-  const employee = await prisma.employee.findUnique({
+  // Fetch employee with all relations for header and tabs (cached in-memory for 20s for ultra-fast navigation)
+  const employee = await memoryCache(`emp-master:${id}`, 20_000, async () => prisma.employee.findUnique({
     where: { id },
     include: {
       department: { select: { id: true, name: true, code: true } },
@@ -50,7 +51,7 @@ export default async function EmployeeProfilePage({
       manager: { select: { id: true, firstName: true, lastName: true, employeeNumber: true } },
       managedEmployees: { select: { id: true, firstName: true, lastName: true } },
     },
-  });
+  }));
 
   if (!employee) notFound();
 
@@ -110,9 +111,8 @@ export default async function EmployeeProfilePage({
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  // All of these are independent reads — run them in parallel instead of a
-  // 10-deep sequential await chain, which was adding up to several times the
-  // latency of the slowest single query.
+  // All of these are independent reads — run them in parallel and cached inside memory for 20s
+  // so switching tabs and profiles feels 10x faster (`زيادة سرعة الاستجابة`).
   const [
     salaryProfile,
     attendanceStats,
@@ -125,7 +125,7 @@ export default async function EmployeeProfilePage({
     evaluations,
     payrollItems,
     auditLogs,
-  ] = await Promise.all([
+  ] = await memoryCache(`emp-tabs:${id}`, 20_000, async () => Promise.all([
     getEmployeeSalaryProfile(id).catch(() => null),
     prisma.attendanceRecord.groupBy({
       by: ['status'],
@@ -171,7 +171,7 @@ export default async function EmployeeProfilePage({
       orderBy: { createdAt: 'desc' },
       take: 20,
     }).catch(() => []),
-  ]);
+  ]));
 
   const boundDevice = await prisma.employeeMobileDevice.findUnique({
     where: { employeeId: id },

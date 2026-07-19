@@ -34,7 +34,7 @@ export async function bulkSyncAllOdooDocuments(client: OdooClient, limit = 2000,
 
   const attachments = await client.search_read<OdooAttachment>(
     "ir.attachment",
-    [["res_model", "in", ["hr.employee", "hr.contract"]]],
+    [["res_model", "in", ["hr.employee", "hr.contract", "res.partner", "hr.employee.public", "mail.message"]]],
     ["id", "name", "mimetype", "file_size", "create_date", "res_id", "res_model"],
     { limit, offset, order: "id desc" }
   ).catch(() => []);
@@ -98,10 +98,13 @@ export async function bulkSyncAllOdooDocuments(client: OdooClient, limit = 2000,
 
     const resIdNum = typeof attachment.res_id === "number" ? attachment.res_id : (Array.isArray(attachment.res_id) ? Number(attachment.res_id[0]) : 0);
     let localEmployeeId: string | undefined = undefined;
-    if (attachment.res_model === "hr.employee") {
+    if (attachment.res_model === "hr.employee" || attachment.res_model === "hr.employee.public") {
       localEmployeeId = empByOdooId.get(resIdNum);
     } else if (attachment.res_model === "hr.contract") {
       localEmployeeId = contractToEmpId.get(resIdNum);
+    }
+    if (!localEmployeeId) {
+      localEmployeeId = empByOdooId.get(resIdNum);
     }
     if (!localEmployeeId) {
       result.skipped += 1;
