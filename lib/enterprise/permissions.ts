@@ -40,7 +40,7 @@ export type UserPermissionStore = {
 // enforcement point. A plain "manage:X" grant from before this existed still
 // implies all four (hasPermission in lib/rbac.ts), so nothing already
 // configured breaks; these are additive, finer-grained keys.
-export const GRANULAR_RESOURCES = ["employees", "contracts", "attendance", "insurance"] as const;
+export const GRANULAR_RESOURCES = ["employees", "contracts", "attendance", "insurance", "hospitals"] as const;
 
 function granularPermissions(resource: string): PermissionKey[] {
   return [`read:${resource}`, `create:${resource}`, `edit:${resource}`, `delete:${resource}`] as PermissionKey[];
@@ -48,6 +48,11 @@ function granularPermissions(resource: string): PermissionKey[] {
 
 export const PERMISSION_CATEGORIES: PermissionCategory[] = [
   { key: "employees", title: "Employees", permissions: [...granularPermissions("employees"), "manage:employees"] },
+  // Full Cascade Access: granting any hospitals permission automatically
+  // cascades matching read/manage access to branches and departments too
+  // (see CASCADE_CHILDREN / withCascadedGrants below), since those are
+  // structurally sub-elements of a hospital in this org model.
+  { key: "hospitals", title: "Hospitals", permissions: [...granularPermissions("hospitals"), "manage:hospitals"] },
   { key: "attendance", title: "Attendance", permissions: [...granularPermissions("attendance"), "manage:attendance"] },
   { key: "leaves", title: "Leaves", permissions: ["read:leave", "manage:leave"] },
   { key: "payroll", title: "Payroll", permissions: ["read:payroll", "manage:payroll", "read:loans", "manage:loans", "read:allowances", "manage:allowances", "read:deductions", "manage:deductions"] },
@@ -127,6 +132,34 @@ const STORE_KEY = "enterprise.userPermissions";
 function normalizePermissionList(values: unknown): PermissionKey[] {
   if (!Array.isArray(values)) return [];
   return Array.from(new Set(values.filter((value): value is PermissionKey => typeof value === "string" && value.includes(":")))).sort();
+}
+
+// Full Cascade Access: modules whose sub-elements should automatically
+// receive matching access whenever the parent module permission is granted
+// to a user, so an admin never has to remember to also grant every child
+// resource by hand. Extend this map as more hierarchical relationships are
+// formalized -- deliberately scoped to well-established parent/child pairs
+// rather than guessed, since over-granting is a real security cost.
+const CASCADE_CHILDREN: Record<string, string[]> = {
+  hospitals: ["branches", "departments"]
+};
+
+/** Expands a grant list so any parent-module permission also grants the
+ * matching action on its cascade children (see CASCADE_CHILDREN). A
+ * "manage" grant additionally cascades "read" on the child, mirroring how
+ * hasPermission() already treats manage as implying read for one resource. */
+function withCascadedGrants(grants: PermissionKey[]): PermissionKey[] {
+  const expanded = new Set(grants);
+  for (const key of grants) {
+    const [action, resource] = key.split(":");
+    const children = CASCADE_CHILDREN[resource];
+    if (!children) continue;
+    for (const child of children) {
+      expanded.add(`${action}:${child}` as PermissionKey);
+      if (action === "manage") expanded.add(`read:${child}` as PermissionKey);
+    }
+  }
+  return normalizePermissionList(Array.from(expanded));
 }
 
 function normalizeStore(value: unknown): UserPermissionStore {
@@ -248,7 +281,7 @@ export async function setUserPermissions({
   const store = await getPermissionStore();
   const previous = store.users[targetUserId] ?? { grants: [], denies: [], temporaryGrants: {} };
   const next = {
-    grants: normalizePermissionList(grants),
+    grants: withCascadedGrants(normalizePermissionList(grants)),
     denies: normalizePermissionList(denies),
     temporaryGrants: temporaryGrants ?? previous.temporaryGrants ?? {}
   };

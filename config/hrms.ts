@@ -29,7 +29,7 @@ const descriptionField: ModuleField = { name: "description", label: "Description
 const employeeIdField: ModuleField = { name: "employeeId", label: "Employee ID", type: "text", required: true };
 
 export const hrmsModules = [
-  { key: "hospitals", title: "المستشفيات", description: "إدارة المستشفيات والفروع", model: "hospital", permissionResource: "employees", searchFields: ["name", "code"], filterFields: ["isActive"], tableFields: ["code", "name", "isActive"], fields: [{ name: "name", label: "Name", type: "text", required: true }] },
+  { key: "hospitals", title: "المستشفيات", description: "إدارة المستشفيات والفروع", model: "hospital", permissionResource: "hospitals", searchFields: ["name", "code"], filterFields: ["isActive"], tableFields: ["code", "name", "isActive"], fields: [{ name: "name", label: "Name", type: "text", required: true }] },
   {
     key: "employees",
     title: "Employees",

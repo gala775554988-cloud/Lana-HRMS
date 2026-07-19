@@ -13,14 +13,14 @@ function canRead(session: any) {
   if (!session?.user) return false;
   const roles = (session.user.roles as string[]) ?? [];
   const permissions = (session.user.permissions as string[]) ?? [];
-  return roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER") || hasPermission(permissions, { action: "read", resource: "employees" });
+  return roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER") || hasPermission(permissions, { action: "read", resource: "hospitals" });
 }
 
 function canManage(session: any) {
   if (!session?.user) return false;
   const roles = (session.user.roles as string[]) ?? [];
   const permissions = (session.user.permissions as string[]) ?? [];
-  return roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER") || hasPermission(permissions, { action: "manage", resource: "employees" });
+  return roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER") || hasPermission(permissions, { action: "manage", resource: "hospitals" });
 }
 
 export async function GET(request: Request) {
