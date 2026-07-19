@@ -46,7 +46,7 @@ function LanaMarkdownRenderer({ content }: { content: string }) {
           return (
             <div key={idx} className="my-2 overflow-hidden rounded-xl border border-slate-700 bg-slate-950 text-slate-100 dark:border-slate-800">
               <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900/80 px-3 py-1.5 text-xs text-slate-400">
-                <span className="font-mono lowercase">{lang || "code"}</span>
+                <span className="font-mono lowercase">{lang || "كود"}</span>
                 <button
                   type="button"
                   onClick={() => copyCode(code, idx)}

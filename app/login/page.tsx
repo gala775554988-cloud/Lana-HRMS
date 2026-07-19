@@ -40,8 +40,8 @@ function MarketingPanel() {
       <div className="absolute -right-24 top-[-10%] h-[600px] w-[600px] rounded-full bg-primary/10 blur-[150px]" />
       <div className="absolute -bottom-28 left-16 h-80 w-80 rounded-full bg-slate-800/20 blur-[120px]" />
       <div className="relative z-10 mx-auto flex w-full max-w-5xl items-center justify-between gap-6">
-        <BrandLogo href="/login" size="md" subtitle="Enterprise Human Resource Platform" textClassName="text-white" subtitleClassName="text-white/65" logoClassName="border-white/25 shadow-xl shadow-black/30" />
-        <span className="rounded-full border border-slate-800/60 bg-slate-900/50 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-slate-400 backdrop-blur-sm">Modern HR Enterprise</span>
+        <BrandLogo href="/login" size="md" subtitle="منصة إدارة الموارد البشرية للمؤسسات" textClassName="text-white" subtitleClassName="text-white/65" logoClassName="border-white/25 shadow-xl shadow-black/30" />
+        <span className="rounded-full border border-slate-800/60 bg-slate-900/50 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-slate-400 backdrop-blur-sm">إدارة موارد بشرية حديثة</span>
       </div>
       <div className="relative z-10 mx-auto my-auto w-full max-w-5xl space-y-8">
         <div className="grid items-center gap-8 xl:grid-cols-[0.85fr_1.15fr]">
@@ -62,17 +62,17 @@ function MarketingPanel() {
                 <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                   <div className="flex items-center gap-1.5">
                     <Monitor className="h-4 w-4 text-primary shrink-0" />
-                    <span className="text-[11px] font-black text-[#0B192B] truncate">Lana HR Platform Web</span>
+                    <span className="text-[11px] font-black text-[#0B192B] truncate">منصة لانا للموارد البشرية</span>
                   </div>
                   <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold text-emerald-700 border border-emerald-200">
-                    Enterprise
+                    للمؤسسات
                   </span>
                 </div>
 
                 {/* Retained Data Widgets in Web Grid */}
                 <div className="grid grid-cols-3 gap-1.5 text-center">
                   <div className="rounded-xl bg-gradient-to-br from-primary to-[#19BFAF] p-2 text-white shadow-xs">
-                    <p className="text-[9px] font-medium text-white/80">Platform</p>
+                    <p className="text-[9px] font-medium text-white/80">المنصة</p>
                     <p className="text-sm font-black mt-0.5">360°</p>
                   </div>
                   <div className="rounded-xl border border-slate-200 bg-white p-2 shadow-2xs">
@@ -90,7 +90,7 @@ function MarketingPanel() {
                   <div className="flex items-center justify-between bg-slate-950/90 px-2.5 py-1.5 text-[9px] text-slate-300 border-b border-slate-800">
                     <span className="font-bold flex items-center gap-1 truncate text-amber-300">
                       <Video className="h-3 w-3 shrink-0" />
-                      Lana Medical Walkthrough Video
+                      فيديو تعريفي بنظام لانا الطبي
                     </span>
                     <span className="font-mono text-[8px] text-slate-400">02:45</span>
                   </div>
@@ -110,10 +110,10 @@ function MarketingPanel() {
                   <div className="rounded-xl border border-slate-200 bg-white p-2 shadow-xs space-y-1">
                     <div className="flex items-center gap-1 text-[9px] font-bold text-slate-700 border-b border-slate-100 pb-1">
                       <LayoutGrid className="h-3 w-3 text-primary shrink-0" />
-                      <span className="truncate">Team Collaboration</span>
+                      <span className="truncate">تعاون الفريق</span>
                     </div>
                     <div className="h-12 rounded-lg bg-primary/60 border border-primary/60 p-1.5 flex flex-col justify-between text-[8px] text-primary font-medium">
-                      <div className="flex justify-between items-center"><span className="truncate font-bold">Shift Schedule</span><span className="text-primary">Active</span></div>
+                      <div className="flex justify-between items-center"><span className="truncate font-bold">جدول الورديات</span><span className="text-primary">نشط</span></div>
                       <div className="h-1.5 w-full rounded-full bg-primary/80"><div className="h-full w-4/5 rounded-full bg-primary" /></div>
                     </div>
                   </div>
@@ -121,10 +121,10 @@ function MarketingPanel() {
                   <div className="rounded-xl border border-slate-200 bg-white p-2 shadow-xs space-y-1">
                     <div className="flex items-center gap-1 text-[9px] font-bold text-slate-700 border-b border-slate-100 pb-1">
                       <Users className="h-3 w-3 text-emerald-600 shrink-0" />
-                      <span className="truncate">Org Chart View</span>
+                      <span className="truncate">الهيكل التنظيمي</span>
                     </div>
                     <div className="h-12 rounded-lg bg-emerald-50/60 border border-emerald-100/60 p-1.5 flex flex-col justify-between text-[8px] text-emerald-900 font-medium">
-                      <div className="flex justify-between items-center"><span className="truncate font-bold">Hierarchy Tree</span><span className="text-emerald-600">Live</span></div>
+                      <div className="flex justify-between items-center"><span className="truncate font-bold">شجرة التسلسل الإداري</span><span className="text-emerald-600">مباشر</span></div>
                       <div className="grid grid-cols-3 gap-0.5 pt-1"><div className="h-3 bg-emerald-200/80 rounded-sm" /><div className="h-3 bg-emerald-300 rounded-sm" /><div className="h-3 bg-emerald-200/80 rounded-sm" /></div>
                     </div>
                   </div>
@@ -134,9 +134,9 @@ function MarketingPanel() {
                 <div className="rounded-xl border border-slate-200 bg-white p-2 text-[9px] flex items-center justify-between shadow-2xs">
                   <span className="font-bold text-slate-700 flex items-center gap-1">
                     <ShieldCheck className="h-3 w-3 text-primary shrink-0" />
-                    Payroll & Medical Workflow Sync
+                    مزامنة سير عمل الرواتب والشؤون الطبية
                   </span>
-                  <span className="text-emerald-600 font-black">100% Verified</span>
+                  <span className="text-emerald-600 font-black">تم التحقق 100%</span>
                 </div>
               </div>
             </div>
@@ -159,7 +159,7 @@ function MarketingPanel() {
 import { LoginHeroContainer } from "@/components/auth/login-hero-container";
 
 function DiagnosticConfessionBox({ err, location }: { err: any; location: string }) {
-  const errMsg = err?.message || String(err || "Unknown error");
+  const errMsg = err?.message || String(err || "خطأ غير معروف");
   const stack = err?.stack || "";
   return (
     <div className="flex min-h-screen items-center justify-center p-6 bg-slate-900 text-rose-100" dir="rtl">

@@ -18,7 +18,7 @@ export default async function ReportsPage() {
 
   return (
     <section className="space-y-6">
-      <div><p className="text-sm font-medium text-muted-foreground">Analytics</p><h1 className="text-3xl font-semibold">Reports</h1><p className="text-muted-foreground">Operational report entry points for every HRMS domain.</p></div>
+      <div><p className="text-sm font-medium text-muted-foreground">التحليلات</p><h1 className="text-3xl font-semibold">التقارير</h1><p className="text-muted-foreground">نقاط الدخول للتقارير التشغيلية لكل وحدة من وحدات النظام.</p></div>
 
       {isAdmin ? (
         <Suspense fallback={<OverviewSkeleton showCharts={false} />}>
@@ -27,7 +27,7 @@ export default async function ReportsPage() {
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {hrmsModules.filter((entity) => entity.key !== "audit-logs" && entity.key !== "reports").map((entity) => <Link key={entity.key} href={"/" + entity.key}><Card className="h-full transition-colors hover:bg-accent"><CardHeader><CardTitle>{entity.title}</CardTitle><CardDescription>{entity.description}</CardDescription></CardHeader><CardContent><p className="text-sm text-muted-foreground">Open live table, filters, and exports-ready data.</p></CardContent></Card></Link>)}
+        {hrmsModules.filter((entity) => entity.key !== "audit-logs" && entity.key !== "reports").map((entity) => <Link key={entity.key} href={"/" + entity.key}><Card className="h-full transition-colors hover:bg-accent"><CardHeader><CardTitle>{entity.title}</CardTitle><CardDescription>{entity.description}</CardDescription></CardHeader><CardContent><p className="text-sm text-muted-foreground">عرض الجدول المباشر والفلاتر والبيانات الجاهزة للتصدير.</p></CardContent></Card></Link>)}
       </div>
     </section>
   );

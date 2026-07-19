@@ -40,22 +40,22 @@ export function ResetPasswordForm({ token }: { token: string }) {
       ) : null}
       <input type="hidden" {...form.register("token")} />
       <div className="space-y-2">
-        <Label htmlFor="password">New password</Label>
+        <Label htmlFor="password">كلمة المرور الجديدة</Label>
         <Input id="password" type="password" autoComplete="new-password" {...form.register("password")} />
         {form.formState.errors.password ? <p className="text-sm text-destructive">{form.formState.errors.password.message}</p> : null}
       </div>
       <div className="space-y-2">
-        <Label htmlFor="confirmPassword">Confirm password</Label>
+        <Label htmlFor="confirmPassword">تأكيد كلمة المرور</Label>
         <Input id="confirmPassword" type="password" autoComplete="new-password" {...form.register("confirmPassword")} />
         {form.formState.errors.confirmPassword ? <p className="text-sm text-destructive">{form.formState.errors.confirmPassword.message}</p> : null}
       </div>
       <Button className="w-full" type="submit" disabled={isPending || !token}>
         {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-        Update password
+        تحديث كلمة المرور
       </Button>
       <div className="text-center text-sm">
         <Link href="/login" className="font-medium text-primary underline-offset-4 hover:underline">
-          Back to sign in
+          العودة لتسجيل الدخول
         </Link>
       </div>
     </form>

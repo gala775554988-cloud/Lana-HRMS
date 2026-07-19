@@ -380,7 +380,7 @@ export function LanaAiFullPageClient() {
               <Sparkles className="h-6 w-6 text-amber-300" />
             </div>
             <div>
-              <h2 className="font-black text-lg text-slate-900 dark:text-slate-100">Lana Assistant</h2>
+              <h2 className="font-black text-lg text-slate-900 dark:text-slate-100">مساعد Lana</h2>
               <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                 متصل بالنظام ومستعد لتنفيذ العمليات والإجابة الفورية

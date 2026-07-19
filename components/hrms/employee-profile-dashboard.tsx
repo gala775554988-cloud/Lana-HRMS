@@ -328,7 +328,7 @@ export function EmployeeProfileDashboard({
                     <Button size="sm" variant="outline" onClick={handleResetPassword} className="gap-1"><KeyRound className="h-4 w-4" />إعادة تعيين كلمة المرور</Button>
                     <Button size="sm" variant="outline" onClick={handleUnbindDevice} className="gap-1.5 border-amber-300 hover:bg-amber-50 text-amber-800 dark:border-amber-800 dark:hover:bg-amber-950/50 dark:text-amber-300">
                       <Smartphone className="h-4 w-4" />
-                      {isAr ? "إلغاء ربط الجهاز (Unbind Device)" : "Unbind Device"}
+                      {isAr ? "إلغاء ربط الجهاز" : "Unbind Device"}
                     </Button>
                   </div>
                 </div>
@@ -353,7 +353,7 @@ export function EmployeeProfileDashboard({
             <TabsTrigger value="assets" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Laptop className="h-4 w-4 ml-1" />الأصول</TabsTrigger>
             <TabsTrigger value="permissions" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Shield className="h-4 w-4 ml-1" />الصلاحيات</TabsTrigger>
             <TabsTrigger value="activity" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Activity className="h-4 w-4 ml-1" />النشاط</TabsTrigger>
-            <TabsTrigger value="ai" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Brain className="h-4 w-4 ml-1" />AI</TabsTrigger>
+            <TabsTrigger value="ai" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Brain className="h-4 w-4 ml-1" />الذكاء الاصطناعي</TabsTrigger>
           </TabsList>
         </div>
 
@@ -569,7 +569,7 @@ export function EmployeeProfileDashboard({
 
         {/* 9- Assets */}
         <TabsContent value="assets" className="space-y-4 mt-6">
-          <Card className="rounded-2xl"><CardHeader><CardTitle>الأصول المستلمة</CardTitle><CardDescription>Laptop, Phone, SIM, Car, Uniform, Access Card, Keys</CardDescription></CardHeader><CardContent><div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">{assets.map((asset: any) => (<div key={asset.id} className="border rounded-xl p-4"><p className="font-bold">{asset.name}</p><p className="text-xs text-muted-foreground">{asset.assetTag} - {asset.category} - {asset.status}</p></div>))}{assets.length===0 && <p className="col-span-full text-center text-muted-foreground py-8">لا يوجد أصول مسلمة</p>}</div></CardContent></Card>
+          <Card className="rounded-2xl"><CardHeader><CardTitle>الأصول المستلمة</CardTitle><CardDescription>لابتوب، هاتف، شريحة اتصال، سيارة، زي موحد، بطاقة دخول، مفاتيح</CardDescription></CardHeader><CardContent><div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">{assets.map((asset: any) => (<div key={asset.id} className="border rounded-xl p-4"><p className="font-bold">{asset.name}</p><p className="text-xs text-muted-foreground">{asset.assetTag} - {asset.category} - {asset.status}</p></div>))}{assets.length===0 && <p className="col-span-full text-center text-muted-foreground py-8">لا يوجد أصول مسلمة</p>}</div></CardContent></Card>
         </TabsContent>
 
         {/* 10- Permissions */}
@@ -579,7 +579,7 @@ export function EmployeeProfileDashboard({
               <div>
                 <CardTitle className="flex items-center gap-2 text-amber-800 dark:text-amber-300">
                   <Smartphone className="h-5 w-5" />
-                  ارتباط جهاز الجوال والتحقق الأمني (Device Binding Policy)
+                  ارتباط جهاز الجوال والتحقق الأمني (سياسة ربط الجهاز)
                 </CardTitle>
                 <CardDescription className="text-amber-700/80 dark:text-amber-400/80 mt-1">
                   نظام حماية الحضور والانصراف والدخول الموحد المرتبط ببصمة جهاز الجوال (UUID)
@@ -620,15 +620,29 @@ export function EmployeeProfileDashboard({
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl"><CardHeader><CardTitle>الصلاحيات - Tree View</CardTitle><CardDescription>إعطاء أي صلاحية لأي موظف بدون تعديل Role بالكامل - Inherited, Custom, Effective</CardDescription></CardHeader><CardContent>
+          <Card className="rounded-2xl"><CardHeader><CardTitle>الصلاحيات - عرض شجري</CardTitle><CardDescription>إعطاء أي صلاحية لأي موظف بدون تعديل الدور بالكامل - موروثة، مخصصة، فعلية</CardDescription></CardHeader><CardContent>
             <div className="space-y-4">
-              {["Employee", "Attendance", "Payroll", "Contracts", "Settings"].map((mod) => (
-                <div key={mod} className="border rounded-xl p-4">
-                  <p className="font-bold mb-3">{mod}</p>
+              {[
+                { key: "Employee", label: "الموظفون" },
+                { key: "Attendance", label: "الحضور" },
+                { key: "Payroll", label: "الرواتب" },
+                { key: "Contracts", label: "العقود" },
+                { key: "Settings", label: "الإعدادات" }
+              ].map((mod) => (
+                <div key={mod.key} className="border rounded-xl p-4">
+                  <p className="font-bold mb-3">{mod.label}</p>
                   <div className="grid gap-3 md:grid-cols-4">
-                    {["View", "Create", "Update", "Delete", "Approve", "Export", "Edit"].slice(0, mod==="Employee"?4:3).map((perm) => (
-                      <label key={perm} className="flex items-center justify-between border rounded-lg p-3 hover:bg-muted/30 cursor-pointer">
-                        <span className="text-sm">{perm}</span>
+                    {[
+                      { key: "View", label: "عرض" },
+                      { key: "Create", label: "إنشاء" },
+                      { key: "Update", label: "تحديث" },
+                      { key: "Delete", label: "حذف" },
+                      { key: "Approve", label: "اعتماد" },
+                      { key: "Export", label: "تصدير" },
+                      { key: "Edit", label: "تعديل" }
+                    ].slice(0, mod.key==="Employee"?4:3).map((perm) => (
+                      <label key={perm.key} className="flex items-center justify-between border rounded-lg p-3 hover:bg-muted/30 cursor-pointer">
+                        <span className="text-sm">{perm.label}</span>
                         <input type="checkbox" defaultChecked={Math.random()>0.5} onChange={() => featureDone("تحديث الصلاحية")} className="h-4 w-4" />
                       </label>
                     ))}
@@ -636,9 +650,9 @@ export function EmployeeProfileDashboard({
                 </div>
               ))}
               <div className="grid gap-4 md:grid-cols-3 mt-6">
-                <Card><CardContent className="p-4"><p className="text-xs">Inherited Permissions</p><p className="text-sm mt-1">من Role: HR_MANAGER (12)</p></CardContent></Card>
-                <Card><CardContent className="p-4"><p className="text-xs">Custom Permissions</p><p className="text-sm mt-1">3 صلاحيات مخصصة</p></CardContent></Card>
-                <Card><CardContent className="p-4"><p className="text-xs">Effective Permissions</p><p className="text-sm mt-1">15 صلاحية فعالة</p></CardContent></Card>
+                <Card><CardContent className="p-4"><p className="text-xs">الصلاحيات الموروثة</p><p className="text-sm mt-1">من الدور: HR_MANAGER (12)</p></CardContent></Card>
+                <Card><CardContent className="p-4"><p className="text-xs">الصلاحيات المخصصة</p><p className="text-sm mt-1">3 صلاحيات مخصصة</p></CardContent></Card>
+                <Card><CardContent className="p-4"><p className="text-xs">الصلاحيات الفعلية</p><p className="text-sm mt-1">15 صلاحية فعالة</p></CardContent></Card>
               </div>
             </div>
           </CardContent></Card>
@@ -646,7 +660,7 @@ export function EmployeeProfileDashboard({
 
         {/* 11- Activity */}
         <TabsContent value="activity" className="space-y-4 mt-6">
-          <Card className="rounded-2xl"><CardHeader><CardTitle>سجل النشاط - Timeline</CardTitle><CardDescription>كل عملية تمت على الموظف - من عدل، متى، IP، جهاز، ما الذي تغير</CardDescription></CardHeader><CardContent>
+          <Card className="rounded-2xl"><CardHeader><CardTitle>سجل النشاط - الخط الزمني</CardTitle><CardDescription>كل عملية تمت على الموظف - من عدل، متى، IP، جهاز، ما الذي تغير</CardDescription></CardHeader><CardContent>
             <div className="space-y-4 relative before:absolute before:inset-y-0 before:left-4 before:w-0.5 before:bg-slate-200 dark:before:bg-slate-800">
               {auditLogs.map((log: any, i: number) => (
                 <div key={log.id || i} className="relative flex gap-4">
@@ -665,7 +679,7 @@ export function EmployeeProfileDashboard({
 
         {/* 12- AI */}
         <TabsContent value="ai" className="space-y-4 mt-6">
-          <Card className="rounded-2xl bg-gradient-to-br from-primary/8 to-violet-50 dark:from-primary/20 dark:to-violet-950/20 border-0 shadow-xl"><CardHeader><CardTitle className="flex items-center gap-2"><Brain className="h-6 w-6 text-primary" />Lana AI - تحليل الموظف</CardTitle></CardHeader><CardContent className="grid gap-4 md:grid-cols-3">
+          <Card className="rounded-2xl bg-gradient-to-br from-primary/8 to-violet-50 dark:from-primary/20 dark:to-violet-950/20 border-0 shadow-xl"><CardHeader><CardTitle className="flex items-center gap-2"><Brain className="h-6 w-6 text-primary" />تحليل الموظف بالذكاء الاصطناعي - Lana</CardTitle></CardHeader><CardContent className="grid gap-4 md:grid-cols-3">
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border"><p className="text-xs">أداء الموظف</p><p className="text-3xl font-black mt-2 text-green-600">87%</p><p className="text-xs mt-1">ممتاز - فوق المتوسط</p></div>
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border"><p className="text-xs">تحليل الغياب</p><p className="text-3xl font-black mt-2 text-amber-600">3 أيام</p><p className="text-xs mt-1">أقل من المتوسط (5)</p></div>
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border"><p className="text-xs">نسبة الاستقرار</p><p className="text-3xl font-black mt-2 text-blue-600">92%</p><p className="text-xs mt-1">مستقر جداً</p></div>

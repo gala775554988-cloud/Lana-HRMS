@@ -115,7 +115,7 @@ export function InstallButton({
                   خطوات تثبيت تطبيق "لانا" على جهازك
                 </DialogTitle>
                 <DialogDescription className="text-xs text-muted-foreground font-mono mt-0.5">
-                  {iosDevice ? "iOS Safari Installation Guide" : "Manual PWA Setup Instructions"}
+                  {iosDevice ? "دليل التثبيت عبر متصفح Safari" : "خطوات التثبيت اليدوي للتطبيق"}
                 </DialogDescription>
               </div>
             </div>

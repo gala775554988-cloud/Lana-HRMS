@@ -150,7 +150,7 @@ export function QuickSearchModal({ isOpen, onClose }: QuickSearchModalProps) {
       category: "الذكاء الاصطناعي والتقارير",
       href: "/lana-ai",
       icon: Sparkles,
-      badge: "AI Powered"
+      badge: "مدعوم بالذكاء الاصطناعي"
     },
     {
       id: "reports",

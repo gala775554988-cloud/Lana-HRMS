@@ -223,7 +223,7 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
                           <span
                             key={pendingApprovalsCount}
                             className="absolute -top-1.5 -end-2 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 px-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white dark:ring-slate-950 shadow-sm"
-                            aria-label={`${pendingApprovalsCount} pending approvals`}
+                            aria-label={`${pendingApprovalsCount} طلبات موافقة معلقة`}
                           >
                             {pendingApprovalsCount > 99 ? "99+" : pendingApprovalsCount}
                           </span>
@@ -232,7 +232,7 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
                           <span
                             key={expiringInsuranceCount}
                             className="absolute -top-1.5 -end-2 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 px-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white dark:ring-slate-950 shadow-sm"
-                            aria-label={`${expiringInsuranceCount} insurance policies renewing soon`}
+                            aria-label={`${expiringInsuranceCount} وثيقة تأمين على وشك الانتهاء`}
                           >
                             {expiringInsuranceCount > 99 ? "99+" : expiringInsuranceCount}
                           </span>
@@ -273,14 +273,14 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
             <button
               onClick={() => setMobileMenuOpen(prev => !prev)}
               className="lg:hidden flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
-              aria-label="Toggle mobile sidebar"
+              aria-label="تبديل القائمة الجانبية للجوال"
             >
               {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
             <button
               onClick={toggleSidebar}
               className="hidden lg:flex h-9 w-9 items-center justify-center rounded-xl hover:bg-primary/10 text-slate-600 hover:text-primary transition-all duration-300 ease-premium dark:text-slate-400 dark:hover:bg-primary/10 dark:hover:text-primary border border-transparent hover:border-primary/20"
-              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-label={sidebarCollapsed ? "توسيع القائمة الجانبية" : "طي القائمة الجانبية"}
             >
               {sidebarCollapsed ? <ChevronLeft className="h-4.5 w-4.5" /> : <ChevronRight className="h-4.5 w-4.5" />}
             </button>

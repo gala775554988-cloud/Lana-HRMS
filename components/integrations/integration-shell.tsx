@@ -6,7 +6,7 @@ export function IntegrationShell({ title, description, children }: { title: stri
   return (
     <section className="space-y-6">
       <div className="rounded-2xl border bg-background p-6 shadow-sm">
-        <p className="text-sm font-medium text-muted-foreground">ERP Integrations</p>
+        <p className="text-sm font-medium text-muted-foreground">تكاملات الأنظمة الخارجية (ERP)</p>
         <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
         <p className="mt-2 text-muted-foreground">{description}</p>
       </div>
@@ -32,7 +32,7 @@ export function SimpleTable({ columns, rows }: { columns: string[]; rows: Array<
       <table className="w-full text-sm">
         <thead className="bg-muted/60 text-muted-foreground"><tr>{columns.map((column) => <th key={column} className="px-4 py-3 text-start font-medium">{column}</th>)}</tr></thead>
         <tbody className="divide-y">
-          {rows.length === 0 ? <tr><td colSpan={columns.length} className="px-4 py-8 text-center text-muted-foreground">No records</td></tr> : rows.map((row, index) => (
+          {rows.length === 0 ? <tr><td colSpan={columns.length} className="px-4 py-8 text-center text-muted-foreground">لا توجد سجلات</td></tr> : rows.map((row, index) => (
             <tr key={String(row.id ?? index)}>{columns.map((column) => <td key={column} className="px-4 py-3 align-top">{formatValue(row[column])}</td>)}</tr>
           ))}
         </tbody>
