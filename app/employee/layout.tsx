@@ -42,7 +42,7 @@ function NotLinkedError() {
 }
 
 export default async function EmployeeLayout({ children }: { children: ReactNode }) {
-  const session = await auth();
+  const session = await auth().catch(() => null);
 
   // Only redirect when there is genuinely no session
   if (!session?.user?.id) {
@@ -61,7 +61,7 @@ export default async function EmployeeLayout({ children }: { children: ReactNode
   }
 
   // EMPLOYEE role: look up employee profile
-  const employee = await getCurrentEmployeeCached();
+  const employee = await getCurrentEmployeeCached().catch(() => null);
 
   // EMPLOYEE with valid session but no linked employee record → show error, NOT redirect to /login
   if (!employee) {

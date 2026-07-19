@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { getCurrentEmployeeCached } from "@/lib/employee/employee-cache";
 
+export const dynamic = "force-dynamic";
+
 const settingsLinks = [
   { href: "/employee/settings/account", label: "الحساب" },
   { href: "/employee/settings/profile-picture", label: "الصورة الشخصية" },
@@ -12,7 +14,7 @@ const settingsLinks = [
 ];
 
 export default async function SettingsLayout({ children }: { children: ReactNode }) {
-  const employee = await getCurrentEmployeeCached();
+  const employee = await getCurrentEmployeeCached().catch(() => null);
 
   return (
     <div className="flex gap-8">
