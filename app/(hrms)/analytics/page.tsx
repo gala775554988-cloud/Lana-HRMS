@@ -191,7 +191,8 @@ async function BranchHospitalBreakdown() {
 }
 
 export async function CompanyOverview({ locale, dictionary, showCharts = true }: { locale: Locale; dictionary: Dictionary; showCharts?: boolean }) {
-  const monthRanges = lastNMonthRanges(8);
+  try {
+    const monthRanges = lastNMonthRanges(8);
 
   let employees = 0;
   let departments = 0;
@@ -293,6 +294,9 @@ export async function CompanyOverview({ locale, dictionary, showCharts = true }:
       {showCharts && series ? <DashboardCharts metrics={metrics} series={series} /> : null}
     </div>
   );
+  } catch (err: any) {
+    return <DiagnosticConfessionBox err={err} location="CompanyOverview (/analytics)" />;
+  }
 }
 
 function KpiCard({
