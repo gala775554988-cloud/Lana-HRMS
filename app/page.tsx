@@ -4,6 +4,8 @@ import { resolveRoleDashboard } from "@/config/auth";
 import { getRequestLocale } from "@/lib/i18n-server";
 import { LandingPage } from "@/components/marketing/landing-page";
 
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const session = await auth();
 

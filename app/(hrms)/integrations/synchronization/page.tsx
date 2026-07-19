@@ -6,6 +6,8 @@ import { BioTimeAttendanceSyncButton } from "@/components/integrations/BioTimeAt
 import { enqueueSync, syncMapping } from "@/lib/integrations/service";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 async function runSync(formData: FormData) { 
   "use server"; 
   await syncMapping(String(formData.get("connectionId")), String(formData.get("mappingId")), String(formData.get("direction")) as "HRMS_TO_ODOO" | "ODOO_TO_HRMS" | "BIDIRECTIONAL"); 

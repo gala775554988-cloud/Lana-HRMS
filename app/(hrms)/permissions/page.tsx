@@ -9,6 +9,8 @@ import { WorkflowPathsTabs } from "@/components/enterprise/workflow-paths-tabs";
 import { MultiDeviceAccessClient } from "@/components/enterprise/multi-device-access-client";
 import { KeyRound, Shield, Workflow, Smartphone } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 const PermissionsManagementClient = dynamicImport(() =>
   import("@/components/enterprise/permissions-management-client").then((mod) => mod.PermissionsManagementClient)
 );

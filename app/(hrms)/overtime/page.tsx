@@ -3,6 +3,8 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { hasPermission } from "@/lib/rbac";
 
+export const dynamic = "force-dynamic";
+
 const OvertimeManagementClient = dynamic(() => import("@/components/enterprise/overtime-management-client").then((mod) => mod.OvertimeManagementClient));
 
 export default async function OvertimePage() {

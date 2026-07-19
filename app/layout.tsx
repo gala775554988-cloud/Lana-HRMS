@@ -12,6 +12,8 @@ import { LazyLanaAiAssistant } from "@/components/enterprise/lazy-lana-ai-assist
 import { PWAInstallPrompt } from "@/components/pwa/pwa-install-prompt";
 import { PWARegister } from "@/components/pwa/pwa-register";
 
+export const dynamic = "force-dynamic";
+
 function getSafeMetadataBase() {
   const url = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
   try {

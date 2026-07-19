@@ -6,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { CompanyOverview, OverviewSkeleton } from "@/app/(hrms)/analytics/page";
 import { getRequestDictionary } from "@/lib/i18n-server";
 
+export const dynamic = "force-dynamic";
+
 export default async function ReportsPage() {
   const session = await auth();
   const roles = (session?.user?.roles as string[]) || [];

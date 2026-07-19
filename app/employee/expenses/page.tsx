@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 function formatAmount(value: unknown) {
   if (value && typeof value === "object" && "toNumber" in value && typeof (value as { toNumber: () => number }).toNumber === "function") {
     return (value as { toNumber: () => number }).toNumber().toLocaleString("ar-SA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });

@@ -8,6 +8,8 @@ import { getEmployeeFieldAccess, redactHiddenFields } from "@/lib/enterprise/emp
 import { EmployeeProfileDashboard } from "@/components/hrms/employee-profile-dashboard";
 import { PermissionsScope } from "@/components/hrms/permissions-scope";
 
+export const dynamic = "force-dynamic";
+
 export default async function EmployeeProfilePage({
   params,
   searchParams

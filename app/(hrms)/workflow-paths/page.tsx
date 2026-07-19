@@ -2,6 +2,8 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { WorkflowPathsTabs } from "@/components/enterprise/workflow-paths-tabs";
 
+export const dynamic = "force-dynamic";
+
 export default async function WorkflowPathsPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");

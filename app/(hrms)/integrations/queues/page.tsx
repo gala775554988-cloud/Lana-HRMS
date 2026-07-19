@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { IntegrationShell, DataCard, SimpleTable } from "@/components/integrations/integration-shell";
 import { processIntegrationQueue, retryDeadLetter } from "@/lib/integrations/service";
 
+export const dynamic = "force-dynamic";
+
 async function processQueue() { "use server"; await processIntegrationQueue(20); }
 async function retry(formData: FormData) { "use server"; await retryDeadLetter(String(formData.get("id"))); }
 

@@ -1,6 +1,8 @@
 import { requireEmployee, getEmployeeSetting } from '@/lib/employee/portal';
 import { EmployeeProfilePortal } from '@/components/employee/EmployeeProfilePortal';
 
+export const dynamic = "force-dynamic";
+
 
 export default async function ProfilePage() {
   const { employee } = await requireEmployee();

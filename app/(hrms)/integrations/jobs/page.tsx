@@ -5,6 +5,8 @@ import { IntegrationShell, DataCard, SimpleTable } from "@/components/integratio
 import { requireIntegrationAccess } from "@/lib/integrations/service";
 import { revalidatePath } from "next/cache";
 
+export const dynamic = "force-dynamic";
+
 async function createJob(formData: FormData) { "use server"; await requireIntegrationAccess("manage"); await prisma.integrationJob.create({ data: { connectionId: String(formData.get("connectionId") || "") || null, mappingId: String(formData.get("mappingId") || "") || null, name: String(formData.get("name")), type: String(formData.get("type") || "CRON_SYNC"), direction: String(formData.get("direction") || "BIDIRECTIONAL"), schedule: String(formData.get("schedule") || "*/15 * * * *"), status: "PENDING", runAt: new Date() } }); revalidatePath("/integrations/jobs"); }
 
 export default async function JobsPage() {

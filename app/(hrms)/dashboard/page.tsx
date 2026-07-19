@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "لوحة التحكم المركزية — Pro Max Executive Hub | Lana HRMS",
   description: "المستشعر الذكي وإدارة الموارد البشرية التنفيذية لمنصات لانا الطبية والتشغيلية."

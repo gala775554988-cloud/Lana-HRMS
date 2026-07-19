@@ -2,6 +2,8 @@ import { requireEmployee } from '@/lib/employee/portal';
 import { prisma } from '@/lib/prisma';
 import { EmployeeDocumentsPortal } from '@/components/employee/EmployeeDocumentsPortal';
 
+export const dynamic = "force-dynamic";
+
 
 export default async function DocumentsPage() {
   const { employee } = await requireEmployee();

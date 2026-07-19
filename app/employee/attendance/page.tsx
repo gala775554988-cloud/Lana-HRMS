@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Clock, Timer, AlertTriangle, TrendingUp } from 'lucide-react';
 import { EmployeeMobileAttendancePunch } from '@/components/employee/EmployeeMobileAttendancePunch';
 
+export const dynamic = "force-dynamic";
+
 
 export default async function AttendancePage() {
   const { employee } = await requireEmployee();

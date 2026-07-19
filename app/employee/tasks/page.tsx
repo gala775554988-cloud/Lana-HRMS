@@ -2,6 +2,8 @@ import { requireEmployee, getEmployeeSetting } from '@/lib/employee/portal';
 import { prisma } from '@/lib/prisma';
 import { EmployeeTasksPortal } from '@/components/employee/EmployeeTasksPortal';
 
+export const dynamic = "force-dynamic";
+
 
 export default async function Tasks() {
   const { employee } = await requireEmployee();

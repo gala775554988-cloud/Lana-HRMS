@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { IntegrationShell, DataCard, SimpleTable } from "@/components/integrations/integration-shell";
 import { createOdooConnection, testOdooConnection } from "@/lib/integrations/service";
 
+export const dynamic = "force-dynamic";
+
 async function createConnection(formData: FormData) {
   "use server";
   await createOdooConnection({ providerId: String(formData.get("providerId") || ""), name: String(formData.get("name")), baseUrl: String(formData.get("baseUrl")), database: String(formData.get("database")), username: String(formData.get("username")), password: String(formData.get("password")) });

@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { writeAuditLog } from "@/lib/audit";
 
+export const dynamic = "force-dynamic";
+
 async function changePasswordAction(formData: FormData) {
   "use server";
   const session = await auth();

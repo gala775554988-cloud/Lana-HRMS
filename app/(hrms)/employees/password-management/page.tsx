@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import PasswordManagementClient from "@/components/hrms/password-management-client";
 
+export const dynamic = "force-dynamic";
+
 export default async function PasswordManagementPage() {
   // Get counts for display
   const totalEmployees = await prisma.employee.count().catch(() => 0);

@@ -4,6 +4,8 @@ import { getHrmsModule } from "@/config/hrms";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 export default async function ModuleDashboardPage({ params }: { params: Promise<{ module: string }> }) {
   const { module } = await params;
   const resource = getHrmsModule(module);

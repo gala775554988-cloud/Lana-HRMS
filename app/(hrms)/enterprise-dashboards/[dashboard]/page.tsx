@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { getEnterpriseDashboardMetrics } from "@/lib/enterprise/dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+export const dynamic = "force-dynamic";
+
 const titles: Record<string, string> = {
   supervisor: "Supervisor Dashboard",
   branch: "Branch Manager Dashboard",

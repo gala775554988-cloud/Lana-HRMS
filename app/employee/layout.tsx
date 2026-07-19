@@ -8,6 +8,8 @@ import { EmployeeDesktopSidebar } from "@/components/employee/EmployeeDesktopSid
 import { EmployeeMobileSidebar } from "@/components/employee/EmployeeMobileSidebar";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
+export const dynamic = "force-dynamic";
+
 const NON_EMPLOYEE_ROLES = [
   "SUPER_ADMIN", "HR_MANAGER", "PAYROLL_MANAGER", "RECRUITER",
   "MANAGER", "HR", "DEPARTMENT_MANAGER", "BRANCH_MANAGER",

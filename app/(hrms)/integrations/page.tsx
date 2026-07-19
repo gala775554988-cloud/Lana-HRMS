@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { IntegrationShell, DataCard, SimpleTable } from "@/components/integrations/integration-shell";
 import { seedOdooProvider } from "@/lib/integrations/service";
 
+export const dynamic = "force-dynamic";
+
 export default async function IntegrationsDashboard() {
   const [providers, connections, mappings, queued, jobs, conflicts] = await Promise.all([
     prisma.integrationProvider.count().catch(() => 0),

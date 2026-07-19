@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { IntegrationShell, DataCard } from "@/components/integrations/integration-shell";
 import DuplicateReportClient from "@/components/integrations/duplicate-national-ids-client";
 
+export const dynamic = "force-dynamic";
+
 export default async function DuplicateNationalIdsPage() {
   const connections = await prisma.integrationConnection.findMany().catch(() => []);
 

@@ -5,6 +5,8 @@ import { IntegrationShell, DataCard, SimpleTable } from "@/components/integratio
 import { requireIntegrationAccess, seedOdooProvider } from "@/lib/integrations/service";
 import { revalidatePath } from "next/cache";
 
+export const dynamic = "force-dynamic";
+
 async function createMapping(formData: FormData) { "use server"; await requireIntegrationAccess("manage"); await prisma.integrationMapping.create({ data: { providerId: String(formData.get("providerId")), connectionId: String(formData.get("connectionId") || "") || null, name: String(formData.get("name")), hrmsModule: String(formData.get("hrmsModule")), hrmsModel: String(formData.get("hrmsModel")), externalModel: String(formData.get("externalModel")), direction: String(formData.get("direction") || "BIDIRECTIONAL"), fieldMap: JSON.parse(String(formData.get("fieldMap") || "{}")), isActive: true } }); revalidatePath("/integrations/mappings"); }
 async function seedMappings() { "use server"; await seedOdooProvider(); }
 

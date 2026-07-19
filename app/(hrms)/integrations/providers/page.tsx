@@ -5,6 +5,8 @@ import { IntegrationShell, DataCard, SimpleTable } from "@/components/integratio
 import { requireIntegrationAccess } from "@/lib/integrations/service";
 import { revalidatePath } from "next/cache";
 
+export const dynamic = "force-dynamic";
+
 async function createProvider(formData: FormData) {
   "use server";
   await requireIntegrationAccess("manage");

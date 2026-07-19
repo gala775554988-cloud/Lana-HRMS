@@ -13,6 +13,8 @@ import { getRequestDictionary } from "@/lib/i18n-server";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { LanaAnalytics } from "@/components/enterprise/lana-analytics";
 
+export const dynamic = "force-dynamic";
+
 const DashboardCharts = dynamic(() => import("@/components/hrms/dashboard-charts").then((mod) => mod.DashboardCharts), {
   loading: () => <div className="h-64 animate-pulse rounded-2xl bg-muted" />,
 });

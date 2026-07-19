@@ -1,6 +1,8 @@
 import { getCurrentEmployeeCached } from "@/lib/employee/employee-cache";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 export default async function LeaveHistory() {
   const employee = await getCurrentEmployeeCached();
   const leaves = await prisma.leaveRequest.findMany({

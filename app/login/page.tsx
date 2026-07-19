@@ -4,6 +4,8 @@ import { BrandLogo } from "@/components/brand/brand-logo";
 import { ClientLanguageToggle } from "@/components/i18n/client-language-toggle";
 import { LoginCard } from "@/components/auth/login-card";
 
+export const dynamic = "force-dynamic";
+
 const stats = [
   { label: "عدد الموظفين", value: "4580", icon: Users },
   { label: "عدد المستشفيات", value: "72", icon: Hospital },
