@@ -73,12 +73,18 @@ export default async function EmployeeLayout({ children }: { children: ReactNode
       <EmployeeTopBar user={session.user} employee={employee} />
 
       <div className="flex">
-        <div className="hidden lg:block w-64 border-l border-slate-200 dark:border-slate-800 bg-white/70 backdrop-blur-md shadow-glass dark:bg-slate-900/70 sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto">
+        {/* Hybrid design: solid opaque sidebar with an edge shadow, matching
+            the admin AppShell -- glass/blur is reserved for the content area. */}
+        <div className="hidden lg:block w-64 border-l border-slate-200/80 bg-white shadow-[0_0_24px_-6px_rgb(15_23_42_/_0.15)] dark:border-slate-800/80 dark:bg-slate-950 dark:shadow-[0_0_24px_-6px_rgb(0_0_0_/_0.4)] sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto">
           <EmployeeDesktopSidebar />
         </div>
 
-        <div className="flex-1 min-w-0">
-          <main className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 lg:pb-8">
+        <div className="relative flex-1 min-w-0 bg-gradient-to-br from-primary/[0.06] via-transparent to-secondary/[0.08] dark:from-primary/[0.08] dark:to-secondary/[0.1]">
+          <div className="pointer-events-none fixed -z-10 inset-0 overflow-hidden">
+            <div className="absolute -top-24 end-1/4 h-96 w-96 rounded-full bg-primary/10 blur-[120px] dark:bg-primary/15" />
+            <div className="absolute top-1/3 start-0 h-80 w-80 rounded-full bg-secondary/10 blur-[120px] dark:bg-secondary/15" />
+          </div>
+          <main className="relative max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 lg:pb-8">
             <ErrorBoundary>
               {children}
             </ErrorBoundary>

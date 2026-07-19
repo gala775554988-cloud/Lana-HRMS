@@ -305,7 +305,7 @@ function KpiCard({
   title: string; value: number | string; icon: LucideIcon; hint: string; tone: string; badgeText?: string; index: number;
 }) {
   return (
-    <Card className="group relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-md shadow-slate-200/40 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl dark:border-slate-800 dark:bg-slate-900 dark:shadow-none" style={{ animationDelay: `${index * 35}ms` }}>
+    <Card className="glass-card-premium group relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl" style={{ animationDelay: `${index * 35}ms` }}>
       <CardContent className="relative p-6 lana-slide-up">
         <div className={`absolute -left-10 -top-10 h-32 w-32 rounded-full bg-gradient-to-br ${tone} opacity-10 blur-2xl transition-opacity duration-300 group-hover:opacity-25 pointer-events-none`} />
         <div className="relative flex items-start justify-between gap-4">

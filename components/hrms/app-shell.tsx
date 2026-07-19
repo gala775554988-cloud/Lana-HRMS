@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
@@ -100,6 +100,31 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
 
   const userRoles = useMemo(() => (session?.user?.roles as string[]) || [], [session?.user?.roles]);
   const userPermissions = useMemo(() => (session?.user?.permissions as string[]) || [], [session?.user?.permissions]);
+  // Apply the user's saved sidebar/system color hue (set via /settings) on
+  // load, so the retint set from Range Slider (Prisma User.sidebarHue)
+  // persists across the whole app, not just the settings page itself.
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    fetch("/api/user/preferences")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.success || typeof data.sidebarHue !== "number") return;
+        const isDark = document.documentElement.classList.contains("dark");
+        const hue = data.sidebarHue;
+        const secondaryHue = (hue + 73) % 360;
+        const root = document.documentElement.style;
+        const primaryL = isDark ? 50 : 42;
+        const secondaryL = isDark ? 72 : 66;
+        root.setProperty("--primary", `${hue} 70% ${primaryL}%`);
+        root.setProperty("--accent", `${hue} 70% ${primaryL}%`);
+        root.setProperty("--ring", `${hue} 70% ${primaryL}%`);
+        root.setProperty("--info", `${hue} 70% ${primaryL}%`);
+        root.setProperty("--sidebar-accent", `${hue} 70% ${primaryL}%`);
+        root.setProperty("--secondary", `${secondaryHue} 85% ${secondaryL}%`);
+      })
+      .catch(() => {});
+  }, [status]);
+
   const { data: pendingApprovalsCount } = usePendingApprovalsCount(status === "authenticated");
   const canViewInsurance = userRoles.includes("SUPER_ADMIN") || userRoles.includes("HR_MANAGER") || userPermissions.includes("read:insurance") || userPermissions.includes("manage:insurance");
   const { data: expiringInsuranceCount } = useExpiringInsuranceCount(status === "authenticated" && canViewInsurance);
@@ -158,12 +183,14 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
         />
       )}
 
-      {/* Premium glassmorphism sidebar: mint/violet gradient accents, layered
-          depth shadows, and motion tuned with the shared premium easing so
-          hover/active states feel considered rather than instant snaps. */}
+      {/* Hybrid design: the sidebar itself is solid, opaque white (no
+          transparency/blur) with a soft edge shadow toward the content side
+          for a crisp, confident separation -- the glass/blur treatment is
+          reserved entirely for cards inside the main content area below, so
+          the two surfaces read as deliberately different materials. */}
       <aside
         className={cn(
-          "fixed inset-y-0 start-0 z-50 flex h-screen flex-col border-e border-primary/10 bg-gradient-to-b from-white/95 via-primary/[0.04] to-white/95 shadow-xl shadow-primary/5 backdrop-blur-2xl transition-all duration-300 ease-premium lg:sticky lg:top-0 lg:z-auto lg:shadow-none lg:!translate-x-0 dark:border-slate-800/80 dark:bg-gradient-to-b dark:from-slate-950/95 dark:via-slate-900/90 dark:to-slate-950/95",
+          "fixed inset-y-0 start-0 z-50 flex h-screen flex-col border-e border-slate-200/80 bg-white shadow-[0_0_24px_-6px_rgb(15_23_42_/_0.15)] transition-all duration-300 ease-premium lg:sticky lg:top-0 lg:z-auto lg:!translate-x-0 dark:border-slate-800/80 dark:bg-slate-950 dark:shadow-[0_0_24px_-6px_rgb(0_0_0_/_0.4)]",
           sidebarCollapsed ? "lg:w-[78px]" : "lg:w-[284px]",
           "w-[284px]",
           mobileMenuOpen ? "translate-x-0" : "rtl:translate-x-full ltr:-translate-x-full"
@@ -333,7 +360,13 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
         </div>
       </header>
 
-      <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-4 lg:p-8">
+      <main className="relative flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-4 lg:p-8 bg-gradient-to-br from-primary/[0.06] via-transparent to-secondary/[0.08] dark:from-primary/[0.08] dark:to-secondary/[0.1]">
+        {/* Soft color-mesh backdrop so the Glassmorphism cards inside have
+            something to actually blur against, per the Hybrid Design brief. */}
+        <div className="pointer-events-none fixed -z-10 inset-0 overflow-hidden">
+          <div className="absolute -top-24 end-1/4 h-96 w-96 rounded-full bg-primary/10 blur-[120px] dark:bg-primary/15" />
+          <div className="absolute top-1/3 start-0 h-80 w-80 rounded-full bg-secondary/10 blur-[120px] dark:bg-secondary/15" />
+        </div>
         {children}
       </main>
       </div>

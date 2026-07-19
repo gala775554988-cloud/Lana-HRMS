@@ -163,6 +163,15 @@
   }
 
   .premium-pop-in { animation: lanaPopIn 380ms var(--ease-premium) both; }
+
+  /* Dashboard-grade glassmorphism (Hybrid Design brief): deliberately more
+     transparent than .glass-surface, meant to sit over the colorful mesh
+     backdrop behind the main content area (not over flat white), where
+     .glass-surface's higher opacity would otherwise be needed for legibility. */
+  .glass-card-premium {
+    @apply relative rounded-3xl border border-white/20 bg-white/10 backdrop-blur-md dark:border-white/10 dark:bg-white/5;
+    box-shadow: var(--shadow-premium-md);
+  }
 }
 
 @keyframes lanaFadeIn {
