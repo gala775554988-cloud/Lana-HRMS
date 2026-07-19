@@ -46,7 +46,7 @@ export default function DuplicateReportClient() {
     try {
       const res = await fetch("/api/integrations/odoo/duplicate-national-ids");
       const json = await res.json();
-      if (!json.success) throw new Error(json.message || "Failed to fetch");
+      if (!json.success) throw new Error(json.message || "فشل في جلب البيانات");
       setData(json);
     } catch (e: any) {
       setError(e.message || String(e));

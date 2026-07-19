@@ -12,8 +12,8 @@ export default async function NotFound() {
     <main className="flex min-h-screen items-center justify-center bg-background px-6">
       <section className="max-w-md text-center">
         <p className="text-sm font-medium uppercase text-muted-foreground">404</p>
-        <h1 className="mt-2 text-3xl font-semibold">Page not found</h1>
-        <p className="mt-3 text-muted-foreground">The HRMS page you requested does not exist or you do not have access to it.</p>
+        <h1 className="mt-2 text-3xl font-semibold">الصفحة غير موجودة</h1>
+        <p className="mt-3 text-muted-foreground">الصفحة التي طلبتها غير موجودة أو لا تملك صلاحية الوصول إليها.</p>
         
         <div className="mt-6 flex flex-col gap-3 items-center">
           <Button asChild>

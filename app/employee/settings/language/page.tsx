@@ -30,7 +30,7 @@ export default function LanguageSettings() {
           <span className="font-medium">اللغة</span>
           <select value={language} onChange={(event) => setLanguage(event.target.value)} className="h-10 w-full rounded-md border bg-background px-3">
             <option value="ar">العربية</option>
-            <option value="en">English</option>
+            <option value="en">الإنجليزية</option>
           </select>
         </label>
         <label className="block space-y-2 text-sm">

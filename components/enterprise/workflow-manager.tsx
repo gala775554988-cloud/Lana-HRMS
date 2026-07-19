@@ -159,7 +159,7 @@ function MultiSelectChips({
         <div className="absolute z-50 w-full mt-1.5 max-h-64 overflow-y-auto rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 shadow-2xl space-y-1 transition-all duration-300 animate-in fade-in slide-in-from-top-2">
           {/* Action Toolbar inside dropdown: Select All / Clear All */}
           <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2 mb-1 px-1">
-            <span className="text-[11px] font-extrabold text-muted-foreground">اختر متعدد (Multi-Select):</span>
+            <span className="text-[11px] font-extrabold text-muted-foreground">اختر متعدد (اختيار متعدد):</span>
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -459,7 +459,7 @@ export function WorkflowManager({
                 {editingPathId ? `تعديل إعدادات مسار الطلبات (${workflowName})` : "إعدادات مسار الطلبات (إضافة مسار اختيار متعدد)"}
               </h2>
               <p className="text-xs font-semibold text-muted-foreground mt-0.5">
-                القسم العلوي: قائمة اختيار متعددة للطلبات والفروع مع ظهور العناصر كـ (Tags/Chips) قابلة للحذف الفردي
+                القسم العلوي: قائمة اختيار متعددة للطلبات والفروع مع ظهور العناصر كعلامات قابلة للحذف الفردي
               </p>
             </div>
           </div>
@@ -475,7 +475,7 @@ export function WorkflowManager({
           <div className="grid gap-6 sm:grid-cols-2">
             {/* 1. قائمة اختيار متعددة للطلبات (Multi-Select Tags/Chips) */}
             <MultiSelectChips
-              label="أنواع الطلبات (`اختيار متعدد Multi-Select`)"
+              label="أنواع الطلبات (اختيار متعدد)"
               placeholder="اختر عدة أنواع طلبات في وقت واحد (مثلاً: الإجازات + السلف)..."
               options={requestTypeOptions}
               selectedValues={selectedRequestTypes}
@@ -484,7 +484,7 @@ export function WorkflowManager({
 
             {/* 2. قائمة اختيار متعددة للفروع/المستشفيات (Multi-Select Tags/Chips) */}
             <MultiSelectChips
-              label={isHospital ? "المستشفيات (`اختيار متعدد Multi-Select`)" : "الإدارات والفروع (`اختيار متعدد Multi-Select`)"}
+              label={isHospital ? "المستشفيات (اختيار متعدد)" : "الإدارات والفروع (اختيار متعدد)"}
               placeholder={isHospital ? "اختر عدة مستشفيات لتطبيق الإعدادات دفعة واحدة..." : "اختر عدة إدارات أو فروع لتطبيق المسار عليها دفعة واحدة..."}
               options={orgUnitOptions}
               selectedValues={selectedOrgUnitIds}
@@ -591,7 +591,7 @@ export function WorkflowManager({
                 <div className="flex items-center gap-3">
                   <span className="grid h-7 w-7 place-items-center rounded-xl bg-primary text-white font-bold text-xs">✓</span>
                   <div>
-                    <p className="text-xs font-black text-slate-900 dark:text-slate-100">تطبيق منطق المباشرة بعد الإجازة (Hidden Resumption Step)</p>
+                    <p className="text-xs font-black text-slate-900 dark:text-slate-100">تطبيق منطق المباشرة بعد الإجازة (مرحلة استئناف مخفية)</p>
                     <p className="text-[11px] font-semibold text-muted-foreground mt-0.5">يتم تلقائياً إدراج مرحلة إضافية مدمجة باسم &apos;مباشرة بعد الإجازة&apos; ضمن تسلسل الاعتمادات لضمان تأكيد العودة للعمل.</p>
                   </div>
                 </div>
@@ -657,8 +657,8 @@ export function WorkflowManager({
             <table className="w-full text-right text-xs">
               <thead className="bg-primary/10 text-slate-900 dark:text-slate-100 font-black border-b border-primary/20">
                 <tr>
-                  <th className="py-4 px-4 font-black w-64">{isHospital ? "المستشفيات المختارة (Chips)" : "الإدارات / الفروع المختارة (Chips)"}</th>
-                  <th className="py-4 px-4 font-black w-56">أنواع الطلبات المختارة (Chips)</th>
+                  <th className="py-4 px-4 font-black w-64">{isHospital ? "المستشفيات المختارة (علامات)" : "الإدارات / الفروع المختارة (علامات)"}</th>
+                  <th className="py-4 px-4 font-black w-56">أنواع الطلبات المختارة (علامات)</th>
                   <th className="py-4 px-4 font-black w-32 text-center">توجيه للمدير أولاً</th>
                   <th className="py-4 px-4 font-black w-32 text-center">عدد المعتمدين</th>
                   <th className="py-4 px-4 font-black w-44 text-center">الإجراءات (عرض | تعديل | حذف)</th>
@@ -811,7 +811,7 @@ export function WorkflowManager({
             </div>
 
             <div className="space-y-2.5">
-              <label className="text-xs font-black text-slate-800 dark:text-slate-200 block">تسلسل المعتمدين بالترتيب (`Workflow Approvers Chain`):</label>
+              <label className="text-xs font-black text-slate-800 dark:text-slate-200 block">تسلسل المعتمدين بالترتيب (سلسلة المعتمدين على الطلب):</label>
               <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                 {viewingPath.steps?.map((s, idx) => (
                   <div key={s.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200/80 dark:border-slate-800">

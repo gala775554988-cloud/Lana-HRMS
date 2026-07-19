@@ -209,7 +209,7 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
               ) : field.type === "boolean" ? (
                 <input id={field.name} type="checkbox" className="h-5 w-5 rounded-md border-input accent-primary transition-colors" {...form.register(field.name)} />
               ) : (
-                <Input id={field.name} type={field.type === "date" ? "date" : field.type === "number" ? "number" : field.type} step={field.type === "number" ? "0.01" : undefined} className={error ? 'border-destructive' : ''} {...form.register(field.name)} />
+                <Input id={field.name} type={field.type === "date" ? "date" : field.type === "number" ? "number" : field.type} step={field.type === "number" ? (field.integer ? "1" : "0.01") : undefined} min={field.type === "number" && field.integer ? 0 : undefined} inputMode={field.integer ? "numeric" : undefined} className={error ? 'border-destructive' : ''} {...form.register(field.name)} />
               )}
               {error ? <p className="text-sm text-destructive flex items-center gap-1"><AlertCircle className="h-3.5 w-3.5" />{error}</p> : null}
             </div>

@@ -66,8 +66,8 @@ export function ModuleTable({ resource, records, dictionary, locale = "en", from
   const [isPending, startTransition] = useTransition();
   const helper = createColumnHelper<Row>();
   const fieldsDict = dictionary.fields as Record<string, string>;
-  const yesLabel = dictionary.common?.yes ?? dictionary.module.yes ?? "Yes";
-  const noLabel = dictionary.common?.no ?? dictionary.module.no ?? "No";
+  const yesLabel = dictionary.common?.yes ?? dictionary.module.yes ?? "نعم";
+  const noLabel = dictionary.common?.no ?? dictionary.module.no ?? "لا";
 
   const handleDelete = useCallback((id: string) => {
     startTransition(async () => {
@@ -107,9 +107,9 @@ export function ModuleTable({ resource, records, dictionary, locale = "en", from
         <div className="flex flex-wrap justify-end gap-1.5">
           {canAct ? (
             <>
-              <Button size="sm" variant="ghost" className="text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-600 dark:text-emerald-400" disabled={isPending} onClick={() => handleDecision(workflowId, "APPROVE")}><Check className="me-1 h-3.5 w-3.5" />Approve</Button>
-              <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10 hover:text-destructive" disabled={isPending} onClick={() => handleDecision(workflowId, "REJECT")}><X className="me-1 h-3.5 w-3.5" />Reject</Button>
-              <Button size="sm" variant="ghost" disabled={isPending} onClick={() => handleDecision(workflowId, "RETURN")}><RotateCcw className="me-1 h-3.5 w-3.5" />Return</Button>
+              <Button size="sm" variant="ghost" className="text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-600 dark:text-emerald-400" disabled={isPending} onClick={() => handleDecision(workflowId, "APPROVE")}><Check className="me-1 h-3.5 w-3.5" />اعتماد</Button>
+              <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10 hover:text-destructive" disabled={isPending} onClick={() => handleDecision(workflowId, "REJECT")}><X className="me-1 h-3.5 w-3.5" />رفض</Button>
+              <Button size="sm" variant="ghost" disabled={isPending} onClick={() => handleDecision(workflowId, "RETURN")}><RotateCcw className="me-1 h-3.5 w-3.5" />إرجاع</Button>
             </>
           ) : null}
           <DropdownMenu>

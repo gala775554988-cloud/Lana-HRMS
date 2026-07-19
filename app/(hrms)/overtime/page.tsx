@@ -18,7 +18,7 @@ export default async function OvertimePage() {
   return (
     <section className="space-y-6">
       <div className="rounded-2xl border bg-background p-6 shadow-sm">
-        <p className="text-sm font-medium text-muted-foreground">Operations</p>
+        <p className="text-sm font-medium text-muted-foreground">العمليات</p>
         <h1 className="text-3xl font-semibold tracking-tight">الأوفر تايم</h1>
         <p className="mt-2 text-muted-foreground">إضافة وإدارة طلبات الأوفر تايم وتصدير المعتمد منها.</p>
       </div>

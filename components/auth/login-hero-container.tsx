@@ -70,7 +70,7 @@ export function LoginHeroContainer({ dictionary, isAr }: { dictionary: Dictionar
       >
         <div className="max-w-6xl mx-auto space-y-12">
           <div className="flex items-center justify-between">
-            <BrandLogo href="/" size="md" subtitle="Enterprise Human Resource Platform" textClassName="text-white" subtitleClassName="text-white/65" />
+            <BrandLogo href="/" size="md" subtitle="منصة إدارة الموارد البشرية للمؤسسات" textClassName="text-white" subtitleClassName="text-white/65" />
             <div className="flex items-center gap-4">
               <ClientLanguageToggle variant="outline" />
               <Button
@@ -87,7 +87,7 @@ export function LoginHeroContainer({ dictionary, isAr }: { dictionary: Dictionar
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="space-y-6">
               <span className="rounded-full border border-teal-500/40 bg-teal-950/50 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-teal-300">
-                Pro Max SaaS HR Platform
+                منصة الموارد البشرية الاحترافية Pro Max
               </span>
               <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-[1.25]">
                 إدارة الموارد البشرية
@@ -111,11 +111,11 @@ export function LoginHeroContainer({ dictionary, isAr }: { dictionary: Dictionar
                 <div className="h-full rounded-[2.35rem] bg-[#F7F9FC] p-3.5 text-[#111827] space-y-3 text-start">
                   <div className="mx-auto mb-2 h-5 w-28 rounded-b-2xl bg-[#030C1B]" />
                   <div className="flex items-center justify-between border-b pb-2">
-                    <span className="text-[11px] font-black text-[#0B192B]">Lana HR Platform</span>
-                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold text-emerald-700">Enterprise</span>
+                    <span className="text-[11px] font-black text-[#0B192B]">منصة لانا للموارد البشرية</span>
+                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold text-emerald-700">للمؤسسات</span>
                   </div>
                   <div className="grid grid-cols-3 gap-1.5 text-center">
-                    <div className="rounded-xl bg-teal-600 p-2 text-white"><p className="text-[9px]">Platform</p><p className="text-sm font-black">360°</p></div>
+                    <div className="rounded-xl bg-teal-600 p-2 text-white"><p className="text-[9px]">المنصة</p><p className="text-sm font-black">360°</p></div>
                     <div className="rounded-xl border bg-white p-2"><p className="text-[9px] text-slate-500">الإجازات</p><p className="text-sm font-black text-teal-600">24</p></div>
                     <div className="rounded-xl border bg-white p-2"><p className="text-[9px] text-slate-500">الحضور</p><p className="text-sm font-black text-emerald-600">16</p></div>
                   </div>
@@ -155,7 +155,7 @@ export function LoginHeroContainer({ dictionary, isAr }: { dictionary: Dictionar
           <BrandLogo href="/" size="sm" showText={true} />
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" onClick={switchToHero} className="text-xs font-bold text-slate-600 hover:bg-slate-100 dark:text-slate-400">
-              استعراض مميزات المنصة (Hero View)
+              استعراض مميزات المنصة (الصفحة الترويجية)
             </Button>
             <ClientLanguageToggle variant="outline" />
           </div>

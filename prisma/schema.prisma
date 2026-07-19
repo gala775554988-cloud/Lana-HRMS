@@ -377,6 +377,7 @@ model Employee {
   payrollItems           PayrollItem[]
   leaveRequests          LeaveRequest[]
   resumptionRequests     ResumptionRequest[]
+  leaveBalance           EmployeeLeaveBalance?
   attendanceRecords      AttendanceRecord[]
   preferences            EmployeePreference?
   mobileDevice           EmployeeMobileDevice?
@@ -465,20 +466,22 @@ model EmployeeContract {
 }
 
 model InsurancePolicy {
-  id           String          @id @default(cuid())
-  employeeId   String
-  policyNumber String          @unique
-  provider     String
-  coverageType String?
-  startDate    DateTime
-  endDate      DateTime
-  status       InsuranceStatus @default(ACTIVE)
-  documentUrl  String?
-  documentName String?
-  notes        String?
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-  employee     Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  id              String          @id @default(cuid())
+  employeeId      String
+  policyNumber    String          @unique
+  provider        String
+  coverageType    String?
+  category        String?         @default("NA") // VIP | A | B | C | NA
+  dependentsCount Int             @default(0)
+  startDate       DateTime
+  endDate         DateTime
+  status          InsuranceStatus @default(ACTIVE)
+  documentUrl     String?
+  documentName    String?
+  notes           String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  employee        Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([employeeId])
   // Backs the "policy renewal due soon" badge: status = ACTIVE AND endDate <= cutoff.
@@ -675,6 +678,23 @@ model ResumptionRequest {
 
   @@index([employeeId])
   @@index([status])
+}
+
+// A single aggregate leave balance per employee (matches how the portal
+// dashboard and CSV import already treat leave balance -- one number, not
+// per-LeaveType). `accrued` is the only field an admin edits directly
+// (grant/correct entitlement); `used` is system-maintained, incremented
+// automatically whenever a LeaveRequest workflow reaches APPROVED.
+// remaining = accrued - used, intentionally allowed to go negative so an
+// employee who was approved past their balance shows a real overdraft
+// instead of being silently clamped to zero.
+model EmployeeLeaveBalance {
+  id         String   @id @default(cuid())
+  employeeId String   @unique
+  accrued    Decimal  @db.Decimal(6, 2) @default(30)
+  used       Decimal  @db.Decimal(6, 2) @default(0)
+  updatedAt  DateTime @updatedAt
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 }
 
 model PayrollRun {

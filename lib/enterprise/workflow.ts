@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
 import { resolveApprovalChain } from "@/lib/enterprise/hierarchy";
 import { createEnterpriseNotification, notifyUsers } from "@/lib/enterprise/notifications";
+import { recordLeaveApprovalUsage } from "@/lib/employee/leave-balance";
 
 export async function createEnterpriseWorkflow(employeeId: string, type: string, entityId: string) {
   const approvers = await resolveApprovalChain(employeeId, type.toLowerCase());
@@ -130,6 +131,18 @@ export async function decideWorkflowStep({
     const nextOvertimeStatus = workflowStatus === "COMPLETED" ? "APPROVED" : workflowStatus === "REJECTED" ? "REJECTED" : workflowStatus === "RETURNED" ? "PENDING" : undefined;
     if (nextOvertimeStatus) {
       await prisma.overtimeRequest.update({ where: { id: instance.entityId }, data: { status: nextOvertimeStatus as any } }).catch(() => null);
+    }
+  }
+
+  if (instance.type === "LEAVE") {
+    const nextLeaveStatus = workflowStatus === "COMPLETED" ? "APPROVED" : workflowStatus === "REJECTED" ? "REJECTED" : workflowStatus === "RETURNED" ? "PENDING" : undefined;
+    if (nextLeaveStatus) {
+      const updatedLeave = await prisma.leaveRequest
+        .update({ where: { id: instance.entityId }, data: { status: nextLeaveStatus as any, decidedAt: new Date(), decisionNote: comments } })
+        .catch(() => null);
+      if (nextLeaveStatus === "APPROVED" && updatedLeave) {
+        await recordLeaveApprovalUsage(instance.employeeId, Number(updatedLeave.days)).catch(() => null);
+      }
     }
   }
 

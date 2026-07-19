@@ -85,6 +85,17 @@ async function ensureDbSchema() {
     `CREATE TABLE IF NOT EXISTS "ResumptionRequest" ("id" TEXT NOT NULL, "employeeId" TEXT NOT NULL, "leaveRequestId" TEXT, "returnDate" TIMESTAMP(3) NOT NULL, "resumptionType" TEXT NOT NULL DEFAULT 'AFTER_LEAVE', "reason" TEXT, "notes" TEXT, "status" TEXT NOT NULL DEFAULT 'PENDING', "decidedAt" TIMESTAMP(3), "decisionNote" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "ResumptionRequest_pkey" PRIMARY KEY ("id"));`,
     `CREATE INDEX IF NOT EXISTS "ResumptionRequest_employeeId_idx" ON "ResumptionRequest"("employeeId");`,
     `CREATE INDEX IF NOT EXISTS "ResumptionRequest_status_idx" ON "ResumptionRequest"("status");`,
+    `CREATE TABLE IF NOT EXISTS "EmployeeLeaveBalance" (
+      "id" TEXT NOT NULL,
+      "employeeId" TEXT NOT NULL,
+      "accrued" DECIMAL(6,2) NOT NULL DEFAULT 30,
+      "used" DECIMAL(6,2) NOT NULL DEFAULT 0,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "EmployeeLeaveBalance_pkey" PRIMARY KEY ("id")
+    );`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "EmployeeLeaveBalance_employeeId_key" ON "EmployeeLeaveBalance"("employeeId");`,
+    `ALTER TABLE "InsurancePolicy" ADD COLUMN IF NOT EXISTS "category" TEXT DEFAULT 'NA';`,
+    `ALTER TABLE "InsurancePolicy" ADD COLUMN IF NOT EXISTS "dependentsCount" INTEGER NOT NULL DEFAULT 0;`,
     `ALTER TABLE "HrPermissionScope" ADD COLUMN IF NOT EXISTS "hospitalId" TEXT;`,
     `ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "sponsor" TEXT;`,
     `ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "odooRawData" JSONB;`,
