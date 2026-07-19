@@ -17,6 +17,7 @@ export type WorkflowStepItem = {
 
 type OrgUnit = { id: string; name: string };
 type OrgUnits = { departments: OrgUnit[]; branches: OrgUnit[]; hospitals: OrgUnit[] };
+type DynamicRequestType = { code: string; label: string };
 
 const EMPTY_ORG_UNITS: OrgUnits = { departments: [], branches: [], hospitals: [] };
 
@@ -29,11 +30,11 @@ interface WorkflowManagerProps {
   defaultOrgScopeType?: "hospital" | "branch" | "department";
 }
 
-function emptyStep(defaultOrgType = ""): WorkflowStepItem {
+function emptyStep(defaultOrgType = "", orgId = ""): WorkflowStepItem {
   return {
     id: `step-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     approverId: "",
-    orgUnitId: defaultOrgType ? `${defaultOrgType}:all` : "",
+    orgUnitId: orgId || (defaultOrgType ? `${defaultOrgType}:all` : ""),
     approverPosition: "معتمِد",
     orgUnitLabel: defaultOrgType === "hospital" ? "المستشفيات" : "الإدارة أو الفروع",
     roleContext: "APPROVER"
@@ -42,7 +43,7 @@ function emptyStep(defaultOrgType = ""): WorkflowStepItem {
 
 export function WorkflowManager({
   initialSteps = [],
-  moduleName = "إجازة سنوية",
+  moduleName = "طلبات الإجازات",
   initialSendToDirectManagerFirst = true,
   onSave,
   defaultOrgScopeType = "hospital"
@@ -52,6 +53,7 @@ export function WorkflowManager({
   const [sendToDirectManagerFirst, setSendToDirectManagerFirst] = useState<boolean>(initialSendToDirectManagerFirst);
   const [steps, setSteps] = useState<WorkflowStepItem[]>(initialSteps);
   const [orgUnits, setOrgUnits] = useState<OrgUnits>(EMPTY_ORG_UNITS);
+  const [requestTypes, setRequestTypes] = useState<DynamicRequestType[]>([]);
   const [selectedOrgUnitId, setSelectedOrgUnitId] = useState<string>("");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -72,8 +74,18 @@ export function WorkflowManager({
     if (moduleName) setWorkflowName(moduleName);
   }, [moduleName]);
 
+  // Fetch dynamic request types and org units from Prisma database
   useEffect(() => {
     let cancelled = false;
+    fetch("/api/enterprise/request-types", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled && data.success && Array.isArray(data.requestTypes)) {
+          setRequestTypes(data.requestTypes);
+        }
+      })
+      .catch(() => {});
+
     fetch("/api/enterprise/workflow-paths/org-units", { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
@@ -86,8 +98,7 @@ export function WorkflowManager({
   }, []);
 
   const addApprover = () => {
-    const newStep = emptyStep(defaultOrgScopeType);
-    if (selectedOrgUnitId) newStep.orgUnitId = selectedOrgUnitId;
+    const newStep = emptyStep(defaultOrgScopeType, selectedOrgUnitId);
     setSteps((current) => [...current, newStep]);
   };
 
@@ -99,6 +110,7 @@ export function WorkflowManager({
     setSteps((current) => current.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   };
 
+  // Cascading Select handler: updating Hospital / Branch cascades to every step in the state
   const handleOrgUnitChange = (val: string) => {
     setSelectedOrgUnitId(val);
     setSteps((current) => current.map((s) => ({ ...s, orgUnitId: val })));
@@ -109,7 +121,7 @@ export function WorkflowManager({
     startTransition(async () => {
       try {
         if (onSave) await onSave(steps, sendToDirectManagerFirst, workflowName);
-        setMessage("✓ تم حفظ إعدادات سير الطلبات والمعتمدين بنجاح");
+        setMessage("✓ تم حفظ إعدادات سير الطلبات والمعتمدين بنجاح 100%");
       } catch (err: any) {
         setMessage(`⚠️ ${err.message || "حدث خطأ أثناء حفظ الإعدادات"}`);
       }
@@ -120,7 +132,7 @@ export function WorkflowManager({
     if (initialSteps && initialSteps.length > 0) setSteps(initialSteps);
     setSendToDirectManagerFirst(initialSendToDirectManagerFirst);
     setWorkflowName(moduleName);
-    setMessage("ℹ️ تم إلغاء التغييرات");
+    setMessage("ℹ️ تم إلغاء التغييرات واستعادة الإعدادات الأصلية");
   };
 
   return (
@@ -137,22 +149,31 @@ export function WorkflowManager({
         </div>
       ) : null}
 
-      {/* Card 1: الاسم - بالعربية + اختيار المستشفى/الإدارة (بنفس شكل الصورة المرسلة تماماً وبدون الإنجليزي) */}
+      {/* Card 1: الاسم - بالعربية (قائمة منسدلة تجلب أنواع الطلبات ديناميكياً) + المستشفى / الإدارة والفروع */}
       <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-5">
         <div className="grid gap-6 sm:grid-cols-2">
-          {/* الاسم - بالعربية */}
+          {/* الاسم - بالعربية (Select Dynamic from Prisma) */}
           <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">الاسم - بالعربية</label>
-            <input
-              type="text"
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">الاسم - بالعربية (`أنواع الطلبات`)</label>
+            <select
               value={workflowName}
               onChange={(e) => setWorkflowName(e.target.value)}
-              placeholder={isHospital ? "إجازة سنوية - المستشفيات" : "إجازة سنوية - الإدارة والفروع"}
               className="w-full h-11 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-3.5 text-sm font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-2xs transition"
-            />
+            >
+              <option value="">-- اختر نوع الطلب من قاعدة البيانات --</option>
+              {requestTypes.map((rt) => (
+                <option key={rt.code} value={rt.label}>
+                  {rt.label}
+                </option>
+              ))}
+              {/* Ensure current workflowName is selectable even if custom/not directly in list */}
+              {workflowName && !requestTypes.some((rt) => rt.label === workflowName) ? (
+                <option value={workflowName}>{workflowName}</option>
+              ) : null}
+            </select>
           </div>
 
-          {/* المستشفى أو الإدارة والفروع كما طلب المستخدم في الترتيب */}
+          {/* المستشفى أو الإدارة والفروع (Cascading Select) */}
           <div className="space-y-2">
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               {isHospital ? "المستشفى" : "الإدارة أو الفروع"}
@@ -176,7 +197,7 @@ export function WorkflowManager({
         </div>
       </div>
 
-      {/* Card 2: توجيه الطلب للمدير المباشر أولا (مطابق تماماً للصورة المرجعية) */}
+      {/* Card 2: توجيه الطلب للمدير المباشر أولا */}
       <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
           <h3 className="text-base font-black text-slate-800 dark:text-slate-100">توجيه الطلب للمدير المباشر أولا</h3>
@@ -218,7 +239,7 @@ export function WorkflowManager({
         </div>
       </div>
 
-      {/* Card 3: المعتمدون (مطابق بالضبط للصورة المرجعية والمطلوبة دون أي إضافات خارجية) */}
+      {/* Card 3: المعتمدون (الموظف المعتمد + إضافة معتمد) */}
       <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3.5">
           <h3 className="text-lg font-black text-slate-900 dark:text-slate-100">المعتمدون</h3>
@@ -232,13 +253,13 @@ export function WorkflowManager({
         </div>
 
         <div>
-          <label className="text-xs font-bold text-muted-foreground block mb-3.5">حدد المعتمدون</label>
+          <label className="text-xs font-bold text-muted-foreground block mb-3.5">حدد المعتمدون (`الموظف المعتمد`)</label>
           <div className="space-y-3">
             {steps.map((step, index) => {
               const canRemove = steps.length > 1;
               return (
                 <div key={step.id} className="flex items-center gap-3">
-                  {/* إزالة button exactly as shown in Screenshot ... 123046.png */}
+                  {/* إزالة button exactly as shown in Screenshot 2026-07-19 123046.png */}
                   {canRemove ? (
                     <button
                       type="button"
@@ -262,7 +283,7 @@ export function WorkflowManager({
                           approverPosition: employee?.position?.title || step.approverPosition || ""
                         });
                       }}
-                      placeholder="اختر المعتمد بالاسم أو الرقم الوظيفي..."
+                      placeholder="اختر الموظف المعتمد بالاسم أو الرقم الوظيفي..."
                     />
                   </div>
                 </div>
