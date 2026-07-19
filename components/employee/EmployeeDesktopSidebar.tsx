@@ -37,12 +37,12 @@ export function EmployeeDesktopSidebar() {
         onMouseEnter={() => handleIntent(item.href)}
         onFocus={() => handleIntent(item.href)}
         className={cn(
-          'flex items-center gap-3 px-3 py-2.5 rounded-2xl text-sm font-medium transition-all duration-200 will-change-transform hover:-translate-y-0.5 active:scale-[0.985]',
+          'flex items-center gap-3 px-3.5 py-3 rounded-2xl text-sm font-bold transition-all duration-200 will-change-transform hover:-translate-y-0.5 active:scale-[0.985] border border-transparent',
           active
-            ? 'bg-primary text-white shadow font-bold'
+            ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-white font-black shadow-md shadow-teal-500/25 border-teal-400/40'
             : emphasized
-            ? 'text-slate-700 bg-slate-50 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:bg-slate-900/60 dark:hover:bg-slate-800'
-            : 'text-slate-600 hover:bg-primary/10 hover:text-primary dark:text-slate-400 dark:hover:bg-slate-800'
+            ? 'text-slate-800 bg-teal-50/60 hover:bg-teal-100 hover:text-teal-900 dark:text-slate-200 dark:bg-slate-900/60'
+            : 'text-slate-700 dark:text-slate-300 hover:bg-teal-500/10 hover:text-teal-700 dark:hover:text-teal-300'
         )}
       >
         <span className="relative inline-flex shrink-0">
@@ -64,12 +64,12 @@ export function EmployeeDesktopSidebar() {
 
   return (
     <div
-      style={{ background: "var(--sidebar-gradient, linear-gradient(180deg, #311158 0%, #4c1d95 50%, #0f172a 100%))" }}
-      className="flex flex-col h-screen overflow-hidden font-sans border-e border-white/10 text-white shadow-2xl backdrop-blur-2xl p-4 overflow-y-auto"
+      style={{ background: "var(--sidebar-gradient, linear-gradient(180deg, #FFFFFF 0%, #EAF8F6 50%, #F4FCFA 100%))" }}
+      className="flex flex-col border border-teal-200/60 dark:border-teal-800/60 text-slate-800 dark:text-slate-100 shadow-2xl shadow-teal-900/10 backdrop-blur-2xl rounded-3xl m-3 lg:my-4 lg:ms-4 h-[calc(100vh-2rem)] p-4 overflow-y-auto font-sans"
     >
-      <div className="px-3 mb-4 text-xs font-extrabold text-white/70 tracking-wider flex items-center justify-between border-b border-white/15 pb-2.5">
-        <span className="flex items-center gap-1.5 font-black text-white">
-          <span className="h-2 w-2 rounded-full bg-emerald-400 inline-block animate-pulse" />
+      <div className="px-3 mb-4 text-xs font-extrabold text-slate-700 dark:text-slate-300 tracking-wider flex items-center justify-between border-b border-teal-200/60 dark:border-teal-800 pb-2.5">
+        <span className="flex items-center gap-1.5 font-black text-slate-900 dark:text-slate-100">
+          <span className="h-2.5 w-2.5 rounded-full bg-teal-500 inline-block animate-pulse" />
           <span>بوابة الموظف (Lana HRMS)</span>
         </span>
       </div>

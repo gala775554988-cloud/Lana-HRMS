@@ -166,9 +166,9 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
           depth shadows, and motion tuned with the shared premium easing so
           hover/active states feel considered rather than instant snaps. */}
       <aside
-        style={{ background: "var(--sidebar-gradient, linear-gradient(180deg, #311158 0%, #4c1d95 50%, #0f172a 100%))" }}
+        style={{ background: "var(--sidebar-gradient, linear-gradient(180deg, #FFFFFF 0%, #EAF8F6 50%, #F4FCFA 100%))" }}
         className={cn(
-          "fixed inset-y-0 start-0 z-50 flex h-screen flex-col border-e border-white/10 text-white shadow-2xl backdrop-blur-2xl transition-all duration-300 ease-premium lg:sticky lg:top-0 lg:z-auto lg:!translate-x-0 dark:border-white/10",
+          "fixed inset-y-0 start-0 z-50 flex flex-col border border-teal-200/60 dark:border-teal-800/60 text-slate-800 dark:text-slate-100 shadow-2xl shadow-teal-900/10 backdrop-blur-2xl transition-all duration-300 ease-premium rounded-3xl m-3 lg:my-4 lg:ms-4 h-[calc(100vh-2rem)] lg:sticky lg:top-4 lg:z-auto lg:!translate-x-0",
           sidebarCollapsed ? "lg:w-[78px]" : "lg:w-[284px]",
           "w-[284px]",
           mobileMenuOpen ? "translate-x-0" : "rtl:translate-x-full ltr:-translate-x-full"
@@ -224,8 +224,8 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
                                 "group relative flex items-center gap-3.5 rounded-2xl px-3.5 py-3 text-sm font-bold transition-all duration-300 ease-premium border",
                                 sidebarCollapsed ? "lg:justify-center lg:px-2.5 lg:py-3" : "",
                                 active
-                                  ? "bg-gradient-to-l from-primary to-secondary text-white font-black shadow-premium-md border-primary/40 dark:text-slate-950"
-                                  : "border-transparent text-slate-600 hover:translate-x-0.5 rtl:hover:-translate-x-0.5 hover:bg-primary/8 hover:text-primary hover:border-primary/15 hover:shadow-premium-sm dark:text-slate-400 dark:hover:bg-primary/10 dark:hover:text-primary dark:hover:border-primary/20"
+                                  ? "bg-gradient-to-r from-teal-500 to-emerald-500 text-white font-black shadow-md shadow-teal-500/25 border-teal-400/40"
+                                  : "border-transparent text-slate-700 dark:text-slate-300 hover:translate-x-0.5 rtl:hover:-translate-x-0.5 hover:bg-teal-500/10 hover:text-teal-700 dark:hover:text-teal-300"
                               )}
                               title={sidebarCollapsed ? label : undefined}
                             >
