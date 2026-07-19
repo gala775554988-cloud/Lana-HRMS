@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import "@/lib/error-interceptor";
 import { cookies, headers } from "next/headers";
 import { siteConfig } from "@/config/site";
 import { getDirection, normalizeLocale } from "@/lib/i18n";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, RefreshCw, Home, Copy, CheckCircle2, LogOut, Code, FileCode } from "lucide-react";
+import { AlertTriangle, RefreshCw, Home, Copy, CheckCircle2, LogOut, Code, FileCode, Loader2 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 
@@ -9,19 +9,37 @@ import { Button } from "@/components/ui/button";
  * Global Root Error Boundary (`app/error.tsx`)
  * --------------------------------------------
  * Catches unhandled runtime errors across the root application layout and dashboard.
- * Explicitly displays diagnostic details, error message, and Server Digest right on the screen
- * so administrators and developers know exact failure origins without needing Vercel console logs.
+ * When Next.js conceals server component errors behind `An error occurred in the Server Components render`,
+ * this component automatically queries `/api/internal/get-error-diagnostic?digest=XXXX` and displays the
+ * exact raw server error message and stack trace directly on the user's screen.
  */
 export default function RootError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   const [copied, setCopied] = useState(false);
+  const [fetchingDiagnostic, setFetchingDiagnostic] = useState(false);
+  const [diagnostic, setDiagnostic] = useState<{ message?: string; stack?: string; timestamp?: string } | null>(null);
 
-  const rawMessage = error.message || "Unknown runtime error";
   const digest = error.digest || "N/A";
-  const stack = error.stack || "";
+  const rawMessage = diagnostic?.message || error.message || "Unknown runtime error";
+  const stack = diagnostic?.stack || error.stack || "";
+
+  useEffect(() => {
+    if (digest !== "N/A" || error.message?.includes("Server Components render")) {
+      setFetchingDiagnostic(true);
+      fetch(`/api/internal/get-error-diagnostic?digest=${encodeURIComponent(digest !== "N/A" ? digest : "")}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.success && data.message) {
+            setDiagnostic({ message: data.message, stack: data.stack, timestamp: data.timestamp });
+          }
+        })
+        .catch(() => {})
+        .finally(() => setFetchingDiagnostic(false));
+    }
+  }, [digest, error.message]);
 
   const handleCopy = () => {
     const text = [
-      `== اعتراف النظام بالخطأ التقني (Diagnostic Confession) ==`,
+      `== اعتراف النظام بالخطأ التقني المباشر (Diagnostic Confession) ==`,
       `رسالة الخطأ: ${rawMessage}`,
       `الرقم المرجعي (Digest): ${digest}`,
       stack ? `مسار الخطأ (Stack Trace):\n${stack}` : "",
@@ -53,7 +71,6 @@ export default function RootError({ error, reset }: { error: Error & { digest?: 
   return (
     <section className="flex min-h-[80vh] items-center justify-center p-4 bg-slate-50 dark:bg-slate-950" dir="rtl">
       <div className="max-w-2xl w-full rounded-3xl border border-rose-200 bg-white p-8 shadow-2xl dark:border-rose-900/80 dark:bg-slate-900">
-        {/* Header */}
         <div className="flex items-start gap-4 mb-6">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-rose-600 text-white shadow-lg shadow-rose-600/30">
             <AlertTriangle className="h-7 w-7 animate-pulse" />
@@ -71,12 +88,21 @@ export default function RootError({ error, reset }: { error: Error & { digest?: 
           </div>
         </div>
 
-        {/* Confession Diagnostic Box */}
         <div className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 mb-5 space-y-3 dark:border-rose-900/60 dark:bg-rose-950/40 font-mono text-xs">
           <div>
-            <span className="font-bold text-rose-900 dark:text-rose-200 block mb-1 flex items-center gap-1.5">
-              <Code className="h-4 w-4" />
-              <span>الرسالة التقنية (Error Message):</span>
+            <span className="font-bold text-rose-900 dark:text-rose-200 block mb-1 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Code className="h-4 w-4" />
+                <span>الرسالة التقنية الحقيقية (Raw Technical Error):</span>
+              </span>
+              {fetchingDiagnostic ? (
+                <span className="flex items-center gap-1 text-[10px] text-amber-600 animate-pulse">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <span>جلب التشخيص الدقيق من السيرفر...</span>
+                </span>
+              ) : diagnostic ? (
+                <span className="text-[10px] text-emerald-600 font-bold">✓ تم سحب التشخيص الفعلي من خادم Vercel</span>
+              ) : null}
             </span>
             <div className="p-3 bg-white dark:bg-slate-950 rounded-xl border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-300 font-bold select-all overflow-x-auto">
               {rawMessage}
@@ -96,7 +122,7 @@ export default function RootError({ error, reset }: { error: Error & { digest?: 
             <div>
               <span className="font-bold text-slate-600 dark:text-slate-400 block mb-1 flex items-center gap-1.5">
                 <FileCode className="h-3.5 w-3.5" />
-                <span>مسار التنفيذ والملف (Stack Trace):</span>
+                <span>مسار التنفيذ والسطر (Stack Trace):</span>
               </span>
               <pre className="p-3 bg-slate-900 text-slate-200 rounded-xl text-[10px] leading-relaxed overflow-x-auto max-h-56 select-all">
                 {stack}
@@ -105,7 +131,6 @@ export default function RootError({ error, reset }: { error: Error & { digest?: 
           )}
         </div>
 
-        {/* Session Purge Warning Box */}
         {isUnlinkedOrAuthError ? (
           <div className="rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 p-4 mb-5 space-y-3">
             <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-bold text-sm">
@@ -122,7 +147,6 @@ export default function RootError({ error, reset }: { error: Error & { digest?: 
           </div>
         ) : null}
 
-        {/* Actions */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
           <Button variant="outline" size="sm" onClick={handleCopy} className="gap-2 text-xs font-bold rounded-xl border-slate-300 dark:border-slate-700 h-10 px-4">
             {copied ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4 text-slate-500" />}
