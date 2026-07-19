@@ -34,7 +34,7 @@ export function WebAuthnDeviceBindingWidget({
       // 2. Trigger browser hardware prompt (Face ID / Fingerprint / Windows Hello)
       let attResp;
       try {
-        attResp = await startRegistration({ optionsJSON: optData.options });
+        attResp = await startRegistration(optData.options);
       } catch (browserErr: any) {
         if (browserErr?.name === "NotAllowedError") {
           throw new Error("تم إلغاء أو رفض المصادقة البيومترية من قبل المستخدم أو الجهاز");
@@ -85,7 +85,7 @@ export function WebAuthnDeviceBindingWidget({
       // 2. Trigger device biometric signature
       let asseResp;
       try {
-        asseResp = await startAuthentication({ optionsJSON: optData.options });
+        asseResp = await startAuthentication(optData.options);
       } catch (browserErr: any) {
         throw new Error(browserErr?.message || "فشل قراءة بصمة الجهاز أو إلغاء العملية");
       }

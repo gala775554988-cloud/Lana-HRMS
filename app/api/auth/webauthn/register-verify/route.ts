@@ -41,7 +41,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: "فشل التحقق من صحة المفتاح البيومتري للجهاز" }, { status: 400 });
     }
 
-    const { credentialID, credentialPublicKey, counter, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
+    const { credentialID: credentialIDBytes, credentialPublicKey, counter, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
+    const credentialID = Buffer.from(credentialIDBytes).toString("base64url");
 
     // Check if hardware credential ID is already registered
     const existingCred = await prisma.biometricCredential.findUnique({
@@ -88,20 +89,13 @@ export async function POST(req: NextRequest) {
         where: { deviceId },
         update: {
           employeeId: employee.id,
-          isBlocked: false,
-          verifiedAt: new Date(),
-          lastActiveAt: new Date(),
-          deviceName: body.deviceName || "PWA / Biometric Hardware Key"
+          lastSeenAt: new Date()
         },
         create: {
           employeeId: employee.id,
           deviceId,
-          deviceHash: credentialID,
-          deviceName: body.deviceName || "PWA / Biometric Hardware Key",
           platform: "WebAuthn Biometric PWA",
-          isBlocked: false,
-          verifiedAt: new Date(),
-          lastActiveAt: new Date()
+          lastSeenAt: new Date()
         }
       }).catch(() => null);
     }
