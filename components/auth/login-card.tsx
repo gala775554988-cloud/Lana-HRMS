@@ -3,7 +3,6 @@
 import { Suspense, useState } from "react";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { LoginForm } from "@/app/login/login-form";
-import { WebAuthnDeviceBindingWidget } from "@/components/auth/webauthn-device-binding";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { Dictionary } from "@/lib/i18n";
@@ -48,23 +47,13 @@ export function LoginCard({ dictionary }: { dictionary: Dictionary }) {
       <div
         style={{ animationDelay: "90ms" }}
         className={cn(
-          "lana-slide-up relative rounded-3xl border border-slate-200/80 bg-white p-8 shadow-glass transition-all duration-500 ease-premium before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:shadow-[inset_0_1px_0_0_rgb(255_255_255_/_0.6)] dark:border-slate-800 dark:bg-slate-900/70 space-y-6",
+          "lana-slide-up relative rounded-3xl border border-slate-200/80 bg-white p-8 shadow-glass transition-all duration-500 ease-premium before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:shadow-[inset_0_1px_0_0_rgb(255_255_255_/_0.6)] dark:border-slate-800 dark:bg-slate-900/70",
           exiting ? "scale-95 opacity-0" : "scale-100 opacity-100"
         )}
       >
         <Suspense>
           <LoginForm dictionary={dictionary} onLoginSuccess={handleLoginSuccess} />
         </Suspense>
-
-        <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
-          <WebAuthnDeviceBindingWidget
-            mode="authenticate"
-            onAuthenticated={async (user) => {
-              await handleLoginSuccess();
-              window.location.href = "/dashboard";
-            }}
-          />
-        </div>
       </div>
     </div>
   );

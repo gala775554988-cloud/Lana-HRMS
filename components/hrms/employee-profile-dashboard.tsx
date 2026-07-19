@@ -18,7 +18,6 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
-import { WebAuthnDeviceBindingWidget } from "@/components/auth/webauthn-device-binding";
 
 interface DeviceBinding {
   bound: boolean;
@@ -665,13 +664,8 @@ export function EmployeeProfileDashboard({
                 {deviceBound ? (isAr ? "مرتبط بجهاز" : "Device bound") : (isAr ? "غير مرتبط" : "Not bound")}
               </button>
             </CardHeader>
-            <CardContent className="text-xs text-amber-800 dark:text-amber-300/90 leading-relaxed space-y-4">
-              <p>
-                عند تسجيل دخول الموظف لأول مرة أو تسجيل الحضور من التطبيق، يقوم النظام تلقائياً بربط الحساب ببصمة الجهاز الفريدة (UUID). عند محاولة الدخول من جهاز جديد يتم حظر المحاولة وإرسال تنبيه أمني للمسؤول. للتمكين من الدخول من جهاز آخر اضغط على المؤشر أعلاه.
-              </p>
-              <div className="pt-2">
-                <WebAuthnDeviceBindingWidget mode="register" identifier={employee?.employeeNumber || employee?.id} />
-              </div>
+            <CardContent className="text-xs text-amber-800 dark:text-amber-300/90 leading-relaxed">
+              عند تسجيل دخول الموظف لأول مرة أو تسجيل الحضور من التطبيق، يقوم النظام تلقائياً بربط الحساب ببصمة الجهاز الفريدة (UUID). عند محاولة الدخول من جهاز جديد يتم حظر المحاولة وإرسال تنبيه أمني للمسؤول. للتمكين من الدخول من جهاز آخر اضغط على المؤشر أعلاه.
             </CardContent>
           </Card>
 

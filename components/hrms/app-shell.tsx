@@ -39,6 +39,7 @@ type NavKey = keyof Dictionary["nav"];
 
 const navItems: Array<{ href: string; labelKey: NavKey; icon: typeof LayoutDashboard; group: string; resource: string | string[] }> = [
   { href: "/dashboard", labelKey: "dashboard", icon: LayoutDashboard, group: "dashboardAnalytics", resource: "dashboard" },
+  { href: "/integrations/synchronization", labelKey: "integrations-sync", icon: PlugZap, group: "dashboardAnalytics", resource: "dashboard" },
 
   { href: "/employees", labelKey: "employees", icon: Users, group: "peopleContracts", resource: "employees" },
   { href: "/branches", labelKey: "departments-branches", icon: MapPin, group: "peopleContracts", resource: ["departments", "branches"] },
@@ -64,7 +65,6 @@ const navItems: Array<{ href: string; labelKey: NavKey; icon: typeof LayoutDashb
   { href: "/assets", labelKey: "assets", icon: Package, group: "talentAssets", resource: "assets" },
 
   { href: "/permissions", labelKey: "permissions", icon: Shield, group: "systemSettings", resource: "permissions" },
-  { href: "/integrations/synchronization", labelKey: "integrations-sync", icon: PlugZap, group: "systemSettings", resource: "settings" },
   { href: "/reports", labelKey: "reports", icon: BarChart3, group: "systemSettings", resource: "reports" },
   { href: "/announcements", labelKey: "announcements", icon: Megaphone, group: "systemSettings", resource: ["announcements", "notifications"] },
   { href: "/audit-logs", labelKey: "audit-logs", icon: Shield, group: "systemSettings", resource: "audit-logs" },
@@ -287,14 +287,14 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
             )}
           </div>
 
-          {/* Personal Navigation Items (بياناتي: ملفي، الرواتب، العهد، المستندات) */}
+          {/* Personal Navigation Items (بياناتي: الخدمة الذاتية، الرواتب، العهد، المستندات، والملف مخفي بآخر خانة) */}
           <div className="space-y-1">
             {[
-              { href: "/employee/profile", label: "ملفي الشخصي", icon: Users, desc: "بياناتي أنا فقط" },
+              { href: "/employee/dashboard", label: "بوابة الخدمة الذاتية", icon: Calendar, desc: "الإجازات والطلبات" },
               { href: "/employee/salary", label: "الرواتب والمستحقات", icon: DollarSign, desc: "قسائم الراتب" },
               { href: "/employee/assets", label: "عهد ممتلكاتي", icon: Package, desc: "العهد والمعدات" },
               { href: "/employee/documents", label: "مستنداتي ووثائقي", icon: FileText, desc: "المستندات والعقود" },
-              { href: "/employee/dashboard", label: "بوابة الخدمة الذاتية", icon: Calendar, desc: "الإجازات والطلبات" },
+              { href: "/employee/profile", label: "ملفي الشخصي (إعدادات الحساب)", icon: Users, desc: "بياناتي مخفية بالأسفل" },
             ].map((pItem) => {
               const PIcon = pItem.icon;
               const pActive = isActive(pItem.href);
