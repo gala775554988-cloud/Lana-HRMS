@@ -12,8 +12,17 @@ import { LazyLanaAiAssistant } from "@/components/enterprise/lazy-lana-ai-assist
 import { PWAInstallPrompt } from "@/components/pwa/pwa-install-prompt";
 import { PWARegister } from "@/components/pwa/pwa-register";
 
+function getSafeMetadataBase() {
+  const url = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+  try {
+    return new URL(url.startsWith("http://") || url.startsWith("https://") ? url : `https://${url}`);
+  } catch {
+    return new URL("https://lanahr.vercel.app");
+  }
+}
+
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.APP_URL ?? "http://localhost:3000"),
+  metadataBase: getSafeMetadataBase(),
   title: { default: siteConfig.name, template: "%s | Lana HRMS" },
   description: siteConfig.description,
   applicationName: siteConfig.name,
