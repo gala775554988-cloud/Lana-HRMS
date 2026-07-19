@@ -4,7 +4,10 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { Menu, X, LayoutDashboard } from 'lucide-react';
+import {
+  Menu, X, LayoutDashboard, Users, GitPullRequest, DollarSign,
+  Shield, PlugZap, BarChart3, Clock
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEmployeeNavItems } from '@/lib/employee/use-employee-nav-items';
 import type { EmployeeNavItem } from '@/lib/employee/nav-items';
@@ -17,9 +20,10 @@ export function EmployeeMobileSidebar() {
   const [open, setOpen] = useState(false);
 
   const userRoles = (session?.user?.roles as string[]) || [];
-  const isExecutiveOrManager = userRoles.some((r) => ["SUPER_ADMIN", "HR_MANAGER", "DIRECT_MANAGER", "DEPARTMENT_MANAGER", "BRANCH_MANAGER", "PAYROLL_OFFICER"].includes(r));
-  const topGroups = groups.filter((g) => g.key !== "myData");
-  const myDataGroup = groups.find((g) => g.key === "myData");
+  const isExecutiveOrManager = userRoles.some((r) =>
+    ["SUPER_ADMIN", "HR_MANAGER", "DIRECT_MANAGER", "DEPARTMENT_MANAGER", "BRANCH_MANAGER", "PAYROLL_OFFICER", "ADMIN"].includes(r) ||
+    r.includes("HR") || r.includes("ADMIN") || r.includes("MANAGER")
+  );
 
   useEffect(() => {
     document.body.style.overflow = open ? 'hidden' : '';
@@ -93,76 +97,82 @@ export function EmployeeMobileSidebar() {
         >
           <nav
             onClick={(e) => e.stopPropagation()}
-            className="max-h-[85vh] w-full flex flex-col overflow-hidden rounded-t-[2.5rem] bg-white dark:bg-slate-900 shadow-2xl transition-all"
+            className="max-h-[85vh] w-full flex flex-col overflow-hidden rounded-t-[2.5rem] bg-white dark:bg-slate-900 shadow-2xl transition-all p-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] overflow-y-auto"
             dir="rtl"
           >
-            {/* Scrollable Operations & Requests Section */}
-            <div className="flex-1 overflow-y-auto p-5 pb-3 space-y-5">
-              <div className="flex items-center justify-between border-b pb-3">
-                <div className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-primary" />
-                  <span className="text-sm font-black text-slate-800 dark:text-slate-200">بوابة عمليات الموظف</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {isExecutiveOrManager ? (
-                    <Link
-                      href="/dashboard"
-                      className="text-[10px] font-black text-primary hover:underline flex items-center gap-1 bg-primary/10 px-2.5 py-1 rounded-xl"
-                      title="المرجع الأساسي لصلاحيات الإدارة"
-                    >
-                      <LayoutDashboard className="h-3.5 w-3.5" />
-                      <span>الإدارة العليا</span>
-                    </Link>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => setOpen(false)}
-                    aria-label="إغلاق"
-                    className="grid h-8 w-8 place-items-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2.5">
-                <NavTile item={home} />
-              </div>
-
-              <div className="space-y-4">
-                {topGroups.map((group) => (
-                  <div key={group.key}>
-                    <p className="mb-2 text-[11px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                      {group.label}
-                    </p>
-                    <div className="grid grid-cols-3 gap-2.5">
-                      {group.items.map((item) => <NavTile key={item.href} item={item} />)}
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <div className="flex items-center justify-between border-b pb-3 mb-4">
+              <span className="text-sm font-black text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-primary inline-block" />
+                <span>بوابة الموظف (Lana HRMS)</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="إغلاق"
+                className="grid h-8 w-8 place-items-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
 
-            {/* Fixed Footer Personal Section */}
-            <div className="shrink-0 border-t-2 border-primary/25 bg-slate-50/90 dark:bg-slate-950/90 p-4 space-y-3 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
-              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2.5">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-white font-black text-xs">
-                    {session?.user?.name?.charAt(0) || "👤"}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-black text-slate-900 dark:text-slate-100 truncate">{session?.user?.name || "حسابي الشخصي"}</p>
-                    <p className="text-[10px] font-extrabold text-primary">بياناتي ومستنداتي (`تظهر بياناتي أنا فقط`)</p>
+            <div className="grid grid-cols-3 gap-2.5 mb-5">
+              <NavTile item={home} />
+            </div>
+
+            {/* =========================================================================================
+                إظهار جميع الصلاحيات في الخانات الجانبية للجوال (Administrative Capabilities Navigation)
+                ========================================================================================= */}
+            {isExecutiveOrManager ? (
+              <div className="mb-6 space-y-2 bg-primary/5 p-3 rounded-2xl border border-primary/20">
+                <p className="px-1 mb-2 text-[11px] font-black uppercase tracking-wider text-primary dark:text-primary/90">
+                  👑 الصلاحيات والإدارة العليا
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { href: "/dashboard", label: "لوحة التحكم", icon: LayoutDashboard },
+                    { href: "/employees", label: "إدارة الموظفين", icon: Users },
+                    { href: "/approvals", label: "مركز الموافقات", icon: GitPullRequest },
+                    { href: "/attendance", label: "الحضور والورديات", icon: Clock },
+                    { href: "/payroll", label: "مسير الرواتب", icon: DollarSign },
+                    { href: "/integrations/synchronization", label: "⚡ مزامنة أودو", icon: PlugZap },
+                    { href: "/permissions", label: "إدارة الصلاحيات", icon: Shield },
+                    { href: "/reports", label: "التقارير", icon: BarChart3 },
+                  ].map((admItem) => {
+                    const AdmIcon = admItem.icon;
+                    const active = isActive(admItem.href);
+                    return (
+                      <Link
+                        key={admItem.href}
+                        href={admItem.href}
+                        onClick={() => setOpen(false)}
+                        className={cn(
+                          "flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs font-extrabold border transition-colors",
+                          active
+                            ? "bg-primary text-white shadow font-black border-primary"
+                            : "bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-primary/40"
+                        )}
+                      >
+                        <AdmIcon className="h-4 w-4 shrink-0 text-primary" />
+                        <span className="truncate">{admItem.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
+            {/* التصميم القديم المعتاد لكافة المجموعات */}
+            <div className="space-y-4">
+              {groups.map((group) => (
+                <div key={group.key}>
+                  <p className="mb-2 text-[11px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                    {group.label}
+                  </p>
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {group.items.map((item) => <NavTile key={item.href} item={item} />)}
                   </div>
                 </div>
-                <span className="text-[10px] font-black bg-primary/10 text-primary px-2.5 py-1 rounded-lg border border-primary/30">
-                  منطقة ثابتة
-                </span>
-              </div>
-
-              <div className="grid grid-cols-4 gap-2">
-                {myDataGroup?.items.map((item) => <NavTile key={item.href} item={item} />)}
-              </div>
+              ))}
             </div>
           </nav>
         </div>

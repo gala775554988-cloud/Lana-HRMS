@@ -166,8 +166,9 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
           depth shadows, and motion tuned with the shared premium easing so
           hover/active states feel considered rather than instant snaps. */}
       <aside
+        style={{ background: "var(--sidebar-gradient, linear-gradient(180deg, #311158 0%, #4c1d95 50%, #0f172a 100%))" }}
         className={cn(
-          "fixed inset-y-0 start-0 z-50 flex h-screen flex-col border-e border-primary/10 bg-gradient-to-b from-white/95 via-primary/[0.04] to-white/95 shadow-xl shadow-primary/5 backdrop-blur-2xl transition-all duration-300 ease-premium lg:sticky lg:top-0 lg:z-auto lg:shadow-none lg:!translate-x-0 dark:border-slate-800/80 dark:bg-gradient-to-b dark:from-slate-950/95 dark:via-slate-900/90 dark:to-slate-950/95",
+          "fixed inset-y-0 start-0 z-50 flex h-screen flex-col border-e border-white/10 text-white shadow-2xl backdrop-blur-2xl transition-all duration-300 ease-premium lg:sticky lg:top-0 lg:z-auto lg:!translate-x-0 dark:border-white/10",
           sidebarCollapsed ? "lg:w-[78px]" : "lg:w-[284px]",
           "w-[284px]",
           mobileMenuOpen ? "translate-x-0" : "rtl:translate-x-full ltr:-translate-x-full"
