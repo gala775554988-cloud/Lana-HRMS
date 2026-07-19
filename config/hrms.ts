@@ -7,6 +7,8 @@ export type ModuleField = {
   required?: boolean;
   options?: readonly string[];
   placeholder?: string;
+  /** For type: "number" -- restricts input to whole numbers (step=1, min=0, no decimals). */
+  integer?: boolean;
 };
 
 export type HrmsModule = {
@@ -149,7 +151,7 @@ export const hrmsModules = [
     key: "shift-assignments", title: "Shift Roster", description: "Assign employees to shifts.", model: "shiftAssignment", permissionResource: "shifts", searchFields: [], filterFields: ["employeeId", "shiftId", "isActive"], tableFields: ["employeeId", "shiftId", "effectiveFrom", "effectiveTo", "isActive"], fields: [employeeIdField, { name: "shiftId", label: "Shift ID", type: "text", required: true }, { name: "effectiveFrom", label: "Effective from", type: "date", required: true }, { name: "effectiveTo", label: "Effective to", type: "date" }, activeField]
   },
   {
-    key: "insurance", title: "Insurance Policies", description: "Manage employee insurance policies, coverage, and renewal dates.", model: "insurancePolicy", permissionResource: "insurance", searchFields: ["policyNumber", "provider"], filterFields: ["status", "employeeId"], tableFields: ["policyNumber", "employeeId", "provider", "coverageType", "endDate", "status"], fields: [employeeIdField, { name: "policyNumber", label: "Policy number", type: "text", required: true }, { name: "provider", label: "Provider", type: "text", required: true }, { name: "coverageType", label: "Coverage type", type: "text" }, { name: "startDate", label: "Start date", type: "date", required: true }, { name: "endDate", label: "End date", type: "date", required: true }, { name: "status", label: "Status", type: "select", options: ["ACTIVE", "EXPIRED", "CANCELLED"] }, { name: "documentUrl", label: "Policy document", type: "text" }, { name: "documentName", label: "Document name", type: "text" }, { name: "notes", label: "Notes", type: "textarea" }]
+    key: "insurance", title: "Insurance Policies", description: "Manage employee insurance policies, coverage, and renewal dates.", model: "insurancePolicy", permissionResource: "insurance", searchFields: ["policyNumber", "provider"], filterFields: ["status", "employeeId", "category"], tableFields: ["policyNumber", "employeeId", "provider", "coverageType", "category", "dependentsCount", "endDate", "status"], fields: [employeeIdField, { name: "policyNumber", label: "Policy number", type: "text", required: true }, { name: "provider", label: "Provider", type: "text", required: true }, { name: "coverageType", label: "Coverage type", type: "text" }, { name: "category", label: "Category", type: "select", options: ["VIP", "A", "B", "C", "NA"] }, { name: "dependentsCount", label: "Number of dependents", type: "number", integer: true }, { name: "startDate", label: "Start date", type: "date", required: true }, { name: "endDate", label: "End date", type: "date", required: true }, { name: "status", label: "Status", type: "select", options: ["ACTIVE", "EXPIRED", "CANCELLED"] }, { name: "documentUrl", label: "Policy document", type: "text" }, { name: "documentName", label: "Document name", type: "text" }, { name: "notes", label: "Notes", type: "textarea" }]
   }
 ] as const satisfies HrmsModule[];
 

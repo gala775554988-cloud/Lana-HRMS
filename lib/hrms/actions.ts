@@ -101,7 +101,7 @@ function serialize(value: unknown): unknown {
 function normalizeValue(field: ModuleField, value: unknown) {
   if (value === "" || value === undefined) return field.name === "profilePhotoUrl" ? null : undefined;
   if (field.type === "boolean") return Boolean(value);
-  if (field.type === "number") return Number(value);
+  if (field.type === "number") return field.integer ? Math.trunc(Number(value)) : Number(value);
   if (field.type === "date") return new Date(String(value));
   if (field.name === "value" || field.name === "metadata") {
     if (typeof value === "string") {

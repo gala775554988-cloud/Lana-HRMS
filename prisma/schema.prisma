@@ -466,20 +466,22 @@ model EmployeeContract {
 }
 
 model InsurancePolicy {
-  id           String          @id @default(cuid())
-  employeeId   String
-  policyNumber String          @unique
-  provider     String
-  coverageType String?
-  startDate    DateTime
-  endDate      DateTime
-  status       InsuranceStatus @default(ACTIVE)
-  documentUrl  String?
-  documentName String?
-  notes        String?
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-  employee     Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  id              String          @id @default(cuid())
+  employeeId      String
+  policyNumber    String          @unique
+  provider        String
+  coverageType    String?
+  category        String?         @default("NA") // VIP | A | B | C | NA
+  dependentsCount Int             @default(0)
+  startDate       DateTime
+  endDate         DateTime
+  status          InsuranceStatus @default(ACTIVE)
+  documentUrl     String?
+  documentName    String?
+  notes           String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  employee        Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([employeeId])
   // Backs the "policy renewal due soon" badge: status = ACTIVE AND endDate <= cutoff.

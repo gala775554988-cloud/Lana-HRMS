@@ -94,6 +94,8 @@ async function ensureDbSchema() {
       CONSTRAINT "EmployeeLeaveBalance_pkey" PRIMARY KEY ("id")
     );`,
     `CREATE UNIQUE INDEX IF NOT EXISTS "EmployeeLeaveBalance_employeeId_key" ON "EmployeeLeaveBalance"("employeeId");`,
+    `ALTER TABLE "InsurancePolicy" ADD COLUMN IF NOT EXISTS "category" TEXT DEFAULT 'NA';`,
+    `ALTER TABLE "InsurancePolicy" ADD COLUMN IF NOT EXISTS "dependentsCount" INTEGER NOT NULL DEFAULT 0;`,
     `ALTER TABLE "HrPermissionScope" ADD COLUMN IF NOT EXISTS "hospitalId" TEXT;`,
     `ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "sponsor" TEXT;`,
     `ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "odooRawData" JSONB;`,
