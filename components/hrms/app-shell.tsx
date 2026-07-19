@@ -263,6 +263,69 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
             </p>
           </div>
         )}
+
+        {/* =========================================================================================
+            القسم الشخصي كمنطقة ثابتة أسفل القائمة (Fixed Personal Footer Section)
+            فاصل واضح بين القسم الإداري والقسم الشخصي، مع ربط دائم بهوية الحساب الحالي
+            ========================================================================================= */}
+        <div className="shrink-0 border-t-2 border-primary/25 bg-gradient-to-b from-slate-50/90 via-primary/[0.03] to-white dark:from-slate-950/90 dark:to-slate-900 p-3 shadow-inner transition-all duration-300">
+          {/* Account Identity Header (هوية الحساب مرتبطة بالمستخدم الحالي) */}
+          <div className={cn("flex items-center gap-3 mb-2.5 px-1.5", sidebarCollapsed ? "lg:justify-center lg:px-0" : "")}>
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-primary to-secondary text-white font-black text-xs shadow-sm ring-2 ring-primary/20">
+              {session?.user?.name?.charAt(0) || "👤"}
+            </div>
+            {(!sidebarCollapsed || mobileMenuOpen) && (
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-black text-slate-900 dark:text-slate-100 truncate">
+                  {session?.user?.name || "الموظف الحالي"}
+                </p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                  <span className="text-[10px] font-extrabold text-primary truncate">حسابي الشخصي (`بياناتي`)</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Personal Navigation Items (بياناتي: ملفي، الرواتب، العهد، المستندات) */}
+          <div className="space-y-1">
+            {[
+              { href: "/employee/profile", label: "ملفي الشخصي", icon: Users, desc: "بياناتي أنا فقط" },
+              { href: "/employee/salary", label: "الرواتب والمستحقات", icon: DollarSign, desc: "قسائم الراتب" },
+              { href: "/employee/assets", label: "عهد ممتلكاتي", icon: Package, desc: "العهد والمعدات" },
+              { href: "/employee/documents", label: "مستنداتي ووثائقي", icon: FileText, desc: "المستندات والعقود" },
+              { href: "/employee/dashboard", label: "بوابة الخدمة الذاتية", icon: Calendar, desc: "الإجازات والطلبات" },
+            ].map((pItem) => {
+              const PIcon = pItem.icon;
+              const pActive = isActive(pItem.href);
+              return (
+                <Link
+                  key={pItem.href}
+                  href={pItem.href}
+                  prefetch={false}
+                  onMouseEnter={() => prefetchRoute(pItem.href)}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={cn(
+                    "group flex items-center gap-3 rounded-xl px-3 py-2 text-xs font-extrabold transition-all duration-200 border",
+                    sidebarCollapsed ? "lg:justify-center lg:px-2 lg:py-2.5" : "",
+                    pActive
+                      ? "bg-primary text-white shadow-sm border-primary font-black"
+                      : "border-transparent text-slate-700 dark:text-slate-300 hover:bg-primary/10 hover:text-primary hover:border-primary/20 hover:translate-x-0.5 rtl:hover:-translate-x-0.5"
+                  )}
+                  title={sidebarCollapsed ? `${pItem.label} - ${pItem.desc}` : undefined}
+                >
+                  <PIcon className={cn("h-4 w-4 shrink-0 transition-transform duration-200 group-hover:scale-110", pActive ? "text-white" : "text-primary/80 group-hover:text-primary")} />
+                  {(!sidebarCollapsed || mobileMenuOpen) && (
+                    <div className="flex items-center justify-between flex-1 min-w-0">
+                      <span className="truncate">{pItem.label}</span>
+                      <span className="text-[9px] font-bold text-muted-foreground/80 group-hover:text-primary/70 truncate ms-1 hidden xl:inline">{pItem.desc}</span>
+                    </div>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col h-screen">
