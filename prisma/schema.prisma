@@ -28,6 +28,7 @@ model User {
   lockedAt                DateTime?
   lockedById              String?
   canUseMultipleDevices   Boolean                  @default(false)
+  currentChallenge        String?                  @db.Text // FIDO2 / WebAuthn Challenge
   loginAttempts           Int                      @default(0)
   lastFailedLoginAt       DateTime?
   loginCount              Int                      @default(0)
@@ -40,6 +41,7 @@ model User {
   grantedPermissions      UserPermission[]         @relation("PermissionGrantedBy")
   passwordResetTokens     PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
+  biometricCredentials    BiometricCredential[]
   employeeProfile         Employee?
   auditLogs               AuditLog[]
   notifications           Notification[]
@@ -49,6 +51,24 @@ model User {
   @@index([mustChangePassword])
   @@index([passwordChanged])
   @@index([isLocked])
+}
+
+model BiometricCredential {
+  id           String   @id @default(cuid())
+  userId       String
+  credentialID String   @unique @db.Text
+  publicKey    Bytes
+  counter      BigInt   @default(0)
+  deviceType   String?
+  backedUp     Boolean  @default(false)
+  transports   String[]
+  deviceName   String?
+  lastUsedAt   DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Account {
