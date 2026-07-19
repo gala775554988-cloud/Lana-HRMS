@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { OdooClient } from "@/lib/integrations/odoo/client";
-import { bulkSyncAllOdooDocuments } from "@/lib/integrations/odoo/documents";
+import { bulkSyncAllOdooDocuments, syncEmployeeDocuments } from "@/lib/integrations/odoo/documents";
 import { requireOdooIntegrationAccess } from "@/lib/integrations/odoo/sync";
 
 export const runtime = "nodejs";
