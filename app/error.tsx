@@ -37,6 +37,23 @@ export default function RootError({ error, reset }: { error: Error & { digest?: 
     }
   }, [digest, error.message]);
 
+  useEffect(() => {
+    if (!error) return;
+    // Best-effort crash telemetry: lands in AuditLog (browsable at
+    // /audit-logs) so a crash is diagnosable from inside the app itself,
+    // without needing direct access to Vercel Runtime Logs.
+    fetch("/api/internal/report-client-error", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        digest: error.digest,
+        message: error.message,
+        name: error.name,
+        path: typeof window !== "undefined" ? window.location.pathname : undefined
+      })
+    }).catch(() => {});
+  }, [error]);
+
   const handleCopy = () => {
     const text = [
       `== اعتراف النظام بالخطأ التقني المباشر (Diagnostic Confession) ==`,

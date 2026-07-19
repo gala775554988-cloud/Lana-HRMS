@@ -35,11 +35,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      # No package-lock.json is committed (removed deliberately -- see
-      # d19e62f -- because npm ci was failing on Vercel from lockfile/
-      # package.json drift; installCommand there is npm install too, see
-      # vercel.json). setup-node's cache:npm option and npm ci both hard-
-      # require a lockfile to exist, so neither is usable here.
+          cache: npm
+      # package-lock.json is committed and kept in sync with package.json --
+      # it was previously removed (see d19e62f) after drifting out of sync
+      # with package.json caused npm ci to fail, which let dependency
+      # versions float uncontrolled between Vercel builds (root cause of
+      # several "works locally, breaks on Vercel" production crashes).
+      # Regenerated fresh; keep both files in sync going forward by running
+      # npm install (not npm install --no-save) whenever adding a dependency.
       - run: npm install
       - run: npx prisma generate
       - run: npx prisma migrate deploy

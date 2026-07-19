@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 
 declare global {
   var __LANA_SERVER_ERRORS__: Map<string, { message: string; stack: string; timestamp: string }> | undefined;
+  var __LANA_ERROR_PATCHED__: boolean | undefined;
 }
 
 if (!globalThis.__LANA_SERVER_ERRORS__) {
@@ -62,7 +63,7 @@ export function recordServerErrorDiagnostic(digestOrErr: any, maybeErr?: any) {
 
 // Automatically patch console.error in Node environment to catch unhandled Server Component crashes
 if (typeof window === "undefined" && !globalThis.__LANA_ERROR_PATCHED__) {
-  (globalThis as any).__LANA_ERROR_PATCHED__ = true;
+  globalThis.__LANA_ERROR_PATCHED__ = true;
   const originalConsoleError = console.error;
   console.error = (...args: any[]) => {
     try {

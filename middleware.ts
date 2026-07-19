@@ -23,6 +23,7 @@ const PUBLIC_API_PREFIXES = [
   "/api/internal/odoo-one-time-ce1bf82bdaf46ba6", // authenticates via internal sync token
   "/api/internal/sync-odoo-documents", // direct Odoo ir.attachment extraction endpoint
   "/api/internal/get-error-diagnostic", // public diagnostic retrieval for client error boundaries
+  "/api/internal/report-client-error", // crash telemetry from app/error.tsx, fires before a session may exist
   "/api/attendance/odoo-sync", // authenticates via internal sync token
   "/api/public/", // re-exports enterprise-erp, which enforces its own auth
   "/api/integrations/webhooks/", // machine-to-machine, verified by request signature
