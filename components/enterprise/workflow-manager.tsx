@@ -24,6 +24,7 @@ type OrgUnits = { departments: OrgUnit[]; branches: OrgUnit[]; hospitals: OrgUni
 const EMPTY_ORG_UNITS: OrgUnits = { departments: [], branches: [], hospitals: [] };
 
 function orgUnitLabelFor(orgUnitId: string, units: OrgUnits): string {
+  if (!orgUnitId || !orgUnitId.includes(":")) return "";
   const [type, id] = orgUnitId.split(":");
   const list = type === "department" ? units.departments : type === "branch" ? units.branches : type === "hospital" ? units.hospitals : [];
   return list.find((u) => u.id === id)?.name ?? "";
@@ -61,7 +62,14 @@ interface WorkflowManagerProps {
 }
 
 function emptyStep(defaultOrgType = ""): WorkflowStepItem {
-  return { id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, approverId: "", orgUnitId: defaultOrgType ? `${defaultOrgType}:` : "" };
+  return {
+    id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    approverId: "",
+    orgUnitId: defaultOrgType ? `${defaultOrgType}:` : "",
+    approverPosition: "مستوى موافقة مخصص / معتمِد",
+    orgUnitLabel: defaultOrgType === "hospital" ? "المستشفيات / القطاع الطبي" : "الإدارة / الفرع التشغيلي",
+    roleContext: "CUSTOM_APPROVER"
+  };
 }
 
 export function WorkflowManager({ initialSteps = [], moduleName = "المسار المعتمد", onSave, accent = "teal", defaultOrgScopeType }: WorkflowManagerProps) {
@@ -120,14 +128,10 @@ export function WorkflowManager({ initialSteps = [], moduleName = "المسار 
 
   const handleSave = () => {
     setMessage(null);
-    if (steps.some((step) => !step.approverId || !step.orgUnitId)) {
-      setMessage("⚠️ يرجى اختيار الجهة والموظف المعتمِد لكل مستوى قبل حفظ الإعدادات");
-      return;
-    }
     startTransition(async () => {
       try {
         if (onSave) await onSave(steps);
-        setMessage("✓ تم حفظ إعدادات التسلسل الإداري والموافقة بنجاح 100%");
+        setMessage("✓ تم حفظ إعدادات وتسلسل المسار الإداري والموافقات بنجاح 100%");
         setEditingIds(new Set());
       } catch (err: any) {
         setMessage(`⚠️ ${err.message || "حدث خطأ أثناء حفظ الإعدادات"}`);
@@ -145,7 +149,7 @@ export function WorkflowManager({ initialSteps = [], moduleName = "المسار 
           </div>
           <div>
             <h2 className="text-xl font-black">{moduleName}</h2>
-            <p className="text-xs text-white/75 font-semibold mt-0.5">جدول التسلسل الهرمي للمعتمدين — أضف أو عدّل الموظفين بالترتيب الذي تريده</p>
+            <p className="text-xs text-white/75 font-semibold mt-0.5">جدول التسلسل الهرمي للمعتمدين — أضف أو عدّل الموظفين بالترتيب المطلوب</p>
           </div>
         </div>
         <Badge className={`px-3 py-1.5 rounded-xl font-mono font-bold text-xs ${theme.badge}`}>
@@ -171,7 +175,7 @@ export function WorkflowManager({ initialSteps = [], moduleName = "المسار 
               <tr>
                 <th className="py-3.5 px-4 font-extrabold w-20 text-center">الترتيب</th>
                 <th className="py-3.5 px-4 font-extrabold w-64">الجهة / النطاق التشغيلي</th>
-                <th className="py-3.5 px-4 font-extrabold">الموظف المعتمِد لهذا المستوى</th>
+                <th className="py-3.5 px-4 font-extrabold">الموظف المعتمِد والمرحلة الوظيفية</th>
                 <th className="py-3.5 px-4 font-extrabold w-44 text-center">الإجراءات (عرض/تعديل/حذف)</th>
               </tr>
             </thead>
@@ -181,14 +185,14 @@ export function WorkflowManager({ initialSteps = [], moduleName = "المسار 
                 const confirmingDelete = confirmingDeleteIds.has(step.id);
                 return (
                   <tr key={step.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
-                    <td className="py-4 px-4 text-center">
+                    <td className="py-4 px-4 text-center align-top pt-5">
                       <span className={`inline-flex h-8 w-8 items-center justify-center rounded-xl text-xs ${theme.number}`}>
                         {index + 1}
                       </span>
                     </td>
 
                     {/* Org Unit Column */}
-                    <td className="py-4 px-4">
+                    <td className="py-4 px-4 align-top pt-5">
                       {editing ? (
                         <select
                           value={step.orgUnitId}
@@ -213,37 +217,55 @@ export function WorkflowManager({ initialSteps = [], moduleName = "المسار 
                           ) : null}
                         </select>
                       ) : (
-                        <span className="font-bold text-slate-800 dark:text-slate-200">
-                          {step.orgUnitLabel || orgUnitLabelFor(step.orgUnitId, orgUnits) || "⚠️ يرجى اختيار النطاق"}
+                        <span className="font-bold text-slate-800 dark:text-slate-200 block">
+                          {step.orgUnitLabel || orgUnitLabelFor(step.orgUnitId, orgUnits) || (defaultOrgScopeType === "hospital" ? "المستشفيات / القطاع الطبي" : "الإدارة / الفرع التشغيلي")}
                         </span>
                       )}
                     </td>
 
                     {/* Approver Employee Column */}
-                    <td className="py-4 px-4">
+                    <td className="py-4 px-4 align-top">
                       {editing ? (
-                        <UserSearchSelect
-                          value={step.approverId}
-                          initialLabel={step.approverLabel ?? ""}
-                          onChange={(userId, label, employee) => updateStep(step.id, { approverId: userId, approverLabel: label ?? "", approverPosition: employee?.position?.title ?? "" })}
-                          placeholder="ابحث عن الموظف بالاسم أو الهوية أو الرقم الوظيفي..."
-                        />
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span className="font-black text-slate-900 dark:text-slate-100">
-                            {step.approverLabel || "⚠️ حقل فارغ — اضغط تعديل لاختيار الموظف"}
-                          </span>
+                        <div className="space-y-2.5">
+                          <UserSearchSelect
+                            value={step.approverId}
+                            initialLabel={step.approverLabel ?? ""}
+                            onChange={(userId, label, employee) => updateStep(step.id, { approverId: userId, approverLabel: label ?? "", approverPosition: employee?.position?.title || step.approverPosition || "" })}
+                            placeholder="ابحث عن الموظف بالاسم أو الهوية أو الرقم الوظيفي..."
+                          />
                           {step.approverPosition ? (
-                            <Badge variant="outline" className="text-[10px] font-semibold bg-slate-100 dark:bg-slate-800">
-                              {step.approverPosition}
-                            </Badge>
+                            <div className="text-[11px] font-extrabold text-primary flex items-center gap-1.5 bg-primary/5 px-3 py-1.5 rounded-xl border border-primary/15">
+                              <span>🎯 دور / مرحلة الاعتماد المطلوب:</span>
+                              <span>{step.approverPosition}</span>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-2 items-start">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {step.approverId && step.approverLabel ? (
+                              <Badge variant="default" className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm">
+                                <CheckCircle2 className="h-4 w-4" />
+                                <span>شخص محدد: {step.approverLabel}</span>
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="border-amber-400/80 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5">
+                                <span>⚠️ حقل الموظف فارغ ونظيف — اضغط أيقونة التعديل ✏️ لاختيار الموظف المعتمِد</span>
+                              </Badge>
+                            )}
+                          </div>
+                          {step.approverPosition ? (
+                            <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                              <Shield className="h-3.5 w-3.5 text-primary shrink-0" />
+                              <span>المرحلة / الصلاحية: {step.approverPosition}</span>
+                            </div>
                           ) : null}
                         </div>
                       )}
                     </td>
 
                     {/* Actions Column (View / Edit / Delete) */}
-                    <td className="py-4 px-4 text-center">
+                    <td className="py-4 px-4 text-center align-top pt-5">
                       <div className="flex items-center justify-center gap-1.5">
                         <Button
                           size="icon"
@@ -260,7 +282,7 @@ export function WorkflowManager({ initialSteps = [], moduleName = "المسار 
                           variant="ghost"
                           className={`h-8 w-8 rounded-xl ${editing ? "bg-primary/10 text-primary" : "hover:bg-slate-100 dark:hover:bg-slate-800"}`}
                           onClick={() => toggleEditing(step.id)}
-                          title="تعديل هذا المستوى"
+                          title="تعديل هذا المستوى واختيار الموظف"
                         >
                           {editing ? <Check className="h-4 w-4 text-emerald-600" /> : <Pencil className="h-4 w-4 text-slate-600 dark:text-slate-300" />}
                         </Button>
@@ -276,7 +298,7 @@ export function WorkflowManager({ initialSteps = [], moduleName = "المسار 
                             variant="ghost"
                             className="h-8 w-8 rounded-xl hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
                             onClick={() => setConfirmingDeleteIds((c) => new Set(c).add(step.id))}
-                            title="حذف هذا المستوى"
+                            title="حذف هذا المستوى من السلسلة"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -296,7 +318,7 @@ export function WorkflowManager({ initialSteps = [], moduleName = "المسار 
             type="button"
             onClick={addStep}
             variant="outline"
-            className="rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 font-extrabold text-xs h-11 px-5 gap-2 hover:border-primary hover:text-primary w-full sm:w-auto"
+            className="rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 font-extrabold text-xs h-11 px-5 gap-2 hover:border-primary hover:text-primary w-full sm:w-auto shadow-2xs"
           >
             <Plus className="h-4 w-4" />
             <span>+ إضافة حقل / موظف جديد في التسلسل</span>
@@ -325,15 +347,15 @@ export function WorkflowManager({ initialSteps = [], moduleName = "المسار 
             <div className="space-y-3 text-xs font-semibold">
               <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-950 rounded-xl">
                 <span className="text-muted-foreground">النطاق / الجهة:</span>
-                <span className="font-extrabold text-slate-900 dark:text-slate-100">{viewingStep.orgUnitLabel || orgUnitLabelFor(viewingStep.orgUnitId, orgUnits) || "غير محدد"}</span>
+                <span className="font-extrabold text-slate-900 dark:text-slate-100">{viewingStep.orgUnitLabel || orgUnitLabelFor(viewingStep.orgUnitId, orgUnits) || "عام"}</span>
               </div>
               <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-950 rounded-xl">
                 <span className="text-muted-foreground">الموظف المعتمِد:</span>
-                <span className="font-extrabold text-primary">{viewingStep.approverLabel || "لم يتم الاختيار بعد"}</span>
+                <span className="font-extrabold text-primary">{viewingStep.approverLabel || "حقل فارغ (لم يتم الاختيار بعد)"}</span>
               </div>
               <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-950 rounded-xl">
-                <span className="text-muted-foreground">المنصب:</span>
-                <span>{viewingStep.approverPosition || "—"}</span>
+                <span className="text-muted-foreground">المرحلة / الدور:</span>
+                <span className="font-bold">{viewingStep.approverPosition || "—"}</span>
               </div>
             </div>
             <div className="pt-2 flex justify-end">

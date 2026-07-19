@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { UserSearchSelect } from "@/components/hrms/user-search-select";
 import { PermissionHint } from "@/components/enterprise/permission-hint";
+import { WorkflowPathsTabs } from "@/components/enterprise/workflow-paths-tabs";
 
 const CAPABILITIES = [["VIEW", "إظهار فقط"], ["APPROVE", "موافقة"], ["REJECT", "رفض"]] as const;
 
@@ -431,40 +432,92 @@ export function PermissionsAdmin({ allRoles, branches, departments, hospitals = 
       )}
 
       {tab === "approval" && (
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card><CardHeader><CardTitle>تعديل سلسلة الموافقات</CardTitle></CardHeader><CardContent className="space-y-3">
-            <select className="w-full border rounded-lg p-2" value={approvalModule} onChange={e=>setApprovalModule(e.target.value)}>
-              {APPROVAL_MODULES.map(([value, label])=><option key={value} value={value}>{label}</option>)}
-            </select>
-            {approvalChains.find((c:any)=>c.module===approvalModule)?.chain?.map((l:any, i:number)=>(
-              <div key={i} className="space-y-2 rounded-xl border p-3">
-                <div className="flex items-center justify-between">
-                  <Badge>المستوى {i+1}</Badge>
-                  <Button size="sm" variant="destructive" onClick={()=>removeApprovalLevel(i)}><Trash2 className="h-4 w-4"/></Button>
-                </div>
-                <div className="text-sm">
-                  {l.approverUserId
-                    ? <span>شخص محدد: <strong>{userLabels[l.approverUserId] || l.approverUserId}</strong></span>
-                    : <span>حسب الدور: <strong>{roleLabel(l.approverRole)}</strong></span>}
-                </div>
-                {l.scopeType && l.scopeType !== "GLOBAL" && l.scopeId ? (
-                  <div className="text-xs text-muted-foreground">
-                    النطاق: {l.scopeType === "BRANCH" ? "فرع" : "مستشفى"} — {
-                      l.scopeType === "BRANCH"
-                        ? (branches.find((b: any) => b.id === l.scopeId)?.name ?? l.scopeId)
-                        : (hospitals.find((h: any) => h.id === l.scopeId)?.name ?? l.scopeId)
-                    }
-                  </div>
-                ) : null}
-                <div className="flex gap-1.5">
-                  {CAPABILITIES.map(([key, label]) => (
-                    <Badge key={key} variant={(l.capabilities ?? ["VIEW","APPROVE","REJECT"]).includes(key) ? "default" : "outline"}>{label}</Badge>
-                  ))}
-                </div>
+        <div className="space-y-10">
+          {/* 1. المسارات التشغيلية المؤسسية للموافقات (Hospital Path - 6 levels & General Admin Path - 4 levels) */}
+          <div className="space-y-4">
+            <WorkflowPathsTabs />
+          </div>
+
+          {/* 2. تخصيص سلاسل الاعتماد الفرعية حسب أنواع الطلبات والأقسام (اختياري) */}
+          <div className="pt-6 border-t-2 border-dashed border-slate-200 dark:border-slate-800 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-black text-slate-900 dark:text-slate-100">سلاسل الاعتماد الفرعية حسب أنواع الطلبات (الإجازات، العمل الإضافي، السلف، المصاريف)</h3>
+                <p className="text-xs font-semibold text-muted-foreground mt-1">
+                  يمكنك هنا تخصيص أو استثناء مستويات إضافية لكل نوع طلب على حدة. في حال عدم إضافة استثناءات هنا (0 مستويات)، يتم تطبيق المسارات المؤسسية الأساسية (6 مستويات للمستشفى أو 4 مستويات للإدارة) تلقائياً 100%.
+                </p>
               </div>
-            ))}
-            <div className="flex gap-2"><Button size="sm" variant="outline" onClick={openAddLevel}><Plus className="h-4 w-4 ml-1"/>إضافة مستوى</Button><Button size="sm" onClick={saveApproval}><Save className="h-4 w-4 ml-1"/>حفظ السلسلة</Button></div>
-          </CardContent></Card>
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Card className="rounded-3xl border border-slate-200 shadow-md dark:border-slate-800">
+                <CardHeader>
+                  <CardTitle className="text-lg font-black flex items-center justify-between">
+                    <span>تعديل استثناءات سلسلة الموافقات</span>
+                    <Badge variant="outline" className="bg-primary/10 text-primary font-bold">استثناء اختياري</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold mb-1.5 text-muted-foreground">اختر نوع الطلب المراد تخصيص استثناء له:</label>
+                    <select className="w-full border rounded-xl p-2.5 text-xs font-bold bg-white dark:bg-slate-950 focus:ring-2 focus:ring-primary" value={approvalModule} onChange={e=>setApprovalModule(e.target.value)}>
+                      {APPROVAL_MODULES.map(([value, label])=><option key={value} value={value}>{label}</option>)}
+                    </select>
+                  </div>
+
+                  {(!approvalChains.find((c:any)=>c.module===approvalModule)?.chain || approvalChains.find((c:any)=>c.module===approvalModule)?.chain.length === 0) ? (
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 text-center dark:border-emerald-900/60 dark:bg-emerald-950/30">
+                      <p className="text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                        ✓ لا توجد مستويات استثنائية مخصصة لطلبات {APPROVAL_MODULES.find(([k]) => k === approvalModule)?.[1] || approvalModule} حالياً (0 مستويات - تم تنظيف وحذف التسلسلات السابقة).
+                      </p>
+                      <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 mt-1">
+                        يتم اعتماد وتمرير الطلب بالكامل وفق المسار المؤسسي الأساسي المعرف أعلاه (6 مستويات للمستشفى أو 4 مستويات للفرع/الإدارة).
+                      </p>
+                    </div>
+                  ) : (
+                    approvalChains.find((c:any)=>c.module===approvalModule)?.chain?.map((l:any, i:number)=>(
+                      <div key={i} className="space-y-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 bg-slate-50/50 dark:bg-slate-900/50">
+                        <div className="flex items-center justify-between">
+                          <Badge className="bg-primary text-white font-extrabold text-xs">المستوى {i+1}</Badge>
+                          <Button size="sm" variant="destructive" className="h-7 px-2.5 rounded-lg text-xs" onClick={()=>removeApprovalLevel(i)}>
+                            <Trash2 className="h-3.5 w-3.5 ml-1"/> حذف
+                          </Button>
+                        </div>
+                        <div className="text-xs font-bold">
+                          {l.approverUserId
+                            ? <span>شخص محدد بالاسم: <strong className="text-primary">{userLabels[l.approverUserId] || l.approverUserId}</strong></span>
+                            : <span>حسب الدور الوظيفي: <strong className="text-primary">{roleLabel(l.approverRole)}</strong></span>}
+                        </div>
+                        {l.scopeType && l.scopeType !== "GLOBAL" && l.scopeId ? (
+                          <div className="text-[11px] font-semibold text-muted-foreground bg-white dark:bg-slate-950 p-2 rounded-lg border">
+                            النطاق المستهدف: {l.scopeType === "BRANCH" ? "فرع" : "مستشفى"} — {
+                              l.scopeType === "BRANCH"
+                                ? (branches.find((b: any) => b.id === l.scopeId)?.name ?? l.scopeId)
+                                : (hospitals.find((h: any) => h.id === l.scopeId)?.name ?? l.scopeId)
+                            }
+                          </div>
+                        ) : null}
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {CAPABILITIES.map(([key, label]) => (
+                            <Badge key={key} className="text-[10px] font-extrabold" variant={(l.capabilities ?? ["VIEW","APPROVE","REJECT"]).includes(key) ? "default" : "outline"}>{label}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  )}
+
+                  <div className="flex gap-2 pt-2">
+                    <Button size="sm" variant="outline" className="rounded-xl font-bold text-xs" onClick={openAddLevel}>
+                      <Plus className="h-4 w-4 ml-1.5"/>إضافة مستوى استثنائي
+                    </Button>
+                    <Button size="sm" className="rounded-xl font-extrabold text-xs bg-primary text-white" onClick={saveApproval}>
+                      <Save className="h-4 w-4 ml-1.5"/>حفظ سلسلة الاستثناءات
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </div>
       )}
 
