@@ -20,6 +20,8 @@ export const workflowPathInputSchema = z.object({
   workflowType: z.enum(WORKFLOW_PATH_TYPES),
   workflowName: z.string().min(1, "workflowName is required"),
   sendToDirectManagerFirst: z.boolean().default(true),
+  requestTypes: z.array(z.string()).default([]),
+  targetOrgUnitIds: z.array(z.string()).default([]),
   steps: z.array(stepSchema).min(1, "يجب أن يحتوي المسار على مستوى موافقة واحد على الأقل")
 });
 
@@ -30,7 +32,9 @@ export async function getWorkflowPath(workflowType: WorkflowPathTypeValue) {
   const record = await prisma.workflowPathTemplate.findUnique({ where: { workflowType } });
   if (!record) return null;
   const steps = (record.steps as unknown as WorkflowPathStep[]).slice().sort((a, b) => a.stepOrder - b.stepOrder);
-  return { id: record.id, workflowType: record.workflowType, workflowName: record.workflowName, sendToDirectManagerFirst: record.sendToDirectManagerFirst ?? true, steps, updatedAt: record.updatedAt };
+  const requestTypes = Array.isArray(record.requestTypes) ? (record.requestTypes as string[]) : [];
+  const targetOrgUnitIds = Array.isArray(record.targetOrgUnitIds) ? (record.targetOrgUnitIds as string[]) : [];
+  return { id: record.id, workflowType: record.workflowType, workflowName: record.workflowName, sendToDirectManagerFirst: record.sendToDirectManagerFirst ?? true, requestTypes, targetOrgUnitIds, steps, updatedAt: record.updatedAt };
 }
 
 function approverIdsOf(steps: WorkflowPathStep[]): string[] {
@@ -97,7 +101,7 @@ export async function saveWorkflowPath(input: WorkflowPathInput, actorUserId: st
 
   // Requirement 3: منطق المباشرة بعد الإجازة
   // عند اختيار 'طلبات الإجازات' (LEAVE)، يجب أن يقوم النظام تلقائياً بإنشاء 'مرحلة إضافية' (Hidden step) في سير العمل تسمى 'مباشرة بعد الإجازة' لضمان إدراجها ضمن تسلسل الاعتمادات
-  const isLeaveWorkflow = parsed.workflowName.includes("إجازة") || parsed.workflowName.includes("LEAVE");
+  const isLeaveWorkflow = parsed.workflowName.includes("إجازة") || parsed.workflowName.includes("LEAVE") || parsed.requestTypes.some((r) => r.includes("إجازة") || r.includes("LEAVE"));
   if (isLeaveWorkflow) {
     const hasResumptionStep = sortedSteps.some((s) => s.roleContext === "RESUMPTION_STAGE" || s.approverPosition?.includes("مباشرة بعد الإجازة"));
     if (!hasResumptionStep) {
@@ -124,6 +128,8 @@ export async function saveWorkflowPath(input: WorkflowPathInput, actorUserId: st
         workflowType: parsed.workflowType,
         workflowName: parsed.workflowName,
         sendToDirectManagerFirst: parsed.sendToDirectManagerFirst ?? true,
+        requestTypes: parsed.requestTypes ?? [],
+        targetOrgUnitIds: parsed.targetOrgUnitIds ?? [],
         steps: sortedSteps,
         updatedById: actorUserId
       }

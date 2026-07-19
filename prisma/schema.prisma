@@ -2280,6 +2280,8 @@ model WorkflowPathTemplate {
   workflowType             WorkflowPathType @unique
   workflowName             String
   sendToDirectManagerFirst Boolean          @default(true)
+  requestTypes             Json             @default("[]") // قائمة أنواع الطلبات المختارة متعددة (Multi-Select)
+  targetOrgUnitIds         Json             @default("[]") // قائمة الفروع والمستشفيات المختارة متعددة (Multi-Select)
   steps                    Json
   updatedById              String?
   createdAt                DateTime         @default(now())

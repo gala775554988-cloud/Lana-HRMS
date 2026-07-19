@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { Loader2, Eye, Pencil, Trash2, CheckCircle2, AlertCircle, Plus, Layers, Building2, Landmark, ShieldCheck, X } from "lucide-react";
+import { useEffect, useState, useTransition, useRef } from "react";
+import { Loader2, Eye, Pencil, Trash2, CheckCircle2, AlertCircle, Plus, Layers, Building2, Check, X, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UserSearchSelect } from "@/components/hrms/user-search-select";
@@ -22,6 +22,8 @@ export type SavedWorkflowPath = {
   orgUnitId: string;
   orgUnitLabel: string;
   sendToDirectManagerFirst: boolean;
+  requestTypes?: string[];
+  targetOrgUnitIds?: string[];
   steps: WorkflowStepItem[];
   createdAt: string;
 };
@@ -36,7 +38,9 @@ interface WorkflowManagerProps {
   initialSteps?: WorkflowStepItem[];
   moduleName?: string;
   initialSendToDirectManagerFirst?: boolean;
-  onSave?: (steps: WorkflowStepItem[], sendToDirectManagerFirst: boolean, workflowName: string) => Promise<void> | void;
+  initialRequestTypes?: string[];
+  initialTargetOrgUnitIds?: string[];
+  onSave?: (steps: WorkflowStepItem[], sendToDirectManagerFirst: boolean, workflowName: string, requestTypes: string[], targetOrgUnitIds: string[]) => Promise<void> | void;
   accent?: "teal" | "violet";
   defaultOrgScopeType?: "hospital" | "branch" | "department";
 }
@@ -52,10 +56,164 @@ function emptyStep(defaultOrgType = "", orgId = ""): WorkflowStepItem {
   };
 }
 
+// Multi-Select Dropdown Component with Teal/Mint Tags/Chips and individual 'x' remove button
+function MultiSelectChips({
+  label,
+  placeholder,
+  options,
+  selectedValues,
+  onChange
+}: {
+  label: string;
+  placeholder: string;
+  options: { id: string; label: string }[];
+  selectedValues: string[];
+  onChange: (newValues: string[]) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const toggleOption = (id: string) => {
+    if (selectedValues.includes(id)) {
+      onChange(selectedValues.filter((v) => v !== id));
+    } else {
+      onChange([...selectedValues, id]);
+    }
+  };
+
+  const removeChip = (idToRemove: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange(selectedValues.filter((v) => v !== idToRemove));
+  };
+
+  const selectAll = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange(options.map((o) => o.id));
+  };
+
+  const clearAll = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange([]);
+  };
+
+  return (
+    <div className="space-y-2 relative font-sans" ref={containerRef} dir="rtl">
+      <label className="block text-xs font-black text-slate-800 dark:text-slate-200">
+        {label}
+      </label>
+
+      {/* Main Display Box with Chips */}
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        className="min-h-12 w-full rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-3.5 py-2 text-sm font-semibold text-slate-900 dark:text-slate-100 cursor-pointer flex items-center justify-between gap-2 shadow-2xs hover:border-primary/60 transition"
+      >
+        <div className="flex flex-wrap items-center gap-1.5 flex-1">
+          {selectedValues.length === 0 ? (
+            <span className="text-muted-foreground text-xs font-bold py-1">{placeholder}</span>
+          ) : (
+            selectedValues.map((val) => {
+              const matched = options.find((o) => o.id === val);
+              const displayLabel = matched ? matched.label : val;
+              return (
+                <span
+                  key={val}
+                  className="bg-primary/15 text-primary border border-primary/40 rounded-xl px-3 py-1 font-black text-xs flex items-center gap-1.5 transition hover:bg-primary/25 shadow-2xs"
+                >
+                  <span>{displayLabel}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => removeChip(val, e)}
+                    className="p-0.5 rounded-full hover:bg-primary/30 text-primary transition"
+                    title="حذف فردي"
+                  >
+                    <X className="h-3 w-3 stroke-[3]" />
+                  </button>
+                </span>
+              );
+            })
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          {selectedValues.length > 0 ? (
+            <Badge variant="outline" className="bg-primary/10 text-primary font-mono font-black text-[10px] px-2 py-0.5">
+              {selectedValues.length}
+            </Badge>
+          ) : null}
+          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+        </div>
+      </div>
+
+      {/* Dropdown Popover */}
+      {isOpen ? (
+        <div className="absolute z-50 w-full mt-1.5 max-h-64 overflow-y-auto rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 shadow-2xl space-y-1 transition-all duration-300 animate-in fade-in slide-in-from-top-2">
+          {/* Action Toolbar inside dropdown: Select All / Clear All */}
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2 mb-1 px-1">
+            <span className="text-[11px] font-extrabold text-muted-foreground">اختر متعدد (Multi-Select):</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={selectAll}
+                className="text-[11px] font-black text-primary hover:underline"
+              >
+                تحديد الكل
+              </button>
+              <span className="text-slate-300 dark:text-slate-700">|</span>
+              <button
+                type="button"
+                onClick={clearAll}
+                className="text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:underline"
+              >
+                إلغاء الكل
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-1 pr-1">
+            {options.map((opt) => {
+              const isSelected = selectedValues.includes(opt.id);
+              return (
+                <div
+                  key={opt.id}
+                  onClick={() => toggleOption(opt.id)}
+                  className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold cursor-pointer transition ${
+                    isSelected
+                      ? "bg-primary/15 text-primary border border-primary/30"
+                      : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200"
+                  }`}
+                >
+                  <span className="truncate">{opt.label}</span>
+                  <div className={`grid h-5 w-5 place-items-center rounded-md border text-xs font-black transition ${
+                    isSelected ? "bg-primary border-primary text-white" : "border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-transparent"
+                  }`}>
+                    {isSelected ? <Check className="h-3 w-3 stroke-[3]" /> : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function WorkflowManager({
   initialSteps = [],
   moduleName = "طلبات الإجازات",
   initialSendToDirectManagerFirst = true,
+  initialRequestTypes = [],
+  initialTargetOrgUnitIds = [],
   onSave,
   defaultOrgScopeType = "hospital"
 }: WorkflowManagerProps) {
@@ -65,7 +223,11 @@ export function WorkflowManager({
   const [steps, setSteps] = useState<WorkflowStepItem[]>(initialSteps);
   const [orgUnits, setOrgUnits] = useState<OrgUnits>(EMPTY_ORG_UNITS);
   const [requestTypes, setRequestTypes] = useState<DynamicRequestType[]>([]);
-  const [selectedOrgUnitId, setSelectedOrgUnitId] = useState<string>("");
+  
+  // Multi-Select arrays state
+  const [selectedRequestTypes, setSelectedRequestTypes] = useState<string[]>(initialRequestTypes.length > 0 ? initialRequestTypes : [moduleName || "طلبات الإجازات"]);
+  const [selectedOrgUnitIds, setSelectedOrgUnitIds] = useState<string[]>(initialTargetOrgUnitIds);
+  
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -82,26 +244,30 @@ export function WorkflowManager({
 
     const firstWithOrg = activeSteps.find((s) => s.orgUnitId);
     const orgId = firstWithOrg ? firstWithOrg.orgUnitId : isHospital ? "hospital:all" : "branch:all";
-    if (orgId) setSelectedOrgUnitId(orgId);
+    if (!selectedOrgUnitIds || selectedOrgUnitIds.length === 0) {
+      if (orgId) setSelectedOrgUnitIds([orgId]);
+    }
 
-    // Initialize saved table with current loaded backend path so table has data immediately
+    // Initialize saved table with current loaded backend path
     const initialSavedRow: SavedWorkflowPath = {
       id: `path-init-${defaultOrgScopeType}`,
       workflowName: moduleName || "طلبات الإجازات",
       orgUnitId: orgId,
-      orgUnitLabel: isHospital ? "جميع المستشفيات (أو جامعة الملك فيصل)" : "جميع الإدارات والفروع",
+      orgUnitLabel: isHospital ? "جامعة الملك فيصل - الاحساء (أو المستشفيات المختارة)" : "جميع الإدارات والفروع المختارة",
       sendToDirectManagerFirst: initialSendToDirectManagerFirst,
+      requestTypes: initialRequestTypes.length > 0 ? initialRequestTypes : [moduleName || "طلبات الإجازات"],
+      targetOrgUnitIds: initialTargetOrgUnitIds.length > 0 ? initialTargetOrgUnitIds : [orgId],
       steps: activeSteps,
       createdAt: new Date().toLocaleDateString("ar-SA")
     };
     setSavedPaths([initialSavedRow]);
-  }, [initialSteps, defaultOrgScopeType, moduleName, initialSendToDirectManagerFirst, isHospital]);
+  }, [initialSteps, defaultOrgScopeType, moduleName, initialSendToDirectManagerFirst, isHospital, initialRequestTypes, initialTargetOrgUnitIds]);
 
   useEffect(() => {
     if (moduleName) setWorkflowName(moduleName);
   }, [moduleName]);
 
-  // Fetch dynamic request types and org units from Prisma database
+  // Dynamic Prisma Request Types & Org Units fetching
   useEffect(() => {
     let cancelled = false;
     fetch("/api/enterprise/request-types", { cache: "no-store" })
@@ -125,7 +291,8 @@ export function WorkflowManager({
   }, []);
 
   const addApprover = () => {
-    const newStep = emptyStep(defaultOrgScopeType, selectedOrgUnitId);
+    const firstOrgId = selectedOrgUnitIds[0] || (isHospital ? "hospital:all" : "branch:all");
+    const newStep = emptyStep(defaultOrgScopeType, firstOrgId);
     setSteps((current) => [...current, newStep]);
   };
 
@@ -137,32 +304,48 @@ export function WorkflowManager({
     setSteps((current) => current.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   };
 
-  // Cascading Selects handler: when Hospital or Branch/Department changes, cascade immediately to all approver steps
-  const handleOrgUnitChange = (val: string) => {
-    setSelectedOrgUnitId(val);
-    const label = orgUnitLabelFor(val, orgUnits) || (isHospital ? "جميع المستشفيات" : "جميع الإدارات والفروع");
-    setSteps((current) => current.map((s) => ({ ...s, orgUnitId: val, orgUnitLabel: label })));
+  // Multi-Select Request Types change
+  const handleMultiRequestTypesChange = (newValues: string[]) => {
+    setSelectedRequestTypes(newValues);
+    if (newValues.length > 0) {
+      setWorkflowName(newValues.join(" + "));
+    } else {
+      setWorkflowName("مسار مخصص");
+    }
   };
 
-  const handleRequestTypeChange = (val: string) => {
-    setWorkflowName(val);
+  // Multi-Select Org Units change: cascade to step orgUnitId
+  const handleMultiOrgChange = (newValues: string[]) => {
+    setSelectedOrgUnitIds(newValues);
+    const primaryOrgId = newValues[0] || (isHospital ? "hospital:all" : "branch:all");
+    const label = newValues.map((v) => orgUnitLabelFor(v, orgUnits) || v).join(" + ") || (isHospital ? "جميع المستشفيات" : "جميع الإدارات والفروع");
+    setSteps((current) => current.map((s) => ({ ...s, orgUnitId: primaryOrgId, orgUnitLabel: label })));
   };
 
   function orgUnitLabelFor(orgUnitId: string, units: OrgUnits): string {
-    if (!orgUnitId || !orgUnitId.includes(":")) return "";
+    if (!orgUnitId || !orgUnitId.includes(":")) return orgUnitId;
     const [type, id] = orgUnitId.split(":");
     const list = type === "department" ? units.departments : type === "branch" ? units.branches : type === "hospital" ? units.hospitals : [];
-    return list.find((u) => u.id === id)?.name ?? "";
+    return list.find((u) => u.id === id)?.name ?? orgUnitId;
   }
 
-  // Save handler: saves to database and dynamically updates bottom table
+  // Build option lists for MultiSelectChips
+  const requestTypeOptions = requestTypes.map((rt) => ({ id: rt.label, label: rt.label }));
+  const orgUnitOptions = isHospital
+    ? orgUnits.hospitals.map((h) => ({ id: `hospital:${h.id}`, label: h.name }))
+    : [
+        ...orgUnits.branches.map((b) => ({ id: `branch:${b.id}`, label: `فرع: ${b.name}` })),
+        ...orgUnits.departments.map((d) => ({ id: `department:${d.id}`, label: `إدارة: ${d.name}` }))
+      ];
+
+  // Save handler: sends Array of selected request types and org units to Supabase/Prisma
   const handleSave = () => {
     setMessage(null);
     startTransition(async () => {
       try {
-        if (onSave) await onSave(steps, sendToDirectManagerFirst, workflowName);
+        if (onSave) await onSave(steps, sendToDirectManagerFirst, workflowName, selectedRequestTypes, selectedOrgUnitIds);
 
-        const currentOrgLabel = orgUnitLabelFor(selectedOrgUnitId, orgUnits) || (isHospital ? "جامعة الملك فيصل - الاحساء (أو جميع المستشفيات)" : "جميع الإدارات والفروع");
+        const currentOrgLabel = selectedOrgUnitIds.map((v) => orgUnitLabelFor(v, orgUnits) || v).join(" + ") || (isHospital ? "جامعة الملك فيصل - الاحساء" : "جميع الإدارات والفروع");
 
         if (editingPathId) {
           // Update existing row in table dynamically with fade animation
@@ -171,30 +354,34 @@ export function WorkflowManager({
               p.id === editingPathId
                 ? {
                     ...p,
-                    workflowName: workflowName || "طلبات الإجازات",
-                    orgUnitId: selectedOrgUnitId,
+                    workflowName: workflowName || selectedRequestTypes.join(" + ") || "طلبات الإجازات",
+                    orgUnitId: selectedOrgUnitIds[0] || "",
                     orgUnitLabel: currentOrgLabel,
                     sendToDirectManagerFirst,
+                    requestTypes: [...selectedRequestTypes],
+                    targetOrgUnitIds: [...selectedOrgUnitIds],
                     steps: [...steps]
                   }
                 : p
             )
           );
           setEditingPathId(null);
-          setMessage("✓ تم تحديث مسار الطلب والمعتمدين في الجدول بنجاح 100%");
+          setMessage("✓ تم تحديث مسار الطلب والمتعدد المعتمدين في الجدول بنجاح 100%");
         } else {
           // Add new row to table dynamically right below the form
           const newPathRecord: SavedWorkflowPath = {
             id: `path-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-            workflowName: workflowName || "طلبات الإجازات",
-            orgUnitId: selectedOrgUnitId || (isHospital ? "hospital:all" : "branch:all"),
+            workflowName: workflowName || selectedRequestTypes.join(" + ") || "طلبات الإجازات",
+            orgUnitId: selectedOrgUnitIds[0] || "",
             orgUnitLabel: currentOrgLabel,
             sendToDirectManagerFirst,
+            requestTypes: [...selectedRequestTypes],
+            targetOrgUnitIds: [...selectedOrgUnitIds],
             steps: [...steps],
             createdAt: new Date().toLocaleDateString("ar-SA")
           };
           setSavedPaths((prev) => [newPathRecord, ...prev]);
-          setMessage("✓ تم حفظ إعدادات المسار والمعتمدين وتفعيل الترابط المنطقي للطلبات بنجاح 100%");
+          setMessage("✓ تم حفظ إعدادات المسار والمعتمدين وإرسال مصفوفة الاختيارات المتعددة لقاعدة البيانات بنجاح 100%");
         }
       } catch (err: any) {
         setMessage(`⚠️ ${err.message || "حدث خطأ أثناء حفظ الإعدادات"}`);
@@ -212,7 +399,8 @@ export function WorkflowManager({
         setSteps(visibleSteps.length > 0 ? visibleSteps : [emptyStep(defaultOrgScopeType)]);
       }
       setSendToDirectManagerFirst(initialSendToDirectManagerFirst);
-      setWorkflowName(moduleName);
+      setSelectedRequestTypes(initialRequestTypes.length > 0 ? initialRequestTypes : [moduleName || "طلبات الإجازات"]);
+      setSelectedOrgUnitIds(initialTargetOrgUnitIds);
       setMessage("ℹ️ تم إلغاء التغييرات واستعادة الإعدادات الأصلية");
     }
   };
@@ -227,14 +415,15 @@ export function WorkflowManager({
   const handleEditPath = (path: SavedWorkflowPath) => {
     setEditingPathId(path.id);
     setWorkflowName(path.workflowName);
-    setSelectedOrgUnitId(path.orgUnitId);
+    setSelectedOrgUnitIds(path.targetOrgUnitIds && path.targetOrgUnitIds.length > 0 ? path.targetOrgUnitIds : [path.orgUnitId]);
+    setSelectedRequestTypes(path.requestTypes && path.requestTypes.length > 0 ? path.requestTypes : [path.workflowName]);
     setSendToDirectManagerFirst(path.sendToDirectManagerFirst);
     setSteps(path.steps && path.steps.length > 0 ? [...path.steps] : [emptyStep(defaultOrgScopeType, path.orgUnitId)]);
     setMessage(`✏️ جاري تعديل إعدادات مسار "${path.workflowName}" للمنشأة "${path.orgUnitLabel}" في النموذج العلوي...`);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const isLeaveSelected = workflowName.includes("إجازة") || workflowName.includes("LEAVE");
+  const isLeaveSelected = selectedRequestTypes.some((r) => r.includes("إجازة") || r.includes("LEAVE")) || workflowName.includes("إجازة");
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-10 text-right font-sans p-2 transition-all duration-300 animate-in fade-in" dir="rtl">
@@ -257,7 +446,7 @@ export function WorkflowManager({
       ) : null}
 
       {/* =========================================================================================
-          1. القسم العلوي (نموذج الإضافة / التعديل): مطابق للصورة وللهوية الفيروزية لشركة لانا الطبية
+          1. القسم العلوي (نموذج الإضافة / التعديل): قائمة اختيار متعددة (Multi-Select Tags/Chips)
           ========================================================================================= */}
       <div className="space-y-6">
         <div className="flex items-center justify-between border-b-2 border-primary/20 pb-3">
@@ -267,10 +456,10 @@ export function WorkflowManager({
             </div>
             <div>
               <h2 className="text-xl font-black text-slate-900 dark:text-slate-100">
-                {editingPathId ? `تعديل إعدادات مسار الطلبات (${workflowName})` : "إعدادات مسار الطلبات (إضافة مسار جديد)"}
+                {editingPathId ? `تعديل إعدادات مسار الطلبات (${workflowName})` : "إعدادات مسار الطلبات (إضافة مسار اختيار متعدد)"}
               </h2>
               <p className="text-xs font-semibold text-muted-foreground mt-0.5">
-                القسم العلوي: نموذج الإضافة والترابط الديناميكي مع المعتمدين وتوجيه المدير المباشر
+                القسم العلوي: قائمة اختيار متعددة للطلبات والفروع مع ظهور العناصر كـ (Tags/Chips) قابلة للحذف الفردي
               </p>
             </div>
           </div>
@@ -281,52 +470,26 @@ export function WorkflowManager({
           ) : null}
         </div>
 
-        {/* Card 1: أنواع الطلبات (Select Dynamic from Prisma) + اختيار المستشفى/الإدارة (Cascading Selects) */}
+        {/* Card 1: اختيار متعدد للطلبات (MultiSelectChips) + اختيار متعدد للفروع/المستشفيات (MultiSelectChips) */}
         <div className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-md dark:border-slate-800 dark:bg-slate-900 space-y-5 transition-all duration-300">
           <div className="grid gap-6 sm:grid-cols-2">
-            {/* 1. قائمة أنواع الطلبات (Select Component تجلب أنواع الطلبات ديناميكياً بدون كل الأنواع) */}
-            <div className="space-y-2">
-              <label className="block text-xs font-black text-slate-800 dark:text-slate-200">
-                أنواع الطلبات (`الاسم - بالعربية`)
-              </label>
-              <select
-                value={workflowName}
-                onChange={(e) => handleRequestTypeChange(e.target.value)}
-                className="w-full h-11 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-3.5 text-sm font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs transition"
-              >
-                <option value="">-- اختر نوع الطلب من قاعدة البيانات --</option>
-                {requestTypes.map((rt) => (
-                  <option key={rt.code} value={rt.label}>
-                    {rt.label}
-                  </option>
-                ))}
-                {workflowName && !requestTypes.some((rt) => rt.label === workflowName) ? (
-                  <option value={workflowName}>{workflowName}</option>
-                ) : null}
-              </select>
-            </div>
+            {/* 1. قائمة اختيار متعددة للطلبات (Multi-Select Tags/Chips) */}
+            <MultiSelectChips
+              label="أنواع الطلبات (`اختيار متعدد Multi-Select`)"
+              placeholder="اختر عدة أنواع طلبات في وقت واحد (مثلاً: الإجازات + السلف)..."
+              options={requestTypeOptions}
+              selectedValues={selectedRequestTypes}
+              onChange={handleMultiRequestTypesChange}
+            />
 
-            {/* 2. المستشفى أو الإدارة والفروع (Cascading Select) */}
-            <div className="space-y-2">
-              <label className="block text-xs font-black text-slate-800 dark:text-slate-200">
-                {isHospital ? "المستشفى" : "الإدارة أو الفروع"}
-              </label>
-              <select
-                value={selectedOrgUnitId}
-                onChange={(e) => handleOrgUnitChange(e.target.value)}
-                className="w-full h-11 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-3.5 text-sm font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs transition"
-              >
-                <option value="">{isHospital ? "اختر المستشفى من القائمة (أو جميع المستشفيات)..." : "اختر الإدارة أو الفرع من القائمة..."}</option>
-                {isHospital ? (
-                  orgUnits.hospitals.map((h) => <option key={h.id} value={`hospital:${h.id}`}>{h.name}</option>)
-                ) : (
-                  <>
-                    {orgUnits.branches.map((b) => <option key={b.id} value={`branch:${b.id}`}>فرع: {b.name}</option>)}
-                    {orgUnits.departments.map((d) => <option key={d.id} value={`department:${d.id}`}>إدارة: {d.name}</option>)}
-                  </>
-                )}
-              </select>
-            </div>
+            {/* 2. قائمة اختيار متعددة للفروع/المستشفيات (Multi-Select Tags/Chips) */}
+            <MultiSelectChips
+              label={isHospital ? "المستشفيات (`اختيار متعدد Multi-Select`)" : "الإدارات والفروع (`اختيار متعدد Multi-Select`)"}
+              placeholder={isHospital ? "اختر عدة مستشفيات لتطبيق الإعدادات دفعة واحدة..." : "اختر عدة إدارات أو فروع لتطبيق المسار عليها دفعة واحدة..."}
+              options={orgUnitOptions}
+              selectedValues={selectedOrgUnitIds}
+              onChange={handleMultiOrgChange}
+            />
           </div>
         </div>
 
@@ -456,7 +619,7 @@ export function WorkflowManager({
             className="bg-primary text-white hover:bg-primary/90 rounded-xl px-9 h-11 font-black text-xs shadow-md shadow-primary/20 transition"
           >
             {isPending ? <Loader2 className="h-4 w-4 animate-spin me-1.5" /> : null}
-            <span>{editingPathId ? "حفظ التعديلات في الجدول" : "حفظ"}</span>
+            <span>{editingPathId ? "حفظ التعديلات وإرسال المصفوفة" : "حفظ (إرسال مصفوفة الاختيارات المتعددة)"}</span>
           </Button>
         </div>
       </div>
@@ -475,7 +638,7 @@ export function WorkflowManager({
                 القسم السفلي: جدول مسارات الطلبات المحفوظة والمعرفة في النظام
               </h3>
               <p className="text-xs font-semibold text-muted-foreground mt-0.5">
-                عند الضغط على حفظ في الأعلى، تنعكس البيانات فوراً في هذا الجدول العَصري المنظم مع أزرار الإجراءات الفورية
+                عند الضغط على حفظ في الأعلى، تنعكس البيانات بمصفوفة الاختيارات المتعددة فوراً في هذا الجدول العَصري المنظم
               </p>
             </div>
           </div>
@@ -487,17 +650,17 @@ export function WorkflowManager({
         {savedPaths.length === 0 ? (
           <div className="rounded-3xl border-2 border-dashed border-slate-300 dark:border-slate-800 p-12 text-center space-y-3 bg-slate-50/50 dark:bg-slate-900/40">
             <p className="text-sm font-black text-slate-700 dark:text-slate-300">لا توجد مسارات طلبات محفوظة في الجدول حالياً</p>
-            <p className="text-xs text-muted-foreground">قم باختيار نوع الطلب والمستشفى/الفرع والموظفين المعتمدين في النموذج العلوي واضغط على &apos;حفظ&apos; لإضافتها هنا</p>
+            <p className="text-xs text-muted-foreground">قم باختيار أنواع الطلبات المتعددة والفروع والمستشفيات في النموذج العلوي واضغط على &apos;حفظ&apos; لإضافتها هنا</p>
           </div>
         ) : (
           <div className="overflow-x-auto rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg transition-all duration-300 animate-in fade-in">
             <table className="w-full text-right text-xs">
               <thead className="bg-primary/10 text-slate-900 dark:text-slate-100 font-black border-b border-primary/20">
                 <tr>
-                  <th className="py-4 px-4 font-black w-60">{isHospital ? "المستشفى" : "الإدارة / الفرع"}</th>
-                  <th className="py-4 px-4 font-black w-48">نوع الطلب (`الاسم - بالعربية`)</th>
-                  <th className="py-4 px-4 font-black w-36 text-center">توجيه للمدير أولاً</th>
-                  <th className="py-4 px-4 font-black w-36 text-center">عدد المعتمدين</th>
+                  <th className="py-4 px-4 font-black w-64">{isHospital ? "المستشفيات المختارة (Chips)" : "الإدارات / الفروع المختارة (Chips)"}</th>
+                  <th className="py-4 px-4 font-black w-56">أنواع الطلبات المختارة (Chips)</th>
+                  <th className="py-4 px-4 font-black w-32 text-center">توجيه للمدير أولاً</th>
+                  <th className="py-4 px-4 font-black w-32 text-center">عدد المعتمدين</th>
                   <th className="py-4 px-4 font-black w-44 text-center">الإجراءات (عرض | تعديل | حذف)</th>
                 </tr>
               </thead>
@@ -505,6 +668,10 @@ export function WorkflowManager({
                 {savedPaths.map((path) => {
                   const isBeingEdited = editingPathId === path.id;
                   const approversCount = path.steps?.filter((s) => s.roleContext !== "RESUMPTION_STAGE").length || 0;
+                  
+                  const targetOrgsList = path.targetOrgUnitIds && path.targetOrgUnitIds.length > 0 ? path.targetOrgUnitIds : [path.orgUnitId];
+                  const requestTypesList = path.requestTypes && path.requestTypes.length > 0 ? path.requestTypes : [path.workflowName];
+
                   return (
                     <tr
                       key={path.id}
@@ -512,17 +679,29 @@ export function WorkflowManager({
                         isBeingEdited ? "bg-primary/10 ring-1 ring-primary" : ""
                       }`}
                     >
-                      {/* المستشفى / الإدارة */}
+                      {/* المستشفيات / الفروع المختارة as Tags/Chips */}
                       <td className="py-4 px-4 font-black text-slate-900 dark:text-slate-100">
-                        <div className="flex items-center gap-2">
-                          <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/10 text-primary font-bold text-xs">🏢</span>
-                          <span>{path.orgUnitLabel || (isHospital ? "جامعة الملك فيصل - الاحساء (أو جميع المستشفيات)" : "جميع الإدارات والفروع")}</span>
+                        <div className="flex flex-wrap gap-1.5 items-center">
+                          {targetOrgsList.map((orgVal) => {
+                            const label = orgUnitLabelFor(orgVal, orgUnits) || orgVal || (isHospital ? "جامعة الملك فيصل - الاحساء" : "جميع الفروع");
+                            return (
+                              <span key={orgVal} className="bg-primary/10 text-primary border border-primary/25 rounded-xl px-2.5 py-0.5 font-extrabold text-[11px] shadow-2xs">
+                                {label}
+                              </span>
+                            );
+                          })}
                         </div>
                       </td>
 
-                      {/* نوع الطلب */}
+                      {/* أنواع الطلبات المختارة as Tags/Chips */}
                       <td className="py-4 px-4 font-bold text-primary text-sm">
-                        {path.workflowName}
+                        <div className="flex flex-wrap gap-1.5 items-center">
+                          {requestTypesList.map((rtVal) => (
+                            <span key={rtVal} className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-0.5 font-black text-[11px] shadow-2xs">
+                              {rtVal}
+                            </span>
+                          ))}
+                        </div>
                       </td>
 
                       {/* توجيه للمدير */}
@@ -600,17 +779,32 @@ export function WorkflowManager({
             <div className="flex items-center justify-between border-b pb-3.5">
               <h3 className="text-lg font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <Eye className="h-5 w-5 text-primary" />
-                <span>تفاصيل المعتمدين وسير العمل للمسار: ({viewingPath.workflowName})</span>
+                <span>تفاصيل الاختيارات المتعددة والمعتمدين للمسار: ({viewingPath.workflowName})</span>
               </h3>
               <button onClick={() => setViewingPath(null)} className="p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800"><X className="h-5 w-5" /></button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-xs font-semibold bg-primary/5 p-4 rounded-2xl border border-primary/20">
+            <div className="space-y-3 text-xs font-semibold bg-primary/5 p-4 rounded-2xl border border-primary/20">
               <div>
-                <span className="text-muted-foreground block">المنشأة / النطاق:</span>
-                <span className="font-extrabold text-slate-900 dark:text-slate-100 text-sm mt-0.5 block">{viewingPath.orgUnitLabel}</span>
+                <span className="text-muted-foreground block mb-1">المنشآت / الفروع المختارة (`targetOrgUnitIds Array`):</span>
+                <div className="flex flex-wrap gap-1.5 items-center">
+                  {(viewingPath.targetOrgUnitIds && viewingPath.targetOrgUnitIds.length > 0 ? viewingPath.targetOrgUnitIds : [viewingPath.orgUnitId]).map((orgVal) => {
+                    const label = orgUnitLabelFor(orgVal, orgUnits) || orgVal || viewingPath.orgUnitLabel;
+                    return <Badge key={orgVal} className="bg-primary text-white font-extrabold px-2.5 py-0.5">{label}</Badge>;
+                  })}
+                </div>
               </div>
+
               <div>
+                <span className="text-muted-foreground block mb-1">أنواع الطلبات المختارة (`requestTypes Array`):</span>
+                <div className="flex flex-wrap gap-1.5 items-center">
+                  {(viewingPath.requestTypes && viewingPath.requestTypes.length > 0 ? viewingPath.requestTypes : [viewingPath.workflowName]).map((rtVal) => (
+                    <Badge key={rtVal} variant="outline" className="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-extrabold px-2.5 py-0.5 border-slate-300 dark:border-slate-700">{rtVal}</Badge>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-1">
                 <span className="text-muted-foreground block">توجيه للمدير المباشر أولاً:</span>
                 <span className="font-black text-primary text-sm mt-0.5 block">{viewingPath.sendToDirectManagerFirst ? "✓ نعم (يصل للمدير أولاً)" : "✖ لا (مباشرة للمعتمدين أدناه)"}</span>
               </div>

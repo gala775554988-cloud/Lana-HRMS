@@ -65,6 +65,8 @@ export function WorkflowPathEditor({ workflowType, defaultName, accent = "teal" 
   const [initialSteps, setInitialSteps] = useState<WorkflowStepItem[] | null>(null);
   const [initialSendToDirectManager, setInitialSendToDirectManager] = useState<boolean>(true);
   const [initialName, setInitialName] = useState<string>(defaultName);
+  const [initialRequestTypes, setInitialRequestTypes] = useState<string[]>([]);
+  const [initialTargetOrgUnitIds, setInitialTargetOrgUnitIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -81,6 +83,12 @@ export function WorkflowPathEditor({ workflowType, defaultName, accent = "teal" 
           if (data.path.workflowName) {
             setInitialName(data.path.workflowName);
           }
+          if (Array.isArray(data.path.requestTypes)) {
+            setInitialRequestTypes(data.path.requestTypes);
+          }
+          if (Array.isArray(data.path.targetOrgUnitIds)) {
+            setInitialTargetOrgUnitIds(data.path.targetOrgUnitIds);
+          }
         } else {
           setInitialSteps([]);
         }
@@ -90,7 +98,7 @@ export function WorkflowPathEditor({ workflowType, defaultName, accent = "teal" 
     return () => { cancelled = true; };
   }, [workflowType]);
 
-  async function handleSave(steps: WorkflowStepItem[], sendToDirectManagerFirst = true, customName = "") {
+  async function handleSave(steps: WorkflowStepItem[], sendToDirectManagerFirst = true, customName = "", requestTypes: string[] = [], targetOrgUnitIds: string[] = []) {
     const response = await fetch("/api/enterprise/workflow-paths", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -98,6 +106,8 @@ export function WorkflowPathEditor({ workflowType, defaultName, accent = "teal" 
         workflowType,
         workflowName: customName || initialName || defaultName,
         sendToDirectManagerFirst,
+        requestTypes,
+        targetOrgUnitIds,
         steps: toStoredSteps(steps)
       })
     });
@@ -126,6 +136,8 @@ export function WorkflowPathEditor({ workflowType, defaultName, accent = "teal" 
       accent={accent}
       initialSteps={initialSteps ?? []}
       initialSendToDirectManagerFirst={initialSendToDirectManager}
+      initialRequestTypes={initialRequestTypes}
+      initialTargetOrgUnitIds={initialTargetOrgUnitIds}
       defaultOrgScopeType={workflowType === "HOSPITAL_PATH" ? "hospital" : "branch"}
       onSave={handleSave}
     />
