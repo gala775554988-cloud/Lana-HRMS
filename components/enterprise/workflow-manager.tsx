@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Plus, Pencil, Check, X, CheckCircle2, Shield, Loader2, GitPullRequest, Eye, Trash2, HelpCircle, Layers, FileText, UserCheck, Building2, Landmark } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { UserSearchSelect } from "@/components/hrms/user-search-select";
 
 export type WorkflowStepItem = {
@@ -22,69 +20,39 @@ type OrgUnits = { departments: OrgUnit[]; branches: OrgUnit[]; hospitals: OrgUni
 
 const EMPTY_ORG_UNITS: OrgUnits = { departments: [], branches: [], hospitals: [] };
 
-function orgUnitLabelFor(orgUnitId: string, units: OrgUnits): string {
-  if (!orgUnitId || !orgUnitId.includes(":")) return "";
-  const [type, id] = orgUnitId.split(":");
-  const list = type === "department" ? units.departments : type === "branch" ? units.branches : type === "hospital" ? units.hospitals : [];
-  return list.find((u) => u.id === id)?.name ?? "";
-}
-
-const REQUEST_TYPE_OPTIONS = [
-  { id: "ALL", label: "جميع الطلبات (شامل)", icon: Layers },
-  { id: "LEAVE", label: "طلب إجازة", icon: FileText },
-  { id: "RESUMPTION", label: "طلب المباشرة", icon: UserCheck },
-  { id: "OVERTIME", label: "العمل الإضافي", icon: FileText },
-  { id: "LOAN", label: "السلف والقروض", icon: FileText },
-  { id: "EXPENSE", label: "المصاريف والعُهد", icon: FileText }
-];
-
-const ACCENTS = {
-  teal: {
-    headerBg: "bg-gradient-to-r from-teal-950 via-teal-900 to-slate-900 text-white",
-    icon: "bg-teal-500/20 text-teal-300 border border-teal-400/30",
-    badge: "bg-teal-500/20 text-teal-200 border-teal-400/30",
-    tableHeader: "bg-teal-100/80 dark:bg-teal-950/70 text-teal-950 dark:text-teal-200 border-b-2 border-teal-300 dark:border-teal-800 font-black",
-    number: "bg-teal-600 text-white font-black",
-    saveBtn: "bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-black shadow-md shadow-teal-600/25 h-11 px-8 rounded-xl text-sm"
-  },
-  violet: {
-    headerBg: "bg-gradient-to-r from-violet-950 via-indigo-900 to-slate-900 text-white",
-    icon: "bg-violet-500/20 text-violet-300 border border-violet-400/30",
-    badge: "bg-violet-500/20 text-violet-200 border-violet-400/30",
-    tableHeader: "bg-violet-100/80 dark:bg-violet-950/70 text-violet-950 dark:text-violet-200 border-b-2 border-violet-300 dark:border-violet-800 font-black",
-    number: "bg-violet-600 text-white font-black",
-    saveBtn: "bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-black shadow-md shadow-violet-600/25 h-11 px-8 rounded-xl text-sm"
-  }
-} as const;
-
 interface WorkflowManagerProps {
   initialSteps?: WorkflowStepItem[];
   moduleName?: string;
-  onSave?: (steps: WorkflowStepItem[]) => Promise<void> | void;
+  initialSendToDirectManagerFirst?: boolean;
+  onSave?: (steps: WorkflowStepItem[], sendToDirectManagerFirst: boolean, workflowName: string) => Promise<void> | void;
   accent?: "teal" | "violet";
   defaultOrgScopeType?: "hospital" | "branch" | "department";
 }
 
 function emptyStep(defaultOrgType = ""): WorkflowStepItem {
   return {
-    id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    id: `step-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     approverId: "",
-    orgUnitId: defaultOrgType ? `${defaultOrgType}:` : "",
-    approverPosition: "حقل مستوى موافقة مخصص",
-    orgUnitLabel: defaultOrgType === "hospital" ? "المستشفيات / القطاع الطبي" : "الإدارة / الفرع التشغيلي",
-    roleContext: "CUSTOM_APPROVER"
+    orgUnitId: defaultOrgType ? `${defaultOrgType}:all` : "",
+    approverPosition: "معتمِد",
+    orgUnitLabel: defaultOrgType === "hospital" ? "المستشفيات" : "الإدارة أو الفروع",
+    roleContext: "APPROVER"
   };
 }
 
-export function WorkflowManager({ initialSteps = [], moduleName = "المسار المعتمد", onSave, accent = "teal", defaultOrgScopeType }: WorkflowManagerProps) {
-  const theme = ACCENTS[accent] ?? ACCENTS.teal;
+export function WorkflowManager({
+  initialSteps = [],
+  moduleName = "إجازة سنوية",
+  initialSendToDirectManagerFirst = true,
+  onSave,
+  defaultOrgScopeType = "hospital"
+}: WorkflowManagerProps) {
   const isHospital = defaultOrgScopeType === "hospital";
+  const [workflowName, setWorkflowName] = useState<string>(moduleName);
+  const [sendToDirectManagerFirst, setSendToDirectManagerFirst] = useState<boolean>(initialSendToDirectManagerFirst);
   const [steps, setSteps] = useState<WorkflowStepItem[]>(initialSteps);
   const [orgUnits, setOrgUnits] = useState<OrgUnits>(EMPTY_ORG_UNITS);
-  const [editingIds, setEditingIds] = useState<Set<number | string>>(new Set());
-  const [confirmingDeleteIds, setConfirmingDeleteIds] = useState<Set<number | string>>(new Set());
-  const [viewingStep, setViewingStep] = useState<WorkflowStepItem | null>(null);
-  const [selectedRequestTypes, setSelectedRequestTypes] = useState<string[]>(["ALL", "LEAVE", "RESUMPTION", "OVERTIME", "LOAN", "EXPENSE"]);
+  const [selectedOrgUnitId, setSelectedOrgUnitId] = useState<string>("");
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -93,351 +61,238 @@ export function WorkflowManager({ initialSteps = [], moduleName = "المسار 
       setSteps([emptyStep(defaultOrgScopeType)]);
     } else {
       setSteps(initialSteps);
+      const firstWithOrg = initialSteps.find((s) => s.orgUnitId);
+      if (firstWithOrg && firstWithOrg.orgUnitId) {
+        setSelectedOrgUnitId(firstWithOrg.orgUnitId);
+      }
     }
   }, [initialSteps, defaultOrgScopeType]);
+
+  useEffect(() => {
+    if (moduleName) setWorkflowName(moduleName);
+  }, [moduleName]);
 
   useEffect(() => {
     let cancelled = false;
     fetch("/api/enterprise/workflow-paths/org-units", { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
-        if (!cancelled && data.success) setOrgUnits({ departments: data.departments ?? [], branches: data.branches ?? [], hospitals: data.hospitals ?? [] });
+        if (!cancelled && data.success) {
+          setOrgUnits({ departments: data.departments ?? [], branches: data.branches ?? [], hospitals: data.hospitals ?? [] });
+        }
       })
       .catch(() => {});
     return () => { cancelled = true; };
   }, []);
 
-  const addStep = () => {
-    const step = emptyStep(defaultOrgScopeType);
-    setSteps((current) => [...current, step]);
-    setEditingIds((current) => new Set(current).add(step.id));
+  const addApprover = () => {
+    const newStep = emptyStep(defaultOrgScopeType);
+    if (selectedOrgUnitId) newStep.orgUnitId = selectedOrgUnitId;
+    setSteps((current) => [...current, newStep]);
   };
 
-  const removeStep = (id: number | string) => {
+  const removeApprover = (id: number | string) => {
     setSteps((current) => current.filter((s) => s.id !== id));
-    setEditingIds((current) => { const next = new Set(current); next.delete(id); return next; });
-    setConfirmingDeleteIds((current) => { const next = new Set(current); next.delete(id); return next; });
   };
 
-  const updateStep = (id: number | string, patch: Partial<WorkflowStepItem>) => {
+  const updateApprover = (id: number | string, patch: Partial<WorkflowStepItem>) => {
     setSteps((current) => current.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   };
 
-  const toggleEditing = (id: number | string) => {
-    setEditingIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleRequestType = (typeId: string) => {
-    if (typeId === "ALL") {
-      if (selectedRequestTypes.includes("ALL")) setSelectedRequestTypes([]);
-      else setSelectedRequestTypes(["ALL", "LEAVE", "RESUMPTION", "OVERTIME", "LOAN", "EXPENSE"]);
-      return;
-    }
-    setSelectedRequestTypes((prev) => {
-      const next = new Set(prev);
-      if (next.has(typeId)) {
-        next.delete(typeId);
-        next.delete("ALL");
-      } else {
-        next.add(typeId);
-        if (next.size >= 5) next.add("ALL");
-      }
-      return Array.from(next);
-    });
+  const handleOrgUnitChange = (val: string) => {
+    setSelectedOrgUnitId(val);
+    setSteps((current) => current.map((s) => ({ ...s, orgUnitId: val })));
   };
 
   const handleSave = () => {
     setMessage(null);
     startTransition(async () => {
       try {
-        if (onSave) await onSave(steps);
-        setMessage("✓ تم حفظ إعدادات وتسلسل الطلبات في هذا الجدول المُرتب بنجاح 100%");
-        setEditingIds(new Set());
+        if (onSave) await onSave(steps, sendToDirectManagerFirst, workflowName);
+        setMessage("✓ تم حفظ إعدادات سير الطلبات والمعتمدين بنجاح");
       } catch (err: any) {
         setMessage(`⚠️ ${err.message || "حدث خطأ أثناء حفظ الإعدادات"}`);
       }
     });
   };
 
+  const handleCancel = () => {
+    if (initialSteps && initialSteps.length > 0) setSteps(initialSteps);
+    setSendToDirectManagerFirst(initialSendToDirectManagerFirst);
+    setWorkflowName(moduleName);
+    setMessage("ℹ️ تم إلغاء التغييرات");
+  };
+
   return (
-    <Card className="w-full overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900" dir="rtl">
-      {/* Sleek Compact Header */}
-      <div className={`px-5 py-4 ${theme.headerBg} flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3`}>
-        <div className="flex items-center gap-3">
-          <div className={`grid h-10 w-10 place-items-center rounded-xl ${theme.icon} shadow-inner shrink-0`}>
-            {isHospital ? <Building2 className="h-5 w-5" /> : <Landmark className="h-5 w-5" />}
+    <div className="w-full max-w-4xl mx-auto space-y-6 text-right font-sans p-2" dir="rtl">
+      {message ? (
+        <div className={`p-4 rounded-xl text-sm font-bold flex items-center gap-2 ${
+          message.startsWith("✓")
+            ? "bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300"
+            : message.startsWith("ℹ️")
+            ? "bg-sky-50 text-sky-800 border border-sky-200 dark:bg-sky-950/40 dark:text-sky-300"
+            : "bg-rose-50 text-rose-800 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300"
+        }`}>
+          <span>{message}</span>
+        </div>
+      ) : null}
+
+      {/* Card 1: الاسم - بالعربية + اختيار المستشفى/الإدارة (بنفس شكل الصورة المرسلة تماماً وبدون الإنجليزي) */}
+      <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-5">
+        <div className="grid gap-6 sm:grid-cols-2">
+          {/* الاسم - بالعربية */}
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">الاسم - بالعربية</label>
+            <input
+              type="text"
+              value={workflowName}
+              onChange={(e) => setWorkflowName(e.target.value)}
+              placeholder={isHospital ? "إجازة سنوية - المستشفيات" : "إجازة سنوية - الإدارة والفروع"}
+              className="w-full h-11 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-3.5 text-sm font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-2xs transition"
+            />
           </div>
-          <div>
-            <h2 className="text-lg font-black">{moduleName}</h2>
-            <p className="text-xs text-white/80 font-semibold">
-              جدول واحد مُرتب بفراغات منظمة — الفراغ الأول لاختيار {isHospital ? "المستشفى" : "الإدارة/الفرع"}، ثم الفراغ الثاني لاختيار المشرف، ثم إضافة حقل
-            </p>
+
+          {/* المستشفى أو الإدارة والفروع كما طلب المستخدم في الترتيب */}
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+              {isHospital ? "المستشفى" : "الإدارة أو الفروع"}
+            </label>
+            <select
+              value={selectedOrgUnitId}
+              onChange={(e) => handleOrgUnitChange(e.target.value)}
+              className="w-full h-11 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-3.5 text-sm font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-2xs transition"
+            >
+              <option value="">{isHospital ? "جميع المستشفيات (All Hospitals)" : "جميع الإدارات والفروع (All Branches)"}</option>
+              {isHospital ? (
+                orgUnits.hospitals.map((h) => <option key={h.id} value={`hospital:${h.id}`}>{h.name}</option>)
+              ) : (
+                <>
+                  {orgUnits.branches.map((b) => <option key={b.id} value={`branch:${b.id}`}>فرع: {b.name}</option>)}
+                  {orgUnits.departments.map((d) => <option key={d.id} value={`department:${d.id}`}>إدارة: {d.name}</option>)}
+                </>
+              )}
+            </select>
           </div>
         </div>
-        <Badge className={`px-3 py-1 rounded-lg font-mono font-bold text-xs ${theme.badge}`}>
-          {steps.length} حقول في الجدول
-        </Badge>
       </div>
 
-      <CardContent className="p-5 space-y-5">
-        {/* Sleek Compact Inline Request Types Bar */}
-        <div className="flex items-center justify-between flex-wrap gap-3 bg-slate-50 dark:bg-slate-950 px-4 py-3 rounded-xl border border-slate-200/80 dark:border-slate-800">
-          <div className="flex items-center gap-2">
-            <Layers className="h-4 w-4 text-primary shrink-0" />
-            <span className="text-xs font-black text-slate-800 dark:text-slate-200">📌 نوع الطلب المرتبط بهذا المسار:</span>
+      {/* Card 2: توجيه الطلب للمدير المباشر أولا (مطابق تماماً للصورة المرجعية) */}
+      <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
+          <h3 className="text-base font-black text-slate-800 dark:text-slate-100">توجيه الطلب للمدير المباشر أولا</h3>
+          <div className="flex items-center rounded-xl border border-slate-200 dark:border-slate-700 p-1 bg-slate-50 dark:bg-slate-950 self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setSendToDirectManagerFirst(true)}
+              className={`flex items-center gap-1.5 px-5 py-1.5 rounded-lg text-xs font-black transition ${
+                sendToDirectManagerFirst
+                  ? "bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800"
+                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-200/50"
+              }`}
+            >
+              <span>✓ نعم</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSendToDirectManagerFirst(false)}
+              className={`flex items-center gap-1.5 px-5 py-1.5 rounded-lg text-xs font-black transition ${
+                !sendToDirectManagerFirst
+                  ? "bg-rose-50 text-rose-700 border border-rose-300 shadow-2xs dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800"
+                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-200/50"
+              }`}
+            >
+              <span>✖ لا</span>
+            </button>
           </div>
-          <div className="flex flex-wrap gap-1.5 items-center">
-            {REQUEST_TYPE_OPTIONS.map((opt) => {
-              const active = selectedRequestTypes.includes(opt.id);
+        </div>
+
+        <div className="space-y-2.5 text-xs font-medium text-slate-600 dark:text-slate-400">
+          <div className="flex items-start gap-2 bg-sky-50/70 dark:bg-sky-950/30 p-3 rounded-xl border border-sky-100 dark:border-sky-900/50 text-sky-900 dark:text-sky-300">
+            <span className="font-extrabold shrink-0 mt-0.5">ℹ️ نعم:</span>
+            <span>سيصل الطلب إلى مدير الموظف أولا، بعدها يبدأ تطبيق مرحلة سير الطلبات المحددة</span>
+          </div>
+          <div className="flex items-start gap-2 bg-slate-50 dark:bg-slate-950/40 p-3 rounded-xl border border-slate-200/60 dark:border-slate-800">
+            <span className="font-extrabold shrink-0 mt-0.5">ℹ️ لا:</span>
+            <span>لن يصل الطلب إلى مدير الموظف، سيتم تطبيق مرحلة سير الطلبات المحددة مباشرة</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Card 3: المعتمدون (مطابق بالضبط للصورة المرجعية والمطلوبة دون أي إضافات خارجية) */}
+      <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3.5">
+          <h3 className="text-lg font-black text-slate-900 dark:text-slate-100">المعتمدون</h3>
+          <button
+            type="button"
+            onClick={addApprover}
+            className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900 border border-emerald-300/60 dark:border-emerald-800 rounded-xl px-5 py-2 font-extrabold text-xs transition flex items-center gap-1.5 shadow-2xs"
+          >
+            <span>إضافة معتمد</span>
+          </button>
+        </div>
+
+        <div>
+          <label className="text-xs font-bold text-muted-foreground block mb-3.5">حدد المعتمدون</label>
+          <div className="space-y-3">
+            {steps.map((step, index) => {
+              const canRemove = steps.length > 1;
               return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => toggleRequestType(opt.id)}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition border ${
-                    active
-                      ? "bg-primary text-white border-primary shadow-2xs"
-                      : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-primary/50"
-                  }`}
-                >
-                  <span>{opt.label}</span>
-                </button>
+                <div key={step.id} className="flex items-center gap-3">
+                  {/* إزالة button exactly as shown in Screenshot ... 123046.png */}
+                  {canRemove ? (
+                    <button
+                      type="button"
+                      onClick={() => removeApprover(step.id)}
+                      className="bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 hover:bg-rose-200 border border-rose-200 dark:border-rose-900 rounded-xl px-4 py-2.5 font-bold text-xs transition shrink-0 shadow-2xs"
+                      title="إزالة"
+                    >
+                      إزالة
+                    </button>
+                  ) : null}
+
+                  {/* Approver Selection Field (UserSearchSelect exactly matching image) */}
+                  <div className="flex-1">
+                    <UserSearchSelect
+                      value={step.approverId}
+                      initialLabel={step.approverLabel ?? ""}
+                      onChange={(userId, label, employee) => {
+                        updateApprover(step.id, {
+                          approverId: userId,
+                          approverLabel: label ?? "",
+                          approverPosition: employee?.position?.title || step.approverPosition || ""
+                        });
+                      }}
+                      placeholder="اختر المعتمد بالاسم أو الرقم الوظيفي..."
+                    />
+                  </div>
+                </div>
               );
             })}
           </div>
         </div>
+      </div>
 
-        {message ? (
-          <div className={`p-3.5 rounded-xl text-xs font-bold flex items-center gap-2 ${
-            message.startsWith("✓") 
-              ? "bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300"
-              : "bg-rose-50 text-rose-800 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300"
-          }`}>
-            <span>{message}</span>
-          </div>
-        ) : null}
+      {/* Action Buttons (حفظ | إلغاء) exactly matching bottom corner of reference image */}
+      <div className="flex items-center justify-end gap-3 pt-2">
+        <Button
+          type="button"
+          onClick={handleCancel}
+          variant="outline"
+          className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 border-slate-300/80 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl px-7 h-10 font-extrabold text-xs shadow-2xs"
+        >
+          إلغاء
+        </Button>
 
-        {/* The One Neat, Compact Table (`جدول واحد مرتب بفراغات مرتبه ليس بهذا الشكل الكبير المفرط`) */}
-        <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <table className="w-full text-right text-xs">
-            <thead className={theme.tableHeader}>
-              <tr>
-                <th className="py-3 px-3.5 font-black w-24 text-center">المستوى</th>
-                <th className="py-3 px-3.5 font-black w-64">الفراغ / حقل النطاق والجهة ({isHospital ? "المستشفى" : "الإدارة/الفرع"})</th>
-                <th className="py-3 px-3.5 font-black">حقل اختيار المشرف / الموظف المعتمِد (`اختر أنا الموظف`)</th>
-                <th className="py-3 px-3.5 font-black w-40 text-center">أزرار: عرض | تعديل | حذف</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900/60">
-              {steps.map((step, index) => {
-                const editing = editingIds.has(step.id);
-                const confirmingDelete = confirmingDeleteIds.has(step.id);
-                const isAssigned = Boolean(step.approverId);
-                const isFirstRow = index === 0;
-                const isSecondRow = index === 1;
-
-                return (
-                  <tr key={step.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
-                    {/* Level Badge */}
-                    <td className="py-3.5 px-3.5 text-center align-middle">
-                      <div className="flex flex-col items-center gap-1">
-                        <span className={`inline-flex h-7 w-7 items-center justify-center rounded-lg text-xs ${theme.number}`}>
-                          {index + 1}
-                        </span>
-                        <span className="text-[10px] font-extrabold text-muted-foreground">
-                          {isFirstRow ? (isHospital ? "المستشفى" : "الفرع/الإدارة") : isSecondRow ? "المشرف/المدير" : `مستوى ${index + 1}`}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* Column 2: The First Blank/Field (`الفراغ الأول حقل لاختيار المستشفى / الإدارة`) */}
-                    <td className="py-3.5 px-3.5 align-middle">
-                      {editing || !step.orgUnitId ? (
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-extrabold text-primary block">
-                            {isFirstRow ? (isHospital ? "👈 الفراغ الأول: حقل لاختيار المستشفى:" : "👈 الفراغ الأول: حقل لاختيار الإدارة أو الفرع:") : `اختر نطاق جهة المستوى ${index + 1}:`}
-                          </label>
-                          <select
-                            value={step.orgUnitId}
-                            onChange={(e) => updateStep(step.id, { orgUnitId: e.target.value, orgUnitLabel: orgUnitLabelFor(e.target.value, orgUnits) })}
-                            className="h-9 w-full rounded-xl border border-input bg-white dark:bg-slate-950 px-2.5 text-xs font-bold shadow-2xs focus:ring-2 focus:ring-primary"
-                          >
-                            <option value="">-- اختر {isHospital ? "المستشفى من القائمة..." : "الفرع أو الإدارة من القائمة..."} --</option>
-                            {orgUnits.hospitals.length ? (
-                              <optgroup label="🏥 المستشفيات / القطاع الطبي">
-                                {orgUnits.hospitals.map((h) => <option key={h.id} value={`hospital:${h.id}`}>{h.name}</option>)}
-                              </optgroup>
-                            ) : null}
-                            {orgUnits.branches.length ? (
-                              <optgroup label="🏢 الفروع التشغيلية">
-                                {orgUnits.branches.map((b) => <option key={b.id} value={`branch:${b.id}`}>{b.name}</option>)}
-                              </optgroup>
-                            ) : null}
-                            {orgUnits.departments.length ? (
-                              <optgroup label="📋 الإدارات العامة">
-                                {orgUnits.departments.map((d) => <option key={d.id} value={`department:${d.id}`}>{d.name}</option>)}
-                              </optgroup>
-                            ) : null}
-                          </select>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between bg-slate-100/80 dark:bg-slate-800/80 p-2 rounded-xl border">
-                          <span className="font-extrabold text-slate-800 dark:text-slate-200">
-                            {step.orgUnitLabel || orgUnitLabelFor(step.orgUnitId, orgUnits) || (isHospital ? "جميع المستشفيات" : "الإدارة / الفرع")}
-                          </span>
-                          <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={() => toggleEditing(step.id)} title="تغيير الجهة / المستشفى">
-                            <Pencil className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      )}
-                    </td>
-
-                    {/* Column 3: The Second Blank/Field (`حقل لاختيار مشرف / اختيار أنا الموظف`) */}
-                    <td className="py-3.5 px-3.5 align-middle">
-                      {editing || !isAssigned ? (
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <label className="text-[10px] font-extrabold text-primary flex items-center gap-1">
-                              <span>{isSecondRow ? "👈 الفراغ الثاني: حقل لاختيار مشرف (`اختر أنا الموظف`):" : isFirstRow ? "👈 اختيار ممثل/منسق الجهة أو اتركه تلقائي:" : `👈 اختيار الموظف المعتمِد للمستوى ${index + 1}:`}</span>
-                            </label>
-                          </div>
-                          <UserSearchSelect
-                            value={step.approverId}
-                            initialLabel={step.approverLabel ?? ""}
-                            onChange={(userId, label, employee) => {
-                              updateStep(step.id, {
-                                approverId: userId,
-                                approverLabel: label ?? "",
-                                approverPosition: employee?.position?.title || step.approverPosition || ""
-                              });
-                            }}
-                            placeholder={isSecondRow ? "👉 ابحث واختر مشرف المستشفى أو الإدارة بالاسم أو الهوية..." : "👉 ابحث واختر الموظف المعتمِد الآن..."}
-                          />
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between bg-emerald-50/80 dark:bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-800">
-                          <div className="flex items-center gap-2">
-                            <span className="grid h-6 w-6 place-items-center rounded-lg bg-emerald-600 text-white font-bold text-xs">✓</span>
-                            <div>
-                              <p className="text-xs font-black text-slate-900 dark:text-slate-100">{step.approverLabel}</p>
-                              <p className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-400 mt-0.5">{step.approverPosition || (isSecondRow ? "مشرف معتمِد" : "معتمِد المستوى")}</p>
-                            </div>
-                          </div>
-                          <Button size="sm" variant="outline" onClick={() => toggleEditing(step.id)} className="h-7 px-2.5 rounded-lg text-[11px] font-bold border-emerald-300 dark:border-emerald-700 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-300">
-                            تغيير الموظف ✏️
-                          </Button>
-                        </div>
-                      )}
-                    </td>
-
-                    {/* Column 4: Actions (`عرض | تعديل | حذف`) */}
-                    <td className="py-3.5 px-3.5 text-center align-middle">
-                      <div className="flex items-center justify-center gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
-                          onClick={() => setViewingStep(step)}
-                          title="عرض تفاصيل المستوى"
-                        >
-                          <Eye className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
-                        </Button>
-
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className={`h-8 w-8 rounded-lg ${editing ? "bg-primary text-white" : "hover:bg-slate-100 dark:hover:bg-slate-800"}`}
-                          onClick={() => toggleEditing(step.id)}
-                          title="تعديل هذا الفراغ / المستوى"
-                        >
-                          {editing ? <Check className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />}
-                        </Button>
-
-                        {confirmingDelete ? (
-                          <div className="flex items-center gap-1 bg-rose-50 dark:bg-rose-950/60 p-1 rounded-lg border border-rose-300 dark:border-rose-800">
-                            <button onClick={() => removeStep(step.id)} className="px-1.5 py-0.5 text-rose-700 dark:text-rose-300 hover:bg-rose-200 rounded text-[10px] font-black">حذف</button>
-                            <button onClick={() => setConfirmingDeleteIds(new Set())} className="p-0.5 text-slate-500 hover:bg-slate-200 rounded"><X className="h-3 w-3" /></button>
-                          </div>
-                        ) : (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8 rounded-lg hover:bg-rose-50 text-rose-600 dark:hover:bg-rose-950/40"
-                            onClick={() => setConfirmingDeleteIds((c) => new Set(c).add(step.id))}
-                            title="حذف هذا المستوى"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Section: "إضافة حقل" Button right underneath the neat table exactly as requested */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
-          <Button
-            type="button"
-            onClick={addStep}
-            variant="outline"
-            className="w-full sm:w-auto rounded-xl border-2 border-dashed border-primary/60 bg-primary/5 hover:bg-primary/10 font-black text-xs h-10 px-5 gap-2 text-primary shadow-2xs"
-          >
-            <Plus className="h-4 w-4 stroke-[3]" />
-            <span>+ إضافة حقل / خانة مستوى موافقة جديد بعد هذا الجدول</span>
-          </Button>
-
-          <Button
-            type="button"
-            onClick={handleSave}
-            disabled={isPending}
-            className={`w-full sm:w-auto ${theme.saveBtn}`}
-          >
-            {isPending ? <Loader2 className="h-4 w-4 animate-spin me-1.5" /> : null}
-            <span>💾 حفظ إعدادات وتسلسل الطلبات في هذا الجدول</span>
-          </Button>
-        </div>
-      </CardContent>
-
-      {/* View Step Details Modal */}
-      {viewingStep ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="max-w-md w-full rounded-2xl bg-white dark:bg-slate-900 p-5 shadow-2xl space-y-3.5 border border-slate-200 dark:border-slate-800" dir="rtl">
-            <div className="flex items-center justify-between border-b pb-2.5">
-              <h3 className="text-base font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                <Eye className="h-4 w-4 text-primary" />
-                <span>تفاصيل الحقل ومستوى الاعتماد</span>
-              </h3>
-              <button onClick={() => setViewingStep(null)} className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"><X className="h-4 w-4" /></button>
-            </div>
-            <div className="space-y-2.5 text-xs font-semibold">
-              <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border">
-                <span className="text-muted-foreground">الفراغ الأول / حقل الجهة (المستشفى/الفرع):</span>
-                <span className="font-extrabold text-slate-900 dark:text-slate-100">{viewingStep.orgUnitLabel || orgUnitLabelFor(viewingStep.orgUnitId, orgUnits) || "غير محدد"}</span>
-              </div>
-              <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border">
-                <span className="text-muted-foreground">الفراغ الثاني / الموظف المعتمِد (`اختيار أنا الموظف`):</span>
-                <span className="font-extrabold text-primary">{viewingStep.approverLabel || "حقل فارغ (جاهز للاختيار)"}</span>
-              </div>
-              <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border">
-                <span className="text-muted-foreground">التوصيف والمرحلة:</span>
-                <span className="font-bold">{viewingStep.approverPosition || "مستوى موافقة مخصص"}</span>
-              </div>
-            </div>
-            <div className="pt-2 flex justify-end">
-              <Button onClick={() => setViewingStep(null)} className="rounded-xl px-5 font-extrabold text-xs bg-primary text-white h-9">إغلاق</Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-    </Card>
+        <Button
+          type="button"
+          onClick={handleSave}
+          disabled={isPending}
+          className="bg-sky-50 text-sky-800 border border-sky-300 hover:bg-sky-100 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800 rounded-xl px-8 h-10 font-black text-xs shadow-sm transition"
+        >
+          {isPending ? <Loader2 className="h-4 w-4 animate-spin me-1.5" /> : null}
+          <span>حفظ</span>
+        </Button>
+      </div>
+    </div>
   );
 }

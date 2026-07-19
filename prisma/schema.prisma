@@ -2276,13 +2276,14 @@ enum WorkflowPathType {
 // الأول" / "المسار الثاني"). `steps` holds the ordered chain as JSON:
 // [{ stepOrder, approverId, departmentId, roleContext }, ...].
 model WorkflowPathTemplate {
-  id           String           @id @default(cuid())
-  workflowType WorkflowPathType @unique
-  workflowName String
-  steps        Json
-  updatedById  String?
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  id                       String           @id @default(cuid())
+  workflowType             WorkflowPathType @unique
+  workflowName             String
+  sendToDirectManagerFirst Boolean          @default(true)
+  steps                    Json
+  updatedById              String?
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime         @updatedAt
 
   @@index([workflowType])
 }

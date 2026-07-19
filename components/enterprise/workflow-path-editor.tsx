@@ -63,6 +63,8 @@ function toStoredSteps(steps: WorkflowStepItem[]): StoredStep[] {
 export function WorkflowPathEditor({ workflowType, defaultName, accent = "teal" }: { workflowType: WorkflowPathType; defaultName: string; accent?: "teal" | "violet" }) {
   const [loading, setLoading] = useState(true);
   const [initialSteps, setInitialSteps] = useState<WorkflowStepItem[] | null>(null);
+  const [initialSendToDirectManager, setInitialSendToDirectManager] = useState<boolean>(true);
+  const [initialName, setInitialName] = useState<string>(defaultName);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -73,6 +75,12 @@ export function WorkflowPathEditor({ workflowType, defaultName, accent = "teal" 
         if (cancelled) return;
         if (data.success && data.path) {
           setInitialSteps(toWorkflowSteps(data.path.steps));
+          if (typeof data.path.sendToDirectManagerFirst === "boolean") {
+            setInitialSendToDirectManager(data.path.sendToDirectManagerFirst);
+          }
+          if (data.path.workflowName) {
+            setInitialName(data.path.workflowName);
+          }
         } else {
           setInitialSteps([]);
         }
@@ -82,13 +90,14 @@ export function WorkflowPathEditor({ workflowType, defaultName, accent = "teal" 
     return () => { cancelled = true; };
   }, [workflowType]);
 
-  async function handleSave(steps: WorkflowStepItem[]) {
+  async function handleSave(steps: WorkflowStepItem[], sendToDirectManagerFirst = true, customName = "") {
     const response = await fetch("/api/enterprise/workflow-paths", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         workflowType,
-        workflowName: defaultName,
+        workflowName: customName || initialName || defaultName,
+        sendToDirectManagerFirst,
         steps: toStoredSteps(steps)
       })
     });
@@ -113,9 +122,10 @@ export function WorkflowPathEditor({ workflowType, defaultName, accent = "teal" 
   return (
     <WorkflowManager
       key={workflowType}
-      moduleName={defaultName}
+      moduleName={initialName || defaultName}
       accent={accent}
       initialSteps={initialSteps ?? []}
+      initialSendToDirectManagerFirst={initialSendToDirectManager}
       defaultOrgScopeType={workflowType === "HOSPITAL_PATH" ? "hospital" : "branch"}
       onSave={handleSave}
     />

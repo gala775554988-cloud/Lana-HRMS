@@ -19,7 +19,7 @@ const stepSchema = z.object({
 export const workflowPathInputSchema = z.object({
   workflowType: z.enum(WORKFLOW_PATH_TYPES),
   workflowName: z.string().min(1, "workflowName is required"),
-  // At least one approval level is required -- an empty path can never be saved.
+  sendToDirectManagerFirst: z.boolean().default(true),
   steps: z.array(stepSchema).min(1, "يجب أن يحتوي المسار على مستوى موافقة واحد على الأقل")
 });
 
@@ -30,7 +30,7 @@ export async function getWorkflowPath(workflowType: WorkflowPathTypeValue) {
   const record = await prisma.workflowPathTemplate.findUnique({ where: { workflowType } });
   if (!record) return null;
   const steps = (record.steps as unknown as WorkflowPathStep[]).slice().sort((a, b) => a.stepOrder - b.stepOrder);
-  return { id: record.id, workflowType: record.workflowType, workflowName: record.workflowName, steps, updatedAt: record.updatedAt };
+  return { id: record.id, workflowType: record.workflowType, workflowName: record.workflowName, sendToDirectManagerFirst: record.sendToDirectManagerFirst ?? true, steps, updatedAt: record.updatedAt };
 }
 
 function approverIdsOf(steps: WorkflowPathStep[]): string[] {
@@ -104,6 +104,7 @@ export async function saveWorkflowPath(input: WorkflowPathInput, actorUserId: st
       data: {
         workflowType: parsed.workflowType,
         workflowName: parsed.workflowName,
+        sendToDirectManagerFirst: parsed.sendToDirectManagerFirst ?? true,
         steps: sortedSteps,
         updatedById: actorUserId
       }
