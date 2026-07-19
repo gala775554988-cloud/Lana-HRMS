@@ -156,6 +156,8 @@ function MarketingPanel() {
   );
 }
 
+import { LoginHeroContainer } from "@/components/auth/login-hero-container";
+
 function DiagnosticConfessionBox({ err, location }: { err: any; location: string }) {
   const errMsg = err?.message || String(err || "Unknown error");
   const stack = err?.stack || "";
@@ -177,13 +179,7 @@ export default async function LoginPage() {
       dictionary: {} as any
     }));
     const isAr = locale === "ar";
-    const loginPanel = (
-      <section className="relative flex min-h-screen items-center justify-center bg-white p-6 dark:bg-slate-950" dir={isAr ? "rtl" : "ltr"}>
-        <div className="absolute end-4 top-4"><ClientLanguageToggle variant="outline" /></div>
-        <LoginCard dictionary={dictionary} />
-      </section>
-    );
-    return (<main className="min-h-screen bg-white dark:bg-slate-950" dir="ltr"><div className="grid min-h-screen lg:grid-cols-[65fr_35fr]">{isAr ? (<><MarketingPanel />{loginPanel}</>) : (<>{loginPanel}<MarketingPanel /></>)}</div></main>);
+    return <LoginHeroContainer dictionary={dictionary} isAr={isAr} />;
   } catch (err: any) {
     return <DiagnosticConfessionBox err={err} location="LoginPage (/login)" />;
   }

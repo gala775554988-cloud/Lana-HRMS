@@ -37,6 +37,8 @@ export async function POST(request: NextRequest) {
 async function executeDocumentSync(request: NextRequest) {
   try {
     await requireOdooIntegrationAccess("manage", request);
+    const odooIdParam = request.nextUrl.searchParams.get("odooId");
+    const employeeIdParam = request.nextUrl.searchParams.get("employeeId");
     const limitParam = request.nextUrl.searchParams.get("limit");
     const offsetParam = request.nextUrl.searchParams.get("offset");
     const limit = limitParam ? parseInt(limitParam, 10) : 3000;
@@ -44,6 +46,21 @@ async function executeDocumentSync(request: NextRequest) {
 
     const client = OdooClient.fromEnv();
     await client.connect();
+
+    if (odooIdParam && employeeIdParam) {
+      const odooIdNum = parseInt(odooIdParam, 10);
+      if (!isNaN(odooIdNum) && odooIdNum > 0) {
+        const singleRes = await syncEmployeeDocuments(client, odooIdNum, employeeIdParam);
+        return NextResponse.json({
+          success: true,
+          message: `تم سحب مستندات الموظف من أودو بنجاح (${singleRes.imported} جديد، ${singleRes.skipped} متواجد مسبقاً)`,
+          imported: singleRes.imported,
+          skipped: singleRes.skipped,
+          errorsCount: singleRes.errors.length,
+          errors: singleRes.errors.slice(0, 50)
+        });
+      }
+    }
 
     const res = await bulkSyncAllOdooDocuments(client, limit, offset);
 

@@ -17,18 +17,35 @@ type StoredStep = {
 };
 
 function toWorkflowSteps(steps: StoredStep[]): WorkflowStepItem[] {
+  if (!steps || steps.length === 0) {
+    return [{ id: "step-1", approverId: "", orgUnitId: "", roleContext: "" }];
+  }
   return steps
     .slice()
     .sort((a, b) => a.stepOrder - b.stepOrder)
-    .map((step, index) => ({
-      id: index + 1,
-      approverId: step.approverId,
-      approverLabel: step.approverLabel ?? "",
-      approverPosition: step.approverPosition ?? "",
-      orgUnitId: step.departmentId ?? "",
-      orgUnitLabel: step.orgUnitLabel ?? "",
-      roleContext: step.roleContext ?? ""
-    }));
+    .map((step, index) => {
+      const isPlaceholder = step.approverId && (
+        step.approverId === "HOSPITAL_INITIATOR" ||
+        step.approverId === "HOSPITAL_SUPERVISOR" ||
+        step.approverId === "DIRECT_MANAGER" ||
+        step.approverId === "HR_MANAGER" ||
+        step.approverId === "PAYROLL_OFFICER" ||
+        step.approverId === "FINAL_ONBOARDING" ||
+        step.approverId === "BRANCH_INITIATOR" ||
+        step.approverId === "BRANCH_MANAGER" ||
+        step.approverId === "EMPLOYEE_FINAL_STEP" ||
+        step.approverId.startsWith("SYSTEM_")
+      );
+      return {
+        id: index + 1,
+        approverId: isPlaceholder ? "" : step.approverId,
+        approverLabel: isPlaceholder ? "" : (step.approverLabel ?? ""),
+        approverPosition: isPlaceholder ? "" : (step.approverPosition ?? ""),
+        orgUnitId: step.departmentId ?? "",
+        orgUnitLabel: step.orgUnitLabel ?? "",
+        roleContext: step.roleContext ?? ""
+      };
+    });
 }
 
 function toStoredSteps(steps: WorkflowStepItem[]): StoredStep[] {
@@ -99,6 +116,7 @@ export function WorkflowPathEditor({ workflowType, defaultName, accent = "teal" 
       moduleName={defaultName}
       accent={accent}
       initialSteps={initialSteps ?? []}
+      defaultOrgScopeType={workflowType === "HOSPITAL_PATH" ? "hospital" : "branch"}
       onSave={handleSave}
     />
   );

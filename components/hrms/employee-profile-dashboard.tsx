@@ -9,7 +9,7 @@ import {
   Edit, Save, Printer, Download, Archive, ArchiveRestore, 
   UserX, UserCheck, Mail, Phone, MapPin, Building2,
   CalendarDays, Clock3, Award, File, Upload, Trash2, Eye,
-  Search, Filter, Plus, Smartphone
+  Search, Filter, Plus, Smartphone, RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -77,6 +77,8 @@ export function EmployeeProfileDashboard({
   const [docs, setDocs] = useState<any[]>(documents || []);
   const [folders, setFolders] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSyncingOdooDocs, setIsSyncingOdooDocs] = useState(false);
+  const [odooSyncResultMsg, setOdooSyncResultMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [deviceBound, setDeviceBound] = useState(deviceBinding?.bound ?? false);
   const [showUnbindModal, setShowUnbindModal] = useState(false);
@@ -165,6 +167,29 @@ export function EmployeeProfileDashboard({
       alert(e?.message || "خطأ في رفع الملفات");
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleSyncThisEmployeeDocs = async () => {
+    if (!employee?.odooId) {
+      alert("هذا الموظف غير مربوط برقم ID في أودو بعد.");
+      return;
+    }
+    setIsSyncingOdooDocs(true);
+    setOdooSyncResultMsg("جاري الاتصال بأودو وسحب المرفقات...");
+    try {
+      const res = await fetch(`/api/internal/sync-odoo-documents?odooId=${employee.odooId}&employeeId=${employee.id}`);
+      const data = await res.json();
+      if (data.success) {
+        setOdooSyncResultMsg(`✓ ${data.message}`);
+        router.refresh();
+      } else {
+        setOdooSyncResultMsg(`⚠️ ${data.message}`);
+      }
+    } catch (e: any) {
+      setOdooSyncResultMsg(`⚠️ تعذر الاتصال: ${e?.message || e}`);
+    } finally {
+      setIsSyncingOdooDocs(false);
     }
   };
 
@@ -417,10 +442,24 @@ export function EmployeeProfileDashboard({
               <CardDescription>مساحة مستندات الموظف - يدعم جميع الصيغ: PDF, Word, Excel, PPT, ZIP, RAR, PNG, JPG, WEBP, MP4, MOV, TXT, CSV, XML</CardDescription>
               <div className="flex flex-wrap gap-2 mt-4">
                 <div className="relative flex-1 min-w-[240px] max-w-sm"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input value={searchDocs} onChange={(e) => setSearchDocs(e.target.value)} placeholder="بحث سريع..." className="pl-9" /></div>
+                <Button 
+                  size="sm" 
+                  disabled={isSyncingOdooDocs || !employee?.odooId} 
+                  onClick={handleSyncThisEmployeeDocs}
+                  className="bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold hover:from-teal-700 hover:to-emerald-700 shadow-sm"
+                >
+                  <RefreshCw className={`h-4 w-4 ml-1 ${isSyncingOdooDocs ? "animate-spin" : ""}`} />
+                  {isSyncingOdooDocs ? "جاري سحب المرفقات..." : "⚡ مزامنة مستندات الموظف من أودو الآن"}
+                </Button>
                 <Button size="sm" disabled={isUploading} onClick={() => fileInputRef.current?.click()}><Upload className="h-4 w-4 ml-1" />رفع متعدد</Button>
                 <Button size="sm" variant="outline" onClick={createFolder}>مجلد جديد</Button>
                 <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(event) => event.target.files && uploadDocuments(event.target.files)} />
               </div>
+              {odooSyncResultMsg ? (
+                <div className="mt-2 p-2.5 rounded-xl bg-teal-50 dark:bg-teal-950/50 border border-teal-200 dark:border-teal-800 text-xs font-bold text-teal-800 dark:text-teal-200">
+                  {odooSyncResultMsg}
+                </div>
+              ) : null}
               {folders.length ? <div className="mt-3 flex flex-wrap gap-2">{folders.map((folder) => <Badge key={folder} variant="outline">📁 {folder}</Badge>)}</div> : null}
             </CardHeader>
             <CardContent>

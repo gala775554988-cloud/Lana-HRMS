@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { applyScopedWhere, getAccessProfile } from "@/lib/enterprise/hierarchy";
 
-const DEFAULT_TYPES = ["LEAVE", "LOAN", "RESIDENCY", "DELEGATION", "CUSTODY", "DOCUMENT", "EXPENSE", "LETTER", "OVERTIME"];
+const DEFAULT_TYPES = ["LEAVE", "RESUMPTION", "LOAN", "RESIDENCY", "DELEGATION", "CUSTODY", "DOCUMENT", "EXPENSE", "LETTER", "OVERTIME"];
 
 function parseDeferredUntil(comments: string | null) {
   if (!comments) return null;

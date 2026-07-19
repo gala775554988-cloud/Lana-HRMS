@@ -17,6 +17,24 @@ export type RequestTypeConfig = {
 
 export const REQUEST_TYPE_CONFIG: RequestTypeConfig[] = [
   {
+    code: "RESUMPTION",
+    label: "طلب المباشرة بعد الإجازة",
+    fields: [
+      { name: "returnDate", label: "تاريخ المباشرة الفعلية", kind: "date", required: true },
+      {
+        name: "resumptionType", label: "نوع الإجازة السابقة", kind: "select", required: true,
+        options: [
+          { value: "AFTER_LEAVE", label: "بعد إجازة سنوية/اعتيادية" },
+          { value: "AFTER_SICK", label: "بعد إجازة مرضية" },
+          { value: "AFTER_MISSION", label: "بعد انتداب/مهمة عمل" },
+          { value: "OTHER", label: "أخرى" },
+        ],
+      },
+      { name: "reason", label: "رقم طلب الإجازة السابق (أو مرجع العودة)", kind: "text", placeholder: "مثال: طلب إجازة رقم #1042" },
+      { name: "notes", label: "ملاحظات إضافية حول العودة", kind: "textarea" },
+    ],
+  },
+  {
     code: "LEAVE",
     label: "طلبات الإجازات",
     fields: [

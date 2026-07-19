@@ -15,9 +15,6 @@ export type WorkflowStepItem = {
   approverPosition?: string;
   orgUnitId: string;
   orgUnitLabel?: string;
-  /** Legacy free-text field, no longer editable via the UI (superseded by
-   * approverPosition) -- kept only so paths saved before the redesign keep
-   * round-tripping their existing value instead of losing it on next save. */
   roleContext?: string;
 };
 
@@ -34,108 +31,56 @@ function orgUnitLabelFor(orgUnitId: string, units: OrgUnits): string {
 
 const ACCENTS = {
   teal: {
-    icon: "bg-teal-50 text-teal-600 dark:bg-teal-950/60 dark:text-teal-400",
-    badge: "text-teal-700 border-teal-200 dark:text-teal-300",
-    connector: "bg-teal-50 text-teal-600 dark:bg-teal-950/60 dark:text-teal-400",
-    number: "bg-teal-600",
-    ring: "hover:border-teal-300 dark:hover:border-teal-800",
-    dashed: "border-teal-500/60 bg-teal-50/20 text-teal-700 hover:border-teal-600 hover:bg-teal-50/50 dark:border-teal-800 dark:bg-teal-950/20 dark:text-teal-300",
-    save: "dark:bg-teal-600 dark:hover:bg-teal-700",
-    focus: "focus:ring-teal-500"
+    headerBg: "bg-gradient-to-r from-teal-900 via-teal-800 to-slate-900 text-white",
+    icon: "bg-teal-500/20 text-teal-300 border border-teal-400/30",
+    badge: "bg-teal-500/20 text-teal-200 border-teal-400/30",
+    tableHeader: "bg-teal-50/80 dark:bg-teal-950/40 text-teal-900 dark:text-teal-200 border-b border-teal-200/60 dark:border-teal-800",
+    connector: "bg-teal-600 hover:bg-teal-700 text-white shadow-md shadow-teal-600/25",
+    number: "bg-teal-600 text-white font-black",
+    ring: "hover:border-teal-400 dark:hover:border-teal-700",
+    saveBtn: "bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-black shadow-lg shadow-teal-600/25 h-11 px-6 rounded-2xl"
   },
   violet: {
-    icon: "bg-violet-50 text-violet-600 dark:bg-violet-950/60 dark:text-violet-400",
-    badge: "text-violet-700 border-violet-200 dark:text-violet-300",
-    connector: "bg-violet-50 text-violet-600 dark:bg-violet-950/60 dark:text-violet-400",
-    number: "bg-violet-600",
-    ring: "hover:border-violet-300 dark:hover:border-violet-800",
-    dashed: "border-violet-500/60 bg-violet-50/20 text-violet-700 hover:border-violet-600 hover:bg-violet-50/50 dark:border-violet-800 dark:bg-violet-950/20 dark:text-violet-300",
-    save: "dark:bg-violet-600 dark:hover:bg-violet-700",
-    focus: "focus:ring-violet-500"
+    headerBg: "bg-gradient-to-r from-violet-900 via-indigo-900 to-slate-900 text-white",
+    icon: "bg-violet-500/20 text-violet-300 border border-violet-400/30",
+    badge: "bg-violet-500/20 text-violet-200 border-violet-400/30",
+    tableHeader: "bg-violet-50/80 dark:bg-violet-950/40 text-violet-900 dark:text-violet-200 border-b border-violet-200/60 dark:border-violet-800",
+    connector: "bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-600/25",
+    number: "bg-violet-600 text-white font-black",
+    ring: "hover:border-violet-400 dark:hover:border-violet-700",
+    saveBtn: "bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-black shadow-lg shadow-violet-600/25 h-11 px-6 rounded-2xl"
   }
 } as const;
 
 interface WorkflowManagerProps {
   initialSteps?: WorkflowStepItem[];
   moduleName?: string;
-  accent?: keyof typeof ACCENTS;
   onSave?: (steps: WorkflowStepItem[]) => Promise<void> | void;
+  accent?: "teal" | "violet";
+  defaultOrgScopeType?: "hospital" | "branch" | "department";
 }
 
-function emptyStep(): WorkflowStepItem {
-  return { id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, approverId: "", orgUnitId: "" };
+function emptyStep(defaultOrgType = ""): WorkflowStepItem {
+  return { id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, approverId: "", orgUnitId: defaultOrgType ? `${defaultOrgType}:` : "" };
 }
 
-/** Small "i" trigger for a guiding tooltip -- same interaction pattern as
- * PermissionHint in the Permissions system (click-to-toggle, not just
- * hover), for visual/behavioral harmony between the two admin surfaces. */
-function StepHint({ text }: { text: string }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <TooltipProvider delayDuration={100}>
-      <Tooltip open={open} onOpenChange={setOpen}>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            onClick={(event) => { event.preventDefault(); setOpen((v) => !v); }}
-            className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800"
-            aria-label={text}
-          >
-            <HelpCircle className="h-3 w-3" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="top" align="start" className="w-56 p-2.5 text-[11px]">{text}</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
-}
-
-/** Dedicated "View" control -- read-only approver details (name + job title +
- * org unit), separate from Edit so opening it never risks changing data. */
-function ApproverViewButton({ step, orgUnits }: { step: WorkflowStepItem; orgUnits: OrgUnits }) {
-  const [open, setOpen] = useState(false);
-  if (!step.approverId) return null;
-  return (
-    <TooltipProvider delayDuration={100}>
-      <Tooltip open={open} onOpenChange={setOpen}>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-            title="عرض تفاصيل المسؤول"
-            aria-label="View"
-          >
-            <Eye className="h-4 w-4" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="top" align="start" className="w-60 p-3">
-          <strong className="mb-1 block font-bold text-slate-100">{step.approverLabel || "—"}</strong>
-          <span className="block text-slate-300">{step.approverPosition || "بدون مسمى وظيفي"}</span>
-          <span className="mt-1 block border-t border-slate-700 pt-1 text-slate-400">{step.orgUnitLabel || orgUnitLabelFor(step.orgUnitId, orgUnits) || "بدون جهة"}</span>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
-}
-
-export function WorkflowManager({
-  initialSteps = [],
-  moduleName = "إجازات الموظفين (Leave Requests)",
-  accent = "teal",
-  onSave
-}: WorkflowManagerProps) {
+export function WorkflowManager({ initialSteps = [], moduleName = "المسار المعتمد", onSave, accent = "teal", defaultOrgScopeType }: WorkflowManagerProps) {
+  const theme = ACCENTS[accent] ?? ACCENTS.teal;
   const [steps, setSteps] = useState<WorkflowStepItem[]>(initialSteps);
-  const [editingIds, setEditingIds] = useState<Set<string | number>>(new Set());
-  const [confirmingDeleteIds, setConfirmingDeleteIds] = useState<Set<string | number>>(new Set());
   const [orgUnits, setOrgUnits] = useState<OrgUnits>(EMPTY_ORG_UNITS);
+  const [editingIds, setEditingIds] = useState<Set<number | string>>(new Set());
+  const [confirmingDeleteIds, setConfirmingDeleteIds] = useState<Set<number | string>>(new Set());
+  const [viewingStep, setViewingStep] = useState<WorkflowStepItem | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const [message, setMessage] = useState("");
-  const theme = ACCENTS[accent];
 
   useEffect(() => {
-    setSteps(initialSteps);
-  }, [initialSteps]);
+    if (!initialSteps || initialSteps.length === 0) {
+      setSteps([emptyStep(defaultOrgScopeType)]);
+    } else {
+      setSteps(initialSteps);
+    }
+  }, [initialSteps, defaultOrgScopeType]);
 
   useEffect(() => {
     let cancelled = false;
@@ -148,262 +93,255 @@ export function WorkflowManager({
     return () => { cancelled = true; };
   }, []);
 
-  function setEditing(id: number | string, value: boolean) {
+  const addStep = () => {
+    const step = emptyStep(defaultOrgScopeType);
+    setSteps((current) => [...current, step]);
+    setEditingIds((current) => new Set(current).add(step.id));
+  };
+
+  const removeStep = (id: number | string) => {
+    setSteps((current) => current.filter((s) => s.id !== id));
+    setEditingIds((current) => { const next = new Set(current); next.delete(id); return next; });
+    setConfirmingDeleteIds((current) => { const next = new Set(current); next.delete(id); return next; });
+  };
+
+  const updateStep = (id: number | string, patch: Partial<WorkflowStepItem>) => {
+    setSteps((current) => current.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  };
+
+  const toggleEditing = (id: number | string) => {
     setEditingIds((current) => {
       const next = new Set(current);
-      if (value) next.add(id);
-      else next.delete(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
-  }
-
-  function setConfirmingDelete(id: number | string, value: boolean) {
-    setConfirmingDeleteIds((current) => {
-      const next = new Set(current);
-      if (value) next.add(id);
-      else next.delete(id);
-      return next;
-    });
-  }
-
-  const hasIncompleteStep = steps.some((step) => !step.approverId || !step.orgUnitId);
-
-  function addStepAfter(id: number | string | null) {
-    if (hasIncompleteStep) return;
-    const step = emptyStep();
-    setSteps((current) => {
-      if (id === null) return [...current, step];
-      const index = current.findIndex((s) => s.id === id);
-      if (index === -1) return [...current, step];
-      return [...current.slice(0, index + 1), step, ...current.slice(index + 1)];
-    });
-    setEditing(step.id, true);
-  }
-
-  function removeStep(id: number | string) {
-    setSteps((current) => current.filter((s) => s.id !== id));
-    setEditing(id, false);
-    setConfirmingDelete(id, false);
-  }
-
-  function updateStep(id: number | string, patch: Partial<WorkflowStepItem>) {
-    setSteps((current) => current.map((s) => (s.id === id ? { ...s, ...patch } : s)));
-  }
+  };
 
   const handleSave = () => {
-    setMessage("");
-    if (hasIncompleteStep) {
-      setMessage("أكمل اختيار الجهة والمسؤول لكل المستويات قبل الحفظ");
+    setMessage(null);
+    if (steps.some((step) => !step.approverId || !step.orgUnitId)) {
+      setMessage("⚠️ يرجى اختيار الجهة والموظف المعتمِد لكل مستوى قبل حفظ الإعدادات");
       return;
     }
     startTransition(async () => {
       try {
         if (onSave) await onSave(steps);
-        setMessage("تم حفظ مسار الطلب وتحديث التسلسل الإداري بنجاح");
+        setMessage("✓ تم حفظ إعدادات التسلسل الإداري والموافقة بنجاح 100%");
         setEditingIds(new Set());
       } catch (err: any) {
-        setMessage(err.message || "حدث خطأ أثناء حفظ المسار");
+        setMessage(`⚠️ ${err.message || "حدث خطأ أثناء حفظ الإعدادات"}`);
       }
     });
   };
 
   return (
-    <Card className="mx-auto w-full max-w-3xl overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900" dir="rtl">
-      <CardHeader className="border-b border-slate-100 bg-slate-50/70 pb-5 dark:border-slate-800 dark:bg-slate-900/50">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className={`flex h-10 w-10 items-center justify-center rounded-2xl shadow-xs ${theme.icon}`}>
-              <GitPullRequest className="h-5 w-5" />
-            </div>
-            <div>
-              <CardTitle className="text-lg font-bold text-slate-900 dark:text-slate-100">إعداد مسار الطلب والتسلسل الإداري</CardTitle>
-              <CardDescription className="mt-0.5 font-mono text-xs text-muted-foreground">{moduleName}</CardDescription>
-            </div>
+    <Card className="w-full overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900" dir="rtl">
+      {/* Header Bar */}
+      <div className={`p-6 ${theme.headerBg} flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4`}>
+        <div className="flex items-center gap-3.5">
+          <div className={`grid h-12 w-12 place-items-center rounded-2xl ${theme.icon} shadow-inner`}>
+            <GitPullRequest className="h-6 w-6" />
           </div>
-          <Badge key={steps.length} variant="outline" className={`rounded-xl bg-white px-2.5 py-1 text-xs font-bold dark:bg-slate-900 ${theme.badge}`}>
-            {steps.length} مستويات
-          </Badge>
+          <div>
+            <h2 className="text-xl font-black">{moduleName}</h2>
+            <p className="text-xs text-white/75 font-semibold mt-0.5">جدول التسلسل الهرمي للمعتمدين — أضف أو عدّل الموظفين بالترتيب الذي تريده</p>
+          </div>
         </div>
-      </CardHeader>
+        <Badge className={`px-3 py-1.5 rounded-xl font-mono font-bold text-xs ${theme.badge}`}>
+          {steps.length} مستوى في السلسلة
+        </Badge>
+      </div>
 
-      <CardContent className="space-y-4 p-6">
+      <CardContent className="p-6 space-y-6">
         {message ? (
-          <div className={`flex items-center gap-2 rounded-2xl p-3.5 text-xs font-semibold ${
-            message.includes("بنجاح")
-              ? "border border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300"
-              : "border border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300"
+          <div className={`p-4 rounded-2xl text-xs font-bold flex items-center gap-2 ${
+            message.startsWith("✓") 
+              ? "bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300"
+              : "bg-rose-50 text-rose-800 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300"
           }`}>
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
             <span>{message}</span>
           </div>
         ) : null}
 
-        {steps.length === 0 ? (
-          <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-8 text-center text-sm text-muted-foreground dark:border-slate-800 dark:bg-slate-950/30">
-            لا توجد مستويات اعتماد بعد. أضف أول مستوى للبدء في بناء المسار.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {steps.map((step, index) => {
-              const editing = editingIds.has(step.id);
-              const confirmingDelete = confirmingDeleteIds.has(step.id);
-              const canConfirm = Boolean(step.approverId && step.orgUnitId);
-              return (
-                <div key={step.id} className="flex flex-col items-stretch">
-                  <div className={`relative w-full rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 shadow-2xs transition-all dark:border-slate-800 dark:bg-slate-900/40 ${theme.ring}`}>
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <span key={`num-${index}`} className={`flex h-6 w-6 items-center justify-center rounded-lg text-xs font-black text-white shadow-xs ${theme.number}`}>
-                          {index + 1}
-                        </span>
-                        <span key={`label-${index}`} className="text-xs font-bold text-slate-700 dark:text-slate-300">المستوى {index + 1}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <ApproverViewButton step={step} orgUnits={orgUnits} />
-                        <button
-                          type="button"
-                          onClick={() => setEditing(step.id, !editing)}
-                          className="rounded-lg p-1.5 text-slate-400 transition hover:bg-primary/8 hover:text-primary dark:hover:bg-primary/40"
-                          title="تعديل الجهة أو المسؤول لهذا المستوى"
-                          aria-label="Edit"
+        {/* Modern Professional Table */}
+        <div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+          <table className="w-full text-right text-sm">
+            <thead className={theme.tableHeader}>
+              <tr>
+                <th className="py-3.5 px-4 font-extrabold w-20 text-center">الترتيب</th>
+                <th className="py-3.5 px-4 font-extrabold w-64">الجهة / النطاق التشغيلي</th>
+                <th className="py-3.5 px-4 font-extrabold">الموظف المعتمِد لهذا المستوى</th>
+                <th className="py-3.5 px-4 font-extrabold w-44 text-center">الإجراءات (عرض/تعديل/حذف)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 bg-white dark:bg-slate-900/60">
+              {steps.map((step, index) => {
+                const editing = editingIds.has(step.id);
+                const confirmingDelete = confirmingDeleteIds.has(step.id);
+                return (
+                  <tr key={step.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                    <td className="py-4 px-4 text-center">
+                      <span className={`inline-flex h-8 w-8 items-center justify-center rounded-xl text-xs ${theme.number}`}>
+                        {index + 1}
+                      </span>
+                    </td>
+
+                    {/* Org Unit Column */}
+                    <td className="py-4 px-4">
+                      {editing ? (
+                        <select
+                          value={step.orgUnitId}
+                          onChange={(e) => updateStep(step.id, { orgUnitId: e.target.value, orgUnitLabel: orgUnitLabelFor(e.target.value, orgUnits) })}
+                          className="h-10 w-full rounded-xl border border-input bg-white dark:bg-slate-950 px-3 text-xs font-bold shadow-2xs focus:ring-2 focus:ring-primary"
                         >
-                          {editing ? <Check className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
-                        </button>
+                          <option value="">اختر النطاق التشغيلي...</option>
+                          {orgUnits.hospitals.length ? (
+                            <optgroup label="المستشفيات / القطاع الطبي">
+                              {orgUnits.hospitals.map((h) => <option key={h.id} value={`hospital:${h.id}`}>{h.name}</option>)}
+                            </optgroup>
+                          ) : null}
+                          {orgUnits.branches.length ? (
+                            <optgroup label="الفروع">
+                              {orgUnits.branches.map((b) => <option key={b.id} value={`branch:${b.id}`}>{b.name}</option>)}
+                            </optgroup>
+                          ) : null}
+                          {orgUnits.departments.length ? (
+                            <optgroup label="الإدارات">
+                              {orgUnits.departments.map((d) => <option key={d.id} value={`department:${d.id}`}>{d.name}</option>)}
+                            </optgroup>
+                          ) : null}
+                        </select>
+                      ) : (
+                        <span className="font-bold text-slate-800 dark:text-slate-200">
+                          {step.orgUnitLabel || orgUnitLabelFor(step.orgUnitId, orgUnits) || "⚠️ يرجى اختيار النطاق"}
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Approver Employee Column */}
+                    <td className="py-4 px-4">
+                      {editing ? (
+                        <UserSearchSelect
+                          value={step.approverId}
+                          initialLabel={step.approverLabel ?? ""}
+                          onChange={(userId, label, employee) => updateStep(step.id, { approverId: userId, approverLabel: label ?? "", approverPosition: employee?.position?.title ?? "" })}
+                          placeholder="ابحث عن الموظف بالاسم أو الهوية أو الرقم الوظيفي..."
+                        />
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className="font-black text-slate-900 dark:text-slate-100">
+                            {step.approverLabel || "⚠️ حقل فارغ — اضغط تعديل لاختيار الموظف"}
+                          </span>
+                          {step.approverPosition ? (
+                            <Badge variant="outline" className="text-[10px] font-semibold bg-slate-100 dark:bg-slate-800">
+                              {step.approverPosition}
+                            </Badge>
+                          ) : null}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Actions Column (View / Edit / Delete) */}
+                    <td className="py-4 px-4 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800"
+                          onClick={() => setViewingStep(step)}
+                          title="عرض تفاصيل المستوى والصلاحيات"
+                        >
+                          <Eye className="h-4 w-4 text-slate-600 dark:text-slate-300" />
+                        </Button>
+
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className={`h-8 w-8 rounded-xl ${editing ? "bg-primary/10 text-primary" : "hover:bg-slate-100 dark:hover:bg-slate-800"}`}
+                          onClick={() => toggleEditing(step.id)}
+                          title="تعديل هذا المستوى"
+                        >
+                          {editing ? <Check className="h-4 w-4 text-emerald-600" /> : <Pencil className="h-4 w-4 text-slate-600 dark:text-slate-300" />}
+                        </Button>
+
                         {confirmingDelete ? (
-                          <div className="flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-1 py-0.5 dark:border-rose-900 dark:bg-rose-950/30">
-                            <span className="px-1 text-[10px] font-semibold text-rose-700 dark:text-rose-300">تأكيد؟</span>
-                            <button type="button" onClick={() => removeStep(step.id)} className="rounded-lg p-1 text-rose-700 hover:bg-rose-100 dark:text-rose-300 dark:hover:bg-rose-900/40" aria-label="Confirm delete"><Check className="h-3.5 w-3.5" /></button>
-                            <button type="button" onClick={() => setConfirmingDelete(step.id, false)} className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Cancel"><X className="h-3.5 w-3.5" /></button>
+                          <div className="flex items-center gap-1 bg-rose-50 dark:bg-rose-950/50 p-1 rounded-xl border border-rose-200 dark:border-rose-800">
+                            <button onClick={() => removeStep(step.id)} className="p-1 text-rose-600 hover:bg-rose-100 rounded-lg text-[10px] font-bold">حذف</button>
+                            <button onClick={() => setConfirmingDeleteIds(new Set())} className="p-1 text-slate-400 hover:bg-slate-200 rounded-lg"><X className="h-3.5 w-3.5" /></button>
                           </div>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => setConfirmingDelete(step.id, true)}
-                            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 rounded-xl hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                            onClick={() => setConfirmingDeleteIds((c) => new Set(c).add(step.id))}
                             title="حذف هذا المستوى"
-                            aria-label="Delete"
                           >
                             <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {editing ? (
-                      <div className="space-y-3">
-                        <div>
-                          <div className="mb-1 flex items-center gap-1.5">
-                            <label className="block text-[10px] font-bold text-muted-foreground">١. الجهة (النطاق الرئيسي)</label>
-                            {!step.orgUnitId ? <StepHint text="اختر الجهة أولاً -- هي المفتاح الرئيسي لهذا المستوى، ويُحدَّد المسؤول بعدها." /> : null}
-                          </div>
-                          <select
-                            value={step.orgUnitId}
-                            onChange={(e) => updateStep(step.id, { orgUnitId: e.target.value, orgUnitLabel: orgUnitLabelFor(e.target.value, orgUnits) })}
-                            className={`h-9 w-full rounded-xl border border-input bg-white px-3 text-xs font-medium dark:bg-slate-900 focus:ring-2 ${theme.focus}`}
-                          >
-                            <option value="">اختر الجهة...</option>
-                            {orgUnits.departments.length ? (
-                              <optgroup label="الإدارات">
-                                {orgUnits.departments.map((d) => <option key={d.id} value={`department:${d.id}`}>{d.name}</option>)}
-                              </optgroup>
-                            ) : null}
-                            {orgUnits.branches.length ? (
-                              <optgroup label="الفروع">
-                                {orgUnits.branches.map((b) => <option key={b.id} value={`branch:${b.id}`}>{b.name}</option>)}
-                              </optgroup>
-                            ) : null}
-                            {orgUnits.hospitals.length ? (
-                              <optgroup label="المستشفيات">
-                                {orgUnits.hospitals.map((h) => <option key={h.id} value={`hospital:${h.id}`}>{h.name}</option>)}
-                              </optgroup>
-                            ) : null}
-                          </select>
-                        </div>
-                        <div>
-                          <div className="mb-1 flex items-center gap-1.5">
-                            <label className="block text-[10px] font-bold text-muted-foreground">٢. المسؤول (المعتمِد)</label>
-                            {step.orgUnitId && !step.approverId ? <StepHint text="اختر الموظف الذي سيعتمد طلبات هذه الجهة." /> : null}
-                          </div>
-                          <div className={!step.orgUnitId ? "pointer-events-none opacity-50" : ""}>
-                            <UserSearchSelect
-                              value={step.approverId}
-                              initialLabel={step.approverLabel ?? ""}
-                              onChange={(userId, label, employee) => updateStep(step.id, { approverId: userId, approverLabel: label ?? "", approverPosition: employee?.position?.title ?? "" })}
-                              placeholder={step.orgUnitId ? "ابحث عن الموظف بالاسم أو الرقم الوظيفي أو الهوية..." : "اختر الجهة أولاً"}
-                            />
-                          </div>
-                        </div>
-                        {canConfirm ? (
-                          <Button type="button" size="sm" onClick={() => setEditing(step.id, false)} className="h-8 rounded-lg text-xs">
-                            <Check className="h-3.5 w-3.5" /> تم
                           </Button>
-                        ) : (
-                          <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">أكمل اختيار الجهة والمسؤول لهذا المستوى.</p>
                         )}
                       </div>
-                    ) : (
-                      <div className="flex flex-wrap items-center gap-2 text-xs">
-                        {step.orgUnitLabel || step.orgUnitId ? (
-                          <Badge variant="outline" className="rounded-lg text-[11px] font-semibold">{step.orgUnitLabel || orgUnitLabelFor(step.orgUnitId, orgUnits)}</Badge>
-                        ) : null}
-                        <span className="font-bold text-slate-800 dark:text-slate-200">{step.approverLabel || "لم يتم اختيار المسؤول"}</span>
-                        {step.approverPosition ? <span className="text-muted-foreground">{step.approverPosition}</span> : null}
-                      </div>
-                    )}
-                  </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
 
-                  <div className="flex items-center justify-center py-1.5">
-                    <TooltipProvider delayDuration={200}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span>
-                            <button
-                              type="button"
-                              onClick={() => addStepAfter(step.id)}
-                              disabled={hasIncompleteStep}
-                              className={`flex h-7 w-7 items-center justify-center rounded-full shadow-2xs transition hover:scale-110 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100 ${theme.connector}`}
-                              aria-label="Add step after"
-                            >
-                              <Plus className="h-4 w-4" />
-                            </button>
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="text-[11px]">
-                          {hasIncompleteStep ? "أكمل المستوى الحالي أولاً قبل إضافة مستوى جديد" : "إضافة مستوى اعتماد جديد بعد هذا المستوى"}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        <div className="space-y-3 pt-2">
-          {steps.length === 0 ? (
-            <Button
-              type="button"
-              onClick={() => addStepAfter(null)}
-              variant="outline"
-              className={`h-11 w-full gap-2 rounded-2xl border-2 border-dashed font-bold shadow-2xs ${theme.dashed}`}
-            >
-              <Plus className="h-5 w-5" />
-              <span>إضافة أول مستوى اعتماد</span>
-            </Button>
-          ) : null}
+        {/* Footer Actions (`+ إضافة حقل` & `💾 حفظ الإعدادات`) */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 border-t border-slate-100 dark:border-slate-800">
+          <Button
+            type="button"
+            onClick={addStep}
+            variant="outline"
+            className="rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 font-extrabold text-xs h-11 px-5 gap-2 hover:border-primary hover:text-primary w-full sm:w-auto"
+          >
+            <Plus className="h-4 w-4" />
+            <span>+ إضافة حقل / موظف جديد في التسلسل</span>
+          </Button>
 
           <Button
             type="button"
             onClick={handleSave}
-            disabled={isPending || steps.length === 0 || hasIncompleteStep}
-            className={`h-12 w-full gap-2 rounded-2xl bg-slate-900 text-sm font-black text-white shadow-lg hover:bg-slate-800 ${theme.save}`}
+            disabled={isPending}
+            className={`w-full sm:w-auto ${theme.saveBtn}`}
           >
-            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4 text-white/80" />}
-            <span>حفظ إعدادات مسار الاعتماد</span>
+            {isPending ? <Loader2 className="h-4 w-4 animate-spin me-2" /> : null}
+            <span>💾 حفظ إعدادات وتسلسل {moduleName}</span>
           </Button>
         </div>
       </CardContent>
+
+      {/* View Step Details Modal */}
+      {viewingStep ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="max-w-md w-full rounded-3xl bg-white dark:bg-slate-900 p-6 shadow-2xl space-y-4 border border-slate-200 dark:border-slate-800" dir="rtl">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="text-lg font-black text-slate-900 dark:text-slate-100">تفاصيل مستوى الاعتماد</h3>
+              <button onClick={() => setViewingStep(null)} className="p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="space-y-3 text-xs font-semibold">
+              <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-950 rounded-xl">
+                <span className="text-muted-foreground">النطاق / الجهة:</span>
+                <span className="font-extrabold text-slate-900 dark:text-slate-100">{viewingStep.orgUnitLabel || orgUnitLabelFor(viewingStep.orgUnitId, orgUnits) || "غير محدد"}</span>
+              </div>
+              <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-950 rounded-xl">
+                <span className="text-muted-foreground">الموظف المعتمِد:</span>
+                <span className="font-extrabold text-primary">{viewingStep.approverLabel || "لم يتم الاختيار بعد"}</span>
+              </div>
+              <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-950 rounded-xl">
+                <span className="text-muted-foreground">المنصب:</span>
+                <span>{viewingStep.approverPosition || "—"}</span>
+              </div>
+            </div>
+            <div className="pt-2 flex justify-end">
+              <Button onClick={() => setViewingStep(null)} className="rounded-xl px-6 font-bold text-xs">إغلاق</Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </Card>
   );
 }

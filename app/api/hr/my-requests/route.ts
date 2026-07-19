@@ -265,6 +265,36 @@ export async function POST(request: Request) {
         break;
       }
 
+      case "resumption": {
+        if (!data.returnDate) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                id: `VAL-${Date.now().toString(36)}`,
+                category: "validation",
+                name: "Missing Return Date",
+                message: "يرجى تحديد تاريخ المباشرة الفعلية للعمل",
+                fields: [{ field: "returnDate", message: "تاريخ المباشرة مطلوب" }],
+                suggestion: "أدخل تاريخ المباشرة الفعلي وحاول مرة أخرى",
+              },
+            },
+            { status: 400 }
+          );
+        }
+        result = await prisma.resumptionRequest.create({
+          data: {
+            employeeId,
+            returnDate: new Date(data.returnDate),
+            resumptionType: data.resumptionType || "AFTER_LEAVE",
+            reason: data.reason || "",
+            notes: data.notes || "",
+            status: "PENDING",
+          },
+        });
+        break;
+      }
+
       case "residency":
       case "delegation":
       case "custody":

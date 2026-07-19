@@ -376,6 +376,7 @@ model Employee {
   loans                  Loan[]
   payrollItems           PayrollItem[]
   leaveRequests          LeaveRequest[]
+  resumptionRequests     ResumptionRequest[]
   attendanceRecords      AttendanceRecord[]
   preferences            EmployeePreference?
   mobileDevice           EmployeeMobileDevice?
@@ -654,6 +655,25 @@ model LeaveRequest {
 
   @@index([employeeId])
   @@index([leaveTypeId])
+  @@index([status])
+}
+
+model ResumptionRequest {
+  id              String   @id @default(cuid())
+  employeeId      String
+  leaveRequestId  String?
+  returnDate      DateTime
+  resumptionType  String   @default("AFTER_LEAVE") // AFTER_LEAVE | AFTER_MISSION | AFTER_SICK | OTHER
+  reason          String?
+  notes           String?
+  status          String   @default("PENDING") // PENDING | APPROVED | REJECTED | RETURNED
+  decidedAt       DateTime?
+  decisionNote    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
   @@index([status])
 }
 
