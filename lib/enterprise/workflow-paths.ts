@@ -8,22 +8,12 @@ export type WorkflowPathTypeValue = (typeof WORKFLOW_PATH_TYPES)[number];
 
 const stepSchema = z.object({
   stepOrder: z.number().int().positive(),
-  // Real, resolvable Employee.userId -- every level names a specific person,
-  // selected via UserSearchSelect in the workflow builder.
-  approverId: z.string().min(1, "يجب اختيار الموظف المُعتمِد لكل مستوى"),
-  // "<department|branch|hospital>:<id>" -- which org unit this approval
-  // level applies to.
-  departmentId: z.string().min(1, "يجب اختيار الجهة (إدارة/فرع/مستشفى) لكل مستوى"),
-  // Free-text role/title label -- kept optional for backward compatibility
-  // with paths saved before the editor redesign; no longer collected via the
-  // UI (superseded by approverPosition, auto-derived from the selected
-  // employee's real position instead of manual entry).
+  approverId: z.string().default(""),
+  departmentId: z.string().default(""),
   roleContext: z.string().optional().default(""),
-  // Denormalized display names, purely cosmetic -- approval routing always
-  // resolves via approverId/departmentId, never these labels.
-  approverLabel: z.string().optional(),
-  approverPosition: z.string().optional(),
-  orgUnitLabel: z.string().optional()
+  approverLabel: z.string().optional().default(""),
+  approverPosition: z.string().optional().default(""),
+  orgUnitLabel: z.string().optional().default("")
 });
 
 export const workflowPathInputSchema = z.object({
