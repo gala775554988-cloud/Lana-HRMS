@@ -114,38 +114,69 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
 
   try {
+    const entityIds: string[] = Array.isArray(body.entityIds) && body.entityIds.length > 0
+      ? body.entityIds.filter((id: any) => typeof id === "string" && id.trim())
+      : (body.entityId ? [body.entityId] : []);
+    const requestTypes: string[] = Array.isArray(body.requestTypes) && body.requestTypes.length > 0
+      ? body.requestTypes.filter((t: any) => typeof t === "string" && t.trim())
+      : (body.requestType ? [body.requestType] : []);
+
     if (!body.companyId) throw new Error("الشركة مطلوبة");
     if (!body.entityType) throw new Error("نوع الجهة مطلوب");
-    if (!body.entityId) throw new Error("اسم الجهة مطلوب");
-    if (!body.requestType || typeof body.requestType !== "string") throw new Error("نوع الطلب مطلوب");
+    if (!entityIds.length) throw new Error("يجب اختيار جهة واحدة أو أكثر");
+    if (!requestTypes.length) throw new Error("يجب اختيار نوع طلب واحد أو أكثر");
     const stages = validateStages(body.stages);
 
-    const path = await prisma.approvalPath.create({
-      data: {
-        companyId: body.companyId,
-        entityType: body.entityType,
-        entityId: body.entityId,
-        requestType: String(body.requestType).toUpperCase().trim(),
-        name: typeof body.name === "string" ? body.name.trim() || null : null,
-        isActive: body.isActive !== false,
-        stages: { create: stages }
-      },
-      include: { stages: true }
+    const createdPaths = await prisma.$transaction(async (tx) => {
+      const results = [];
+      for (const eId of entityIds) {
+        for (const rType of requestTypes) {
+          const normalizedReqType = String(rType).toUpperCase().trim();
+          const upserted = await tx.approvalPath.upsert({
+            where: {
+              companyId_entityType_entityId_requestType: {
+                companyId: body.companyId,
+                entityType: body.entityType,
+                entityId: eId,
+                requestType: normalizedReqType
+              }
+            },
+            update: {
+              name: typeof body.name === "string" ? body.name.trim() || null : null,
+              isActive: body.isActive !== false,
+              stages: {
+                deleteMany: {},
+                create: stages
+              }
+            },
+            create: {
+              companyId: body.companyId,
+              entityType: body.entityType,
+              entityId: eId,
+              requestType: normalizedReqType,
+              name: typeof body.name === "string" ? body.name.trim() || null : null,
+              isActive: body.isActive !== false,
+              stages: { create: stages }
+            },
+            include: { stages: true }
+          });
+          results.push(upserted);
+        }
+      }
+      return results;
     });
 
     await writeAuditLog({
       actorUserId: session!.user.id as string,
-      action: "approval-path:create",
+      action: "approval-path:create-multi",
       entity: "approvalPath",
-      entityId: path.id,
-      metadata: { companyId: body.companyId, entityType: body.entityType, entityId: body.entityId, requestType: path.requestType, stageCount: stages.length }
+      entityId: createdPaths[0]?.id || "multi",
+      metadata: { companyId: body.companyId, entityType: body.entityType, entityIds, requestTypes, stageCount: stages.length, createdCount: createdPaths.length }
     });
 
-    return NextResponse.json({ success: true, path });
+    return NextResponse.json({ success: true, path: createdPaths[0], createdCount: createdPaths.length, paths: createdPaths });
   } catch (err) {
     const message = err instanceof Error ? err.message : "فشل إنشاء مسار الموافقة";
-    // Unique constraint: a path already exists for this exact (company, entity, requestType).
-    const isDuplicate = message.includes("Unique constraint");
-    return NextResponse.json({ success: false, message: isDuplicate ? "يوجد مسار موافقة بنفس الشركة والجهة ونوع الطلب مسبقاً" : message }, { status: 400 });
+    return NextResponse.json({ success: false, message }, { status: 400 });
   }
 }

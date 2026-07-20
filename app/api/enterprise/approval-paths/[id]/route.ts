@@ -44,6 +44,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const data: Record<string, unknown> = {};
     if (typeof body.name === "string") data.name = body.name.trim() || null;
     if (typeof body.isActive === "boolean") data.isActive = body.isActive;
+    if (typeof body.entityId === "string" && body.entityId.trim()) data.entityId = body.entityId.trim();
+    if (typeof body.requestType === "string" && body.requestType.trim()) data.requestType = body.requestType.toUpperCase().trim();
 
     if (Array.isArray(body.stages)) {
       const stages = validateStages(body.stages);

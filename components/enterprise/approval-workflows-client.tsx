@@ -35,6 +35,161 @@ function entityOptions(org: OrgEntities, entityType: string) {
   return [];
 }
 
+function MultiSelectChipsDropdown({
+  label,
+  placeholder,
+  options,
+  selectedIds,
+  onChange,
+  showCustomOption = false,
+  customValue = ""
+}: {
+  label: string;
+  placeholder: string;
+  options: { id: string; name: string }[];
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+  showCustomOption?: boolean;
+  customValue?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const toggleOption = (id: string) => {
+    if (selectedIds.includes(id)) {
+      onChange(selectedIds.filter((v) => v !== id));
+    } else {
+      onChange([...selectedIds, id]);
+    }
+  };
+
+  const removeChip = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange(selectedIds.filter((v) => v !== id));
+  };
+
+  return (
+    <label className="space-y-1.5 text-sm block relative font-sans" ref={containerRef} dir="rtl">
+      <span className="font-bold flex items-center justify-between">
+        <span>{label}</span>
+        <Badge variant="outline" className="bg-primary/10 text-primary font-mono text-[10px] px-2 py-0">
+          {selectedIds.length} محدد
+        </Badge>
+      </span>
+
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        className="min-h-10 w-full rounded-lg border bg-background px-3 py-1 text-xs font-semibold cursor-pointer flex items-center justify-between gap-2 shadow-2xs hover:border-primary/60 transition"
+      >
+        <div className="flex flex-wrap items-center gap-1 flex-1">
+          {selectedIds.length === 0 ? (
+            <span className="text-muted-foreground text-xs font-medium py-1">{placeholder}</span>
+          ) : (
+            selectedIds.map((val) => {
+              const matched = options.find((o) => o.id === val);
+              const displayLabel = matched ? matched.name : (val === "OTHER" && customValue ? customValue : val);
+              return (
+                <span
+                  key={val}
+                  className="bg-primary/15 text-primary border border-primary/40 rounded-xl px-2.5 py-0.5 font-black text-xs flex items-center gap-1 transition hover:bg-primary/25 shadow-2xs"
+                >
+                  <span>{displayLabel}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => removeChip(val, e)}
+                    className="p-0.5 rounded-full hover:bg-primary/30 text-primary transition"
+                    title="حذف فردي"
+                  >
+                    <X className="h-3 w-3 stroke-[3]" />
+                  </button>
+                </span>
+              );
+            })
+          )}
+        </div>
+        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 shrink-0 ${isOpen ? "rotate-180" : ""}`} />
+      </div>
+
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 max-h-60 overflow-y-auto rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2 shadow-2xl space-y-1 transition-all animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2 mb-1 px-1">
+            <span className="text-[11px] font-extrabold text-muted-foreground">اختيار متعدد (`Multi-Select`):</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onChange(options.map((o) => o.id)); }}
+                className="text-[11px] font-black text-primary hover:underline"
+              >
+                تحديد الكل
+              </button>
+              <span className="text-slate-300 dark:text-slate-700">|</span>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onChange([]); }}
+                className="text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:underline"
+              >
+                إلغاء الكل
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-1 pr-1">
+            {options.map((opt) => {
+              const isSelected = selectedIds.includes(opt.id);
+              return (
+                <div
+                  key={opt.id}
+                  onClick={() => toggleOption(opt.id)}
+                  className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold cursor-pointer transition ${
+                    isSelected
+                      ? "bg-primary/15 text-primary border border-primary/30"
+                      : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200"
+                  }`}
+                >
+                  <span className="truncate">{opt.name}</span>
+                  <div className={`grid h-5 w-5 place-items-center rounded-md border text-xs font-black transition ${
+                    isSelected ? "bg-primary border-primary text-white" : "border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-transparent"
+                  }`}>
+                    {isSelected ? <Check className="h-3 w-3 stroke-[3]" /> : null}
+                  </div>
+                </div>
+              );
+            })}
+
+            {showCustomOption && (
+              <div
+                onClick={() => toggleOption("OTHER")}
+                className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold cursor-pointer transition ${
+                  selectedIds.includes("OTHER")
+                    ? "bg-primary/15 text-primary border border-primary/30"
+                    : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200"
+                }`}
+              >
+                <span className="truncate">نوع آخر (مخصص)...</span>
+                <div className={`grid h-5 w-5 place-items-center rounded-md border text-xs font-black transition ${
+                  selectedIds.includes("OTHER") ? "bg-primary border-primary text-white" : "border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-transparent"
+                }`}>
+                  {selectedIds.includes("OTHER") ? <Check className="h-3 w-3 stroke-[3]" /> : null}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </label>
+  );
+}
+
 export function ApprovalWorkflowsClient() {
   const [org, setOrg] = useState<OrgEntities>(emptyOrg);
   const [requestTypeOptions, setRequestTypeOptions] = useState<{ id: string; label: string }[]>([]);
@@ -55,7 +210,9 @@ export function ApprovalWorkflowsClient() {
   const [companyId, setCompanyId] = useState("");
   const [entityType, setEntityType] = useState<string>("HOSPITAL");
   const [entityId, setEntityId] = useState("");
+  const [entityIds, setEntityIds] = useState<string[]>([]);
   const [requestType, setRequestType] = useState("");
+  const [requestTypes, setRequestTypes] = useState<string[]>([]);
   const [customRequestType, setCustomRequestType] = useState("");
   const [pathName, setPathName] = useState("");
   const [stages, setStages] = useState<Stage[]>([]);
@@ -86,7 +243,9 @@ export function ApprovalWorkflowsClient() {
     setCompanyId(org.companies[0]?.id ?? "");
     setEntityType("HOSPITAL");
     setEntityId("");
+    setEntityIds([]);
     setRequestType("");
+    setRequestTypes([]);
     setCustomRequestType("");
     setPathName("");
     setStages([]);
@@ -98,7 +257,9 @@ export function ApprovalWorkflowsClient() {
     setCompanyId(path.companyId);
     setEntityType(path.entityType);
     setEntityId(path.entityId);
+    setEntityIds([path.entityId]);
     setRequestType(requestTypeOptions.some((t) => t.id === path.requestType) ? path.requestType : "OTHER");
+    setRequestTypes([path.requestType]);
     setCustomRequestType(requestTypeOptions.some((t) => t.id === path.requestType) ? "" : path.requestType);
     setPathName(path.name ?? "");
     setStages(path.stages.map((s) => ({ ...s })));
@@ -130,11 +291,14 @@ export function ApprovalWorkflowsClient() {
     setStages((current) => current.map((s, i) => (i === index ? { ...s, ...patch } : s)));
   }
 
-  const resolvedRequestType = requestType === "OTHER" ? customRequestType.trim().toUpperCase() : requestType;
+  const targetEntityIds = entityIds.length > 0 ? entityIds : (entityId ? [entityId] : []);
+  const targetRequestTypes = requestTypes.length > 0
+    ? requestTypes.map((t) => (t === "OTHER" ? customRequestType.trim().toUpperCase() : t)).filter(Boolean)
+    : (resolvedRequestType ? [resolvedRequestType] : []);
 
   async function savePath() {
-    if (!companyId || !entityId || !resolvedRequestType || !stages.length) {
-      setMessage("الشركة، الجهة، نوع الطلب، ومرحلة واحدة على الأقل كلها مطلوبة");
+    if (!companyId || !targetEntityIds.length || !targetRequestTypes.length || !stages.length) {
+      setMessage("الشركة، الجهة (أو أكثر)، نوع الطلب (أو أكثر)، ومرحلة واحدة على الأقل كلها مطلوبة");
       return;
     }
     if (stages.some((s) => !s.approverEmployeeId)) {
@@ -144,10 +308,10 @@ export function ApprovalWorkflowsClient() {
     setSaving(true);
     try {
       const payload = {
-        companyId, entityType, entityId, requestType: resolvedRequestType, name: pathName || undefined,
+        companyId, entityType, entityId: targetEntityIds[0] || "", entityIds: targetEntityIds, requestType: targetRequestTypes[0] || "", requestTypes: targetRequestTypes, name: pathName || undefined,
         stages: stages.map((s) => ({ name: s.name || undefined, approverEmployeeId: s.approverEmployeeId, isMandatory: s.isMandatory }))
       };
-      const response = editingId
+      const response = editingId && targetEntityIds.length <= 1 && targetRequestTypes.length <= 1
         ? await fetch(`/api/enterprise/approval-paths/${editingId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
         : await fetch("/api/enterprise/approval-paths", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await response.json();
@@ -283,22 +447,23 @@ export function ApprovalWorkflowsClient() {
                     {ENTITY_TYPES.map((t) => <option key={t} value={t}>{ENTITY_TYPE_LABELS[t]}</option>)}
                   </select>
                 </label>
-                <label className="space-y-1.5 text-sm">
-                  <span className="font-bold">اسم الجهة</span>
-                  <select className="h-10 w-full rounded-lg border bg-background px-3" value={entityId} onChange={(e) => setEntityId(e.target.value)}>
-                    <option value="">اختر الجهة</option>
-                    {entityEditorOptions.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
-                  </select>
-                </label>
-                <label className="space-y-1.5 text-sm">
-                  <span className="font-bold">نوع الطلب</span>
-                  <select className="h-10 w-full rounded-lg border bg-background px-3" value={requestType} onChange={(e) => setRequestType(e.target.value)}>
-                    <option value="">اختر نوع الطلب</option>
-                    {requestTypeOptions.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
-                    <option value="OTHER">نوع آخر...</option>
-                  </select>
-                </label>
-                {requestType === "OTHER" ? (
+                <MultiSelectChipsDropdown
+                  label="اسم الجهة (اختر أكثر من مستشفى/فرع لمسار واحد)"
+                  placeholder="اختر مستشفى أو فرع أو عدة جهات دفعة واحدة..."
+                  options={entityEditorOptions}
+                  selectedIds={entityIds.length > 0 ? entityIds : (entityId ? [entityId] : [])}
+                  onChange={(ids) => { setEntityIds(ids); if (ids[0]) setEntityId(ids[0]); }}
+                />
+                <MultiSelectChipsDropdown
+                  label="نوع الطلب (اختر أكثر من طلبات لمسار واحد)"
+                  placeholder="اختر نوع طلب أو عدة طلبات لتطبيق نفس المسار..."
+                  options={requestTypeOptions.map((t) => ({ id: t.id, name: t.label }))}
+                  selectedIds={requestTypes.length > 0 ? requestTypes : (requestType ? [requestType] : [])}
+                  onChange={(ids) => { setRequestTypes(ids); if (ids[0]) setRequestType(ids[0]); }}
+                  showCustomOption={true}
+                  customValue={customRequestType}
+                />
+                {requestTypes.includes("OTHER") || requestType === "OTHER" ? (
                   <Input placeholder="اكتب نوع الطلب (مثال: تعريف راتب)" value={customRequestType} onChange={(e) => setCustomRequestType(e.target.value)} className="sm:col-span-2" />
                 ) : null}
                 <Input placeholder="اسم المسار (اختياري)" value={pathName} onChange={(e) => setPathName(e.target.value)} className="sm:col-span-2" />
