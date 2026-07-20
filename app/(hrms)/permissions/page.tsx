@@ -7,17 +7,20 @@ import { MergedModuleTabs } from "@/components/hrms/merged-module-tabs";
 import { PermissionsAdmin } from "@/app/(hrms)/permissions-system/admin-client";
 import { WorkflowPathsTabs } from "@/components/enterprise/workflow-paths-tabs";
 import { MultiDeviceAccessClient } from "@/components/enterprise/multi-device-access-client";
-import { KeyRound, Shield, Workflow, Smartphone } from "lucide-react";
+import { KeyRound, Shield, ShieldCheck, Workflow, Smartphone } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 const PermissionsManagementClient = dynamicImport(() =>
   import("@/components/enterprise/permissions-management-client").then((mod) => mod.PermissionsManagementClient)
 );
+const RolesManagementClient = dynamicImport(() =>
+  import("@/components/enterprise/roles-management-client").then((mod) => mod.RolesManagementClient)
+);
 
 export default async function PermissionsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const query = await searchParams;
-  const activeTab = typeof query.tab === "string" ? query.tab : "management";
+  const activeTab = typeof query.tab === "string" ? query.tab : "roles";
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   const roles = (session.user as any).roles || [];
@@ -75,11 +78,21 @@ export default async function PermissionsPage({ searchParams }: { searchParams: 
 
   return (
     <MergedModuleTabs
-      defaultValue="management"
+      defaultValue="roles"
       items={[
         {
+          value: "roles",
+          label: "الأدوار",
+          icon: <ShieldCheck className="h-4 w-4" />,
+          content: activeTab === "roles" ? (
+            <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">Loading roles...</div>}>
+              <RolesManagementClient />
+            </Suspense>
+          ) : null
+        },
+        {
           value: "management",
-          label: "إدارة الصلاحيات",
+          label: "صلاحيات إضافية لمستخدم",
           icon: <Shield className="h-4 w-4" />,
           content: activeTab === "management" ? (
             <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">Loading permissions...</div>}>

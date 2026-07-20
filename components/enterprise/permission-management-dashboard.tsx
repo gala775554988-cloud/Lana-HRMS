@@ -4,62 +4,12 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { Crown, Pencil, Trash2, Check, X, ShieldCheck, ChevronDown, CheckSquare } from "lucide-react";
 import { UserSearchSelect } from "@/components/hrms/user-search-select";
 import { getPermissionHint } from "@/lib/enterprise/permission-hints";
+import { RESOURCE_LABELS_AR, ACTION_LABELS_AR, CATEGORY_LABELS_AR } from "@/lib/enterprise/permission-labels";
 
 type PermissionCategory = { key: string; title: string; permissions: string[] };
 type PermissionTreeAction = { key: string; action: string; label: string };
 type PermissionTreeFeature = { resource: string; label: string; granular: boolean; actions: PermissionTreeAction[] };
 type PermissionTreeCategory = { key: string; title: string; features: PermissionTreeFeature[]; allPermissions: string[] };
-
-const RESOURCE_LABELS_AR: Record<string, string> = {
-  employees: "الموظفون",
-  contracts: "العقود",
-  attendance: "الحضور",
-  leave: "الإجازات",
-  payroll: "الرواتب",
-  loans: "السلف",
-  allowances: "البدلات",
-  deductions: "الاستقطاعات",
-  insurance: "التأمين",
-  residency: "الإقامات",
-  requests: "الطلبات",
-  overtime: "العمل الإضافي",
-  projects: "المشاريع",
-  warehouse: "المستودع",
-  assets: "العهد",
-  reports: "التقارير",
-  documents: "المستندات",
-  dashboard: "لوحة التحكم",
-  "audit-logs": "سجل التدقيق",
-  announcements: "الإعلانات",
-  notifications: "الإشعارات",
-  settings: "الإعدادات",
-  permissions: "الصلاحيات"
-};
-
-const ACTION_LABELS_AR: Record<string, string> = {
-  read: "مشاهدة",
-  create: "إضافة",
-  edit: "تعديل",
-  delete: "حذف",
-  manage: "إدارة"
-};
-
-const CATEGORY_LABELS_AR: Record<string, string> = {
-  employees: "الموظفون",
-  attendance: "الحضور",
-  leaves: "الإجازات",
-  payroll: "الرواتب",
-  insurance: "التأمين",
-  residency: "الإقامات",
-  requests: "الطلبات",
-  projects: "المشاريع",
-  warehouse: "المستودع",
-  assets: "العهد",
-  reports: "التقارير",
-  documents: "المستندات",
-  administration: "الإدارة",
-  settings: "الإعدادات"
-};
 
 type EmployeeLite = {
   userId: string;

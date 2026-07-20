@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AlertTriangle, RefreshCw, Home, Copy, CheckCircle2, LogOut, Code, FileCode } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
+import { Forbidden403 } from "@/components/hrms/forbidden-403";
 
 export default function EmployeePortalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   const [copied, setCopied] = useState(false);
@@ -11,6 +12,8 @@ export default function EmployeePortalError({ error, reset }: { error: Error & {
   const rawMessage = error.message || "Unknown runtime error";
   const digest = error.digest || "N/A";
   const stack = error.stack || "";
+
+  if (rawMessage === "Forbidden") return <Forbidden403 />;
 
   const handleCopy = () => {
     const text = [

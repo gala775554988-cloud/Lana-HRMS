@@ -25,6 +25,7 @@ import { ThemeToggle } from "@/components/hrms/theme-toggle";
 import { QuickSearchModal } from "@/components/hrms/quick-search-modal";
 import { useThemeStore } from "@/store/theme";
 import { cn } from "@/lib/utils";
+import { resolveRoleDashboard } from "@/config/auth";
 import type { Dictionary, Locale } from "@/lib/i18n";
 
 interface AppShellProps {
@@ -125,7 +126,14 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
     });
   }, [userPermissions, userRoles]);
 
-  const visibleNavItems = useMemo(() => navItems.filter(isNavItemAllowed), [isNavItemAllowed]);
+  // "الرئيسية" always points at the role's OWN dashboard (Employee/Manager/
+  // HR/Super Admin each have a distinct one) rather than the hardcoded
+  // Central Executive Dashboard every non-super-admin used to land on.
+  const homeHref = useMemo(() => resolveRoleDashboard(userRoles), [userRoles]);
+  const visibleNavItems = useMemo(
+    () => navItems.filter(isNavItemAllowed).map((item) => (item.resource === "dashboard" ? { ...item, href: homeHref } : item)),
+    [isNavItemAllowed, homeHref]
+  );
   // Defense-in-depth Auth Guard for Lana AI Pro Max: this whole shell already
   // returns null with no session (below), but this item additionally checks
   // the live authenticated status explicitly, per requirement, so it can

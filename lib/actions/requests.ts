@@ -125,6 +125,8 @@ export async function createRequest(data: {
 
     // 5. Cache Revalidation for instant UI refresh
     revalidatePath("/dashboard");
+    revalidatePath("/hr/dashboard");
+    revalidatePath("/manager/dashboard");
     revalidatePath("/requests");
     revalidatePath("/approvals");
     revalidatePath(`/employees/${employeeId}`);
