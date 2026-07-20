@@ -35,16 +35,20 @@ async function withConnectionRetry<T>(run: () => Promise<T>): Promise<T> {
   throw lastErr;
 }
 
-// Neon's own guidance for serverless clients: give the driver enough patience
-// on the wire before giving up, since a suspended compute can take a few
-// seconds to resume -- separate from (and in addition to) the query-level
-// retry above, which covers the case where even that patience isn't enough.
-function withConnectTimeout(url: string): string {
+// Neon's own guidance for serverless clients hitting the pooled ("-pooler")
+// endpoint: set connect_timeout generously (a suspended compute can take a
+// few seconds to resume) and pgbouncer=true (Neon's pooler runs in
+// transaction mode, which cannot serve Prisma's prepared statements without
+// this flag). Both are safe no-ops if already present in the URL.
+function normalizeDbUrl(url: string): string {
   if (!url) return url;
   try {
     const parsed = new URL(url);
     if (!parsed.searchParams.has("connect_timeout")) {
-      parsed.searchParams.set("connect_timeout", "15");
+      parsed.searchParams.set("connect_timeout", "20");
+    }
+    if (parsed.hostname.includes("-pooler") && !parsed.searchParams.has("pgbouncer")) {
+      parsed.searchParams.set("pgbouncer", "true");
     }
     return parsed.toString();
   } catch {
@@ -142,7 +146,7 @@ async function ensureSchemaReady(client: PrismaClient) {
 
 const prismaClientSingleton = () => {
   const rawDbUrl = process.env.POSTGRES_PRISMA_URL || process.env.DATABASE_URL || process.env.DIRECT_URL || "";
-  const dbUrl = withConnectTimeout(rawDbUrl.trim());
+  const dbUrl = normalizeDbUrl(rawDbUrl.trim());
   if (!dbUrl) {
     console.warn("[Prisma] Neither POSTGRES_PRISMA_URL nor DATABASE_URL is set in environment variables");
   }

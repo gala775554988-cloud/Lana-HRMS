@@ -13,10 +13,13 @@ async function ensureDbSchema() {
     return;
   }
   // Same cold-start patience as the app's runtime client (lib/prisma.ts) --
-  // the Neon compute backing a build may itself be suspended.
+  // the Neon compute backing a build may itself be suspended -- plus
+  // pgbouncer=true, required by Neon's pooled endpoint (transaction-mode
+  // PgBouncer) for Prisma's prepared statements.
   try {
     const parsed = new URL(url);
-    if (!parsed.searchParams.has('connect_timeout')) parsed.searchParams.set('connect_timeout', '15');
+    if (!parsed.searchParams.has('connect_timeout')) parsed.searchParams.set('connect_timeout', '20');
+    if (parsed.hostname.includes('-pooler') && !parsed.searchParams.has('pgbouncer')) parsed.searchParams.set('pgbouncer', 'true');
     url = parsed.toString();
   } catch {}
 
