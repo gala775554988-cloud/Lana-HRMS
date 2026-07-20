@@ -7,6 +7,7 @@ import { EmployeeTopBar } from "@/components/employee/EmployeeTopBar";
 import { EmployeeDesktopSidebar } from "@/components/employee/EmployeeDesktopSidebar";
 import { EmployeeMobileSidebar } from "@/components/employee/EmployeeMobileSidebar";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import "@/lib/error-interceptor";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,20 @@ function NotLinkedError() {
   );
 }
 
+function DiagnosticConfessionBox({ err, location }: { err: any; location: string }) {
+  const errMsg = err?.message || String(err || "Unknown error");
+  const stack = err?.stack || "";
+  return (
+    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-900 text-rose-100" dir="rtl">
+      <div className="max-w-2xl w-full rounded-3xl border border-rose-500/50 bg-rose-950/90 p-6 shadow-2xl">
+        <h2 className="text-lg font-black text-rose-300">اعتراف النظام بالخطأ التقني المباشر (`{location}`)</h2>
+        <p className="font-mono text-xs p-3 bg-black/60 rounded-xl mt-3 text-rose-400 font-bold select-all">{errMsg}</p>
+        {stack ? <pre className="font-mono text-[10px] p-3 bg-black/80 text-slate-300 rounded-xl mt-3 overflow-auto max-h-64 select-all">{stack}</pre> : null}
+      </div>
+    </div>
+  );
+}
+
 export default async function EmployeeLayout({ children }: { children: ReactNode }) {
   const session = await auth().catch(() => null);
 
@@ -60,39 +75,43 @@ export default async function EmployeeLayout({ children }: { children: ReactNode
     redirect(target);
   }
 
-  // EMPLOYEE role: look up employee profile
-  const employee = await getCurrentEmployeeCached().catch(() => null);
+  try {
+    // EMPLOYEE role: look up employee profile
+    const employee = await getCurrentEmployeeCached().catch(() => null);
 
-  // EMPLOYEE with valid session but no linked employee record → show error, NOT redirect to /login
-  if (!employee) {
-    return <NotLinkedError />;
-  }
+    // EMPLOYEE with valid session but no linked employee record → show error, NOT redirect to /login
+    if (!employee) {
+      return <NotLinkedError />;
+    }
 
-  return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
-      <EmployeeTopBar user={session.user} employee={employee} />
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+        <EmployeeTopBar user={session.user} employee={employee} />
 
-      <div className="flex">
-        {/* Hybrid design: solid opaque sidebar with an edge shadow, matching
-            the admin AppShell -- glass/blur is reserved for the content area. */}
-        <div className="hidden lg:block w-64 border-l border-slate-200/80 bg-white shadow-[0_0_24px_-6px_rgb(15_23_42_/_0.15)] dark:border-slate-800/80 dark:bg-slate-950 dark:shadow-[0_0_24px_-6px_rgb(0_0_0_/_0.4)] sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto">
-          <EmployeeDesktopSidebar />
-        </div>
-
-        <div className="relative flex-1 min-w-0 bg-gradient-to-br from-primary/[0.06] via-transparent to-secondary/[0.08] dark:from-primary/[0.08] dark:to-secondary/[0.1]">
-          <div className="pointer-events-none fixed -z-10 inset-0 overflow-hidden">
-            <div className="absolute -top-24 end-1/4 h-96 w-96 rounded-full bg-primary/10 blur-[120px] dark:bg-primary/15" />
-            <div className="absolute top-1/3 start-0 h-80 w-80 rounded-full bg-secondary/10 blur-[120px] dark:bg-secondary/15" />
+        <div className="flex">
+          {/* Hybrid design: solid opaque sidebar with an edge shadow, matching
+              the admin AppShell -- glass/blur is reserved for the content area. */}
+          <div className="hidden lg:block w-64 border-l border-slate-200/80 bg-white shadow-[0_0_24px_-6px_rgb(15_23_42_/_0.15)] dark:border-slate-800/80 dark:bg-slate-950 dark:shadow-[0_0_24px_-6px_rgb(0_0_0_/_0.4)] sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto">
+            <EmployeeDesktopSidebar />
           </div>
-          <main className="relative max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 lg:pb-8">
-            <ErrorBoundary>
-              {children}
-            </ErrorBoundary>
-          </main>
-        </div>
-      </div>
 
-      <EmployeeMobileSidebar />
-    </div>
-  );
+          <div className="relative flex-1 min-w-0 bg-gradient-to-br from-primary/[0.06] via-transparent to-secondary/[0.08] dark:from-primary/[0.08] dark:to-secondary/[0.1]">
+            <div className="pointer-events-none fixed -z-10 inset-0 overflow-hidden">
+              <div className="absolute -top-24 end-1/4 h-96 w-96 rounded-full bg-primary/10 blur-[120px] dark:bg-primary/15" />
+              <div className="absolute top-1/3 start-0 h-80 w-80 rounded-full bg-secondary/10 blur-[120px] dark:bg-secondary/15" />
+            </div>
+            <main className="relative max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 lg:pb-8">
+              <ErrorBoundary>
+                {children}
+              </ErrorBoundary>
+            </main>
+          </div>
+        </div>
+
+        <EmployeeMobileSidebar />
+      </div>
+    );
+  } catch (err: any) {
+    return <DiagnosticConfessionBox err={err} location="EmployeeLayout (/employee/*)" />;
+  }
 }

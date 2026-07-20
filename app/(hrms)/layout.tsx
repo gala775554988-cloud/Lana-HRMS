@@ -8,6 +8,7 @@ import { getCompanyLogo } from "@/lib/settings";
 import { TopLoader } from "@/components/ui/top-loader";
 import { getRequestDictionary } from "@/lib/i18n-server";
 import { AlertTriangle } from "lucide-react";
+import "@/lib/error-interceptor";
 
 export const dynamic = "force-dynamic";
 

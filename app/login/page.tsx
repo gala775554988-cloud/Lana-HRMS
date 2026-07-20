@@ -3,6 +3,7 @@ import { getRequestDictionary } from "@/lib/i18n-server";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { ClientLanguageToggle } from "@/components/i18n/client-language-toggle";
 import { LoginCard } from "@/components/auth/login-card";
+import "@/lib/error-interceptor";
 
 export const dynamic = "force-dynamic";
 
