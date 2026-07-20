@@ -7,11 +7,18 @@ async function ensureDbSchema() {
   }, 25000);
 
   const rawUrl = process.env.POSTGRES_PRISMA_URL || process.env.DIRECT_URL || process.env.DATABASE_URL || "";
-  const url = rawUrl.trim();
+  let url = rawUrl.trim();
   if (!url) {
     console.warn('[ensure-db-schema] Neither POSTGRES_PRISMA_URL nor DATABASE_URL is set in environment variables. Skipping schema verification.');
     return;
   }
+  // Same cold-start patience as the app's runtime client (lib/prisma.ts) --
+  // the Neon compute backing a build may itself be suspended.
+  try {
+    const parsed = new URL(url);
+    if (!parsed.searchParams.has('connect_timeout')) parsed.searchParams.set('connect_timeout', '15');
+    url = parsed.toString();
+  } catch {}
 
   console.log('[ensure-db-schema] Connecting to verify and auto-heal database schema on Neon...');
   const client = new PrismaClient({

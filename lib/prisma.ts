@@ -1,6 +1,56 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 
 let schemaChecked = false;
+
+// Neon (our Postgres host) suspends its compute after a period of inactivity
+// and takes a moment to resume on the next query -- if that resume window
+// overlaps a serverless invocation, Prisma fails immediately with
+// PrismaClientInitializationError ("Can't reach database server at ...").
+// This has been the actual cause behind several "Server Components render"
+// crashes reported in production (confirmed via Vercel Function Logs), not a
+// real outage -- a short retry gives the compute time to wake up, which is
+// Neon's own documented mitigation for serverless clients.
+const RETRYABLE_MESSAGE = /Can't reach database server|Connection terminated|ECONNREFUSED|timed out|Server has closed the connection/i;
+
+function isRetryableConnectionError(err: unknown): boolean {
+  if (err instanceof Prisma.PrismaClientInitializationError) return true;
+  if (err instanceof Prisma.PrismaClientKnownRequestError && ["P1001", "P1002", "P1017"].includes(err.code)) return true;
+  return err instanceof Error && RETRYABLE_MESSAGE.test(err.message);
+}
+
+async function withConnectionRetry<T>(run: () => Promise<T>): Promise<T> {
+  const attempts = 5;
+  const delayMs = 500;
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      return await run();
+    } catch (err) {
+      lastErr = err;
+      if (!isRetryableConnectionError(err) || attempt === attempts - 1) throw err;
+      console.error(`[Prisma] Retryable connection error (attempt ${attempt + 1}/${attempts}), retrying:`, err instanceof Error ? err.message.split("\n")[0] : err);
+      await new Promise((resolve) => setTimeout(resolve, delayMs * (attempt + 1)));
+    }
+  }
+  throw lastErr;
+}
+
+// Neon's own guidance for serverless clients: give the driver enough patience
+// on the wire before giving up, since a suspended compute can take a few
+// seconds to resume -- separate from (and in addition to) the query-level
+// retry above, which covers the case where even that patience isn't enough.
+function withConnectTimeout(url: string): string {
+  if (!url) return url;
+  try {
+    const parsed = new URL(url);
+    if (!parsed.searchParams.has("connect_timeout")) {
+      parsed.searchParams.set("connect_timeout", "15");
+    }
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
 
 async function ensureSchemaReady(client: PrismaClient) {
   if (schemaChecked || process.env.NEXT_PHASE === "phase-production-build" || process.env.SKIP_AUTO_DDL === "true") return;
@@ -92,7 +142,7 @@ async function ensureSchemaReady(client: PrismaClient) {
 
 const prismaClientSingleton = () => {
   const rawDbUrl = process.env.POSTGRES_PRISMA_URL || process.env.DATABASE_URL || process.env.DIRECT_URL || "";
-  const dbUrl = rawDbUrl.trim();
+  const dbUrl = withConnectTimeout(rawDbUrl.trim());
   if (!dbUrl) {
     console.warn("[Prisma] Neither POSTGRES_PRISMA_URL nor DATABASE_URL is set in environment variables");
   }
@@ -116,7 +166,15 @@ const prismaClientSingleton = () => {
   if (process.env.NODE_ENV !== "production" && process.env.NEXT_PHASE !== "phase-production-build" && process.env.SKIP_AUTO_DDL !== "true") {
     setTimeout(() => ensureSchemaReady(client).catch(() => {}), 100);
   }
-  return client;
+  return client.$extends({
+    query: {
+      $allModels: {
+        async $allOperations({ args, query }) {
+          return withConnectionRetry(() => query(args));
+        }
+      }
+    }
+  });
 };
 
 declare const globalThis: {
