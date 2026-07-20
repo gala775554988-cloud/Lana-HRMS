@@ -4,7 +4,7 @@ import { applyScopedWhere, getAccessProfile, resolveRoleEmployeeIds } from "@/li
 import { listHospitals } from "@/lib/enterprise/hospitals";
 import { getEffectivePermissionsForRoles } from "@/lib/enterprise/permissions";
 import { getEmployeeFieldAccess, redactHiddenFields } from "@/lib/enterprise/employee-field-access";
-import { isOdooIntegrationEnabled } from "@/lib/settings";
+import { isOdooIntegrationEnabled, getLanaApiKey } from "@/lib/settings";
 import type { LanaSyncEntity } from "@/lib/enterprise/lana-sync-actions";
 import { isLanaDelegate } from "@/lib/enterprise/lana-delegates";
 import { writeAuditLog } from "@/lib/audit";
@@ -66,7 +66,7 @@ function policyAnswer(message: string, ar: boolean) {
 }
 
 async function answerWithOpenAi(message: string, ar: boolean): Promise<string | null> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = await getLanaApiKey();
   if (!apiKey) return null;
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",

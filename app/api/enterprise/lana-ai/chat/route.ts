@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { createScopedHrTools, type ToolAuthContext } from "@/lib/ai/tools";
 import { getLanaSystemPrompt } from "@/lib/ai/system-prompt";
 import { isLanaDelegate } from "@/lib/enterprise/lana-delegates";
+import { getLanaApiKey } from "@/lib/settings";
 import { streamText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 
@@ -293,8 +294,8 @@ export async function POST(request: NextRequest) {
       content: m.content
     }));
 
-    // 3. Execution: If OPENAI_API_KEY is available and configured, execute streamText with toolChoice: "auto"
-    const openAiKey = (process.env.OPENAI_API_KEY || "").trim();
+    // 3. Execution: If API key is available and configured in database/env, execute streamText with toolChoice: "auto"
+    const openAiKey = (await getLanaApiKey() || process.env.OPENAI_API_KEY || "").trim();
     if (openAiKey) {
       try {
         const openai = createOpenAI({ apiKey: openAiKey });

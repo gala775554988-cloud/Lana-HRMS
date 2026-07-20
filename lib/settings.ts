@@ -38,6 +38,23 @@ export async function setAppSetting(key: string, value: unknown, description?: s
   }
 }
 
+export async function getLanaApiKey(): Promise<string> {
+  return memoryCache("setting:lana.ai.apiKey", 60 * 1000, async () => {
+    try {
+      const setting = await prisma.appSetting.findUnique({
+        where: { key: "lana.ai.apiKey" }
+      });
+      if (setting && typeof setting.value === "object" && setting.value !== null && "value" in setting.value) {
+        return String((setting.value as Record<string, unknown>).value || "");
+      }
+      if (typeof setting?.value === "string") return setting.value;
+      return process.env.OPENAI_API_KEY || process.env.AI_API_KEY || "";
+    } catch {
+      return process.env.OPENAI_API_KEY || process.env.AI_API_KEY || "";
+    }
+  });
+}
+
 async function getCompanyLogoUncached(): Promise<string | null> {
   const setting = await getAppSetting("company.logo");
   if (setting && typeof setting === "object" && setting !== null) {
