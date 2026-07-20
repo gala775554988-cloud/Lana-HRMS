@@ -119,7 +119,22 @@ async function ensureDbSchema() {
     `CREATE INDEX IF NOT EXISTS "Employee_employeeNumber_trgm_idx" ON "Employee" USING GIN ("employeeNumber" gin_trgm_ops);`,
     `CREATE INDEX IF NOT EXISTS "Employee_nationalId_trgm_idx" ON "Employee" USING GIN ("nationalId" gin_trgm_ops);`,
     `CREATE INDEX IF NOT EXISTS "Employee_email_trgm_idx" ON "Employee" USING GIN ("email" gin_trgm_ops);`,
-    `CREATE INDEX IF NOT EXISTS "Employee_phone_trgm_idx" ON "Employee" USING GIN ("phone" gin_trgm_ops);`
+    `CREATE INDEX IF NOT EXISTS "Employee_phone_trgm_idx" ON "Employee" USING GIN ("phone" gin_trgm_ops);`,
+    `DO $$ BEGIN CREATE TYPE "ApprovalEntityType" AS ENUM ('HOSPITAL', 'DEPARTMENT', 'BRANCH', 'PROJECT'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `CREATE TABLE IF NOT EXISTS "Company" ("id" TEXT NOT NULL, "name" TEXT NOT NULL, "code" TEXT NOT NULL, "isActive" BOOLEAN NOT NULL DEFAULT true, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "Company_pkey" PRIMARY KEY ("id"));`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "Company_code_key" ON "Company"("code");`,
+    `CREATE TABLE IF NOT EXISTS "Project" ("id" TEXT NOT NULL, "name" TEXT NOT NULL, "code" TEXT, "isActive" BOOLEAN NOT NULL DEFAULT true, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "Project_pkey" PRIMARY KEY ("id"));`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "Project_code_key" ON "Project"("code");`,
+    `CREATE TABLE IF NOT EXISTS "ApprovalPath" ("id" TEXT NOT NULL, "companyId" TEXT NOT NULL, "entityType" "ApprovalEntityType" NOT NULL, "entityId" TEXT NOT NULL, "requestType" TEXT NOT NULL, "name" TEXT, "isActive" BOOLEAN NOT NULL DEFAULT true, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "ApprovalPath_pkey" PRIMARY KEY ("id"));`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "ApprovalPath_companyId_entityType_entityId_requestType_key" ON "ApprovalPath"("companyId", "entityType", "entityId", "requestType");`,
+    `CREATE TABLE IF NOT EXISTS "ApprovalStage" ("id" TEXT NOT NULL, "approvalPathId" TEXT NOT NULL, "order" INTEGER NOT NULL, "name" TEXT, "approverEmployeeId" TEXT NOT NULL, "isMandatory" BOOLEAN NOT NULL DEFAULT true, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "ApprovalStage_pkey" PRIMARY KEY ("id"));`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "ApprovalStage_approvalPathId_order_key" ON "ApprovalStage"("approvalPathId", "order");`,
+    `CREATE TABLE IF NOT EXISTS "SupervisorAssignment" ("id" TEXT NOT NULL, "employeeId" TEXT NOT NULL, "entityType" "ApprovalEntityType" NOT NULL, "entityId" TEXT NOT NULL, "title" TEXT, "startDate" TIMESTAMP(3) NOT NULL, "endDate" TIMESTAMP(3), "isActive" BOOLEAN NOT NULL DEFAULT true, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "SupervisorAssignment_pkey" PRIMARY KEY ("id"));`,
+    `ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "companyId" TEXT;`,
+    `ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "projectId" TEXT;`,
+    `CREATE INDEX IF NOT EXISTS "Employee_companyId_idx" ON "Employee"("companyId");`,
+    `CREATE INDEX IF NOT EXISTS "Employee_projectId_idx" ON "Employee"("projectId");`,
+    `INSERT INTO "Company" ("id", "name", "code", "isActive", "createdAt", "updatedAt") VALUES ('default-company', 'الشركة الرئيسية', 'MAIN', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT ("code") DO NOTHING;`
   ];
 
   let successCount = 0;
