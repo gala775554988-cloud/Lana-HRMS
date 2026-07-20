@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Copy, Pencil, X, Check, ArrowUp, ArrowDown, GripVertical, Search } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Plus, Trash2, Copy, Pencil, X, Check, ArrowUp, ArrowDown, ChevronDown, GripVertical, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -53,7 +53,7 @@ function MultiSelectChipsDropdown({
   customValue?: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLLabelElement>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -294,7 +294,7 @@ export function ApprovalWorkflowsClient() {
   const targetEntityIds = entityIds.length > 0 ? entityIds : (entityId ? [entityId] : []);
   const targetRequestTypes = requestTypes.length > 0
     ? requestTypes.map((t) => (t === "OTHER" ? customRequestType.trim().toUpperCase() : t)).filter(Boolean)
-    : (resolvedRequestType ? [resolvedRequestType] : []);
+    : (requestType ? [requestType] : []);
 
   async function savePath() {
     if (!companyId || !targetEntityIds.length || !targetRequestTypes.length || !stages.length) {

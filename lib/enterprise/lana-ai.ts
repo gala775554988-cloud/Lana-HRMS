@@ -4,7 +4,7 @@ import { applyScopedWhere, getAccessProfile } from "@/lib/enterprise/hierarchy";
 import { listHospitals } from "@/lib/enterprise/hospitals";
 import { getEffectivePermissionsForRoles } from "@/lib/enterprise/permissions";
 import { getEmployeeFieldAccess, redactHiddenFields } from "@/lib/enterprise/employee-field-access";
-import { isOdooIntegrationEnabled, getLanaApiKey } from "@/lib/settings";
+import { isOdooIntegrationEnabled, getLanaApiKey, getGeminiApiKey, getGeminiModel } from "@/lib/settings";
 import type { LanaSyncEntity } from "@/lib/enterprise/lana-sync-actions";
 import { isLanaDelegate } from "@/lib/enterprise/lana-delegates";
 import { writeAuditLog } from "@/lib/audit";
@@ -65,6 +65,27 @@ function policyAnswer(message: string, ar: boolean) {
   return null;
 }
 
+const LANA_SYSTEM_INSTRUCTION_AR = "أنت مساعد موارد بشرية لنظام Lana HRMS. أجب بإيجاز وبشكل عملي.";
+const LANA_SYSTEM_INSTRUCTION_EN = "You are an HR assistant for Lana HRMS. Answer concisely and practically.";
+
+async function answerWithGemini(message: string, ar: boolean): Promise<string | null> {
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) return null;
+  const model = getGeminiModel();
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: ar ? LANA_SYSTEM_INSTRUCTION_AR : LANA_SYSTEM_INSTRUCTION_EN }] },
+      contents: [{ role: "user", parts: [{ text: message }] }],
+      generationConfig: { temperature: 0.2 }
+    })
+  });
+  if (!response.ok) return null;
+  const data = await response.json().catch(() => null) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> } | null;
+  return data?.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("").trim() || null;
+}
+
 async function answerWithOpenAi(message: string, ar: boolean): Promise<string | null> {
   const apiKey = await getLanaApiKey();
   if (!apiKey) return null;
@@ -74,7 +95,7 @@ async function answerWithOpenAi(message: string, ar: boolean): Promise<string | 
     body: JSON.stringify({
       model: process.env.OPENAI_MODEL || "gpt-4o-mini",
       messages: [
-        { role: "system", content: ar ? "أنت مساعد موارد بشرية لنظام Lana HRMS. أجب بإيجاز وبشكل عملي." : "You are an HR assistant for Lana HRMS. Answer concisely and practically." },
+        { role: "system", content: ar ? LANA_SYSTEM_INSTRUCTION_AR : LANA_SYSTEM_INSTRUCTION_EN },
         { role: "user", content: message }
       ],
       temperature: 0.2
@@ -83,6 +104,13 @@ async function answerWithOpenAi(message: string, ar: boolean): Promise<string | 
   if (!response.ok) return null;
   const data = await response.json().catch(() => null) as { choices?: Array<{ message?: { content?: string } }> } | null;
   return data?.choices?.[0]?.message?.content?.trim() || null;
+}
+
+/** Gemini is the primary provider; OpenAI (lana.ai.apiKey / OPENAI_API_KEY)
+ * stays as a fallback so an existing deployment without GEMINI_API_KEY set
+ * keeps working exactly as before. */
+async function answerWithLlm(message: string, ar: boolean): Promise<string | null> {
+  return (await answerWithGemini(message, ar).catch(() => null)) || (await answerWithOpenAi(message, ar).catch(() => null));
 }
 
 export async function answerLanaAi({
@@ -492,9 +520,9 @@ export async function answerLanaAi({
     };
   }
 
-  const openAiAnswer = await answerWithOpenAi(message, ar).catch(() => null);
+  const llmAnswer = await answerWithLlm(message, ar).catch(() => null);
   return {
-    answer: openAiAnswer || (ar
+    answer: llmAnswer || (ar
       ? "أنا Lana AI. أستطيع مساعدتك في سياسات الموارد البشرية، الطلبات، الرواتب، الإجازات، الأوفر تايم، والبحث داخل البيانات التي تملك صلاحية رؤيتها."
       : "I am Lana AI. I can help with HR policies, requests, payroll, leave, overtime, and searching data you are allowed to access."),
     suggestions
