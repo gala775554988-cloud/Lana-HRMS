@@ -235,6 +235,38 @@ export async function POST(request: NextRequest) {
     const employeeNumbers = rows.map(employeeNumberFrom).filter(Boolean);
     const emails = rows.map(emailFrom).filter(Boolean) as string[];
 
+    // Fetch all contracts from Odoo hr.contract to pull exact Analytic Account (cost center) and wage per employee
+    const contractFieldsMeta: Record<string, Record<string, unknown>> = await client.fieldsGet("hr.contract", [], ["string", "type", "relation"]).catch(() => ({}));
+    const contractAnalyticCandidates = ["analytic_account_id", "analytic_account", "x_cost_center", "x_analytic_account_id", "analytic_distribution", "x_studio_cost_center"];
+    const validContractAnalyticFields = contractAnalyticCandidates.filter((f) => contractFieldsMeta[f]);
+    const contractFields = ["id", "employee_id", "name", "state", "wage", "date_start", "date_end", ...validContractAnalyticFields];
+    
+    const contractsFromOdoo = await client.search_read<Record<string, any>>(
+      "hr.contract",
+      [["employee_id", "in", odooIds]],
+      contractFields,
+      { context: { active_test: false } }
+    ).catch(() => []);
+
+    const employeeIdToAnalyticAccount = new Map<number, string>();
+    const employeeIdToContract = new Map<number, Record<string, any>>();
+    for (const c of contractsFromOdoo) {
+      const empId = many2oneId(c.employee_id);
+      if (!empId) continue;
+      const existingC = employeeIdToContract.get(empId);
+      if (existingC && c.state !== "open") continue;
+      employeeIdToContract.set(empId, c);
+
+      let analyticName = "";
+      for (const f of validContractAnalyticFields) {
+        analyticName = many2oneName(c[f]) || clean(c[f]);
+        if (analyticName && typeof analyticName === "string" && !analyticName.startsWith("{")) break;
+      }
+      if (analyticName) {
+        employeeIdToAnalyticAccount.set(empId, analyticName);
+      }
+    }
+
     const existingEmployees = await prisma.employee.findMany({
       where: {
         OR: [
@@ -259,13 +291,14 @@ export async function POST(request: NextRequest) {
       const employeeNumber = employeeNumberFrom(row);
       const email = emailFrom(row);
       const existing = byOdooId.get(odooId) || byNationalId.get(nationalId) || byEmployeeNumber.get(employeeNumber) || (email ? byEmail.get(email) : undefined) || null;
-      const hospitalName = clean((row as any).school) || many2oneName((row as any).work_location_id) || clean((row as any).work_location_id) || many2oneName((row as any).x_studio_school_name) || clean((row as any).x_studio_school_name) || null;
-      const costCenterVal = many2oneName((row as any).analytic_account) || clean((row as any).analytic_account) || many2oneName((row as any).x_cost_center) || clean((row as any).x_cost_center) || many2oneName((row as any).analytic_distribution) || null;
+      const hospitalName = hospitalFields.map((f) => many2oneName((row as any)[f]) || clean((row as any)[f])).find(Boolean) || clean((row as any).school) || many2oneName((row as any).work_location_id) || clean((row as any).work_location_id) || null;
+      const costCenterVal = employeeIdToAnalyticAccount.get(odooId) || analyticFields.map((f) => many2oneName((row as any)[f]) || clean((row as any)[f])).find(Boolean) || null;
       return {
         row,
         odooId,
         parentOdooId: many2oneId(row.parent_id),
         hospitalName,
+        contractData: employeeIdToContract.get(odooId),
         existing,
         data: {
           odooId,
@@ -372,6 +405,30 @@ export async function POST(request: NextRequest) {
           if (hospital?.id) {
             await prisma.employee.update({ where: { id: employeeId }, data: { hospitalId: hospital.id } }).catch(() => {});
           }
+        }
+        if (item.contractData) {
+          const cData = item.contractData;
+          await prisma.employeeContract.upsert({
+            where: { employeeId_contractNumber: { employeeId, contractNumber: `ODOO-CONT-${cData.id}` } },
+            update: {
+              title: clean(cData.name) || "عقد العمل (Odoo)",
+              salaryAmount: Number(cData.wage || 0) || undefined,
+              status: cData.state === "open" ? "ACTIVE" : cData.state === "close" ? "EXPIRED" : "DRAFT",
+              startDate: dateValue(cData.date_start) || new Date(),
+              endDate: dateValue(cData.date_end) || undefined,
+              odooRawData: cData
+            },
+            create: {
+              employeeId,
+              contractNumber: `ODOO-CONT-${cData.id}`,
+              title: clean(cData.name) || "عقد العمل (Odoo)",
+              salaryAmount: Number(cData.wage || 0) || 0,
+              status: cData.state === "open" ? "ACTIVE" : cData.state === "close" ? "EXPIRED" : "DRAFT",
+              startDate: dateValue(cData.date_start) || new Date(),
+              endDate: dateValue(cData.date_end) || undefined,
+              odooRawData: cData
+            }
+          }).catch(() => {});
         }
         if (!body.skipUserProvisioning) {
           const userResult = await ensureEmployeeUser(employeeId, item.data).catch((error) => ({ created: false, reason: error instanceof Error ? error.message : String(error) }));
