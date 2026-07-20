@@ -74,7 +74,7 @@ export default async function EmployeeRequests() {
         <h1 className="text-2xl font-semibold">طلباتي</h1>
         <Link 
           href="/employee/leave/new" 
-          className="px-4 py-2 bg-primary text-white rounded-xl text-sm hover:bg-primary"
+          className="px-4 py-2 bg-primary text-white rounded-xl text-sm transition-colors hover:bg-primary/90"
         >
           طلب جديد
         </Link>

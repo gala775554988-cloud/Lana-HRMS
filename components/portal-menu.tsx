@@ -8,9 +8,9 @@ import { cn } from "@/lib/utils";
 
 export const portalMenuItems = [
   { title: "الرئيسية", href: "/employee/dashboard", icon: LayoutDashboard },
-  { title: "الطلبات", href: "/portal/requests", icon: GitPullRequest },
+  { title: "الطلبات", href: "/employee/requests", icon: GitPullRequest },
   { title: "سجل الحضور", href: "/employee/attendance", icon: Clock },
-  { title: "الإجازات", href: "/employee/leaves", icon: Calendar },
+  { title: "الإجازات", href: "/employee/leave", icon: Calendar },
   { title: "الوثائق والعقود", href: "/employee/documents", icon: FileText },
   { title: "الملف الشخصي", href: "/employee/profile", icon: User }
 ];
