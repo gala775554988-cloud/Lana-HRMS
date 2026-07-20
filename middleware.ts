@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getToken } from "@auth/core/jwt";
-import { resolveRoleDashboard } from "@/config/auth";
+import { resolveRoleDashboard, DEFAULT_LOGIN_REDIRECT } from "@/config/auth";
 
 const AUTH_SECRET = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? "";
 
@@ -45,6 +45,35 @@ function isPublicStaticAsset(pathname: string) {
   return PUBLIC_ASSET_EXTENSIONS.test(pathname);
 }
 
+// Paths a pure-EMPLOYEE session (no admin/HR/manager role) is allowed to
+// reach directly. Everything else is admin-shell territory and gets bounced
+// to the employee dashboard here -- before any page component even starts
+// rendering -- so typing an admin URL by hand can't work even if a layout
+// guard were ever missed. Uses startsWith("/employee/") (not "/employee",
+// which would also match the admin employees list at "/employees").
+//
+// "/approvals" is deliberately exempt from this coarse role-only check: the
+// RBAC design grants read:requests/manage:requests to any employee named as
+// an ApprovalStage approver or active SupervisorAssignment purely via
+// permission, with no role change (see mergeEffectivePermissions in
+// lib/enterprise/permissions.ts) -- the JWT this middleware reads only ever
+// carries roles, never the computed permission set (kept out deliberately to
+// avoid cookie-chunking), so it cannot tell that case apart here. The real,
+// permission-aware gate for it lives in app/(hrms)/layout.tsx, which does
+// have the full session with permissions.
+function isEmployeeSafePath(pathname: string) {
+  return (
+    pathname === "/employee" ||
+    pathname.startsWith("/employee/") ||
+    pathname === "/force-change-password" ||
+    pathname.startsWith("/force-change-password/") ||
+    pathname === "/logout" ||
+    pathname.startsWith("/logout/") ||
+    pathname === "/approvals" ||
+    pathname.startsWith("/approvals/")
+  );
+}
+
 export async function middleware(request: NextRequest) {
   try {
     const p = request.nextUrl.pathname;
@@ -87,6 +116,16 @@ export async function middleware(request: NextRequest) {
       if (isRoot) return NextResponse.next();
       return NextResponse.redirect(new URL("/login", request.url));
     }
+
+    // A session with no admin/HR/manager role resolves to the employee
+    // dashboard just like at login (resolveRoleDashboard) -- mirror that
+    // here for every subsequent page request, not just the first redirect,
+    // so a pure-EMPLOYEE session can never reach an admin-shell path by
+    // typing the URL directly.
+    if (!isEmployeeSafePath(p) && resolveRoleDashboard(roles) === DEFAULT_LOGIN_REDIRECT) {
+      return NextResponse.redirect(new URL(DEFAULT_LOGIN_REDIRECT, request.url));
+    }
+
     return NextResponse.next();
   } catch (err: any) {
     console.error("[Middleware][FATAL_ERROR] Stack trace:", err?.stack || err);
