@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Search, Sun, Moon, User } from 'lucide-react';
 import Link from 'next/link';
 import { BrandLogo } from '@/components/brand/brand-logo';
 import { ClientLanguageToggle } from '@/components/i18n/client-language-toggle';
 import { NotificationBell } from '@/components/enterprise/notification-bell';
+import { useThemeStore } from '@/store/theme';
 
 interface Props {
   user: any;
@@ -13,16 +14,12 @@ interface Props {
 }
 
 export function EmployeeHeader({ user, employee }: Props) {
-  const [isDark, setIsDark] = useState(false);
+  const { mode, setMode } = useThemeStore();
+  const isDark = mode === 'dark';
 
   const toggleTheme = () => {
-    const newDark = !isDark;
-    setIsDark(newDark);
-    if (newDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    const nextMode = isDark ? 'light' : 'dark';
+    setMode(nextMode);
   };
 
   return (

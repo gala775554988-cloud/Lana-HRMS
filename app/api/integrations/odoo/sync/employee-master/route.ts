@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
 import { OdooSyncService, requireOdooIntegrationAccess } from "@/lib/integrations/odoo/sync";
+import { bulkSyncAllOdooDocuments } from "@/lib/integrations/odoo/documents";
 import { many2oneId, many2oneName } from "@/lib/integrations/odoo/mapper";
 import type { OdooRecord } from "@/lib/integrations/odoo/types";
 import { isOdooIntegrationEnabled } from "@/lib/settings";
@@ -181,6 +182,12 @@ export async function POST(request: NextRequest) {
       "job_id",
       "company_id",
       "image_1920",
+      "school",
+      "work_location_id",
+      "x_studio_school_name",
+      "analytic_account",
+      "x_cost_center",
+      "analytic_distribution",
       ...sponsorFields,
     ];
 
@@ -232,10 +239,13 @@ export async function POST(request: NextRequest) {
       const employeeNumber = employeeNumberFrom(row);
       const email = emailFrom(row);
       const existing = byOdooId.get(odooId) || byNationalId.get(nationalId) || byEmployeeNumber.get(employeeNumber) || (email ? byEmail.get(email) : undefined) || null;
+      const hospitalName = clean((row as any).school) || many2oneName((row as any).work_location_id) || clean((row as any).work_location_id) || many2oneName((row as any).x_studio_school_name) || clean((row as any).x_studio_school_name) || null;
+      const costCenterVal = many2oneName((row as any).analytic_account) || clean((row as any).analytic_account) || many2oneName((row as any).x_cost_center) || clean((row as any).x_cost_center) || many2oneName((row as any).analytic_distribution) || null;
       return {
         row,
         odooId,
         parentOdooId: many2oneId(row.parent_id),
+        hospitalName,
         existing,
         data: {
           odooId,
@@ -247,6 +257,7 @@ export async function POST(request: NextRequest) {
           phone: phoneFrom(row),
           profilePhotoUrl: (row as any).image_1920 ? (String((row as any).image_1920).startsWith("data:") ? String((row as any).image_1920) : `data:image/jpeg;base64,${(row as any).image_1920}`) : undefined,
           sponsor: sponsorValue(row as Record<string, unknown>, sponsorFields),
+          costCenter: costCenterVal || undefined,
           hireDate: dateValue(row.first_contract_date) || dateValue(row.create_date) || new Date(),
           status: row.active === false ? "INACTIVE" : "ACTIVE",
           odooWriteDate: dateValue(row.write_date),
@@ -331,6 +342,17 @@ export async function POST(request: NextRequest) {
           created += 1;
         }
         localByOdooId.set(item.odooId, employeeId);
+        if (item.hospitalName) {
+          const hospital = await prisma.hospital.upsert({
+            where: { name: item.hospitalName },
+            update: {},
+            create: { name: item.hospitalName, code: ("ODOO-HOSP-" + item.hospitalName).slice(0, 191) },
+            select: { id: true }
+          }).catch(() => null);
+          if (hospital?.id) {
+            await prisma.employee.update({ where: { id: employeeId }, data: { hospitalId: hospital.id } }).catch(() => {});
+          }
+        }
         if (!body.skipUserProvisioning) {
           const userResult = await ensureEmployeeUser(employeeId, item.data).catch((error) => ({ created: false, reason: error instanceof Error ? error.message : String(error) }));
           if (userResult.created) usersCreated += 1;
@@ -353,6 +375,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Trigger high-speed bulk document sync for all attachments (< 400KB embedded, > 400KB on-demand)
+    const docSyncResult = await bulkSyncAllOdooDocuments(client, 1500, 0).catch(() => ({ imported: 0, errors: 0 }));
+
     const result = {
       success: true,
       pages,
@@ -363,6 +388,7 @@ export async function POST(request: NextRequest) {
       managersUpdated,
       forcedCodeDisplacements: staged.length,
       skipped: errors.length,
+      documentsImported: docSyncResult.imported,
       sponsorFields,
       startedAfterId,
       lastOdooId,
