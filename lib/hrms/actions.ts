@@ -324,11 +324,7 @@ export async function listModuleRecords(input: QueryInput) {
       }
     }
     if (filters.project) {
-      const store = await getHierarchyStore();
-      const employeeIds = Object.values(store.projects)
-        .filter((project) => project.name.toLowerCase().includes(String(filters.project).toLowerCase()))
-        .flatMap((project) => project.employeeIds);
-      employeeAnd.push({ id: { in: employeeIds.length ? employeeIds : ["__NO_PROJECT_MATCH__"] } });
+      employeeAnd.push({ project: { name: { contains: String(filters.project), mode: "insensitive" } } });
     }
     if (employeeAnd.length) baseWhere = Object.keys(baseWhere).length ? { AND: [baseWhere, ...employeeAnd] } : { AND: employeeAnd };
   }
@@ -336,7 +332,7 @@ export async function listModuleRecords(input: QueryInput) {
   // Skip expensive hierarchy/profile queries for SUPER_ADMIN (no scope restrictions)
   const roles = (session.user.roles as string[]) ?? [];
   const accessProfile = roles.includes("SUPER_ADMIN")
-    ? { isSuperAdmin: true, isHrManager: false, userId: session.user.id, roles, employee: null, store: {} as any }
+    ? { isSuperAdmin: true, isHrManager: false, userId: session.user.id, roles, employee: null }
     : await getAccessProfile(session.user.id, roles);
   const where = await applyScopedWhere(resource.key, baseWhere, accessProfile);
 

@@ -6,36 +6,48 @@ import { recordLeaveApprovalUsage } from "@/lib/employee/leave-balance";
 
 export async function createEnterpriseWorkflow(employeeId: string, type: string, entityId: string) {
   const approvers = await resolveApprovalChain(employeeId, type.toLowerCase());
+  // Optional stages (isMandatory: false) never block progression -- they're
+  // auto-resolved to APPROVED right away (still recorded, VIEW-only) so the
+  // chain moves straight to the first mandatory stage. If every stage is
+  // optional (or there are none), the whole request auto-completes.
+  const firstMandatoryIndex = approvers.findIndex((approver) => approver.isMandatory);
+  const hasMandatoryStage = firstMandatoryIndex !== -1;
+
   const instance = await prisma.workflowInstance.create({
     data: {
       employeeId,
       type,
       entityId,
-      status: approvers.length ? "PENDING" : "COMPLETED",
-      currentStep: approvers.length ? 1 : 0
+      status: approvers.length ? (hasMandatoryStage ? "PENDING" : "COMPLETED") : "COMPLETED",
+      currentStep: hasMandatoryStage ? firstMandatoryIndex + 1 : approvers.length ? approvers.length + 1 : 0
     }
   });
 
   if (approvers.length) {
+    const now = new Date();
     await prisma.workflowStep.createMany({
       data: approvers.map((approver, index) => ({
         workflowInstanceId: instance.id,
         step: index + 1,
         approverUserId: approver.userId,
-        status: index === 0 ? "PENDING" : "WAITING",
-        capabilities: approver.capabilities
+        status: !approver.isMandatory ? "APPROVED" : index === firstMandatoryIndex ? "PENDING" : "WAITING",
+        capabilities: approver.capabilities,
+        ...(!approver.isMandatory ? { approvedAt: now, comments: "تمت الموافقة تلقائياً (مرحلة اختيارية)" } : {})
       }))
     });
-    await notifyUsers([approvers[0].userId], "وصول طلب جديد", `New ${type} request is waiting for your approval.`, "INFO", `/approvals?tab=inbox&highlight=${instance.id}`);
+    if (hasMandatoryStage) {
+      const firstApprover = approvers[firstMandatoryIndex];
+      await notifyUsers([firstApprover.userId], "وصول طلب جديد", `New ${type} request is waiting for your approval.`, "INFO", `/approvals?tab=inbox&highlight=${instance.id}`);
+    }
   }
 
   const employee = await prisma.employee.findUnique({ where: { id: employeeId }, select: { userId: true } });
   if (employee?.userId) {
     await createEnterpriseNotification({
       userId: employee.userId,
-      title: approvers.length ? "تم إرسال الطلب" : "تم اعتماد الطلب",
-      body: approvers.length ? `Your ${type} request has been submitted.` : `Your ${type} request was approved automatically.`,
-      type: approvers.length ? "INFO" : "SUCCESS",
+      title: hasMandatoryStage ? "تم إرسال الطلب" : "تم اعتماد الطلب",
+      body: hasMandatoryStage ? `Your ${type} request has been submitted.` : `Your ${type} request was approved automatically.`,
+      type: hasMandatoryStage ? "INFO" : "SUCCESS",
       link: `/approvals?tab=outbox&highlight=${instance.id}`
     });
   }
@@ -101,7 +113,11 @@ export async function decideWorkflowStep({
   } else if (decision === "RETURN") {
     workflowStatus = "RETURNED";
   } else {
-    const nextStep = instance.steps.find((step) => step.step > instance.currentStep);
+    // Optional stages after this one were already auto-resolved to APPROVED
+    // at creation time (see createEnterpriseWorkflow) -- only a still-"WAITING"
+    // step is a real next stop; skipping past already-decided ones this way
+    // is what makes optional stages never block progression.
+    const nextStep = instance.steps.find((step) => step.step > instance.currentStep && step.status === "WAITING");
     if (nextStep) {
       currentStepNumber = nextStep.step;
       const liveChain = await resolveApprovalChain(instance.employeeId, instance.type.toLowerCase());

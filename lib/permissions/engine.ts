@@ -65,36 +65,10 @@ export async function getEmployeeScopeWhere(userId: string): Promise<Record<stri
   return {};
 }
 
-export async function getApprovalChain(module: string) {
-  return prisma.hrApprovalChain.findMany({ where: { module, isActive: true }, orderBy: { level: "asc" } });
-}
-
-export type ApprovalChainLevelInput = {
-  level: number;
-  approverRole: string;
-  approverUserId?: string | null;
-  scopeType?: string;
-  scopeId?: string | null;
-  capabilities?: string[];
-};
-
-export async function saveApprovalChain(module: string, approvals: ApprovalChainLevelInput[]) {
-  await prisma.hrApprovalChain.deleteMany({ where: { module } });
-  for (const a of approvals) {
-    await prisma.hrApprovalChain.create({
-      data: {
-        module,
-        level: a.level,
-        approverRole: a.approverRole,
-        approverUserId: a.approverUserId || null,
-        scopeType: a.scopeType || "GLOBAL",
-        scopeId: a.scopeId || "",
-        capabilities: a.capabilities?.length ? a.capabilities : ["VIEW", "APPROVE", "REJECT"]
-      }
-    });
-  }
-  return getApprovalChain(module);
-}
+// Approval-chain CRUD (getApprovalChain/saveApprovalChain against
+// HrApprovalChain) was removed with the old approval-path system -- see
+// lib/enterprise/approval-engine.ts (ApprovalPath/ApprovalStage) and
+// app/api/enterprise/approval-paths/ for the replacement.
 
 export const MODULES = ["employees","attendance","payroll","leaves","loans","overtime","documents","contracts","reports","settings","permissions","audit-logs","integrations"] as const;
 export const SCOPES = ["ALL","BRANCH","DEPARTMENT","HOSPITAL","TEAM","SELF"] as const;

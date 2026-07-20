@@ -11,7 +11,7 @@ import { usePendingApprovalsCount } from "@/lib/hooks/use-pending-approvals-coun
  * has its own fixed nav list, completely separate from the HRMS admin shell's
  * navItems in app-shell.tsx -- EMPLOYEE-role users are always routed to this
  * portal (see resolveRoleDashboard), so a plain employee named as a
- * CUSTOM_APPROVER in a workflow path (see lib/enterprise/workflow-paths.ts)
+ * approver on an ApprovalStage (see lib/enterprise/approval-engine.ts)
  * would never see the "Pending Approvals" entry that only exists in the HRMS
  * shell. This hook appends that entry to the "الطلبات" group here too, gated
  * on the same read:requests/manage:requests permission, so it shows up

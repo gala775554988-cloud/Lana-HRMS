@@ -1,25 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Shield, Users, GitBranch, Save, Plus, Trash2, RefreshCw, UserPlus, X, HelpCircle } from "lucide-react";
+import { Shield, Save, Plus, Trash2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { UserSearchSelect } from "@/components/hrms/user-search-select";
 import { PermissionHint } from "@/components/enterprise/permission-hint";
-import { WorkflowPathsTabs } from "@/components/enterprise/workflow-paths-tabs";
-
-const CAPABILITIES = [["VIEW", "إظهار فقط"], ["APPROVE", "موافقة"], ["REJECT", "رفض"]] as const;
-
-function capabilityLabel(key: string) {
-  return CAPABILITIES.find(([value]) => value === key)?.[1] ?? key;
-}
-
-function roleLabel(role: string) {
-  return APPROVER_ROLES.find(([value]) => value === role)?.[1] ?? role;
-}
 
 const MODULES = [
   ["employees", "الموظفون"], ["attendance", "الحضور"], ["payroll", "الرواتب"], ["leaves", "الإجازات"],
@@ -28,11 +16,6 @@ const MODULES = [
   ["integrations", "التكاملات"]
 ] as const;
 const SCOPES = [["ALL", "الكل"], ["BRANCH", "الفرع"], ["DEPARTMENT", "الإدارة"], ["HOSPITAL", "مستشفى / موقع"], ["TEAM", "الفريق"], ["SELF", "ذاتي"]] as const;
-const APPROVAL_MODULES = [["leave", "الإجازات"], ["overtime", "الأوفر تايم"], ["loan", "السلف"], ["expense", "المصروفات"]] as const;
-const APPROVER_ROLES = [
-  ["DIRECT_MANAGER", "المدير المباشر"], ["DEPARTMENT_MANAGER", "مدير الإدارة"], ["BRANCH_MANAGER", "مدير الفرع"],
-  ["HR_MANAGER", "مدير الموارد البشرية"], ["SUPER_ADMIN", "المدير العام"]
-] as const;
 
 type RoleRecord = {
   id: string;
@@ -224,40 +207,18 @@ function RolesTab({ initialRoles }: { initialRoles: any[] }) {
   );
 }
 
-export function PermissionsAdmin({ allRoles, branches, departments, hospitals = [], approvalChains: initialChains }: any) {
-  const [tab, setTab] = useState<"roles"|"scopes"|"approval">("roles");
+export function PermissionsAdmin({ allRoles, branches, departments, hospitals = [] }: any) {
+  const [tab, setTab] = useState<"roles"|"scopes">("roles");
   const [scopes, setScopes] = useState<any[]>([]);
-  const [approvalChains, setApprovalChains] = useState(initialChains);
   const [selectedUserId, setSelectedUserId] = useState("");
   const [selectedModule, setSelectedModule] = useState("employees");
   const [selectedScope, setSelectedScope] = useState("ALL");
   const [selectedBranchId, setSelectedBranchId] = useState("");
   const [selectedDeptId, setSelectedDeptId] = useState("");
   const [selectedHospitalId, setSelectedHospitalId] = useState("");
-  const [approvalModule, setApprovalModule] = useState("leave");
-  const [userLabels, setUserLabels] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState("");
 
-  const [showAddLevel, setShowAddLevel] = useState(false);
-  const [draftAssignMode, setDraftAssignMode] = useState<"ROLE" | "PERSON">("ROLE");
-  const [draftRole, setDraftRole] = useState("DIRECT_MANAGER");
-  const [draftUserId, setDraftUserId] = useState("");
-  const [draftScopeType, setDraftScopeType] = useState<"GLOBAL" | "BRANCH" | "HOSPITAL">("GLOBAL");
-  const [draftScopeId, setDraftScopeId] = useState("");
-  const [draftCapabilities, setDraftCapabilities] = useState<Set<string>>(new Set(["VIEW", "APPROVE", "REJECT"]));
-
   useEffect(() => { fetch("/api/permissions/scope").then(r => r.json()).then(d => setScopes(d.scopes||[])); }, []);
-
-  useEffect(() => {
-    const allUserIds = (approvalChains as any[]).flatMap((c: any) => c.chain?.map((l: any) => l.approverUserId).filter(Boolean) ?? []);
-    const missing = Array.from(new Set(allUserIds as string[])).filter((id) => !userLabels[id]);
-    if (!missing.length) return;
-    fetch("/api/permissions/resolve-users", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userIds: missing }),
-    }).then((r) => r.json()).then((d) => { if (d.success) setUserLabels((prev) => ({ ...prev, ...d.labels })); });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [approvalChains]);
 
   const saveScope = async () => {
     if (!selectedUserId) {
@@ -309,60 +270,6 @@ export function PermissionsAdmin({ allRoles, branches, departments, hospitals = 
     }
   };
 
-  const saveApproval = async () => {
-    const chain = approvalChains.find((c:any) => c.module === approvalModule);
-    const levels = chain?.chain?.map((c:any, i:number) => ({
-      level: i + 1,
-      approverRole: c.approverRole,
-      approverUserId: c.approverUserId || null,
-      scopeType: c.scopeType || "GLOBAL",
-      scopeId: c.scopeId || "",
-      capabilities: c.capabilities?.length ? c.capabilities : ["VIEW", "APPROVE", "REJECT"]
-    })) || [];
-    const res = await fetch("/api/permissions/approval", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ module: approvalModule, approvals: levels }),
-    });
-    if (res.ok) setMsg("✅ تم حفظ سلسلة الموافقات");
-  };
-
-  const openAddLevel = () => {
-    setDraftAssignMode("ROLE");
-    setDraftRole("DIRECT_MANAGER");
-    setDraftUserId("");
-    setDraftScopeType("GLOBAL");
-    setDraftScopeId("");
-    setDraftCapabilities(new Set(["VIEW", "APPROVE", "REJECT"]));
-    setShowAddLevel(true);
-  };
-
-  const toggleDraftCapability = (key: string) => {
-    setDraftCapabilities((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      return next;
-    });
-  };
-
-  const confirmAddLevel = () => {
-    if (draftAssignMode === "PERSON" && !draftUserId) return;
-    if (draftScopeType !== "GLOBAL" && !draftScopeId) return;
-    const newLevel = {
-      level: 0,
-      approverRole: draftAssignMode === "ROLE" ? draftRole : "DIRECT_MANAGER",
-      approverUserId: draftAssignMode === "PERSON" ? draftUserId : null,
-      scopeType: draftScopeType,
-      scopeId: draftScopeType === "GLOBAL" ? "" : draftScopeId,
-      capabilities: Array.from(draftCapabilities)
-    };
-    setApprovalChains((prev: any) => prev.map((c: any) => c.module === approvalModule ? { ...c, chain: [...(c.chain||[]), newLevel].map((l: any, i: number) => ({ ...l, level: i + 1 })) } : c));
-    setShowAddLevel(false);
-  };
-
-  const removeApprovalLevel = (idx: number) => {
-    setApprovalChains((prev: any) => prev.map((c: any) => c.module === approvalModule ? { ...c, chain: c.chain?.filter((_: any, i: number) => i !== idx).map((l: any, i: number) => ({ ...l, level: i+1 })) } : c));
-  };
-
   return (
     <div className="space-y-6 p-4" dir="rtl">
       <div className="flex items-center gap-3"><Shield className="h-8 w-8 text-primary" /><h1 className="text-2xl font-black">نظام الصلاحيات المؤسسي</h1></div>
@@ -370,7 +277,6 @@ export function PermissionsAdmin({ allRoles, branches, departments, hospitals = 
       <div className="flex gap-2">
         <Button variant={tab==="roles"?"default":"outline"} onClick={()=>setTab("roles")}>الأدوار</Button>
         <Button variant={tab==="scopes"?"default":"outline"} onClick={()=>setTab("scopes")}>نطاق الرؤية</Button>
-        <Button variant={tab==="approval"?"default":"outline"} onClick={()=>setTab("approval")}>سلسلة الموافقات</Button>
       </div>
 
       {tab === "roles" && <RolesTab initialRoles={allRoles} />}
@@ -431,162 +337,6 @@ export function PermissionsAdmin({ allRoles, branches, departments, hospitals = 
         </div>
       )}
 
-      {tab === "approval" && (
-        <div className="space-y-10">
-          {/* 1. المسارات التشغيلية المؤسسية للموافقات (Hospital Path - 6 levels & General Admin Path - 4 levels) */}
-          <div className="space-y-4">
-            <WorkflowPathsTabs />
-          </div>
-
-          {/* 2. تخصيص سلاسل الاعتماد الفرعية حسب أنواع الطلبات والأقسام (اختياري) */}
-          <div className="pt-6 border-t-2 border-dashed border-slate-200 dark:border-slate-800 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-xl font-black text-slate-900 dark:text-slate-100">سلاسل الاعتماد الفرعية حسب أنواع الطلبات (الإجازات، العمل الإضافي، السلف، المصاريف)</h3>
-                <p className="text-xs font-semibold text-muted-foreground mt-1">
-                  يمكنك هنا تخصيص أو استثناء مستويات إضافية لكل نوع طلب على حدة. في حال عدم إضافة استثناءات هنا (0 مستويات)، يتم تطبيق المسارات المؤسسية الأساسية (6 مستويات للمستشفى أو 4 مستويات للإدارة) تلقائياً 100%.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid gap-6 lg:grid-cols-2">
-              <Card className="rounded-3xl border border-slate-200 shadow-md dark:border-slate-800">
-                <CardHeader>
-                  <CardTitle className="text-lg font-black flex items-center justify-between">
-                    <span>تعديل استثناءات سلسلة الموافقات</span>
-                    <Badge variant="outline" className="bg-primary/10 text-primary font-bold">استثناء اختياري</Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold mb-1.5 text-muted-foreground">اختر نوع الطلب المراد تخصيص استثناء له:</label>
-                    <select className="w-full border rounded-xl p-2.5 text-xs font-bold bg-white dark:bg-slate-950 focus:ring-2 focus:ring-primary" value={approvalModule} onChange={e=>setApprovalModule(e.target.value)}>
-                      {APPROVAL_MODULES.map(([value, label])=><option key={value} value={value}>{label}</option>)}
-                    </select>
-                  </div>
-
-                  {(!approvalChains.find((c:any)=>c.module===approvalModule)?.chain || approvalChains.find((c:any)=>c.module===approvalModule)?.chain.length === 0) ? (
-                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 text-center dark:border-emerald-900/60 dark:bg-emerald-950/30">
-                      <p className="text-xs font-bold text-emerald-800 dark:text-emerald-300">
-                        ✓ لا توجد مستويات استثنائية مخصصة لطلبات {APPROVAL_MODULES.find(([k]) => k === approvalModule)?.[1] || approvalModule} حالياً (0 مستويات - تم تنظيف وحذف التسلسلات السابقة).
-                      </p>
-                      <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 mt-1">
-                        يتم اعتماد وتمرير الطلب بالكامل وفق المسار المؤسسي الأساسي المعرف أعلاه (6 مستويات للمستشفى أو 4 مستويات للفرع/الإدارة).
-                      </p>
-                    </div>
-                  ) : (
-                    approvalChains.find((c:any)=>c.module===approvalModule)?.chain?.map((l:any, i:number)=>(
-                      <div key={i} className="space-y-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 bg-slate-50/50 dark:bg-slate-900/50">
-                        <div className="flex items-center justify-between">
-                          <Badge className="bg-primary text-white font-extrabold text-xs">المستوى {i+1}</Badge>
-                          <Button size="sm" variant="destructive" className="h-7 px-2.5 rounded-lg text-xs" onClick={()=>removeApprovalLevel(i)}>
-                            <Trash2 className="h-3.5 w-3.5 ml-1"/> حذف
-                          </Button>
-                        </div>
-                        <div className="text-xs font-bold">
-                          {l.approverUserId
-                            ? <span>شخص محدد بالاسم: <strong className="text-primary">{userLabels[l.approverUserId] || l.approverUserId}</strong></span>
-                            : <span>حسب الدور الوظيفي: <strong className="text-primary">{roleLabel(l.approverRole)}</strong></span>}
-                        </div>
-                        {l.scopeType && l.scopeType !== "GLOBAL" && l.scopeId ? (
-                          <div className="text-[11px] font-semibold text-muted-foreground bg-white dark:bg-slate-950 p-2 rounded-lg border">
-                            النطاق المستهدف: {l.scopeType === "BRANCH" ? "فرع" : "مستشفى"} — {
-                              l.scopeType === "BRANCH"
-                                ? (branches.find((b: any) => b.id === l.scopeId)?.name ?? l.scopeId)
-                                : (hospitals.find((h: any) => h.id === l.scopeId)?.name ?? l.scopeId)
-                            }
-                          </div>
-                        ) : null}
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          {CAPABILITIES.map(([key, label]) => (
-                            <Badge key={key} className="text-[10px] font-extrabold" variant={(l.capabilities ?? ["VIEW","APPROVE","REJECT"]).includes(key) ? "default" : "outline"}>{label}</Badge>
-                          ))}
-                        </div>
-                      </div>
-                    ))
-                  )}
-
-                  <div className="flex gap-2 pt-2">
-                    <Button size="sm" variant="outline" className="rounded-xl font-bold text-xs" onClick={openAddLevel}>
-                      <Plus className="h-4 w-4 ml-1.5"/>إضافة مستوى استثنائي
-                    </Button>
-                    <Button size="sm" className="rounded-xl font-extrabold text-xs bg-primary text-white" onClick={saveApproval}>
-                      <Save className="h-4 w-4 ml-1.5"/>حفظ سلسلة الاستثناءات
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <Dialog open={showAddLevel} onOpenChange={setShowAddLevel}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>إضافة مستوى موافقة</DialogTitle>
-            <DialogClose onClick={() => setShowAddLevel(false)} />
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="flex gap-2">
-              <Button size="sm" type="button" variant={draftAssignMode==="ROLE"?"default":"outline"} onClick={() => setDraftAssignMode("ROLE")}>حسب الدور</Button>
-              <Button size="sm" type="button" variant={draftAssignMode==="PERSON"?"default":"outline"} onClick={() => setDraftAssignMode("PERSON")}><UserPlus className="h-4 w-4 ml-1" />شخص محدد بالاسم</Button>
-            </div>
-
-            {draftAssignMode === "ROLE" ? (
-              <select className="w-full rounded-lg border p-2" value={draftRole} onChange={(e) => setDraftRole(e.target.value)}>
-                {APPROVER_ROLES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select>
-            ) : (
-              <UserSearchSelect
-                value={draftUserId}
-                onChange={(userId, label) => { setDraftUserId(userId); if (userId && label) setUserLabels((prev) => ({ ...prev, [userId]: label })); }}
-              />
-            )}
-
-            <div>
-              <p className="mb-1.5 text-sm font-medium">تحديد المسؤول حسب المستشفى/الفرع (اختياري)</p>
-              <select className="w-full rounded-lg border p-2" value={draftScopeType} onChange={(e) => { setDraftScopeType(e.target.value as any); setDraftScopeId(""); }}>
-                <option value="GLOBAL">عام (كل الفروع/المستشفيات)</option>
-                <option value="BRANCH">حسب الفرع</option>
-                <option value="HOSPITAL">حسب المستشفى</option>
-              </select>
-              {draftScopeType === "BRANCH" && (
-                <select className="mt-2 w-full rounded-lg border p-2" value={draftScopeId} onChange={(e) => setDraftScopeId(e.target.value)}>
-                  <option value="">اختر الفرع</option>
-                  {branches.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
-              )}
-              {draftScopeType === "HOSPITAL" && (
-                <select className="mt-2 w-full rounded-lg border p-2" value={draftScopeId} onChange={(e) => setDraftScopeId(e.target.value)}>
-                  <option value="">اختر المستشفى</option>
-                  {hospitals.map((h: any) => <option key={h.id} value={h.id}>{h.name}</option>)}
-                </select>
-              )}
-            </div>
-
-            <div>
-              <p className="mb-1.5 text-sm font-medium">صلاحية هذا المستوى</p>
-              <div className="flex gap-4">
-                {CAPABILITIES.map(([key, label]) => (
-                  <label key={key} className="flex items-center gap-1.5 text-sm">
-                    <input type="checkbox" checked={draftCapabilities.has(key)} onChange={() => toggleDraftCapability(key)} className="h-4 w-4" />
-                    {label}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <Button
-              onClick={confirmAddLevel}
-              disabled={(draftAssignMode === "PERSON" && !draftUserId) || (draftScopeType !== "GLOBAL" && !draftScopeId)}
-              className="w-full"
-            >
-              إضافة المستوى
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

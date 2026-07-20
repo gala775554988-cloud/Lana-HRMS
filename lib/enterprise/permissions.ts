@@ -213,16 +213,20 @@ export async function mergeEffectivePermissions(rolePermissions: string[] | unde
   const base = new Set(rolePermissions ?? []);
   if (!userId) return Array.from(base).sort();
 
-  // Anyone currently named as a CUSTOM_APPROVER in an active approval-path
-  // template automatically gets "requests" access -- derived live from the
-  // path template, never written into the grants store below, so removing
-  // them from the path revokes it the instant this set no longer contains
-  // them (see getWorkflowPathApproverUserIds / saveWorkflowPath).
-  const { getWorkflowPathApproverUserIds } = await import("@/lib/enterprise/workflow-paths");
-  const approverIds = await getWorkflowPathApproverUserIds().catch(() => new Set<string>());
-  if (approverIds.has(userId)) {
-    base.add("read:requests");
-    base.add("manage:requests");
+  // Anyone currently named as an approver on any active ApprovalPath stage,
+  // or holding an active SupervisorAssignment, automatically gets "requests"
+  // access -- derived live, never written into the grants store below, so
+  // removing them revokes it the instant they're no longer named anywhere.
+  const employee = await prisma.employee.findFirst({ where: { userId }, select: { id: true } });
+  if (employee) {
+    const [approverStage, supervisorAssignment] = await Promise.all([
+      prisma.approvalStage.findFirst({ where: { approverEmployeeId: employee.id, approvalPath: { isActive: true } }, select: { id: true } }),
+      prisma.supervisorAssignment.findFirst({ where: { employeeId: employee.id, isActive: true }, select: { id: true } })
+    ]);
+    if (approverStage || supervisorAssignment) {
+      base.add("read:requests");
+      base.add("manage:requests");
+    }
   }
 
   const store = await getPermissionStore();

@@ -32,16 +32,6 @@ async function ensureDbSchema() {
       "updatedAt" TIMESTAMP(3) NOT NULL,
       CONSTRAINT "HrPermissionScope_pkey" PRIMARY KEY ("id")
     );`,
-    `CREATE TABLE IF NOT EXISTS "HrApprovalChain" (
-      "id" TEXT NOT NULL,
-      "module" TEXT NOT NULL,
-      "level" INTEGER NOT NULL DEFAULT 1,
-      "approverRole" TEXT NOT NULL DEFAULT 'DIRECT_MANAGER',
-      "isActive" BOOLEAN NOT NULL DEFAULT true,
-      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" TIMESTAMP(3) NOT NULL,
-      CONSTRAINT "HrApprovalChain_pkey" PRIMARY KEY ("id")
-    );`,
     `CREATE TABLE IF NOT EXISTS "HrPermissionAudit" (
       "id" TEXT NOT NULL,
       "userId" TEXT NOT NULL,
@@ -56,8 +46,6 @@ async function ensureDbSchema() {
     `CREATE INDEX IF NOT EXISTS "HrPermissionScope_userId_idx" ON "HrPermissionScope"("userId");`,
     `CREATE INDEX IF NOT EXISTS "HrPermissionScope_module_idx" ON "HrPermissionScope"("module");`,
     `CREATE UNIQUE INDEX IF NOT EXISTS "HrPermissionScope_userId_module_key" ON "HrPermissionScope"("userId", "module");`,
-    `CREATE INDEX IF NOT EXISTS "HrApprovalChain_module_idx" ON "HrApprovalChain"("module");`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS "HrApprovalChain_module_level_key" ON "HrApprovalChain"("module", "level");`,
     `CREATE INDEX IF NOT EXISTS "HrPermissionAudit_userId_idx" ON "HrPermissionAudit"("userId");`,
     `CREATE INDEX IF NOT EXISTS "HrPermissionAudit_createdAt_idx" ON "HrPermissionAudit"("createdAt");`,
     `CREATE TABLE IF NOT EXISTS "EmployeeMobileDevice" (
