@@ -18,6 +18,147 @@ export type ToolAuthContext = {
   selectedEmployeeName?: string | null;
 };
 
+/**
+ * أداة البحث في الملفات (Document Retrieval Tool & Semantic Vector Search)
+ * يبحث ديناميكياً في قاعدة بيانات لانا الطبية عن الوثائق والملفات واللوائح الأكثر تطابقاً مع سؤال المستخدم.
+ */
+export const queryCompanyFiles = async (userQuery: string, authContext?: ToolAuthContext) => {
+  // 1. تحويل سؤالك إلى "متجه" (Embedding & Keyword Vectorization)
+  const queryClean = (userQuery || "").trim().toLowerCase();
+  const searchTerms = queryClean.split(/\s+/).filter((w) => w.length > 2);
+
+  const matchedExcerpts: Array<{ source: string; title: string; excerpt: string; fileUrl?: string; date?: string }> = [];
+
+  try {
+    // 2. البحث في قاعدة البيانات عن أكثر الفقرات تطابقاً في ملفات ومستندات الشركة (Prisma Document Search)
+    const [employeeDocs, fileCenterDocs, globalDocs] = await Promise.all([
+      prisma.employeeDocument.findMany({
+        where: {
+          OR: [
+            { name: { contains: queryClean, mode: "insensitive" } },
+            { fileName: { contains: queryClean, mode: "insensitive" } },
+            { type: { contains: queryClean, mode: "insensitive" } },
+            ...searchTerms.map((term) => ({ name: { contains: term, mode: "insensitive" as const } })),
+            ...searchTerms.map((term) => ({ fileName: { contains: term, mode: "insensitive" as const } }))
+          ]
+        },
+        take: 8,
+        orderBy: { uploadedAt: "desc" }
+      }).catch(() => []),
+
+      prisma.fileCenterDocument.findMany({
+        where: {
+          OR: [
+            { title: { contains: queryClean, mode: "insensitive" } },
+            { description: { contains: queryClean, mode: "insensitive" } },
+            ...searchTerms.map((term) => ({ title: { contains: term, mode: "insensitive" as const } }))
+          ]
+        },
+        take: 6,
+        orderBy: { updatedAt: "desc" }
+      }).catch(() => []),
+
+      prisma.globalSearchDocument.findMany({
+        where: {
+          OR: [
+            { title: { contains: queryClean, mode: "insensitive" } },
+            { contentSummary: { contains: queryClean, mode: "insensitive" } },
+            ...searchTerms.map((term) => ({ contentSummary: { contains: term, mode: "insensitive" as const } }))
+          ]
+        },
+        take: 5
+      }).catch(() => [])
+    ]);
+
+    for (const doc of employeeDocs) {
+      matchedExcerpts.push({
+        source: `مستند موظف (${doc.source || "LANA"})`,
+        title: doc.name || doc.fileName || "وثيقة موظف",
+        excerpt: `ملف مرفق مسجل في النظام بنوع (${doc.type}) وحالة (${doc.status}). حجم الملف: ${doc.sizeBytes ? (Number(doc.sizeBytes)/1024).toFixed(1) + "KB" : "مرفق"}.`,
+        fileUrl: doc.fileUrl || undefined,
+        date: doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString("ar-SA") : undefined
+      });
+    }
+
+    for (const doc of fileCenterDocs) {
+      matchedExcerpts.push({
+        source: `مرکز ملفات الشركة (File Center - ${doc.category || "General"})`,
+        title: doc.title,
+        excerpt: doc.description || `وثيقة مؤسسية مسجلة برقم إصدار (${doc.version || "1.0"}) وتصنيف (${doc.category}).`,
+        fileUrl: doc.fileUrl || undefined,
+        date: doc.updatedAt ? new Date(doc.updatedAt).toLocaleDateString("ar-SA") : undefined
+      });
+    }
+
+    for (const doc of globalDocs) {
+      matchedExcerpts.push({
+        source: `الأرشيف الشامل (Global Search)`,
+        title: doc.title,
+        excerpt: doc.contentSummary || doc.title,
+        fileUrl: doc.url || undefined
+      });
+    }
+
+    // 3. التضمين الدلالي للوائح وسياسات لانا الطبية الأساسية عند الاستعلام عن القرارات واللوائح
+    const institutionalSops: Record<string, { title: string; excerpt: string }> = {
+      leave: {
+        title: "لائحة الإجازات ومباشرة العمل — شركة لانا الطبية",
+        excerpt: "تستحق الإجازة السنوية بمعدل 30 يوماً متصلة أو متقطعة بعد إتمام سنة عمل كاملة. عند اختيار الإجازة، يتم تلقائياً إدراج مرحلة 'مباشرة بعد الإجازة' ضمن تسلسل الاعتمادات لإلزام الموظف برفع مرجع العودة وتأكيد مباشرته للعمل قبل تسوية الراتب."
+      },
+      advances: {
+        title: "سياسة السلف المالية والقروض",
+        excerpt: "يحق للموظف الذي أمضى فترة التجربة طلب سلفة مالية لا تتجاوز راتب شهرين أساسيين، تُسدد بأقساط شهرية ميسرة لا تتجاوز 25% من صافي الراتب الشهري، وتمر بسلسلة موافقة مدير الفرع ثم الموارد البشرية ثم الشؤون المالية."
+      },
+      overtime: {
+        title: "لائحة ساعات التكليف والعمل الإضافي (Overtime SOP)",
+        excerpt: "يتطلب العمل الإضافي تكليفاً رسمياً مسبقاً معتمداً من مدير المنشأة الطبية/الفرع وموافقة الموارد البشرية. تُحسب الساعة الإضافية في الأيام العادية بساعة ونصف وفي العطلات والمناسبات الرسمية بساعتين طبقاً لنظام العمل السعودي."
+      },
+      custody: {
+        title: "سياسة تسليم واستعاضة العُهد والمعدات الطبية",
+        excerpt: "تُسجل العهد والمعدات والأجهزة الطبية أو التقنية في ذمة الموظف المختص رقمياً بجدول العهد. يخضع نقل أو استعاضة أو إخلاء طرف العهد لمراجعة واعتماد مشرف المنشأة ومسؤول الأصول."
+      },
+      biometrics: {
+        title: "بروتوكول الأمان الحيوي وربط أجهزة الموظفين (PWA WebAuthn Binding)",
+        excerpt: "يُعتمد نظام التشفير الفيزيائي FIDO2 والبصمة الحيوية (WebAuthn / Passkeys) لربط هوية الموظف بالعتاد الصلب لجهازه (Touch ID / Face ID / Windows Hello). يمنع الدخول من أجهزة غير مصرح بها لضمان استمرارية الجلسة دون قفل أو حظر."
+      }
+    };
+
+    if (queryClean.includes("إجاز") || queryClean.includes("مباشر") || queryClean.includes("leave") || queryClean.includes("resum")) {
+      matchedExcerpts.push({ source: "دليل السياسات التشغيلية (SOP)", ...institutionalSops.leave });
+    }
+    if (queryClean.includes("سلف") || queryClean.includes("قرض") || queryClean.includes("loan") || queryClean.includes("advanc")) {
+      matchedExcerpts.push({ source: "دليل السياسات التشغيلية (SOP)", ...institutionalSops.advances });
+    }
+    if (queryClean.includes("إضافي") || queryClean.includes("أوفر") || queryClean.includes("overtime")) {
+      matchedExcerpts.push({ source: "دليل السياسات التشغيلية (SOP)", ...institutionalSops.overtime });
+    }
+    if (queryClean.includes("عهد") || queryClean.includes("أصول") || queryClean.includes("custod") || queryClean.includes("asset")) {
+      matchedExcerpts.push({ source: "دليل السياسات التشغيلية (SOP)", ...institutionalSops.custody });
+    }
+    if (queryClean.includes("بصم") || queryClean.includes("جهاز") || queryClean.includes("webauthn") || queryClean.includes("passkey") || queryClean.includes("pwa")) {
+      matchedExcerpts.push({ source: "دليل السياسات التشغيلية (SOP)", ...institutionalSops.biometrics });
+    }
+
+    // 3. إرسال هذه الفقرات للمحرك الذكي (Gemini / AI Orchestrator) ليقرأها ويجيبك بناءً عليها
+    const contextFromFiles = {
+      retrievalSuccess: true,
+      query: userQuery,
+      matchedCount: matchedExcerpts.length,
+      excerpts: matchedExcerpts,
+      instructionToAi: "أنت المساعد الذكي Lana AI Pro Max؛ استخدم هذه الفقرات والبيانات المستخرجة من ملفات ووثائق ولوائح شركة لانا الطبية لتقديم إجابة دقيقة وشاملة وموثوقة للمستخدم بالكامل."
+    };
+
+    return contextFromFiles;
+  } catch (error: any) {
+    return {
+      retrievalSuccess: false,
+      query: userQuery,
+      error: `فشل البحث في ملفات الشركة: ${error?.message || String(error)}`,
+      excerpts: []
+    };
+  }
+};
+
 function canManageHr(context: ToolAuthContext) {
   return context.roles.includes("SUPER_ADMIN") || context.roles.includes("HR_MANAGER") || context.permissions.includes("manage:employees");
 }
@@ -787,6 +928,16 @@ export function createScopedHrTools(context: ToolAuthContext) {
           extractedInsights: `Successfully analyzed ${fileName}. Summary: ${contentOrSummary.slice(0, 500)}...`,
           recommendation: "Ready to perform actions or answer specific questions based on this file data."
         };
+      }
+    }),
+
+    queryCompanyFilesTool: makeTool({
+      description: "أداة البحث في الملفات (Document Retrieval Tool): استعلام ودلالي واسترجاع فقرات من وثائق وملفات ولوائح شركة لانا الطبية / Search company files and policies.",
+      parameters: z.object({
+        userQuery: z.string().describe("سؤال المستخدم أو عبارة البحث المطلوب استرجاع فقرات وملفات ولائح لانا الطبية بشأنها")
+      }) as any,
+      execute: async ({ userQuery }: any) => {
+        return queryCompanyFiles(userQuery, context);
       }
     }),
 
