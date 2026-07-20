@@ -12,6 +12,7 @@ import { hashPassword } from "@/lib/password";
 import { notifyRole } from "@/lib/enterprise/notifications";
 import { extractSalaryProfile } from "@/lib/employee/salary-profile";
 import { saveEmployeeSalaryProfile } from "@/lib/employee/salary-profile-store";
+import { syncSocialInsuranceFromPayroll } from "@/lib/enterprise/social-insurance";
 import { requirePasswordChange } from "@/lib/auth/password-change-policy";
 import { isEnterpriseResourceAllowed } from "@/lib/enterprise/resource-access";
 import { getEmployeeIdsByHospital } from "@/lib/enterprise/hospitals";
@@ -625,6 +626,7 @@ export async function createModuleRecord(input: MutationInput) {
       });
 
       await saveEmployeeSalaryProfile(String(result.employee.id), salaryProfile);
+      await syncSocialInsuranceFromPayroll(String(result.employee.id), salaryProfile, session.user.id).catch(() => null);
       await requirePasswordChange(String(result.user.id));
       revalidatePath("/" + resource.key);
       revalidatePath("/");
@@ -681,6 +683,7 @@ export async function updateModuleRecord(input: MutationInput) {
     const { data: allowedData, blockedFields } = filterEditableFields(data, fieldAccess);
     const record = await delegateFor(resource.model).update({ where: { id: input.id }, data: allowedData });
     await saveEmployeeSalaryProfile(input.id, salaryProfile);
+    await syncSocialInsuranceFromPayroll(input.id, salaryProfile, session.user.id).catch(() => null);
 
     await writeAuditLog({ actorUserId: session.user.id, action: "update", entity: resource.model, entityId: input.id, metadata: { before: serialize(existingRecord), after: serialize({ ...allowedData, salaryProfileUpdated: true }), blockedFields: blockedFields.length ? blockedFields : undefined } });
     await notifyRole(["SUPER_ADMIN", "HR_MANAGER"], "تعديل موظف", `Employee record ${input.id} was updated.`, "INFO", `/employees/${input.id}`).catch(() => null);

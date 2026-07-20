@@ -11,7 +11,7 @@ import {
   DollarSign, Package, Megaphone, BarChart3, Settings,
   Shield, GitPullRequest, Sparkles, Menu, X, PlugZap,
   CalendarClock, Fingerprint,
-  Umbrella, User, Mail, ShieldCheck
+  Umbrella, User, Mail, ShieldCheck, Landmark
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/brand/brand-logo";
@@ -20,6 +20,7 @@ import { NotificationBell } from "@/components/enterprise/notification-bell";
 import { isEnterpriseResourceAllowed } from "@/lib/enterprise/resource-access";
 import { usePendingApprovalsCount } from "@/lib/hooks/use-pending-approvals-count";
 import { useExpiringInsuranceCount } from "@/lib/hooks/use-expiring-insurance-count";
+import { useSocialInsuranceAlertsCount } from "@/lib/hooks/use-social-insurance-alerts-count";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/hrms/theme-toggle";
 import { QuickSearchModal } from "@/components/hrms/quick-search-modal";
@@ -49,6 +50,7 @@ const navItems: Array<{ href: string; label: string; icon: typeof LayoutDashboar
   { href: "/request-center", label: "الطلبات", icon: GitPullRequest, resource: ["leave", "requests"] },
   { href: "/permissions", label: "الصلاحيات", icon: Shield, resource: "permissions" },
   { href: "/insurance", label: "التأمين", icon: Umbrella, resource: "insurance" },
+  { href: "/social-insurance", label: "التأمينات الاجتماعية", icon: Landmark, resource: "social-insurance" },
   { href: "/attendance", label: "الحضور والورديات", icon: Clock, resource: ["attendance", "shifts"] },
   { href: "/payroll", label: "مسير الرواتب والبدلات", icon: DollarSign, resource: ["payroll", "allowances", "deductions"] },
   { href: "/assets", label: "الأصول والعهد", icon: Package, resource: "assets" },
@@ -105,6 +107,8 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
   const { data: pendingApprovalsCount } = usePendingApprovalsCount(status === "authenticated");
   const canViewInsurance = userRoles.includes("SUPER_ADMIN") || userRoles.includes("HR_MANAGER") || userPermissions.includes("read:insurance") || userPermissions.includes("manage:insurance");
   const { data: expiringInsuranceCount } = useExpiringInsuranceCount(status === "authenticated" && canViewInsurance);
+  const canViewSocialInsurance = userRoles.includes("SUPER_ADMIN") || userRoles.includes("HR_MANAGER") || userPermissions.includes("read:social-insurance") || userPermissions.includes("manage:social-insurance");
+  const { data: socialInsuranceAlertsCount } = useSocialInsuranceAlertsCount(status === "authenticated" && canViewSocialInsurance);
 
   const handleLogout = useCallback(async () => {
     await signOut({ redirect: true, callbackUrl: "/login" });
@@ -231,6 +235,15 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
                         aria-label={`${expiringInsuranceCount} وثيقة تأمين على وشك الانتهاء`}
                       >
                         {expiringInsuranceCount > 99 ? "99+" : expiringInsuranceCount}
+                      </span>
+                    ) : null}
+                    {item.href === "/social-insurance" && socialInsuranceAlertsCount ? (
+                      <span
+                        key={socialInsuranceAlertsCount}
+                        className="absolute -top-1.5 -end-2 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 px-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white dark:ring-slate-950 shadow-sm"
+                        aria-label={`${socialInsuranceAlertsCount} موظف بدون تسجيل تأمينات اجتماعية`}
+                      >
+                        {socialInsuranceAlertsCount > 99 ? "99+" : socialInsuranceAlertsCount}
                       </span>
                     ) : null}
                   </span>

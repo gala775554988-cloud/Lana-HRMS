@@ -394,6 +394,7 @@ model Employee {
   documents              EmployeeDocument[]
   contracts              EmployeeContract[]
   insurancePolicies      InsurancePolicy[]
+  socialInsuranceRecord  SocialInsuranceRecord?
   assignedAssets         Asset[]
   trainingEnrollments    TrainingEnrollment[]
   evaluations            PerformanceEvaluation[]
@@ -515,6 +516,88 @@ model InsurancePolicy {
   @@index([employeeId])
   // Backs the "policy renewal due soon" badge: status = ACTIVE AND endDate <= cutoff.
   @@index([status, endDate])
+}
+
+enum SocialInsuranceStatus {
+  NOT_REGISTERED
+  ACTIVE
+  SUSPENDED
+  EXCLUDED
+}
+
+enum SocialInsuranceMovementType {
+  REGISTERED
+  WAGE_ADJUSTED
+  SUSPENDED
+  REACTIVATED
+  EXCLUDED
+  RATE_CHANGED
+  DOCUMENT_ADDED
+  NOTE_ADDED
+}
+
+enum SocialInsuranceMovementSource {
+  MANUAL
+  PAYROLL_SYNC
+  CONTRACT_SYNC
+  SYSTEM
+}
+
+// One row per employee -- the current, live GOSI-style social-insurance
+// registration state. History of how it got there lives in
+// SocialInsuranceMovement (append-only, never updated/deleted), while raw
+// field-level before/after diffs on this record are also still separately
+// captured by the generic AuditLog (writeAuditLog) on every mutation, same
+// as every other HRMS module.
+model SocialInsuranceRecord {
+  id                         String                      @id @default(cuid())
+  employeeId                 String                      @unique
+  status                     SocialInsuranceStatus       @default(NOT_REGISTERED)
+  subscriberNumber           String?
+  registrationDate           DateTime?
+  exclusionDate              DateTime?
+  exclusionReason            String?
+  // "الأجر الخاضع للاشتراك" -- kept in sync with the employee's live salary
+  // profile (lib/employee/salary-profile.ts) whenever payroll data changes,
+  // see syncSocialInsuranceFromPayroll in lib/enterprise/social-insurance.ts.
+  subjectWage                Decimal                     @default(0) @db.Decimal(12, 2)
+  currency                   String                      @default("SAR")
+  // Contribution rates as whole percentages (e.g. 9.00 = 9%), editable per
+  // record since real-world GOSI rates differ by nationality/scheme and
+  // change over time -- lib/employee/salary-profile.ts's SOCIAL_INSURANCE_RATE
+  // (0.09) is the pre-existing default this mirrors for the employee side.
+  employeeContributionRate   Decimal                     @default(9.00) @db.Decimal(5, 2)
+  employerContributionRate   Decimal                     @default(11.75) @db.Decimal(5, 2)
+  employeeContributionAmount Decimal                     @default(0) @db.Decimal(12, 2)
+  employerContributionAmount Decimal                     @default(0) @db.Decimal(12, 2)
+  lastSyncedAt               DateTime?
+  notes                      String?
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+  employee                   Employee                    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  movements                  SocialInsuranceMovement[]
+
+  @@index([status])
+}
+
+model SocialInsuranceMovement {
+  id          String                         @id @default(cuid())
+  recordId    String
+  // Denormalized for fast cross-employee reporting (by branch/department/
+  // nationality) without joining back through SocialInsuranceRecord first.
+  employeeId  String
+  type        SocialInsuranceMovementType
+  description String
+  previousValue Json?
+  newValue    Json?
+  source      SocialInsuranceMovementSource @default(MANUAL)
+  actorUserId String?
+  createdAt   DateTime                       @default(now())
+  record      SocialInsuranceRecord          @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  @@index([recordId])
+  @@index([employeeId])
+  @@index([createdAt])
 }
 
 model SalaryStructure {

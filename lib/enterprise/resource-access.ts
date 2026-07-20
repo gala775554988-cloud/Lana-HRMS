@@ -15,6 +15,10 @@ export function isEnterpriseResourceAllowed(roles: string[] | undefined, resourc
     return ["dashboard", "documents", "reports", "insurance"].includes(resource);
   }
 
+  if (roleSet.has("SOCIAL_INSURANCE_OFFICER")) {
+    return ["dashboard", "documents", "reports", "payroll", "social-insurance"].includes(resource);
+  }
+
   if (roleSet.has("RESIDENCY_OFFICER")) {
     return ["dashboard", "documents", "reports"].includes(resource);
   }

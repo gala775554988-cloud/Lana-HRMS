@@ -21,6 +21,7 @@ export type PermissionTemplateKey =
   | "SUPERVISOR"
   | "PAYROLL_OFFICER"
   | "INSURANCE_OFFICER"
+  | "SOCIAL_INSURANCE_OFFICER"
   | "RESIDENCY_OFFICER"
   | "REQUESTS_OFFICER"
   | "WAREHOUSE_OFFICER"
@@ -40,7 +41,7 @@ export type UserPermissionStore = {
 // enforcement point. A plain "manage:X" grant from before this existed still
 // implies all four (hasPermission in lib/rbac.ts), so nothing already
 // configured breaks; these are additive, finer-grained keys.
-export const GRANULAR_RESOURCES = ["employees", "contracts", "attendance", "insurance", "hospitals"] as const;
+export const GRANULAR_RESOURCES = ["employees", "contracts", "attendance", "insurance", "hospitals", "social-insurance"] as const;
 
 function granularPermissions(resource: string): PermissionKey[] {
   return [`read:${resource}`, `create:${resource}`, `edit:${resource}`, `delete:${resource}`] as PermissionKey[];
@@ -57,6 +58,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
   { key: "leaves", title: "Leaves", permissions: ["read:leave", "manage:leave"] },
   { key: "payroll", title: "Payroll", permissions: ["read:payroll", "manage:payroll", "read:loans", "manage:loans", "read:allowances", "manage:allowances", "read:deductions", "manage:deductions"] },
   { key: "insurance", title: "Insurance", permissions: [...granularPermissions("insurance"), "manage:insurance"] },
+  { key: "social-insurance", title: "Social Insurance", permissions: [...granularPermissions("social-insurance"), "manage:social-insurance"] },
   { key: "residency", title: "Residency", permissions: ["read:residency", "manage:residency"] },
   { key: "requests", title: "Requests", permissions: ["read:requests", "manage:requests", "read:overtime", "manage:overtime"] },
   { key: "projects", title: "Projects", permissions: ["read:projects", "manage:projects"] },
@@ -121,6 +123,7 @@ export const PERMISSION_TEMPLATES: Record<PermissionTemplateKey, PermissionKey[]
   SUPERVISOR: ["read:dashboard", "read:employees", "read:attendance", "read:leave", "manage:leave", "read:requests", "manage:requests", "read:performance", "read:documents"],
   PAYROLL_OFFICER: ["read:dashboard", "read:employees", "read:payroll", "manage:payroll", "read:loans", "manage:loans", "read:allowances", "manage:allowances", "read:deductions", "manage:deductions", "read:reports"],
   INSURANCE_OFFICER: ["read:dashboard", "read:employees", "read:insurance", "manage:insurance", "read:documents", "read:reports"],
+  SOCIAL_INSURANCE_OFFICER: ["read:dashboard", "read:employees", "read:social-insurance", "manage:social-insurance", "read:payroll", "read:documents", "read:reports"],
   RESIDENCY_OFFICER: ["read:dashboard", "read:employees", "read:residency", "manage:residency", "read:documents", "manage:documents", "read:reports"],
   REQUESTS_OFFICER: ["read:dashboard", "read:employees", "read:requests", "manage:requests", "read:leave", "manage:leave", "read:overtime", "manage:overtime"],
   WAREHOUSE_OFFICER: ["read:dashboard", "read:employees", "read:warehouse", "manage:warehouse", "read:assets", "manage:assets"],

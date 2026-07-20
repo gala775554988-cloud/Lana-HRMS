@@ -2,11 +2,13 @@ import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { ensureExpiryNotificationsForUser } from "@/lib/enterprise/notifications";
+import { ensureSocialInsuranceAlertsForUser } from "@/lib/enterprise/social-insurance";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   await ensureExpiryNotificationsForUser(session.user.id).catch(() => null);
+  await ensureSocialInsuranceAlertsForUser(session.user.id, (session.user.roles as string[] | undefined) ?? []).catch(() => null);
 
   const status = request.nextUrl.searchParams.get("status") ?? "all";
   const where = {

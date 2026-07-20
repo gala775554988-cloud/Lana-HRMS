@@ -127,6 +127,8 @@ export default async function EmployeeProfilePage({
     evaluations,
     payrollItems,
     auditLogs,
+    socialInsurance,
+    socialInsuranceDocuments,
   ] = await memoryCache(`emp-tabs:${id}`, 20_000, async () => Promise.all([
     getEmployeeSalaryProfile(id).catch(() => null),
     prisma.attendanceRecord.groupBy({
@@ -172,6 +174,14 @@ export default async function EmployeeProfilePage({
       where: { entityId: id },
       orderBy: { createdAt: 'desc' },
       take: 20,
+    }).catch(() => []),
+    prisma.socialInsuranceRecord.findUnique({
+      where: { employeeId: id },
+      include: { movements: { orderBy: { createdAt: 'desc' }, take: 20 } },
+    }).catch(() => null),
+    prisma.employeeDocument.findMany({
+      where: { employeeId: id, type: 'SOCIAL_INSURANCE' },
+      orderBy: { uploadedAt: 'desc' },
     }).catch(() => []),
   ]));
 
@@ -224,6 +234,8 @@ export default async function EmployeeProfilePage({
       evaluations={evaluations as any}
       payrollItems={payrollItems as any}
       auditLogs={auditLogs as any}
+      socialInsurance={socialInsurance as any}
+      socialInsuranceDocuments={socialInsuranceDocuments as any}
       permissionsScopeContent={<PermissionsScope employeeId={id} />}
       deviceBinding={deviceBinding}
       canEditLeaveBalance={hasAnyRole(session, ["SUPER_ADMIN", "HR_MANAGER"])}

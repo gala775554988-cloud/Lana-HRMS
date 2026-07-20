@@ -9,8 +9,9 @@ import {
   Edit, Save, Printer, Download, Archive, ArchiveRestore, 
   UserX, UserCheck, Mail, Phone, MapPin, Building2,
   CalendarDays, Clock3, Award, File, Upload, Trash2, Eye,
-  Search, Filter, Plus, Smartphone, RefreshCw
+  Search, Filter, Plus, Smartphone, RefreshCw, Landmark, History
 } from "lucide-react";
+import { SocialInsuranceEditDialog } from "@/components/enterprise/social-insurance-client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +43,8 @@ interface Props {
   evaluations: any[];
   payrollItems: any[];
   auditLogs: any[];
+  socialInsurance?: any;
+  socialInsuranceDocuments?: any[];
   permissionsScopeContent?: React.ReactNode;
   deviceBinding?: DeviceBinding | null;
   canEditLeaveBalance?: boolean;
@@ -65,6 +68,8 @@ export function EmployeeProfileDashboard({
   evaluations,
   payrollItems,
   auditLogs,
+  socialInsurance,
+  socialInsuranceDocuments,
   permissionsScopeContent,
   deviceBinding,
   canEditLeaveBalance,
@@ -89,6 +94,9 @@ export function EmployeeProfileDashboard({
   const [editingBalanceId, setEditingBalanceId] = useState<string | null>(null);
   const [balanceDraft, setBalanceDraft] = useState("");
   const [savingBalance, setSavingBalance] = useState(false);
+  const [siEditOpen, setSiEditOpen] = useState(false);
+  const [siUploading, setSiUploading] = useState(false);
+  const siFileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSaveLeaveBalance = async () => {
     const accrued = Number(balanceDraft);
@@ -395,7 +403,7 @@ export function EmployeeProfileDashboard({
       {/* Tabs - Modern, not long page */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border rounded-2xl p-2 shadow-premium-sm">
-          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 xl:grid-cols-12 gap-1 h-auto bg-transparent">
+          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 xl:grid-cols-13 gap-1 h-auto bg-transparent">
             <TabsTrigger value="personal" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><User className="h-4 w-4 ml-1" />الشخصية</TabsTrigger>
             <TabsTrigger value="job" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Briefcase className="h-4 w-4 ml-1" />الوظيفة</TabsTrigger>
             <TabsTrigger value="salary" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Wallet className="h-4 w-4 ml-1" />الرواتب</TabsTrigger>
@@ -403,6 +411,7 @@ export function EmployeeProfileDashboard({
             <TabsTrigger value="leaves" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Calendar className="h-4 w-4 ml-1" />الإجازات</TabsTrigger>
             <TabsTrigger value="documents" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><FileText className="h-4 w-4 ml-1" />المستندات</TabsTrigger>
             <TabsTrigger value="contracts" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><FileCheck className="h-4 w-4 ml-1" />العقود</TabsTrigger>
+            <TabsTrigger value="social-insurance" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Landmark className="h-4 w-4 ml-1" />التأمينات الاجتماعية</TabsTrigger>
             <TabsTrigger value="performance" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><BarChart3 className="h-4 w-4 ml-1" />الأداء</TabsTrigger>
             <TabsTrigger value="assets" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Laptop className="h-4 w-4 ml-1" />الأصول</TabsTrigger>
             <TabsTrigger value="permissions" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Shield className="h-4 w-4 ml-1" />الصلاحيات</TabsTrigger>
@@ -619,6 +628,146 @@ export function EmployeeProfileDashboard({
           <Card className="rounded-2xl"><CardHeader><CardTitle>العقود</CardTitle><CardDescription>العقد الحالي والسابقة - تحميل PDF، تجديد، إنهاء</CardDescription></CardHeader><CardContent>
             <div className="space-y-3">{contracts.map((c: any) => (<div key={c.id} className="border rounded-xl p-4 flex justify-between items-center"><div><p className="font-bold">{c.contractNumber} - {c.title}</p><p className="text-xs text-muted-foreground">{c.startDate ? new Date(c.startDate).toLocaleDateString() : ""} - {c.endDate ? new Date(c.endDate).toLocaleDateString() : "حتى الآن"} | {c.status} | {c.salaryAmount?.toString()} {c.currency}</p></div><div className="flex gap-1"><Button size="sm" variant="outline" onClick={() => c.attachmentUrl ? handleViewDocument(c) : featureDone("PDF العقد")}>PDF</Button><Button size="sm" variant="outline" onClick={() => featureDone("تجديد العقد")}>تجديد</Button><Button size="sm" variant="destructive" onClick={() => featureDone("إنهاء العقد")}>إنهاء</Button></div></div>))}{contracts.length===0 && <p className="text-center text-muted-foreground py-8">لا يوجد عقود</p>}</div>
           </CardContent></Card>
+        </TabsContent>
+
+        {/* 7b- Social Insurance */}
+        <TabsContent value="social-insurance" className="space-y-4 mt-6">
+          <Card className="rounded-2xl">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle>التأمينات الاجتماعية</CardTitle>
+                <CardDescription>بيانات التسجيل، الأجر الخاضع للاشتراك، والمستندات -- تُزامن تلقائياً مع الرواتب</CardDescription>
+              </div>
+              <Button size="sm" onClick={() => setSiEditOpen(true)}>{socialInsurance ? "تعديل" : "تسجيل"}</Button>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {socialInsurance ? (
+                <>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="rounded-xl border p-3">
+                      <p className="text-xs text-muted-foreground">الحالة</p>
+                      <Badge className="mt-1">{{ NOT_REGISTERED: "غير مسجل", ACTIVE: "نشط", SUSPENDED: "موقوف", EXCLUDED: "مستبعد" }[socialInsurance.status as string] ?? socialInsurance.status}</Badge>
+                    </div>
+                    <div className="rounded-xl border p-3">
+                      <p className="text-xs text-muted-foreground">رقم المشترك</p>
+                      <p className="mt-1 font-bold">{socialInsurance.subscriberNumber ?? "—"}</p>
+                    </div>
+                    <div className="rounded-xl border p-3">
+                      <p className="text-xs text-muted-foreground">تاريخ التسجيل</p>
+                      <p className="mt-1 font-bold">{socialInsurance.registrationDate ? new Date(socialInsurance.registrationDate).toLocaleDateString("ar-SA") : "—"}</p>
+                    </div>
+                    <div className="rounded-xl border p-3">
+                      <p className="text-xs text-muted-foreground">تاريخ الاستبعاد</p>
+                      <p className="mt-1 font-bold">{socialInsurance.exclusionDate ? new Date(socialInsurance.exclusionDate).toLocaleDateString("ar-SA") : "—"}</p>
+                    </div>
+                    <div className="rounded-xl border p-3">
+                      <p className="text-xs text-muted-foreground">الأجر الخاضع للاشتراك</p>
+                      <p className="mt-1 font-bold">{Number(socialInsurance.subjectWage).toLocaleString("ar-SA")} {socialInsurance.currency}</p>
+                    </div>
+                    <div className="rounded-xl border p-3">
+                      <p className="text-xs text-muted-foreground">مساهمة الموظف ({Number(socialInsurance.employeeContributionRate)}%)</p>
+                      <p className="mt-1 font-bold">{Number(socialInsurance.employeeContributionAmount).toLocaleString("ar-SA")} {socialInsurance.currency}</p>
+                    </div>
+                    <div className="rounded-xl border p-3">
+                      <p className="text-xs text-muted-foreground">مساهمة الجهة ({Number(socialInsurance.employerContributionRate)}%)</p>
+                      <p className="mt-1 font-bold">{Number(socialInsurance.employerContributionAmount).toLocaleString("ar-SA")} {socialInsurance.currency}</p>
+                    </div>
+                    {socialInsurance.exclusionReason ? (
+                      <div className="rounded-xl border p-3 sm:col-span-2">
+                        <p className="text-xs text-muted-foreground">سبب الاستبعاد</p>
+                        <p className="mt-1">{socialInsurance.exclusionReason}</p>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div>
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="flex items-center gap-2 text-sm font-bold"><FileText className="h-4 w-4" /> المستندات</p>
+                      <Button size="sm" variant="outline" disabled={siUploading} onClick={() => siFileInputRef.current?.click()}>
+                        <Upload className="h-3.5 w-3.5 ml-1" />{siUploading ? "جارٍ الرفع..." : "رفع مستند"}
+                      </Button>
+                      <input
+                        ref={siFileInputRef}
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = "";
+                          if (!file) return;
+                          setSiUploading(true);
+                          try {
+                            const formData = new FormData();
+                            formData.append("file", file);
+                            formData.append("kind", "document");
+                            formData.append("folder", "social-insurance");
+                            const uploadRes = await fetch("/api/uploads", { method: "POST", body: formData });
+                            const uploadData = await uploadRes.json();
+                            if (!uploadData.success) throw new Error(uploadData.message || "فشل الرفع");
+                            const attachRes = await fetch(`/api/enterprise/social-insurance/${employee.id}/documents`, {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ fileUrl: uploadData.url, fileName: uploadData.fileName, name: file.name })
+                            });
+                            const attachData = await attachRes.json();
+                            if (!attachData.success) throw new Error(attachData.message || "فشل حفظ المستند");
+                            router.refresh();
+                          } catch (error) {
+                            alert(error instanceof Error ? error.message : "فشل رفع المستند");
+                          } finally {
+                            setSiUploading(false);
+                          }
+                        }}
+                      />
+                    </div>
+                    {(socialInsuranceDocuments ?? []).length === 0 ? (
+                      <p className="text-sm text-muted-foreground">لا توجد مستندات مرفوعة.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {(socialInsuranceDocuments ?? []).map((doc: any) => (
+                          <a key={doc.id} href={doc.fileUrl} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-xl border p-3 text-sm hover:bg-muted">
+                            <span>{doc.name}</span>
+                            <span className="text-xs text-muted-foreground">{new Date(doc.uploadedAt).toLocaleDateString("ar-SA")}</span>
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="mb-2 flex items-center gap-2 text-sm font-bold"><History className="h-4 w-4" /> سجل الحركات</p>
+                    {(socialInsurance.movements ?? []).length === 0 ? (
+                      <p className="text-sm text-muted-foreground">لا توجد حركات مسجلة بعد.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {(socialInsurance.movements ?? []).map((m: any) => (
+                          <div key={m.id} className="rounded-xl border p-3 text-sm">
+                            <p className="font-medium">{m.description}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">{new Date(m.createdAt).toLocaleString("ar-SA")} · {m.source === "PAYROLL_SYNC" ? "مزامنة تلقائية من الرواتب" : m.source === "MANUAL" ? "يدوي" : m.source}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <p className="py-8 text-center text-muted-foreground">لم يتم تسجيل الموظف في التأمينات الاجتماعية بعد.</p>
+              )}
+            </CardContent>
+          </Card>
+          {siEditOpen ? (
+            <SocialInsuranceEditDialog
+              employeeId={employee.id}
+              employeeLabel={fullName}
+              record={socialInsurance ? {
+                ...socialInsurance,
+                subjectWage: Number(socialInsurance.subjectWage),
+                registrationDate: socialInsurance.registrationDate ? new Date(socialInsurance.registrationDate).toISOString() : null
+              } : null}
+              onClose={() => setSiEditOpen(false)}
+              onSaved={() => { setSiEditOpen(false); router.refresh(); }}
+            />
+          ) : null}
         </TabsContent>
 
         {/* 8- Performance */}

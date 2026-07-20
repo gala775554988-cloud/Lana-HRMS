@@ -79,7 +79,8 @@ export async function POST(request: NextRequest) {
       const fileName = randomUUID() + extension;
       const contentType = file.type || "application/octet-stream";
 
-      const supabaseUrl = await uploadToSupabaseStorage(rawBytes, fileName, contentType, "documents/insurance");
+      const documentFolder = String(formData.get("folder") || "insurance");
+      const supabaseUrl = await uploadToSupabaseStorage(rawBytes, fileName, contentType, `documents/${documentFolder}`);
       if (supabaseUrl) {
         return NextResponse.json({ success: true, url: supabaseUrl, fileName: file.name, size: rawBytes.length, type: contentType, storage: "supabase-storage" });
       }
