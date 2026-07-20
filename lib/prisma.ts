@@ -1,6 +1,38 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 
 let schemaChecked = false;
+
+// Neon (our Postgres host) suspends its compute after a period of inactivity
+// and takes a moment to resume on the next query -- if that resume window
+// overlaps a serverless invocation, Prisma fails immediately with
+// PrismaClientInitializationError ("Can't reach database server at ...").
+// This has been the actual cause behind several "Server Components render"
+// crashes reported in production (confirmed via Vercel Function Logs), not a
+// real outage -- a short retry gives the compute time to wake up, which is
+// Neon's own documented mitigation for serverless clients.
+const RETRYABLE_MESSAGE = /Can't reach database server|Connection terminated|ECONNREFUSED|timed out|Server has closed the connection/i;
+
+function isRetryableConnectionError(err: unknown): boolean {
+  if (err instanceof Prisma.PrismaClientInitializationError) return true;
+  if (err instanceof Prisma.PrismaClientKnownRequestError && ["P1001", "P1002", "P1017"].includes(err.code)) return true;
+  return err instanceof Error && RETRYABLE_MESSAGE.test(err.message);
+}
+
+async function withConnectionRetry<T>(run: () => Promise<T>): Promise<T> {
+  const attempts = 3;
+  const delayMs = 400;
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      return await run();
+    } catch (err) {
+      lastErr = err;
+      if (!isRetryableConnectionError(err) || attempt === attempts - 1) throw err;
+      await new Promise((resolve) => setTimeout(resolve, delayMs * (attempt + 1)));
+    }
+  }
+  throw lastErr;
+}
 
 async function ensureSchemaReady(client: PrismaClient) {
   if (schemaChecked || process.env.NEXT_PHASE === "phase-production-build" || process.env.SKIP_AUTO_DDL === "true") return;
@@ -116,7 +148,15 @@ const prismaClientSingleton = () => {
   if (process.env.NODE_ENV !== "production" && process.env.NEXT_PHASE !== "phase-production-build" && process.env.SKIP_AUTO_DDL !== "true") {
     setTimeout(() => ensureSchemaReady(client).catch(() => {}), 100);
   }
-  return client;
+  return client.$extends({
+    query: {
+      $allModels: {
+        async $allOperations({ args, query }) {
+          return withConnectionRetry(() => query(args));
+        }
+      }
+    }
+  });
 };
 
 declare const globalThis: {
