@@ -62,6 +62,28 @@ const SPONSOR_FIELD_CANDIDATES = [
   "kafeel_id",
 ];
 
+const HOSPITAL_FIELD_CANDIDATES = [
+  "school",
+  "work_location_id",
+  "x_studio_school_name",
+  "x_school",
+  "x_school_id",
+  "x_hospital",
+  "x_hospital_id",
+  "x_work_location",
+  "work_location"
+];
+
+const ANALYTIC_FIELD_CANDIDATES = [
+  "analytic_account",
+  "analytic_account_id",
+  "x_cost_center",
+  "x_analytic_account",
+  "x_analytic_account_id",
+  "analytic_distribution",
+  "x_studio_cost_center"
+];
+
 function clean(value: unknown) {
   if (value === false || value === null || value === undefined) return "";
   return String(value).trim();
@@ -163,6 +185,8 @@ export async function POST(request: NextRequest) {
 
     const fieldsMeta: Record<string, Record<string, unknown>> = await client.fieldsGet("hr.employee", [], ["string", "type", "relation"]).catch(() => ({}));
     const sponsorFields = SPONSOR_FIELD_CANDIDATES.filter((field) => fieldsMeta[field]);
+    const hospitalFields = HOSPITAL_FIELD_CANDIDATES.filter((field) => fieldsMeta[field]);
+    const analyticFields = ANALYTIC_FIELD_CANDIDATES.filter((field) => fieldsMeta[field]);
     const fields = [
       "id",
       "name",
@@ -182,13 +206,9 @@ export async function POST(request: NextRequest) {
       "job_id",
       "company_id",
       "image_1920",
-      "school",
-      "work_location_id",
-      "x_studio_school_name",
-      "analytic_account",
-      "x_cost_center",
-      "analytic_distribution",
       ...sponsorFields,
+      ...hospitalFields,
+      ...analyticFields,
     ];
 
     const rows: MasterRow[] = [];
@@ -390,6 +410,8 @@ export async function POST(request: NextRequest) {
       skipped: errors.length,
       documentsImported: docSyncResult.imported,
       sponsorFields,
+      hospitalFields,
+      analyticFields,
       startedAfterId,
       lastOdooId,
       durationMs: Date.now() - startedAt,

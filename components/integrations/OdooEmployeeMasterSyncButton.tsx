@@ -65,7 +65,11 @@ export function OdooEmployeeMasterSyncButton() {
               <div>حسابات مستخدمين: <strong className="font-black">{result.usersCreated ?? 0}</strong></div>
               <div>أكواد متعارضة تم نقلها: <strong className="font-black">{result.forcedCodeDisplacements ?? 0}</strong></div>
               <div>أخطاء/متجاوز: <strong className="font-black">{result.skipped ?? 0}</strong></div>
-              <div className="md:col-span-4">حقول الكفيل المكتشفة في Odoo: <strong>{result.sponsorFields?.join(", ") || "لم يتم العثور على حقل كفيل في Odoo"}</strong></div>
+              <div className="md:col-span-4 space-y-1 text-xs pt-1 border-t border-emerald-200/60 dark:border-emerald-800/60">
+                <div>حقول الكفيل المكتشفة في Odoo: <strong>{result.sponsorFields?.join(", ") || "لا يوجد حقل مخصص لكفيل في هذا السيرفر"}</strong></div>
+                <div>حقول المستشفيات/مواقع العمل المكتشفة: <strong>{(result as any).hospitalFields?.join(", ") || "لا يوجد حقل مخصص للمستشفى (تم استخدام الافتراضي)"}</strong></div>
+                <div>حقول الحساب التحليلي المكتشفة: <strong>{(result as any).analyticFields?.join(", ") || "لا يوجد حقل مخصص للحساب التحليلي (تم استخدام الافتراضي)"}</strong></div>
+              </div>
             </div>
           ) : (
             <p className="font-bold">فشلت المزامنة: {result.message}</p>
