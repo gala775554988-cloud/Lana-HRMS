@@ -6,6 +6,9 @@ export const authRoutes = ["/login", "/forgot-password", "/reset-password", "/ve
 export const publicRoutes = [...authRoutes];
 export const DEFAULT_LOGIN_REDIRECT = "/employee/dashboard";
 
+const HR_DASHBOARD_ROLES = ["HR_MANAGER", "HR", "PAYROLL_MANAGER", "RECRUITER"];
+const MANAGER_DASHBOARD_ROLES = ["MANAGER", "DEPARTMENT_MANAGER", "BRANCH_MANAGER", "SUPERVISOR", "PROJECT_MANAGER"];
+
 export function resolveRoleDashboard(userRoles?: string[] | null): string {
   if (!userRoles || !Array.isArray(userRoles)) return DEFAULT_LOGIN_REDIRECT;
   const roleSet = new Set(userRoles);
@@ -18,10 +21,12 @@ export function resolveRoleDashboard(userRoles?: string[] | null): string {
   // real reason some employee accounts still rendered the old HR layout.
   if (roleSet.has("EMPLOYEE")) return "/employee/dashboard";
 
-  const isAdminOrManager = userRoles.some((role) =>
-    ["HR_MANAGER", "PAYROLL_MANAGER", "RECRUITER", "MANAGER", "HR", "DEPARTMENT_MANAGER", "BRANCH_MANAGER", "SUPERVISOR", "PROJECT_MANAGER"].includes(role)
-  );
-  if (isAdminOrManager) return "/dashboard";
+  // HR-type roles get the HR Dashboard (company-wide employee/contract/
+  // document/recruitment view); pure manager-type roles get the Manager
+  // Dashboard (their own team's approvals/attendance/reports). A user
+  // holding both lands on the broader HR view.
+  if (userRoles.some((role) => HR_DASHBOARD_ROLES.includes(role))) return "/hr/dashboard";
+  if (userRoles.some((role) => MANAGER_DASHBOARD_ROLES.includes(role))) return "/manager/dashboard";
   return DEFAULT_LOGIN_REDIRECT;
 }
 

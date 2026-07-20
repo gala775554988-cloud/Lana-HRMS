@@ -29,7 +29,7 @@ const descriptionField: ModuleField = { name: "description", label: "Description
 const employeeIdField: ModuleField = { name: "employeeId", label: "Employee ID", type: "text", required: true };
 
 export const hrmsModules = [
-  { key: "hospitals", title: "المستشفيات", description: "إدارة المستشفيات والفروع", model: "hospital", permissionResource: "employees", searchFields: ["name", "code"], filterFields: ["isActive"], tableFields: ["code", "name", "isActive"], fields: [{ name: "name", label: "Name", type: "text", required: true }] },
+  { key: "hospitals", title: "المستشفيات", description: "إدارة المستشفيات والفروع", model: "hospital", permissionResource: "hospitals", searchFields: ["name", "code"], filterFields: ["isActive"], tableFields: ["code", "name", "isActive"], fields: [{ name: "name", label: "Name", type: "text", required: true }] },
   {
     key: "employees",
     title: "Employees",
@@ -65,6 +65,12 @@ export const hrmsModules = [
   },
   {
     key: "departments", title: "Departments", description: "Organize teams and business units.", model: "department", permissionResource: "departments", searchFields: ["name", "code"], filterFields: ["isActive"], tableFields: ["code", "name", "isActive"], fields: [{ name: "name", label: "Name", type: "text", required: true }, codeField, descriptionField, activeField]
+  },
+  {
+    key: "companies", title: "Companies", description: "Manage companies for multi-company approval routing.", model: "company", permissionResource: "companies", searchFields: ["name", "code"], filterFields: ["isActive"], tableFields: ["code", "name", "isActive"], fields: [{ name: "name", label: "Name", type: "text", required: true }, codeField, activeField]
+  },
+  {
+    key: "projects", title: "Projects", description: "Fourth org-unit type for team/project-based approval routing and scoping.", model: "project", permissionResource: "projects", searchFields: ["name", "code"], filterFields: ["isActive"], tableFields: ["code", "name", "isActive"], fields: [{ name: "name", label: "Name", type: "text", required: true }, { name: "code", label: "Code", type: "text" }, activeField]
   },
   {
     key: "branches", title: "Branches", description: "Manage physical locations and offices.", model: "branch", permissionResource: "branches", searchFields: ["name", "code", "city", "country"], filterFields: ["isActive"], tableFields: ["code", "name", "city", "country", "isActive"], fields: [{ name: "name", label: "Name", type: "text", required: true }, codeField, { name: "address", label: "Address", type: "textarea" }, { name: "city", label: "City", type: "text" }, { name: "country", label: "Country", type: "text" }, activeField]

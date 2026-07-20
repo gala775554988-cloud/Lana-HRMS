@@ -3,8 +3,8 @@ import * as XLSX from "xlsx";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/rbac";
-import { applyScopedWhere, canAccessEmployeeId, getAccessProfile, resolveRoleEmployeeIds } from "@/lib/enterprise/hierarchy";
-import { createEnterpriseNotification } from "@/lib/enterprise/notifications";
+import { applyScopedWhere, canAccessEmployeeId, getAccessProfile } from "@/lib/enterprise/hierarchy";
+import { createEnterpriseWorkflow } from "@/lib/enterprise/workflow";
 import { getEmployeeExtraSettings } from "@/lib/enterprise/hospitals";
 import { calculateNetSalary } from "@/lib/employee/salary-profile";
 import { getEmployeeSalaryProfile } from "@/lib/employee/salary-profile-store";
@@ -60,32 +60,17 @@ async function getEmployeeScope(userId: string, roles: string[]) {
   return applyScopedWhere("employees", {}, profile);
 }
 
-async function createHrOnlyWorkflow(employeeId: string, entityId: string, actorUserId: string) {
-  const hrEmployees = await resolveRoleEmployeeIds(["HR_MANAGER"]);
-  const approverUserIds = Array.from(new Set(hrEmployees.map((employee) => employee.userId).filter((id): id is string => Boolean(id))));
-  const instance = await prisma.workflowInstance.create({
-    data: {
-      employeeId,
-      type: "OVERTIME",
-      entityId,
-      status: approverUserIds.length ? "PENDING" : "COMPLETED",
-      currentStep: approverUserIds.length ? 1 : 0
-    }
-  });
-  if (approverUserIds.length) {
-    await prisma.workflowStep.createMany({
-      data: approverUserIds.map((approverUserId, index) => ({
-        workflowInstanceId: instance.id,
-        step: index + 1,
-        approverUserId,
-        status: index === 0 ? "PENDING" : "WAITING"
-      }))
-    });
-    await Promise.all(approverUserIds.slice(0, 1).map((userId) => createEnterpriseNotification({ userId, title: "طلب أوفر تايم جديد", body: "يوجد طلب أوفر تايم بانتظار اعتمادك.", type: "INFO" })));
-  } else {
+// Routes overtime requests through the same ApprovalPath-driven engine as
+// every other request type (see lib/enterprise/workflow.ts) instead of the
+// old HR-managers-only bypass -- an admin now configures overtime's approval
+// stages per hospital/department/branch/project from the Approval Workflows
+// page, same as leave/loan/expense/etc.
+async function createOvertimeWorkflow(employeeId: string, entityId: string, actorUserId: string) {
+  const instance = await createEnterpriseWorkflow(employeeId, "OVERTIME", entityId);
+  if (instance.status === "COMPLETED") {
     await prisma.overtimeRequest.update({ where: { id: entityId }, data: { status: "APPROVED" } }).catch(() => null);
   }
-  await writeAuditLog({ actorUserId, action: "overtime:workflow-create", entity: "workflowInstance", entityId: instance.id, metadata: { employeeId, entityId, approverUserIds } }).catch(() => null);
+  await writeAuditLog({ actorUserId, action: "overtime:workflow-create", entity: "workflowInstance", entityId: instance.id, metadata: { employeeId, entityId } }).catch(() => null);
   return instance;
 }
 
@@ -258,7 +243,7 @@ export async function POST(request: NextRequest) {
     update: { value: { ...body, amount, rate } as any },
     create: { key: `overtime.extra.${overtime.id}`, value: { ...body, amount, rate } as any, description: "Overtime extra details" }
   });
-  await createHrOnlyWorkflow(body.employeeId, overtime.id, session.user.id);
+  await createOvertimeWorkflow(body.employeeId, overtime.id, session.user.id);
   await writeAuditLog({ actorUserId: session.user.id, action: "overtime:create", entity: "overtimeRequest", entityId: overtime.id, metadata: { amount, hours, rate } }).catch(() => null);
 
   return NextResponse.json({ success: true, overtime, amount });

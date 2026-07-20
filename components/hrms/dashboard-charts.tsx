@@ -9,7 +9,7 @@ import {
 const palette = ["#2ED3C6", "#7C6CF8", "#22C55E", "#F59E0B", "#EF4444", "#19BFAF"];
 
 function cardClass(extra = "") {
-  return `rounded-3xl border border-slate-200/80 bg-white p-6 shadow-premium-md transition-all duration-300 ease-premium hover:-translate-y-1 hover:border-primary/40 hover:shadow-premium-lg dark:border-slate-800 dark:bg-slate-900 dark:shadow-none ${extra}`;
+  return `glass-card-premium p-6 transition-all duration-300 ease-premium hover:-translate-y-1 hover:border-primary/40 hover:shadow-premium-lg ${extra}`;
 }
 
 type Series = { months: string[]; employeeGrowth: number[]; requests: number[]; payroll: number[] };

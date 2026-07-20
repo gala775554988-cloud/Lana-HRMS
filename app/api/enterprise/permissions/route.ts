@@ -115,17 +115,25 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 2. Update HrPermissionScope for Hospital Supervisor if requested
-    if (employee.userId && typeof body.grantHospitalSupervisor === "boolean") {
+    // 2. Grant/revoke hospital-supervisor status via SupervisorAssignment --
+    //    this is what now actually scopes this employee's dashboard/team/
+    //    approvals view to their hospital (see buildEmployeeScopeWhere).
+    if (typeof body.grantHospitalSupervisor === "boolean") {
       if (body.grantHospitalSupervisor && employee.hospitalId) {
-        await prisma.hrPermissionScope.upsert({
-          where: { userId_module: { userId: employee.userId, module: "HOSPITAL_SUPERVISOR" } },
-          update: { scope: "HOSPITAL", hospitalId: employee.hospitalId },
-          create: { userId: employee.userId, module: "HOSPITAL_SUPERVISOR", scope: "HOSPITAL", hospitalId: employee.hospitalId }
+        const existing = await prisma.supervisorAssignment.findFirst({
+          where: { employeeId: employee.id, entityType: "HOSPITAL", entityId: employee.hospitalId }
         });
+        if (existing) {
+          await prisma.supervisorAssignment.update({ where: { id: existing.id }, data: { isActive: true, endDate: null } });
+        } else {
+          await prisma.supervisorAssignment.create({
+            data: { employeeId: employee.id, entityType: "HOSPITAL", entityId: employee.hospitalId, title: "مشرف المستشفى", startDate: new Date(), isActive: true }
+          });
+        }
       } else {
-        await prisma.hrPermissionScope.deleteMany({
-          where: { userId: employee.userId, module: "HOSPITAL_SUPERVISOR" }
+        await prisma.supervisorAssignment.updateMany({
+          where: { employeeId: employee.id, entityType: "HOSPITAL" },
+          data: { isActive: false, endDate: new Date() }
         });
       }
     }

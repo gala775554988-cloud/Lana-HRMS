@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Bell, CheckCheck, MailOpen, MailWarning } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -9,6 +10,7 @@ type NotificationItem = {
   title: string;
   body: string;
   type: string;
+  link: string | null;
   readAt: string | null;
   createdAt: string;
 };
@@ -20,6 +22,7 @@ const tabs = [
 ];
 
 export function NotificationCenterClient() {
+  const router = useRouter();
   const [tab, setTab] = useState("all");
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -47,6 +50,11 @@ export function NotificationCenterClient() {
     });
   }
 
+  function openNotification(notification: NotificationItem) {
+    if (!notification.readAt) markRead(notification.id);
+    if (notification.link) router.push(notification.link);
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -64,7 +72,7 @@ export function NotificationCenterClient() {
       <div className="grid gap-3">
         {notifications.length === 0 ? <div className="rounded-2xl border bg-card p-8 text-center text-muted-foreground">لا توجد إشعارات</div> : null}
         {notifications.map((notification) => (
-          <button key={notification.id} type="button" onClick={() => markRead(notification.id)} className="rounded-2xl border bg-card p-4 text-start shadow-sm transition hover:bg-muted/40">
+          <button key={notification.id} type="button" onClick={() => openNotification(notification)} className="rounded-2xl border bg-card p-4 text-start shadow-sm transition hover:bg-muted/40">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="font-semibold">{notification.title}</p>

@@ -3,9 +3,11 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-export default async function Tracker() {
+export default async function Tracker({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const employee = await getCurrentEmployeeCached();
-  
+  const query = await searchParams;
+  const highlight = typeof query.highlight === "string" ? query.highlight : null;
+
   const workflows = await prisma.workflowInstance.findMany({
     where: { employeeId: employee?.id },
     include: { steps: true },
@@ -19,7 +21,7 @@ export default async function Tracker() {
       {workflows.length === 0 && <div className="text-slate-500">لا يوجد طلبات حالياً</div>}
 
       {workflows.map(wf => (
-        <div key={wf.id} className="mb-8 border rounded-3xl p-6">
+        <div key={wf.id} id={`wf-${wf.id}`} className={`mb-8 border rounded-3xl p-6 ${wf.id === highlight ? "ring-2 ring-primary" : ""}`}>
           <div className="flex justify-between">
             <div>
               <div className="font-semibold">{wf.type}</div>

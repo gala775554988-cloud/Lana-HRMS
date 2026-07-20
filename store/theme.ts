@@ -19,7 +19,10 @@ interface ThemeState {
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set) => ({
-      mode: 'system',
+      // Light mode is the default look regardless of OS preference -- users
+      // opt into dark mode explicitly (ThemeToggle in the header, or the
+      // toggle in /settings), rather than inheriting a system preference.
+      mode: 'light',
       themeName: 'default',
       sidebarCollapsed: false,
       _hasHydrated: false,

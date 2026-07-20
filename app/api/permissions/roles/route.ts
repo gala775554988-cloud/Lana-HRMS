@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { listRoles, createRole } from "@/lib/enterprise/roles";
-import { PERMISSION_CATEGORIES, PERMISSION_TEMPLATES } from "@/lib/enterprise/permissions";
+import { PERMISSION_CATEGORIES, PERMISSION_TEMPLATES, buildPermissionTree } from "@/lib/enterprise/permissions";
 
 async function requireSuperAdmin() {
   const session = await auth();
@@ -15,7 +15,12 @@ export async function GET() {
   const { error } = await requireSuperAdmin();
   if (error) return error;
   const roles = await listRoles();
-  return NextResponse.json({ roles, categories: PERMISSION_CATEGORIES, templateKeys: Object.keys(PERMISSION_TEMPLATES) });
+  return NextResponse.json({
+    roles,
+    categories: PERMISSION_CATEGORIES,
+    tree: buildPermissionTree(PERMISSION_CATEGORIES),
+    templateKeys: Object.keys(PERMISSION_TEMPLATES)
+  });
 }
 
 export async function POST(request: NextRequest) {

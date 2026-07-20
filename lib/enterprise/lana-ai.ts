@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/rbac";
-import { applyScopedWhere, getAccessProfile, resolveRoleEmployeeIds } from "@/lib/enterprise/hierarchy";
+import { applyScopedWhere, getAccessProfile } from "@/lib/enterprise/hierarchy";
 import { listHospitals } from "@/lib/enterprise/hospitals";
 import { getEffectivePermissionsForRoles } from "@/lib/enterprise/permissions";
 import { getEmployeeFieldAccess, redactHiddenFields } from "@/lib/enterprise/employee-field-access";
@@ -162,59 +162,49 @@ export async function answerLanaAi({
       return { answer: ar ? "يرجى تحديد نوع الطلب (إجازات، أوفر تايم، سلف، مصروفات) لمعرفة المعتمدين." : "Please specify the request type (leave, overtime, loan, expense) to find approvers.", suggestions };
     }
 
-    const [hospitals, branches] = await Promise.all([
+    const [hospitals, branches, departments, projects] = await Promise.all([
       prisma.hospital.findMany({ select: { id: true, name: true }, take: 200 }),
-      prisma.branch.findMany({ select: { id: true, name: true }, take: 200 })
+      prisma.branch.findMany({ select: { id: true, name: true }, take: 200 }),
+      prisma.department.findMany({ select: { id: true, name: true }, take: 200 }),
+      prisma.project.findMany({ select: { id: true, name: true }, take: 200 })
     ]);
     const matchedHospital = hospitals.find((h) => message.includes(h.name));
     const matchedBranch = branches.find((b) => message.includes(b.name));
+    const matchedDepartment = departments.find((d) => message.includes(d.name));
+    const matchedProject = projects.find((p) => message.includes(p.name));
+    const matchedEntity = matchedHospital
+      ? { entityType: "HOSPITAL" as const, entityId: matchedHospital.id, name: matchedHospital.name }
+      : matchedBranch
+      ? { entityType: "BRANCH" as const, entityId: matchedBranch.id, name: matchedBranch.name }
+      : matchedDepartment
+      ? { entityType: "DEPARTMENT" as const, entityId: matchedDepartment.id, name: matchedDepartment.name }
+      : matchedProject
+      ? { entityType: "PROJECT" as const, entityId: matchedProject.id, name: matchedProject.name }
+      : null;
 
-    const configured = await prisma.hrApprovalChain.findMany({ where: { module: matchedModule, isActive: true }, orderBy: { level: "asc" } });
-    const levels = Array.from(new Set(configured.map((row) => row.level))).sort((a, b) => a - b);
-    const resolvedRows = levels
-      .map((level) => {
-        const atLevel = configured.filter((row) => row.level === level);
-        return (
-          (matchedHospital && atLevel.find((row) => row.scopeType === "HOSPITAL" && row.scopeId === matchedHospital.id)) ||
-          (matchedBranch && atLevel.find((row) => row.scopeType === "BRANCH" && row.scopeId === matchedBranch.id)) ||
-          atLevel.find((row) => row.scopeType === "GLOBAL" || !row.scopeType)
-        );
-      })
-      .filter((row): row is NonNullable<typeof row> => Boolean(row) && (row!.capabilities ?? []).includes("APPROVE"));
-
-    const approverNames: string[] = [];
-    for (const row of resolvedRows) {
-      if (row.approverUserId) {
-        const employee = await prisma.employee.findFirst({ where: { userId: row.approverUserId }, select: { firstName: true, lastName: true } });
-        if (employee) approverNames.push(`${employee.firstName} ${employee.lastName}`);
-        continue;
-      }
-      if (row.approverRole === "HR_MANAGER" || row.approverRole === "SUPER_ADMIN") {
-        const managers = await resolveRoleEmployeeIds([row.approverRole]);
-        const names = await prisma.employee.findMany({ where: { id: { in: managers.map((m) => m.id) } }, select: { firstName: true, lastName: true } });
-        approverNames.push(...names.map((n) => `${n.firstName} ${n.lastName}`));
-      } else if (row.approverRole === "BRANCH_MANAGER" && matchedBranch) {
-        const managers = await resolveRoleEmployeeIds(["BRANCH_MANAGER"], { branchId: matchedBranch.id });
-        const names = await prisma.employee.findMany({ where: { id: { in: managers.map((m) => m.id) } }, select: { firstName: true, lastName: true } });
-        approverNames.push(...names.map((n) => `${n.firstName} ${n.lastName}`));
-      } else if (row.approverRole === "DIRECT_MANAGER" || row.approverRole === "DEPARTMENT_MANAGER") {
-        approverNames.push(ar ? `(يعتمد على ${row.approverRole === "DIRECT_MANAGER" ? "المدير المباشر" : "مدير الإدارة"} لكل موظف)` : `(depends on each employee's ${row.approverRole === "DIRECT_MANAGER" ? "direct manager" : "department manager"})`);
-      }
+    if (!matchedEntity) {
+      return { answer: ar ? "يرجى ذكر اسم المستشفى/الإدارة/الفرع/المشروع لمعرفة معتمدي طلباته." : "Please name the hospital/department/branch/project to look up its approvers.", suggestions };
     }
 
-    if (!configured.length) {
+    const path = await prisma.approvalPath.findFirst({
+      where: { entityType: matchedEntity.entityType, entityId: matchedEntity.entityId, requestType: matchedModule.toUpperCase(), isActive: true },
+      include: { stages: { orderBy: { order: "asc" }, include: { approverEmployee: { select: { firstName: true, lastName: true } } } } }
+    });
+
+    if (!path || !path.stages.length) {
       return {
         answer: ar
-          ? `لا توجد سلسلة موافقات مخصصة لهذا النوع من الطلبات؛ يتم استخدام التسلسل الافتراضي (المدير المباشر ثم مدير الفرع/الإدارة ثم الموارد البشرية).`
-          : "No custom approval chain is configured for this request type; the default hierarchy (direct manager, then branch/department manager, then HR) applies.",
+          ? `لا يوجد مسار موافقات مُعد لهذا النوع من الطلبات لـ ${matchedEntity.name} بعد. أنشئه من صفحة Approval Workflows.`
+          : `No approval path is configured for this request type at ${matchedEntity.name} yet. Create one from the Approval Workflows page.`,
         suggestions
       };
     }
-    const scopeLabel = matchedHospital ? ` لمستشفى ${matchedHospital.name}` : matchedBranch ? ` لفرع ${matchedBranch.name}` : "";
+
+    const approverNames = path.stages.map((stage) => `${stage.approverEmployee.firstName} ${stage.approverEmployee.lastName}${stage.isMandatory ? "" : ar ? " (اختياري)" : " (optional)"}`);
     return {
-      answer: approverNames.length
-        ? (ar ? `الأشخاص الذين يملكون صلاحية الموافقة${scopeLabel}: ${approverNames.join("، ")}.` : `Approvers${scopeLabel}: ${approverNames.join(", ")}.`)
-        : (ar ? "لم يتم العثور على معتمدين محددين ضمن سلسلة الموافقات المُعدة." : "No specific approvers found in the configured approval chain."),
+      answer: ar
+        ? `مسار موافقة ${matchedEntity.name}: ${approverNames.join(" ← ")}.`
+        : `${matchedEntity.name}'s approval path: ${approverNames.join(" -> ")}.`,
       suggestions
     };
   }
@@ -517,7 +507,6 @@ const MODULE_KEYWORD_MAP: Array<[RegExp, string, string]> = [
   [/سلف/i, "loan", "السلف"],
   [/مصروف/i, "expense", "المصروفات"]
 ];
-const ALL_APPROVAL_MODULES: Array<[string, string]> = [["leave", "الإجازات"], ["overtime", "الأوفر تايم"], ["loan", "السلف"], ["expense", "المصروفات"]];
 
 /**
  * Executive command handler: "اجعل الموظف X مسؤولاً عن مستشفى/فرع Y [لموافقات Z]".
@@ -526,9 +515,9 @@ const ALL_APPROVAL_MODULES: Array<[string, string]> = [["leave", "الإجازا
  *   2. Any name ambiguity (scope or employee) stops immediately with a
  *      disambiguation list -- nothing is written until the caller repeats
  *      the command with an unambiguous identifier (employee number).
- *   3. After writing, the affected HrApprovalChain rows are re-read fresh
- *      from the DB (not just the values just sent) for the confirmation
- *      report, and everything is audit-logged.
+ *   3. Creates/reactivates a SupervisorAssignment row (see
+ *      lib/enterprise/hierarchy.ts) rather than editing values just sent,
+ *      and everything is audit-logged.
  */
 async function handleAssignResponsibleCommand({
   userId,
@@ -614,51 +603,38 @@ async function handleAssignResponsibleCommand({
     };
   }
 
-  // --- Resolve module(s): a named type, or all four if none was specified ---
-  const matchedModule = moduleToken ? MODULE_KEYWORD_MAP.find(([pattern]) => pattern.test(moduleToken)) : null;
-  const targetModules: Array<[string, string]> = matchedModule ? [[matchedModule[1], matchedModule[2]]] : ALL_APPROVAL_MODULES;
+  // --- Execute: create/reactivate a SupervisorAssignment for this employee
+  // on this entity. This grants general supervision (team/attendance/
+  // approvals visibility scoping) -- per-request-type approval STAGES still
+  // need to be built explicitly on the Approval Workflows page, since a
+  // supervisor assignment alone doesn't say which request types they
+  // approve or where in the stage order they sit. ---
+  const before = await prisma.supervisorAssignment.findFirst({ where: { employeeId: employee.id, entityType: scopeType, entityId: scope.id } });
 
-  // --- Execute: upsert a level-1 scoped override per target module ---
-  const before: Record<string, unknown> = {};
-  for (const [moduleKey] of targetModules) {
-    before[moduleKey] = await prisma.hrApprovalChain.findUnique({
-      where: { module_level_scopeType_scopeId: { module: moduleKey, level: 1, scopeType, scopeId: scope.id } }
-    });
-  }
-
-  for (const [moduleKey] of targetModules) {
-    await prisma.hrApprovalChain.upsert({
-      where: { module_level_scopeType_scopeId: { module: moduleKey, level: 1, scopeType, scopeId: scope.id } },
-      update: { approverUserId: employee.userId, approverRole: "DIRECT_MANAGER", capabilities: ["VIEW", "APPROVE", "REJECT"], isActive: true },
-      create: { module: moduleKey, level: 1, scopeType, scopeId: scope.id, approverUserId: employee.userId, approverRole: "DIRECT_MANAGER", capabilities: ["VIEW", "APPROVE", "REJECT"], isActive: true }
-    });
-  }
-
-  // --- Validation: re-read the freshly-written state from the DB (never
-  // trust the values just sent) to build the confirmation report ---
-  const afterRows = await prisma.hrApprovalChain.findMany({
-    where: { scopeType, scopeId: scope.id, module: { in: targetModules.map(([key]) => key) } },
-    orderBy: { module: "asc" }
-  });
+  const assignment = before
+    ? await prisma.supervisorAssignment.update({ where: { id: before.id }, data: { isActive: true, endDate: null } })
+    : await prisma.supervisorAssignment.create({
+        data: { employeeId: employee.id, entityType: scopeType, entityId: scope.id, title: scopeType === "HOSPITAL" ? "مشرف المستشفى" : "مشرف الفرع", startDate: new Date(), isActive: true }
+      });
 
   await writeAuditLog({
     actorUserId: userId,
-    action: "lana-ai:assign-approver",
-    entity: "hrApprovalChain",
-    metadata: { before, after: afterRows, employeeId: employee.id, scopeType, scopeId: scope.id, scopeName: scope.name }
+    action: "lana-ai:assign-supervisor",
+    entity: "supervisorAssignment",
+    entityId: assignment.id,
+    metadata: { before, after: assignment, employeeId: employee.id, scopeType, scopeId: scope.id, scopeName: scope.name }
   });
 
   const scopeLabel = scopeType === "HOSPITAL" ? "مستشفى" : "فرع";
   const employeeLabel = `${employee.firstName} ${employee.lastName} (${employee.employeeNumber})`;
-  const lines = afterRows.map((row) => {
-    const moduleLabel = ALL_APPROVAL_MODULES.find(([key]) => key === row.module)?.[1] ?? row.module;
-    return `${moduleLabel}: ${scopeLabel} ${scope.name} -> ${employeeLabel} (${(row.capabilities ?? []).includes("APPROVE") ? "موافقة/رفض" : "إظهار فقط"})`;
-  });
+  const moduleNote = moduleToken
+    ? (ar ? ` لإضافة مراحل موافقة محددة لطلبات ${MODULE_KEYWORD_MAP.find(([pattern]) => pattern.test(moduleToken))?.[2] ?? moduleToken}، استخدم صفحة Approval Workflows.` : ` To add specific approval stages for that request type, use the Approval Workflows page.`)
+    : "";
 
   return {
     answer: ar
-      ? `تم تنفيذ سلسلة الموافقات كالتالي:\n${lines.join("\n")}`
-      : `Approval chain executed as follows:\n${lines.join("\n")}`,
+      ? `تم تعيين ${employeeLabel} مشرفاً على ${scopeLabel} ${scope.name}.${moduleNote}`
+      : `${employeeLabel} has been assigned as supervisor of ${scopeLabel.toLowerCase()} ${scope.name}.${moduleNote}`,
     suggestions
   };
 }

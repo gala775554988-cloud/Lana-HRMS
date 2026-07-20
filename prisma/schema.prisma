@@ -346,6 +346,8 @@ model Employee {
   branchId               String?
   employmentTypeId       String?
   nationalityId          String?
+  companyId              String?
+  projectId              String?
   // Odoo sync fields
   sponsor                String? // كفيل / Sponsor name synced from Odoo
   hospitalId             String? // Real FK, replaces the old freeform employee.extra AppSetting hospital string
@@ -384,6 +386,10 @@ model Employee {
   manager                Employee?               @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull)
   managedEmployees       Employee[]              @relation("EmployeeManager")
   hospital               Hospital?               @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
+  company                Company?                @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  project                Project?                @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  approvalStages         ApprovalStage[]
+  supervisorAssignments  SupervisorAssignment[]
   shiftAssignments       ShiftAssignment[]
   documents              EmployeeDocument[]
   contracts              EmployeeContract[]
@@ -436,6 +442,8 @@ model Employee {
   @@index([status, departmentId])
   @@index([status, branchId])
   @@index([hospitalId])
+  @@index([companyId])
+  @@index([projectId])
 }
 
 model EmployeeDocument {
@@ -945,6 +953,7 @@ model Notification {
   title     String
   body      String
   type      NotificationType @default(INFO)
+  link      String?
   readAt    DateTime?
   createdAt DateTime         @default(now())
   user      User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -2275,24 +2284,6 @@ model HrPermissionScope {
   @@index([module])
 }
 
-model HrApprovalChain {
-  id        String   @id @default(cuid())
-  module    String   // leave, overtime, loan, expense, etc
-  level     Int      @default(1)
-  approverRole String @default("DIRECT_MANAGER") // DIRECT_MANAGER, DEPARTMENT_MANAGER, BRANCH_MANAGER, HR_MANAGER, SUPER_ADMIN -- used when approverUserId is not set
-  approverUserId String? // Specific named person for this level; takes priority over approverRole
-  scopeType String  @default("GLOBAL") // GLOBAL | BRANCH | HOSPITAL -- narrows this level to requests from a specific branch/hospital
-  scopeId   String  @default("") // Branch.id or Hospital.id when scopeType != GLOBAL; "" (not null) so the unique index below behaves predictably
-  capabilities String[] @default(["VIEW", "APPROVE", "REJECT"]) // What this level's approver can do: VIEW (see only), APPROVE, REJECT
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([module, level, scopeType, scopeId])
-  @@index([module])
-  @@index([approverUserId])
-}
-
 model HrPermissionAudit {
   id        String   @id @default(cuid())
   userId    String
@@ -2307,26 +2298,115 @@ model HrPermissionAudit {
   @@index([createdAt])
 }
 
-enum WorkflowPathType {
-  HOSPITAL_PATH
-  GENERAL_ADMIN_PATH
+// ═══════════════════════════════════════════════════════════
+// APPROVAL WORKFLOWS ENGINE (v2) -- replaces HrApprovalChain +
+// WorkflowPathTemplate + the HierarchyStore department/branch/project
+// manager maps entirely. An unlimited number of ApprovalPath rows can be
+// configured per (company, entity type, entity name, request type), each
+// with an unlimited, manually-ordered stage list -- no fixed/hardcoded
+// stage roles anywhere in the engine.
+// ═══════════════════════════════════════════════════════════
+
+enum ApprovalEntityType {
+  HOSPITAL
+  DEPARTMENT
+  BRANCH
+  PROJECT
 }
 
-// One configurable named approval path per type (محرر مسارات الموافقات) --
-// @unique on workflowType makes each type a single, replaceable record ("المسار
-// الأول" / "المسار الثاني"). `steps` holds the ordered chain as JSON:
-// [{ stepOrder, approverId, departmentId, roleContext }, ...].
-model WorkflowPathTemplate {
-  id                       String           @id @default(cuid())
-  workflowType             WorkflowPathType @unique
-  workflowName             String
-  sendToDirectManagerFirst Boolean          @default(true)
-  requestTypes             Json             @default("[]") // قائمة أنواع الطلبات المختارة متعددة (Multi-Select)
-  targetOrgUnitIds         Json             @default("[]") // قائمة الفروع والمستشفيات المختارة متعددة (Multi-Select)
-  steps                    Json
-  updatedById              String?
-  createdAt                DateTime         @default(now())
-  updatedAt                DateTime         @updatedAt
+model Company {
+  id           String         @id @default(cuid())
+  name         String
+  code         String         @unique
+  isActive     Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  employees    Employee[]
+  approvalPaths ApprovalPath[]
 
-  @@index([workflowType])
+  @@index([isActive])
+}
+
+// Fourth org-unit type alongside Hospital/Department/Branch -- previously
+// only existed as an unstructured JSON map, with no relational membership
+// and no admin CRUD of its own.
+model Project {
+  id        String     @id @default(cuid())
+  name      String
+  code      String?    @unique
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  employees Employee[]
+
+  @@index([isActive])
+}
+
+// One approval path per (company, entity type, entity name, request type)
+// -- e.g. "شركة لانا / HOSPITAL / مستشفى الملك فهد / LEAVE". Unlimited
+// paths can exist; each carries an unlimited, manually-built stage list.
+// `entityId` is intentionally a loose, unenforced id (matching the existing
+// Hospital.branchId/managerId convention in this schema) rather than a real
+// FK, since it must point at one of four different tables (Hospital /
+// Department / Branch / Project) depending on `entityType` -- Prisma has no
+// polymorphic relation; entity existence is validated at the API layer.
+model ApprovalPath {
+  id          String             @id @default(cuid())
+  companyId   String
+  entityType  ApprovalEntityType
+  entityId    String             // Hospital.id | Department.id | Branch.id | Project.id, matching entityType
+  requestType String             // freeform: "LEAVE" | "OVERTIME" | ... -- open-ended, not a fixed enum
+  name        String?            // optional display name for the path
+  isActive    Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  company     Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  stages      ApprovalStage[]
+
+  @@unique([companyId, entityType, entityId, requestType])
+  @@index([entityType, entityId])
+  @@index([requestType])
+  @@index([isActive])
+}
+
+// A single manually-added stage in an approval path -- no fixed roles, the
+// admin always names a specific employee. `order`/`isMandatory` are the
+// only structural fields; `name` is a free label ("المشرف", "مدير الفرع"...).
+model ApprovalStage {
+  id                 String       @id @default(cuid())
+  approvalPathId     String
+  order              Int
+  name               String?
+  approverEmployeeId String
+  isMandatory        Boolean      @default(true)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  approvalPath       ApprovalPath @relation(fields: [approvalPathId], references: [id], onDelete: Cascade)
+  approverEmployee   Employee     @relation(fields: [approverEmployeeId], references: [id], onDelete: Cascade)
+
+  @@unique([approvalPathId, order])
+  @@index([approvalPathId])
+  @@index([approverEmployeeId])
+}
+
+// Independent supervisor/manager assignment registry -- assigning an
+// employee here to an entity is what automatically scopes their dashboard,
+// employee list, approvals, attendance, and leave views to that entity
+// only (see buildEmployeeScopeWhere in lib/enterprise/hierarchy.ts).
+model SupervisorAssignment {
+  id         String             @id @default(cuid())
+  employeeId String
+  entityType ApprovalEntityType
+  entityId   String
+  title      String?            // freeform: "مشرف" | "مدير مستشفى" | "مدير مشروع" ...
+  startDate  DateTime
+  endDate    DateTime?
+  isActive   Boolean            @default(true)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  employee   Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([entityType, entityId])
+  @@index([isActive])
 }

@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AlertTriangle, RefreshCw, Home, Copy, CheckCircle2, LogOut, Code, FileCode } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
+import { Forbidden403 } from "@/components/hrms/forbidden-403";
 
 export default function HrmsError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   const [copied, setCopied] = useState(false);
@@ -11,6 +12,11 @@ export default function HrmsError({ error, reset }: { error: Error & { digest?: 
   const rawMessage = error.message || "Unknown runtime error";
   const digest = error.digest || "N/A";
   const stack = error.stack || "";
+
+  // A permission gate throwing "Forbidden" is expected, routine behavior,
+  // not a bug -- show the clean 403 screen instead of the raw diagnostic
+  // stack-trace box reserved for genuinely unexpected errors.
+  if (rawMessage === "Forbidden") return <Forbidden403 />;
 
   const handleCopy = () => {
     const text = [

@@ -8,6 +8,7 @@ export async function createEnterpriseNotification({
   title,
   body,
   type = "INFO",
+  link,
   dedupe = false,
   pushToMobile = false
 }: {
@@ -15,6 +16,10 @@ export async function createEnterpriseNotification({
   title: string;
   body: string;
   type?: EnterpriseNotificationType;
+  /** Relative URL (e.g. "/approvals?tab=inbox&highlight=<id>") the notification
+   * navigates to on click -- lets the notification center and the bell deep-link
+   * straight to the relevant record instead of dropping the user on a generic list. */
+  link?: string | null;
   dedupe?: boolean;
   pushToMobile?: boolean;
 }) {
@@ -26,7 +31,7 @@ export async function createEnterpriseNotification({
   }
 
   const notification = await prisma.notification.create({
-    data: { userId: userId ?? null, title, body, type }
+    data: { userId: userId ?? null, title, body, type, link: link ?? null }
   });
 
   if (userId && (pushToMobile || type === "WARNING" || type === "ERROR")) {
@@ -36,17 +41,17 @@ export async function createEnterpriseNotification({
   return notification;
 }
 
-export async function notifyUsers(userIds: Array<string | null | undefined>, title: string, body: string, type: EnterpriseNotificationType = "INFO") {
+export async function notifyUsers(userIds: Array<string | null | undefined>, title: string, body: string, type: EnterpriseNotificationType = "INFO", link?: string | null) {
   const uniqueUserIds = Array.from(new Set(userIds.filter((id): id is string => Boolean(id))));
-  await Promise.all(uniqueUserIds.map((userId) => createEnterpriseNotification({ userId, title, body, type })));
+  await Promise.all(uniqueUserIds.map((userId) => createEnterpriseNotification({ userId, title, body, type, link })));
 }
 
-export async function notifyRole(roleNames: string[], title: string, body: string, type: EnterpriseNotificationType = "INFO") {
+export async function notifyRole(roleNames: string[], title: string, body: string, type: EnterpriseNotificationType = "INFO", link?: string | null) {
   const users = await prisma.user.findMany({
     where: { roles: { some: { role: { name: { in: roleNames } } } }, isActive: true },
     select: { id: true }
   });
-  await notifyUsers(users.map((user) => user.id), title, body, type);
+  await notifyUsers(users.map((user) => user.id), title, body, type, link);
 }
 
 function documentExpiryTitle(type: string | null | undefined) {

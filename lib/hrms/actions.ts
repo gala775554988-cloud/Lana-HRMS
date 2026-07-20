@@ -324,11 +324,7 @@ export async function listModuleRecords(input: QueryInput) {
       }
     }
     if (filters.project) {
-      const store = await getHierarchyStore();
-      const employeeIds = Object.values(store.projects)
-        .filter((project) => project.name.toLowerCase().includes(String(filters.project).toLowerCase()))
-        .flatMap((project) => project.employeeIds);
-      employeeAnd.push({ id: { in: employeeIds.length ? employeeIds : ["__NO_PROJECT_MATCH__"] } });
+      employeeAnd.push({ project: { name: { contains: String(filters.project), mode: "insensitive" } } });
     }
     if (employeeAnd.length) baseWhere = Object.keys(baseWhere).length ? { AND: [baseWhere, ...employeeAnd] } : { AND: employeeAnd };
   }
@@ -336,7 +332,7 @@ export async function listModuleRecords(input: QueryInput) {
   // Skip expensive hierarchy/profile queries for SUPER_ADMIN (no scope restrictions)
   const roles = (session.user.roles as string[]) ?? [];
   const accessProfile = roles.includes("SUPER_ADMIN")
-    ? { isSuperAdmin: true, isHrManager: false, userId: session.user.id, roles, employee: null, store: {} as any }
+    ? { isSuperAdmin: true, isHrManager: false, userId: session.user.id, roles, employee: null }
     : await getAccessProfile(session.user.id, roles);
   const where = await applyScopedWhere(resource.key, baseWhere, accessProfile);
 
@@ -632,7 +628,7 @@ export async function createModuleRecord(input: MutationInput) {
       await requirePasswordChange(String(result.user.id));
       revalidatePath("/" + resource.key);
       revalidatePath("/");
-      await notifyRole(["SUPER_ADMIN", "HR_MANAGER"], "إضافة موظف", `Employee ${fullName} was added.`, "SUCCESS").catch(() => null);
+      await notifyRole(["SUPER_ADMIN", "HR_MANAGER"], "إضافة موظف", `Employee ${fullName} was added.`, "SUCCESS", `/employees/${result.employee.id}`).catch(() => null);
 
       return {
         success: true,
@@ -687,7 +683,7 @@ export async function updateModuleRecord(input: MutationInput) {
     await saveEmployeeSalaryProfile(input.id, salaryProfile);
 
     await writeAuditLog({ actorUserId: session.user.id, action: "update", entity: resource.model, entityId: input.id, metadata: { before: serialize(existingRecord), after: serialize({ ...allowedData, salaryProfileUpdated: true }), blockedFields: blockedFields.length ? blockedFields : undefined } });
-    await notifyRole(["SUPER_ADMIN", "HR_MANAGER"], "تعديل موظف", `Employee record ${input.id} was updated.`, "INFO").catch(() => null);
+    await notifyRole(["SUPER_ADMIN", "HR_MANAGER"], "تعديل موظف", `Employee record ${input.id} was updated.`, "INFO", `/employees/${input.id}`).catch(() => null);
     revalidatePath("/" + resource.key);
     revalidatePath("/" + resource.key + "/" + input.id);
     return { success: true, message: resource.title + " record updated.", id: String(record.id) };
