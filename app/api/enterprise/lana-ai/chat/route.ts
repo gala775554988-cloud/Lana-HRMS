@@ -4,9 +4,10 @@ import { prisma } from "@/lib/prisma";
 import { createScopedHrTools, type ToolAuthContext } from "@/lib/ai/tools";
 import { getLanaSystemPrompt } from "@/lib/ai/system-prompt";
 import { isLanaDelegate } from "@/lib/enterprise/lana-delegates";
-import { getLanaApiKey } from "@/lib/settings";
-import { streamText } from "ai";
+import { getLanaApiKey, getGeminiApiKey, getGeminiModel } from "@/lib/settings";
+import { streamText, stepCountIs } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -294,21 +295,34 @@ export async function POST(request: NextRequest) {
       content: m.content
     }));
 
-    // 3. Execution: If API key is available and configured in database/env, execute streamText with toolChoice: "auto"
-    const openAiKey = (await getLanaApiKey() || process.env.OPENAI_API_KEY || "").trim();
-    if (openAiKey) {
+    // 3. Execution: Gemini is the primary Lana AI provider (GEMINI_API_KEY /
+    // GOOGLE_GENERATIVE_AI_API_KEY / GOOGLE_API_KEY from the deploy
+    // environment -- see getGeminiApiKey). OpenAI stays as a fallback
+    // provider so an existing deployment that only has lana.ai.apiKey/
+    // OPENAI_API_KEY configured keeps working unchanged.
+    const geminiKey = getGeminiApiKey();
+    const openAiKey = geminiKey ? "" : (await getLanaApiKey() || process.env.OPENAI_API_KEY || "").trim();
+    const model = geminiKey
+      ? createGoogleGenerativeAI({ apiKey: geminiKey })(getGeminiModel())
+      : openAiKey
+        ? createOpenAI({ apiKey: openAiKey })((process.env.OPENAI_MODEL || "").trim() || "gpt-4o-mini")
+        : null;
+
+    if (model) {
       try {
-        const openai = createOpenAI({ apiKey: openAiKey });
         const systemPrompt = getLanaSystemPrompt(authContext);
 
-        const result = await streamText({
-          model: openai((process.env.OPENAI_MODEL || "").trim() || "gpt-4o-mini"),
+        const result = streamText({
+          model,
           system: systemPrompt,
           messages: formattedMessages.length ? (formattedMessages as any) : (messages as any),
           tools: tools as any,
           toolChoice: "auto" as any,
           temperature: 0.3,
-          ...({ maxSteps: 5 } as any),
+          // v6 "ai" replaced maxSteps with stopWhen(stepCountIs(N)) -- without
+          // this, execution stopped right after a tool call and never
+          // synthesized the tool result into a real answer.
+          stopWhen: stepCountIs(5),
           onFinish: async ({ text, toolCalls, toolResults }) => {
             await prisma.aIAssistantMessage.create({
               data: {
@@ -330,11 +344,12 @@ export async function POST(request: NextRequest) {
         response.headers.set("X-Conversation-Id", conversationId);
         return response;
       } catch (externalErr) {
-        // Fallback to local intelligent stream if OpenAI API call fails/times out
+        // Fallback to local intelligent stream if the LLM API call fails/times out
       }
     }
 
-    // 4. AI-First Semantic Orchestrator Fallback when running without OPENAI_API_KEY
+    // 4. AI-First Semantic Orchestrator Fallback when running without a
+    // configured Gemini or OpenAI key (or if the LLM call above failed)
     return executeAiFirstSemanticOrchestrator(lastMessage, authContext, tools, conversationId!, formattedMessages);
   } catch (error: any) {
     return NextResponse.json({ success: false, message: error.message || "Server Error" }, { status: 500 });

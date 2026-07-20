@@ -55,6 +55,21 @@ export async function getLanaApiKey(): Promise<string> {
   });
 }
 
+/** Gemini is the primary Lana AI provider -- read straight from the deploy
+ * environment (never the DB-backed setting lana.ai.apiKey uses, since the
+ * key is meant to live in Vercel/host env vars, not app settings). Accepts
+ * the three names Google's own tooling uses interchangeably. */
+export function getGeminiApiKey(): string {
+  return (process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_API_KEY || "").trim();
+}
+
+/** "gemini-flash-latest" auto-tracks Google's current stable flash release
+ * instead of a pinned version string that Google periodically retires for
+ * new API keys (e.g. "gemini-2.5-flash" started 404ing for new projects). */
+export function getGeminiModel(): string {
+  return (process.env.GEMINI_MODEL || "").trim() || "gemini-flash-latest";
+}
+
 async function getCompanyLogoUncached(): Promise<string | null> {
   const setting = await getAppSetting("company.logo");
   if (setting && typeof setting === "object" && setting !== null) {

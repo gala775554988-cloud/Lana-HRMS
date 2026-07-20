@@ -22,6 +22,7 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@ai-sdk/google": "^3.0.95",
     "@ai-sdk/openai": "^3.0.85",
     "@ai-sdk/react": "^3.0.0",
     "@auth/prisma-adapter": "^2.7.4",
