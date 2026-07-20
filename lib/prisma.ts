@@ -19,8 +19,8 @@ function isRetryableConnectionError(err: unknown): boolean {
 }
 
 async function withConnectionRetry<T>(run: () => Promise<T>): Promise<T> {
-  const attempts = 3;
-  const delayMs = 400;
+  const attempts = 5;
+  const delayMs = 500;
   let lastErr: unknown;
   for (let attempt = 0; attempt < attempts; attempt++) {
     try {
@@ -28,10 +28,28 @@ async function withConnectionRetry<T>(run: () => Promise<T>): Promise<T> {
     } catch (err) {
       lastErr = err;
       if (!isRetryableConnectionError(err) || attempt === attempts - 1) throw err;
+      console.error(`[Prisma] Retryable connection error (attempt ${attempt + 1}/${attempts}), retrying:`, err instanceof Error ? err.message.split("\n")[0] : err);
       await new Promise((resolve) => setTimeout(resolve, delayMs * (attempt + 1)));
     }
   }
   throw lastErr;
+}
+
+// Neon's own guidance for serverless clients: give the driver enough patience
+// on the wire before giving up, since a suspended compute can take a few
+// seconds to resume -- separate from (and in addition to) the query-level
+// retry above, which covers the case where even that patience isn't enough.
+function withConnectTimeout(url: string): string {
+  if (!url) return url;
+  try {
+    const parsed = new URL(url);
+    if (!parsed.searchParams.has("connect_timeout")) {
+      parsed.searchParams.set("connect_timeout", "15");
+    }
+    return parsed.toString();
+  } catch {
+    return url;
+  }
 }
 
 async function ensureSchemaReady(client: PrismaClient) {
@@ -124,7 +142,7 @@ async function ensureSchemaReady(client: PrismaClient) {
 
 const prismaClientSingleton = () => {
   const rawDbUrl = process.env.POSTGRES_PRISMA_URL || process.env.DATABASE_URL || process.env.DIRECT_URL || "";
-  const dbUrl = rawDbUrl.trim();
+  const dbUrl = withConnectTimeout(rawDbUrl.trim());
   if (!dbUrl) {
     console.warn("[Prisma] Neither POSTGRES_PRISMA_URL nor DATABASE_URL is set in environment variables");
   }
