@@ -328,9 +328,9 @@ export function ApprovalWorkflowsClient() {
                         <div className="flex flex-wrap items-center gap-2">
                           <div className="min-w-[220px] flex-1">
                             <UserSearchSelect
-                              value=""
-                              initialLabel={stage.approverLabel}
-                              onChange={(_userId, label, employee) => updateStage(index, { approverEmployeeId: employee?.id ?? "", approverLabel: label ?? "" })}
+                              value={stage.approverEmployeeId || ""}
+                              initialLabel={stage.approverLabel || ""}
+                              onChange={(userId, label, employee) => updateStage(index, { approverEmployeeId: employee?.id || userId || "", approverLabel: label || "" })}
                               placeholder="اختر الموظف المسؤول عن الموافقة..."
                             />
                           </div>

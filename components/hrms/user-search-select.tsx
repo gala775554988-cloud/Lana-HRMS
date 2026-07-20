@@ -34,12 +34,12 @@ export function UserSearchSelect({
   const hydratedRef = useRef(false);
 
   useEffect(() => {
-    // Only hydrate the label from the parent-supplied initialLabel once, the
-    // first time a real value shows up (e.g. loading a saved workflow step) --
-    // never again afterward, so it doesn't clobber the label select() just set.
-    if (!hydratedRef.current && value && initialLabel) {
+    if (value && initialLabel) {
       setSelectedLabel(initialLabel);
-      hydratedRef.current = true;
+    } else if (initialLabel && !selectedLabel) {
+      setSelectedLabel(initialLabel);
+    } else if (!value && !initialLabel) {
+      setSelectedLabel("");
     }
   }, [value, initialLabel]);
 
@@ -69,7 +69,7 @@ export function UserSearchSelect({
     setQuery("");
     setResults([]);
     setOpen(false);
-    onChange(employee.userId!, label, employee);
+    onChange(employee.userId || employee.id, label, employee);
   }
 
   function clear() {
@@ -77,12 +77,12 @@ export function UserSearchSelect({
     onChange("", "", null);
   }
 
-  if (value && selectedLabel) {
+  if ((value || selectedLabel) && selectedLabel) {
     return (
-      <div className="flex h-9 items-center justify-between rounded-md border bg-background px-3 text-sm">
-        <span className="truncate">{selectedLabel}</span>
-        <button type="button" onClick={clear} className="ms-2 shrink-0 text-muted-foreground hover:text-foreground">
-          <X className="h-3.5 w-3.5" />
+      <div className="flex h-9 items-center justify-between rounded-md border border-primary/40 bg-primary/5 px-3 text-sm shadow-2xs">
+        <span className="truncate font-bold text-slate-900 dark:text-slate-100">{selectedLabel}</span>
+        <button type="button" onClick={clear} className="ms-2 shrink-0 text-rose-600 hover:text-rose-700 font-bold" title="تغيير الموظف">
+          <X className="h-4 w-4" />
         </button>
       </div>
     );

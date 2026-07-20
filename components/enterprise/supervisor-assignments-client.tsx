@@ -188,7 +188,7 @@ export function SupervisorAssignmentsClient() {
             <div className="space-y-3">
               <label className="space-y-1.5 text-sm block">
                 <span className="font-bold">الموظف</span>
-                <UserSearchSelect value={employeeId ? "x" : ""} initialLabel={employeeLabel} onChange={(_userId, label, employee) => { setEmployeeId(employee?.id ?? ""); setEmployeeLabel(label ?? ""); }} />
+                <UserSearchSelect value={employeeId || ""} initialLabel={employeeLabel} onChange={(userId, label, employee) => { setEmployeeId(employee?.id || userId || ""); setEmployeeLabel(label || ""); }} />
               </label>
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="space-y-1.5 text-sm">
