@@ -1,21 +1,49 @@
 "use client";
 
-import { useState } from "react";
-import { AlertTriangle, RefreshCw, Home, Copy, CheckCircle2, LogOut, Code, FileCode } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AlertTriangle, RefreshCw, Home, Copy, CheckCircle2, LogOut, Code, FileCode, Loader2 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Forbidden403 } from "@/components/hrms/forbidden-403";
 
 export default function HrmsError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   const [copied, setCopied] = useState(false);
+  const [fetchingDiagnostic, setFetchingDiagnostic] = useState(false);
+  const [diagnostic, setDiagnostic] = useState<{ message?: string; stack?: string; timestamp?: string } | null>(null);
 
-  const rawMessage = error.message || "Unknown runtime error";
   const digest = error.digest || "N/A";
-  const stack = error.stack || "";
+  const rawMessage = diagnostic?.message || error.message || "Unknown runtime error";
+  const stack = diagnostic?.stack || error.stack || "";
 
-  // A permission gate throwing "Forbidden" is expected, routine behavior,
-  // not a bug -- show the clean 403 screen instead of the raw diagnostic
-  // stack-trace box reserved for genuinely unexpected errors.
+  useEffect(() => {
+    if (digest !== "N/A" || error.message?.includes("Server Components render")) {
+      setFetchingDiagnostic(true);
+      fetch(`/api/internal/get-error-diagnostic?digest=${encodeURIComponent(digest !== "N/A" ? digest : "")}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.success && data.message) {
+            setDiagnostic({ message: data.message, stack: data.stack, timestamp: data.timestamp });
+          }
+        })
+        .catch(() => {})
+        .finally(() => setFetchingDiagnostic(false));
+    }
+  }, [digest, error.message]);
+
+  useEffect(() => {
+    if (!error) return;
+    fetch("/api/internal/report-client-error", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        digest: error.digest,
+        message: error.message,
+        name: error.name,
+        path: typeof window !== "undefined" ? window.location.pathname : undefined
+      })
+    }).catch(() => {});
+  }, [error]);
+
   if (rawMessage === "Forbidden") return <Forbidden403 />;
 
   const handleCopy = () => {
@@ -71,9 +99,19 @@ export default function HrmsError({ error, reset }: { error: Error & { digest?: 
 
         <div className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 mb-5 space-y-3 dark:border-rose-900/60 dark:bg-rose-950/40 font-mono text-xs">
           <div>
-            <span className="font-bold text-rose-900 dark:text-rose-200 block mb-1 flex items-center gap-1.5">
-              <Code className="h-4 w-4" />
-              <span>الرسالة التقنية (Error Message):</span>
+            <span className="font-bold text-rose-900 dark:text-rose-200 block mb-1 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Code className="h-4 w-4" />
+                <span>الرسالة التقنية (Error Message):</span>
+              </span>
+              {fetchingDiagnostic ? (
+                <span className="flex items-center gap-1 text-[10px] text-amber-600 animate-pulse">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <span>جلب التشخيص الدقيق من السيرفر...</span>
+                </span>
+              ) : diagnostic ? (
+                <span className="text-[10px] text-emerald-600 font-bold">✓ تم سحب التشخيص الفعلي من خادم Vercel</span>
+              ) : null}
             </span>
             <div className="p-3 bg-white dark:bg-slate-950 rounded-xl border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-300 font-bold select-all overflow-x-auto">
               {rawMessage}
