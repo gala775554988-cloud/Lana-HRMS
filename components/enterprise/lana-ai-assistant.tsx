@@ -23,13 +23,76 @@ type ChatMessage = {
   isStreaming?: boolean;
 };
 
-function LanaMarkdownRenderer({ content }: { content: string }) {
+function LanaMarkdownRenderer({ content, onConfirmAction }: { content: string; onConfirmAction?: (cmd: string) => void }) {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   function copyCode(code: string, idx: number) {
     navigator.clipboard.writeText(code);
     setCopiedIndex(idx);
     setTimeout(() => setCopiedIndex(null), 2000);
+  }
+
+  // Check if content contains a Double Validation JSON preview
+  if (content.includes('"doubleValidation": true') || content.includes('"doubleValidation":true') || content.includes("AWAITING_EXECUTIVE_CONFIRMATION")) {
+    try {
+      const jsonMatch = content.match(/\{[\s\S]*?"doubleValidation"[\s\S]*?\}/);
+      if (jsonMatch) {
+        const previewObj = JSON.parse(jsonMatch[0]);
+        return (
+          <div className="space-y-4 my-2 p-5 rounded-3xl border-2 border-amber-400/80 bg-gradient-to-br from-amber-50/90 via-white to-amber-100/50 dark:from-amber-950/60 dark:via-slate-900 dark:to-amber-900/40 text-slate-900 dark:text-slate-100 shadow-xl" dir="rtl">
+            <div className="flex items-center justify-between border-b border-amber-300/60 dark:border-amber-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <span className="grid h-10 w-10 place-items-center rounded-2xl bg-amber-500 text-white font-black text-base shadow-sm">👑</span>
+                <div>
+                  <h4 className="text-base font-black text-amber-950 dark:text-amber-200">{previewObj.previewTitle || "ملخص تنفيذي (Execution Preview) — التثبيت المزدوج"}</h4>
+                  <p className="text-xs font-bold text-amber-800 dark:text-amber-300 mt-0.5">يتطلب هذا الإجراء مصادقتك المباشرة (Double-Validation) قبل التنفيذ في قاعدة البيانات</p>
+                </div>
+              </div>
+              <span className="px-3 py-1 rounded-xl bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-100 text-xs font-black shrink-0">بانتظار الاعتماد</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white/90 dark:bg-slate-950/80 border border-amber-200 dark:border-amber-800/80 space-y-3">
+              <p className="text-sm font-extrabold leading-relaxed text-slate-800 dark:text-slate-200">{previewObj.previewMessage}</p>
+              {previewObj.payload ? (
+                <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border text-xs font-semibold">
+                  {Object.entries(previewObj.payload).map(([k, v]) => (
+                    <div key={k} className="truncate">
+                      <span className="text-muted-foreground block text-[10px] uppercase font-bold">{k}:</span>
+                      <span className="font-black text-primary truncate block mt-0.5">{String(v || "-")}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => onConfirmAction && onConfirmAction("إلغاء الإجراء وتجاهل التعديل")}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-100 transition"
+              >
+                ✖ إلغاء الإجراء
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onConfirmAction) {
+                    if (previewObj.actionType === "ESCALATE_WORKFLOW") {
+                      onConfirmAction(`قم فوراً بتنفيذ دالة confirmAndExecuteEscalation للطلب رقم (${previewObj.payload?.requestId}) وتوجيهه للمسؤول (${previewObj.payload?.targetManagerId}) والآن`);
+                    } else {
+                      onConfirmAction("تأكيد واعتماد الإجراء وتنفيذه فوراً في قاعدة البيانات");
+                    }
+                  }
+                }}
+                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 via-primary to-emerald-600 hover:from-amber-700 hover:to-emerald-700 text-white font-black text-xs shadow-md transition"
+              >
+                ✓ اعتماد وتنفيذ الإجراء في قاعدة البيانات الآن
+              </button>
+            </div>
+          </div>
+        );
+      }
+    } catch {}
   }
 
   // Split into code blocks vs regular text
@@ -433,7 +496,7 @@ export function LanaAiAssistant() {
 
                     {msg.role === "assistant" ? (
                       msg.content ? (
-                        <LanaMarkdownRenderer content={msg.content} />
+                        <LanaMarkdownRenderer content={msg.content} onConfirmAction={(cmd) => send(cmd)} />
                       ) : (
                         <div className="flex items-center gap-2 py-1 text-secondary dark:text-secondary/50">
                           <span className="flex gap-1">

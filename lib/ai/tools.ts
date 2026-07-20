@@ -787,6 +787,211 @@ export function createScopedHrTools(context: ToolAuthContext) {
           recommendation: "Ready to perform actions or answer specific questions based on this file data."
         };
       }
+    }),
+
+    analyzeApprovalWorkflow: makeTool({
+      description: "استقصاء الحالة وتحليل الاختناق لسلاسل الاعتماد المؤسسية / Check workflow status and bottleneck analysis for any request.",
+      parameters: z.object({
+        requestId: z.string().describe("رقم الطلب أو معرف مسار الاعتماد في قاعدة البيانات (e.g. cmr...) أو رقم طلب الإجازة/المباشرة")
+      }) as any,
+      execute: async ({ requestId }: any) => {
+        // 1. استقصاء الحالة من قاعدة البيانات الحية
+        const instance = await prisma.workflowInstance.findFirst({
+          where: {
+            OR: [
+              { id: requestId },
+              { entityId: requestId },
+              { id: { contains: requestId, mode: "insensitive" } }
+            ]
+          },
+          include: {
+            steps: { orderBy: { step: "asc" } }
+          }
+        });
+
+        if (!instance) {
+          // Check if it's directly in EmployeeRequest or LeaveRequest
+          const leaveReq = await prisma.leaveRequest.findFirst({ where: { OR: [{ id: requestId }, { id: { contains: requestId } }] }, include: { employee: true } });
+          if (leaveReq) {
+            const createdAt = leaveReq.createdAt.getTime();
+            const now = Date.now();
+            const hoursElapsed = (now - createdAt) / (1000 * 60 * 60);
+            if (leaveReq.status === "PENDING" && hoursElapsed > 24) {
+              return {
+                status: "Delayed / متأخر في الاعتماد",
+                bottleneck: "المدير المباشر / الموارد البشرية",
+                hoursElapsed: Number(hoursElapsed.toFixed(1)),
+                message: `⚠️ تنبيه اختناق إداري: الطلب رقم (#${leaveReq.id.slice(0, 8)}) للموظف (${leaveReq.employee.firstName} ${leaveReq.employee.lastName}) معلق منذ ${hoursElapsed.toFixed(1)} ساعة دون اتخاذ قرار.`,
+                actionRequired: "إعادة توجيه (Escalation) أو اعتماد فوري"
+              };
+            }
+            return { status: leaveReq.status, progress: `طلب إجازة ${leaveReq.status}`, hoursElapsed: Number(hoursElapsed.toFixed(1)) };
+          }
+          return { error: "الطلب أو مسار الاعتماد غير موجود في السجلات الحية لنظام لانا." };
+        }
+
+        // 2. تحليل الاختناق (إذا تجاوز الطلب 24 ساعة في خطوة معلقة)
+        const currentStep = instance.steps.find((s) => s.step === instance.currentStep && s.status === "PENDING") || instance.steps.find((s) => s.status === "PENDING");
+        if (!currentStep) {
+          return { status: instance.status, progress: `المرحلة رقم ${instance.currentStep} من أصل ${instance.steps.length} (${instance.status})` };
+        }
+
+        const stepCreatedAt = currentStep.createdAt ? new Date(currentStep.createdAt).getTime() : new Date(instance.createdAt).getTime();
+        const now = Date.now();
+        const hoursElapsed = (now - stepCreatedAt) / (1000 * 60 * 60);
+
+        let approverName = currentStep.approverUserId;
+        if (currentStep.approverUserId) {
+          const approverUser = await prisma.user.findUnique({ where: { id: currentStep.approverUserId }, select: { name: true, employeeProfile: { select: { firstName: true, lastName: true } } } });
+          if (approverUser) {
+            approverName = approverUser.employeeProfile ? `${approverUser.employeeProfile.firstName} ${approverUser.employeeProfile.lastName}` : (approverUser.name || currentStep.approverUserId);
+          }
+        }
+
+        if (hoursElapsed > 24) {
+          return {
+            status: "Delayed / متأخر في الاعتماد",
+            bottleneck: approverName || "المسؤول المعتمِد",
+            hoursElapsed: Number(hoursElapsed.toFixed(1)),
+            message: `⚠️ تنبيه اختناق إداري: الطلب رقم (#${instance.id.slice(0, 8)}) معلق منذ ${hoursElapsed.toFixed(1)} ساعة بانتظار قرار (${approverName || "المسؤول المعتمِد"}).`,
+            actionRequired: "إعادة توجيه (Escalation)",
+            canEscalate: true,
+            requestId: instance.id,
+            currentApproverId: currentStep.approverUserId
+          };
+        }
+
+        return {
+          status: "Active / قيد المراجعة الفعالة",
+          progress: `المرحلة رقم ${instance.currentStep} من أصل ${instance.steps.length}`,
+          currentApprover: approverName,
+          hoursElapsed: Number(hoursElapsed.toFixed(1))
+        };
+      }
+    }),
+
+    escalateWorkflow: makeTool({
+      description: "إعادة توجيه الطلب لمدير بديل في حال غياب أو تأخر المدير المباشر (تخضع لشرط التثبيت المزدوج Double-Validation) / Escalate or re-route workflow with double validation.",
+      parameters: z.object({
+        requestId: z.string().describe("معرف الطلب أو رقم مسار الاعتماد المراد تصعيده أو توجيهه"),
+        targetManagerId: z.string().describe("معرف أو رقم الموظف أو الدور للمدير البديل المراد توجيه الطلب إليه"),
+        reason: z.string().optional().describe("سبب التوجيه أو تصعيد الطلب")
+      }) as any,
+      execute: async ({ requestId, targetManagerId, reason }: any) => {
+        if (!canManageHr(context) && !context.isExecutive && !context.isDelegate) {
+          return { error: "عذراً: ليس لديك صلاحية تنفيذية لتوجيه أو تصعيد طلبات الاعتماد." };
+        }
+
+        // Resolve target manager label for clear Executive Preview
+        let targetLabel = targetManagerId;
+        const targetEmp = await prisma.employee.findFirst({
+          where: { OR: [{ id: targetManagerId }, { employeeNumber: targetManagerId }, { nationalId: targetManagerId }] },
+          select: { id: true, firstName: true, lastName: true, userId: true }
+        });
+        if (targetEmp) {
+          targetLabel = `${targetEmp.firstName} ${targetEmp.lastName} (رقم وظيفي: ${targetManagerId})`;
+        } else {
+          const targetUser = await prisma.user.findFirst({ where: { OR: [{ id: targetManagerId }, { username: targetManagerId }] }, select: { id: true, name: true } });
+          if (targetUser?.name) targetLabel = `${targetUser.name} (${targetUser.id})`;
+        }
+
+        // Double-Validation: Return Execution Preview requiring explicit user confirmation
+        return {
+          doubleValidation: true,
+          status: "AWAITING_EXECUTIVE_CONFIRMATION",
+          actionType: "ESCALATE_WORKFLOW",
+          previewTitle: "👑 ملخص تنفيذي (Execution Preview) — طلب تأكيد التوجيه المزدوج",
+          previewMessage: `أنت بصدد إعادة توجيه مسار الاعتماد للطلب رقم (#${requestId.slice(0, 8)}) إلى المدير البديل: ${targetLabel}. هل تؤكد التنفيذ النهائي في قاعدة البيانات؟`,
+          payload: {
+            requestId,
+            targetManagerId: targetEmp?.userId || targetEmp?.id || targetManagerId,
+            targetManagerName: targetLabel,
+            reason: reason || "تأخر في الاعتماد لأكثر من 24 ساعة (اختناق إداري)"
+          },
+          requiresConfirmation: true
+        };
+      }
+    }),
+
+    confirmAndExecuteEscalation: makeTool({
+      description: "تأكيد وتنفيذ إعادة توجيه مسار الاعتماد برمجياً في قاعدة البيانات بعد اعتماد المسؤول / Execute escalation after double validation.",
+      parameters: z.object({
+        requestId: z.string(),
+        targetManagerId: z.string(),
+        reason: z.string().optional()
+      }) as any,
+      execute: async ({ requestId, targetManagerId, reason }: any) => {
+        if (!canManageHr(context) && !context.isExecutive && !context.isDelegate) {
+          return { error: "عذراً: ليس لديك صلاحية تنفيذية لإتمام إعادة التوجيه." };
+        }
+
+        const instance = await prisma.workflowInstance.findFirst({
+          where: { OR: [{ id: requestId }, { entityId: requestId }] },
+          include: { steps: { orderBy: { step: "asc" } } }
+        });
+
+        if (!instance) {
+          return { error: "فشل العثور على مسار الاعتماد المستهدف في قاعدة البيانات." };
+        }
+
+        const pendingStep = instance.steps.find((s) => s.step === instance.currentStep && s.status === "PENDING") || instance.steps.find((s) => s.status === "PENDING");
+        if (!pendingStep) {
+          return { error: "لا توجد مرحلة معلقة بانتظار الاعتماد في هذا الطلب لإعادة توجيهها." };
+        }
+
+        const updatedStep = await prisma.workflowStep.update({
+          where: { id: pendingStep.id },
+          data: {
+            approverUserId: targetManagerId,
+            status: "PENDING",
+            comments: `[تمت إعادة التوجيه برمجياً عبر Lana AI Pro Max Delegate]: ${reason || "تجاوز المدة الزمنية المسموحة"}`
+          }
+        });
+
+        return {
+          success: true,
+          message: `✓ تم اعتماد وتنفيذ التوجيه بنجاح 100%! تم تحويل المرحلة رقم (${pendingStep.step}) في الطلب (#${instance.id.slice(0, 8)}) إلى المسؤول البديل في قاعدة البيانات الحية.`,
+          stepId: updatedStep.id,
+          newApproverId: targetManagerId
+        };
+      }
+    }),
+
+    modifyLeaveBalanceWithValidation: makeTool({
+      description: "تعديل أرصدة إجازات الموظف مع تطبيق التثبيت المزدوج (Double-Validation) / Modify employee leave balance with double validation.",
+      parameters: z.object({
+        employeeId: z.string().describe("الرقم الوظيفي أو معرف الموظف"),
+        newRemainingDays: z.number().describe("الرصيد المتبقي الجديد للأيام"),
+        reason: z.string().describe("سبب التعديل أو تسوية الرصيد")
+      }) as any,
+      execute: async ({ employeeId, newRemainingDays, reason }: any) => {
+        if (!canManageHr(context) && !context.isExecutive && !context.isDelegate) {
+          return { error: "عذراً: ليس لديك الصلاحية التنفيذية لتعديل أرصدة الموظفين." };
+        }
+
+        const emp = await prisma.employee.findFirst({
+          where: { OR: [{ id: employeeId }, { employeeNumber: employeeId }, { nationalId: employeeId }] },
+          select: { id: true, firstName: true, lastName: true, employeeNumber: true, odooRawData: true }
+        });
+
+        if (!emp) return { error: `لم يتم العثور على موظف بالرقم أو المعرف: ${employeeId}` };
+
+        return {
+          doubleValidation: true,
+          status: "AWAITING_EXECUTIVE_CONFIRMATION",
+          actionType: "MODIFY_LEAVE_BALANCE",
+          previewTitle: "👑 ملخص تنفيذي (Execution Preview) — طلب تأكيد تعديل الرصيد",
+          previewMessage: `أنت بصدد تعديل رصيد الإجازة السنوية للموظف: (${emp.firstName} ${emp.lastName} - #${emp.employeeNumber}) ليصبح الرصيد المتبقي: [ ${newRemainingDays} يوم ]. هل تؤكد التنفيذ في قاعدة البيانات؟`,
+          payload: {
+            employeeId: emp.id,
+            employeeName: `${emp.firstName} ${emp.lastName}`,
+            employeeNumber: emp.employeeNumber,
+            newRemainingDays,
+            reason
+          },
+          requiresConfirmation: true
+        };
+      }
     })
   };
 }
