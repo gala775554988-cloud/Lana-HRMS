@@ -3,6 +3,7 @@ import { tool } from "ai";
 import { prisma } from "@/lib/prisma";
 import { memoryCache } from "@/lib/cache/memory-cache";
 import { applyScopedWhere } from "@/lib/enterprise/hierarchy";
+import { executiveCommands, executeDirectModifyDB, type UiActionType, type DbOperationType } from "@/lib/ai/executiveControl";
 
 export type ToolAuthContext = {
   userId: string;
@@ -991,6 +992,51 @@ export function createScopedHrTools(context: ToolAuthContext) {
           },
           requiresConfirmation: true
         };
+      }
+    }),
+
+    modifyUI: makeTool({
+      description: "بروتوكول التحكم المباشر (Direct Control Protocol): التحكم في الواجهات وتعديل مكونات واجهة المستخدم UI/UX / Modify UI/UX components.",
+      parameters: z.object({
+        uiComponentId: z.string().describe("معرف واجهة المستخدم أو المكون البرمجي المراد تعديله أو حذفه"),
+        action: z.enum(["remove", "update", "add"]).describe("نوع العملية التنفيذية للواجهة"),
+        specs: z.record(z.string(), z.any()).describe("المواصفات البرمجية أو التصميمية أو الحقول المرفقة للتنفيذ")
+      }) as any,
+      execute: async ({ uiComponentId, action, specs }: any) => {
+        if (!canManageHr(context) && !context.isExecutive && !context.isDelegate) {
+          return { error: "عذراً: ليس لديك الصلاحية التنفيذية للتحكم المباشر بالواجهات." };
+        }
+        return executiveCommands.modifyUI(uiComponentId, action as UiActionType, specs || {}, context.userId);
+      }
+    }),
+
+    modifyDB: makeTool({
+      description: "بروتوكول التحكم المباشر (Direct Control Protocol): التحكم المباشر في جداول قاعدة البيانات واستعلامات PostgreSQL (تخضع لشرط التثبيت المزدوج Double-Validation) / Modify database schema or execute SQL query.",
+      parameters: z.object({
+        table: z.string().describe("اسم جدول قاعدة البيانات المستهدف مثل WorkflowInstance أو Employee"),
+        operation: z.enum(["delete", "update", "insert", "alter", "query"]).describe("نوع العملية أو الاستعلام"),
+        query: z.string().describe("نص استعلام SQL أو وصف العملية التفصيلي للتنفيذ")
+      }) as any,
+      execute: async ({ table, operation, query }: any) => {
+        if (!canManageHr(context) && !context.isExecutive && !context.isDelegate) {
+          return { error: "عذراً: ليس لديك الصلاحية التنفيذية للتحكم المباشر بقاعدة البيانات." };
+        }
+        return executiveCommands.modifyDB(table, operation as DbOperationType, query, context.userId);
+      }
+    }),
+
+    confirmAndExecuteModifyDB: makeTool({
+      description: "تأكيد وتنفيذ استعلام قاعدة البيانات برمجياً بعد مصادقة المسؤول (Double-Validation Confirmation) / Execute confirmed DB modification.",
+      parameters: z.object({
+        table: z.string(),
+        operation: z.enum(["delete", "update", "insert", "alter", "query"]),
+        query: z.string()
+      }) as any,
+      execute: async ({ table, operation, query }: any) => {
+        if (!canManageHr(context) && !context.isExecutive && !context.isDelegate) {
+          return { error: "عذراً: ليس لديك الصلاحية التنفيذية النهائية لتنفيذ هذا الاستعلام المباشر." };
+        }
+        return executeDirectModifyDB(table, operation as DbOperationType, query, context.userId);
       }
     })
   };

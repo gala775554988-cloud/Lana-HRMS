@@ -79,6 +79,8 @@ function LanaMarkdownRenderer({ content, onConfirmAction }: { content: string; o
                   if (onConfirmAction) {
                     if (previewObj.actionType === "ESCALATE_WORKFLOW") {
                       onConfirmAction(`قم فوراً بتنفيذ دالة confirmAndExecuteEscalation للطلب رقم (${previewObj.payload?.requestId}) وتوجيهه للمسؤول (${previewObj.payload?.targetManagerId}) والآن`);
+                    } else if (previewObj.actionType === "MODIFY_DB") {
+                      onConfirmAction(`قم فوراً بتنفيذ دالة confirmAndExecuteModifyDB على جدول (${previewObj.payload?.table}) بالعملية (${previewObj.payload?.operation}) والاستعلام (${previewObj.payload?.query}) والآن`);
                     } else {
                       onConfirmAction("تأكيد واعتماد الإجراء وتنفيذه فوراً في قاعدة البيانات");
                     }
