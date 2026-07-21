@@ -4,7 +4,15 @@ import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/rbac";
 import { writeAuditLog } from "@/lib/audit";
 import { computeEmployeePayroll, markPayrollSourcesConsumed } from "@/lib/enterprise/payroll-engine";
+import { notifyRole } from "@/lib/enterprise/notifications";
 import type { PayrollStatus } from "@prisma/client";
+
+const TRANSITION_NOTIFICATIONS: Record<string, { roles: string[]; title: string; body: (run: { name: string }) => string; type: "INFO" | "SUCCESS" | "WARNING" | "ERROR" }> = {
+  submit: { roles: ["HR_MANAGER", "SUPER_ADMIN"], title: "مسير رواتب بانتظار الاعتماد", body: (run) => `مسير "${run.name}" أُرسل للمراجعة ويحتاج اعتمادك.`, type: "INFO" },
+  approve: { roles: ["PAYROLL_OFFICER", "SUPER_ADMIN"], title: "تم اعتماد مسير الرواتب", body: (run) => `تم اعتماد مسير "${run.name}"، جاهز للصرف.`, type: "SUCCESS" },
+  pay: { roles: ["HR_MANAGER", "PAYROLL_OFFICER", "SUPER_ADMIN"], title: "تم صرف الرواتب", body: (run) => `تم صرف رواتب مسير "${run.name}" بنجاح.`, type: "SUCCESS" },
+  cancel: { roles: ["HR_MANAGER", "PAYROLL_OFFICER", "SUPER_ADMIN"], title: "تم إلغاء مسير رواتب", body: (run) => `تم إلغاء مسير "${run.name}".`, type: "WARNING" }
+};
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -143,6 +151,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     entityId: id,
     metadata: { from: run.status, to: transition.to, reason: body?.reason }
   });
+
+  const notification = TRANSITION_NOTIFICATIONS[action];
+  if (notification) {
+    await notifyRole(
+      notification.roles,
+      notification.title,
+      notification.body(updated),
+      notification.type,
+      `/payroll?tab=payroll-run&runId=${id}`
+    ).catch(() => undefined);
+  }
 
   return NextResponse.json({ success: true, run: updated });
 }
