@@ -1,16 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, AlertTriangle, TrendingUp, Users, CalendarClock, Activity, FileWarning } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Button } from "@/components/ui/button";
+import {
+  Loader2, AlertTriangle, TrendingUp, Users, CalendarClock, Activity, FileWarning,
+  PlusCircle, ListChecks, Wallet, Clock, MinusCircle, Lock, Archive
+} from "lucide-react";
+import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-type StatusCounts = { DRAFT: number; PROCESSING: number; APPROVED: number; PAID: number; CANCELLED: number };
+type StatusCounts = { DRAFT: number; PROCESSING: number; APPROVED: number; PAID: number; CANCELLED: number; LOCKED: number; ARCHIVED: number };
 type CostRow = { name: string; gross: number; net: number; employeeCount: number };
+type TrendPoint = { period: string; gross: number; net: number };
 type DashboardData = {
   statusCounts: StatusCounts;
-  latestRun: { id: string; name: string; period: string; status: string; totals: { gross: number; net: number; employeeCount: number } } | null;
+  latestRun: { id: string; name: string; period: string; status: string; totals: { gross: number; net: number; employeeCount: number; overtimeTotal: number; deductionTotal: number } } | null;
+  kpis: { activeEmployeeCount: number; avgNetPerEmployee: number; overtimeTotal: number; deductionTotal: number };
+  costTrend: TrendPoint[];
   departmentCost: CostRow[];
   branchCost: CostRow[];
   missingData: { missingContracts: number; missingSalaryAmount: number };
@@ -23,7 +31,9 @@ const STATUS_LABEL: Record<string, string> = {
   PROCESSING: "قيد المراجعة",
   APPROVED: "معتمد",
   PAID: "مصروف",
-  CANCELLED: "ملغي"
+  CANCELLED: "ملغي",
+  LOCKED: "مقفل",
+  ARCHIVED: "مؤرشف"
 };
 
 const ACTION_LABEL: Record<string, string> = {
@@ -31,11 +41,38 @@ const ACTION_LABEL: Record<string, string> = {
   payroll_submit: "إرسال للمراجعة",
   payroll_approve: "اعتماد المسير",
   payroll_pay: "صرف الرواتب",
-  payroll_cancel: "إلغاء المسير"
+  payroll_cancel: "إلغاء المسير",
+  payroll_lock: "قفل المسير",
+  payroll_unlock: "فتح قفل المسير",
+  payroll_archive: "أرشفة المسير",
+  payroll_recalculate: "إعادة احتساب",
+  payroll_duplicate: "نسخ مسير رواتب"
 };
 
 function currency(value: number) {
   return value.toLocaleString("ar-SA", { maximumFractionDigits: 0 });
+}
+
+function KpiCard({ icon: Icon, label, value, tone = "primary" }: { icon: any; label: string; value: string; tone?: "primary" | "emerald" | "amber" | "rose" }) {
+  const toneClass = {
+    primary: "text-primary bg-primary/10",
+    emerald: "text-emerald-600 bg-emerald-100 dark:bg-emerald-950/40",
+    amber: "text-amber-600 bg-amber-100 dark:bg-amber-950/40",
+    rose: "text-rose-600 bg-rose-100 dark:bg-rose-950/40"
+  }[tone];
+  return (
+    <Card className="rounded-2xl">
+      <CardContent className="p-4 flex items-center gap-3">
+        <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${toneClass}`}>
+          <Icon className="h-5 w-5" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs text-muted-foreground font-semibold truncate">{label}</p>
+          <p className="text-lg font-black mt-0.5">{value}</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 export function PayrollDashboard() {
@@ -61,11 +98,24 @@ export function PayrollDashboard() {
     return <p className="text-center text-muted-foreground py-16">تعذر تحميل لوحة معلومات الرواتب</p>;
   }
 
-  const { statusCounts, latestRun, departmentCost, branchCost, missingData, upcomingPeriods, recentActivity } = data;
+  const { statusCounts, latestRun, kpis, costTrend, departmentCost, branchCost, missingData, upcomingPeriods, recentActivity } = data;
   const hasMissingData = missingData.missingContracts > 0 || missingData.missingSalaryAmount > 0;
+  const secondaryStatuses = (["LOCKED", "ARCHIVED"] as const).filter((s) => statusCounts[s] > 0);
 
   return (
     <div className="space-y-6" dir="rtl">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-black flex items-center gap-2"><Wallet className="h-5 w-5 text-primary" />نظرة عامة على الرواتب</h2>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild size="sm" className="gap-1.5">
+            <Link href="/payroll?tab=payroll-run"><PlusCircle className="h-4 w-4" />مسير رواتب جديد</Link>
+          </Button>
+          <Button asChild size="sm" variant="outline" className="gap-1.5">
+            <Link href="/payroll?tab=activity"><ListChecks className="h-4 w-4" />سجل النشاط الكامل</Link>
+          </Button>
+        </div>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {(["DRAFT", "PROCESSING", "APPROVED", "PAID", "CANCELLED"] as const).map((status) => (
           <Card key={status} className="rounded-2xl">
@@ -75,6 +125,24 @@ export function PayrollDashboard() {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      {secondaryStatuses.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {secondaryStatuses.map((status) => (
+            <Badge key={status} variant="outline" className="gap-1.5 py-1.5 px-3">
+              {status === "LOCKED" ? <Lock className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
+              {STATUS_LABEL[status]}: {statusCounts[status]}
+            </Badge>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard icon={Users} label="إجمالي الموظفين النشطين" value={kpis.activeEmployeeCount.toLocaleString("ar-SA")} tone="primary" />
+        <KpiCard icon={Wallet} label="متوسط صافي الراتب" value={currency(kpis.avgNetPerEmployee)} tone="emerald" />
+        <KpiCard icon={Clock} label="إجمالي الوقت الإضافي (آخر مسير)" value={currency(kpis.overtimeTotal)} tone="amber" />
+        <KpiCard icon={MinusCircle} label="إجمالي الاستقطاعات (آخر مسير)" value={currency(kpis.deductionTotal)} tone="rose" />
       </div>
 
       {latestRun ? (
@@ -98,7 +166,17 @@ export function PayrollDashboard() {
             </div>
           </CardContent>
         </Card>
-      ) : null}
+      ) : (
+        <Card className="rounded-2xl border-dashed">
+          <CardContent className="py-12 text-center space-y-3">
+            <Wallet className="h-10 w-10 mx-auto text-muted-foreground/50" />
+            <p className="text-muted-foreground text-sm">لا يوجد أي مسير رواتب بعد</p>
+            <Button asChild size="sm" className="gap-1.5">
+              <Link href="/payroll?tab=payroll-run"><PlusCircle className="h-4 w-4" />إنشاء أول مسير رواتب</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {hasMissingData ? (
         <Card className="rounded-2xl border-amber-300 bg-amber-50/70 dark:border-amber-800 dark:bg-amber-950/30">
@@ -118,6 +196,24 @@ export function PayrollDashboard() {
                 <span>{missingData.missingSalaryAmount} موظف نشط بدون راتب أساسي فعّال</span>
               </div>
             ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {costTrend.length > 1 ? (
+        <Card className="rounded-2xl">
+          <CardHeader><CardTitle>اتجاه تكلفة الرواتب عبر الفترات المصروفة</CardTitle></CardHeader>
+          <CardContent className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={costTrend} margin={{ left: 8, right: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="period" />
+                <YAxis />
+                <Tooltip formatter={(value: number) => currency(value)} />
+                <Line type="monotone" dataKey="gross" name="إجمالي" stroke="#2ED3C6" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="net" name="صافي" stroke="#7C6CF8" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
       ) : null}
@@ -166,7 +262,7 @@ export function PayrollDashboard() {
               <p className="text-center text-muted-foreground py-6 text-sm">لا توجد فترات رواتب مفتوحة قادمة</p>
             ) : (
               upcomingPeriods.map((period) => (
-                <div key={period.id} className="flex items-center justify-between rounded-xl border p-3 text-sm">
+                <div key={period.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 rounded-xl border p-3 text-sm">
                   <span className="font-bold">{period.name}</span>
                   <span className="text-muted-foreground text-xs">
                     {new Date(period.startDate).toLocaleDateString("ar-SA")} → {new Date(period.endDate).toLocaleDateString("ar-SA")}
@@ -184,7 +280,7 @@ export function PayrollDashboard() {
               <p className="text-center text-muted-foreground py-6 text-sm">لا يوجد نشاط بعد</p>
             ) : (
               recentActivity.map((entry) => (
-                <div key={entry.id} className="flex items-center justify-between rounded-xl border p-3 text-sm">
+                <div key={entry.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 rounded-xl border p-3 text-sm">
                   <span className="font-semibold">{ACTION_LABEL[entry.action] ?? entry.action}</span>
                   <span className="text-muted-foreground text-xs">{entry.actorName} · {new Date(entry.createdAt).toLocaleString("ar-SA")}</span>
                 </div>

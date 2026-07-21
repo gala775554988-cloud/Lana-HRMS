@@ -2,7 +2,8 @@ import { ModulePageBody } from "@/components/hrms/module-page-body";
 import { MergedModuleTabs } from "@/components/hrms/merged-module-tabs";
 import { PayrollRunManager } from "@/components/enterprise/payroll-run-manager";
 import { PayrollDashboard } from "@/components/enterprise/payroll-dashboard";
-import { LayoutDashboard, DollarSign, MinusCircle, PlusCircle, Receipt, CalendarRange, Building2, Gift } from "lucide-react";
+import { PayrollActivityFeed } from "@/components/enterprise/payroll-activity-feed";
+import { LayoutDashboard, DollarSign, MinusCircle, PlusCircle, Receipt, CalendarRange, Building2, Gift, ListChecks } from "lucide-react";
 
 export default async function PayrollPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const query = await searchParams;
@@ -19,7 +20,8 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
         { value: "payroll-items", label: "بنود الرواتب", icon: <Receipt className="h-4 w-4" />, content: activeTab === "payroll-items" ? <ModulePageBody resourceKey="payroll-items" query={query} showModuleTabs={false} tabValue="payroll-items" /> : null },
         { value: "allowances", label: "البدلات", icon: <PlusCircle className="h-4 w-4" />, content: activeTab === "allowances" ? <ModulePageBody resourceKey="allowances" query={query} showModuleTabs={false} tabValue="allowances" /> : null },
         { value: "deductions", label: "الاستقطاعات", icon: <MinusCircle className="h-4 w-4" />, content: activeTab === "deductions" ? <ModulePageBody resourceKey="deductions" query={query} showModuleTabs={false} tabValue="deductions" /> : null },
-        { value: "bonuses", label: "المكافآت والعمولات", icon: <Gift className="h-4 w-4" />, content: activeTab === "bonuses" ? <ModulePageBody resourceKey="bonuses" query={query} showModuleTabs={false} tabValue="bonuses" /> : null }
+        { value: "bonuses", label: "المكافآت والعمولات", icon: <Gift className="h-4 w-4" />, content: activeTab === "bonuses" ? <ModulePageBody resourceKey="bonuses" query={query} showModuleTabs={false} tabValue="bonuses" /> : null },
+        { value: "activity", label: "سجل النشاط", icon: <ListChecks className="h-4 w-4" />, content: activeTab === "activity" ? <PayrollActivityFeed /> : null }
       ]}
     />
   );

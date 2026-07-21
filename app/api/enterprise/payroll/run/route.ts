@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/rbac";
-import { computeEmployeePayroll } from "@/lib/enterprise/payroll-engine";
+import { computeAndUpsertPayrollItems } from "@/lib/enterprise/payroll-engine";
 import { writeAuditLog } from "@/lib/audit";
 
 export const runtime = "nodejs";
@@ -73,72 +73,21 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const employeeWhere: Record<string, unknown> = { status: "ACTIVE" };
-  if (body.employeeIds?.length) employeeWhere.id = { in: body.employeeIds };
-  if (body.companyId) employeeWhere.companyId = body.companyId;
-  if (body.branchId) employeeWhere.branchId = body.branchId;
-  if (body.departmentId) employeeWhere.departmentId = body.departmentId;
-
-  const employees = await prisma.employee.findMany({ where: employeeWhere, select: { id: true } });
-
-  const items: Array<{ employeeId: string; netPay: number; error?: string }> = [];
-  for (const employee of employees) {
-    try {
-      const breakdown = await computeEmployeePayroll(employee.id, startDate, endDate);
-      await prisma.payrollItem.upsert({
-        where: { payrollRunId_employeeId: { payrollRunId: run.id, employeeId: employee.id } },
-        update: {
-          baseSalary: breakdown.baseSalary,
-          allowanceTotal: breakdown.allowanceTotal,
-          bonusTotal: breakdown.bonusTotal,
-          overtimeTotal: breakdown.overtimeTotal,
-          grossPay: breakdown.grossPay,
-          insuranceDeduction: breakdown.insuranceDeduction,
-          taxTotal: breakdown.taxTotal,
-          loanDeduction: breakdown.loanDeduction,
-          advanceDeduction: breakdown.advanceDeduction,
-          absenceDeduction: breakdown.absenceDeduction,
-          lateDeduction: breakdown.lateDeduction,
-          penaltyDeduction: breakdown.penaltyDeduction,
-          deductionTotal: breakdown.deductionTotal,
-          netPay: breakdown.netPay,
-          currency: breakdown.currency,
-          costCenterId: body.costCenterId
-        },
-        create: {
-          payrollRunId: run.id,
-          employeeId: employee.id,
-          baseSalary: breakdown.baseSalary,
-          allowanceTotal: breakdown.allowanceTotal,
-          bonusTotal: breakdown.bonusTotal,
-          overtimeTotal: breakdown.overtimeTotal,
-          grossPay: breakdown.grossPay,
-          insuranceDeduction: breakdown.insuranceDeduction,
-          taxTotal: breakdown.taxTotal,
-          loanDeduction: breakdown.loanDeduction,
-          advanceDeduction: breakdown.advanceDeduction,
-          absenceDeduction: breakdown.absenceDeduction,
-          lateDeduction: breakdown.lateDeduction,
-          penaltyDeduction: breakdown.penaltyDeduction,
-          deductionTotal: breakdown.deductionTotal,
-          netPay: breakdown.netPay,
-          currency: breakdown.currency,
-          costCenterId: body.costCenterId
-        }
-      });
-      items.push({ employeeId: employee.id, netPay: breakdown.netPay });
-    } catch (error: any) {
-      items.push({ employeeId: employee.id, netPay: 0, error: error?.message || String(error) });
-    }
-  }
+  const { employeeCount, items, errorCount } = await computeAndUpsertPayrollItems(run.id, startDate, endDate, {
+    employeeIds: body.employeeIds,
+    companyId: body.companyId,
+    branchId: body.branchId,
+    departmentId: body.departmentId,
+    costCenterId: body.costCenterId
+  });
 
   await writeAuditLog({
     actorUserId: session.user.id,
     action: "create",
     entity: "payrollRun",
     entityId: run.id,
-    metadata: { period: body.period, employeeCount: employees.length, errors: items.filter((i) => i.error).length }
+    metadata: { period: body.period, employeeCount, errors: errorCount }
   });
 
-  return NextResponse.json({ success: true, run, computed: items.length, errors: items.filter((i) => i.error).length, items });
+  return NextResponse.json({ success: true, run, computed: items.length, errors: errorCount, items });
 }

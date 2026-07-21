@@ -671,6 +671,8 @@ enum PayrollStatus {
   APPROVED
   PAID
   CANCELLED
+  LOCKED
+  ARCHIVED
 }
 
 enum LoanStatus {
@@ -869,6 +871,10 @@ model PayrollRun {
   approvedById   String?
   approvedAt     DateTime?
   paidAt         DateTime?
+  lockedAt       DateTime?
+  lockedById     String?
+  archivedAt     DateTime?
+  archivedById   String?
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
   payrollPeriod  PayrollPeriod?     @relation(fields: [periodId], references: [id], onDelete: SetNull)

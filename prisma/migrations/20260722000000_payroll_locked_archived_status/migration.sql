@@ -1,0 +1,8 @@
+-- Add LOCKED and ARCHIVED as additional PayrollStatus values (additive, non-breaking).
+ALTER TYPE "PayrollStatus" ADD VALUE IF NOT EXISTS 'LOCKED';
+ALTER TYPE "PayrollStatus" ADD VALUE IF NOT EXISTS 'ARCHIVED';
+
+ALTER TABLE "PayrollRun" ADD COLUMN IF NOT EXISTS "lockedAt" TIMESTAMP(3);
+ALTER TABLE "PayrollRun" ADD COLUMN IF NOT EXISTS "lockedById" TEXT;
+ALTER TABLE "PayrollRun" ADD COLUMN IF NOT EXISTS "archivedAt" TIMESTAMP(3);
+ALTER TABLE "PayrollRun" ADD COLUMN IF NOT EXISTS "archivedById" TEXT;

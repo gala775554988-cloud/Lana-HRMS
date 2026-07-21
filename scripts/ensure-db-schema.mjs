@@ -202,7 +202,13 @@ async function ensureDbSchema() {
     `DO $$ BEGIN ALTER TABLE "PayrollRun" ADD CONSTRAINT "PayrollRun_periodId_fkey" FOREIGN KEY ("periodId") REFERENCES "PayrollPeriod"("id") ON DELETE SET NULL ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE "PayrollRun" ADD CONSTRAINT "PayrollRun_costCenterId_fkey" FOREIGN KEY ("costCenterId") REFERENCES "PayrollCostCenter"("id") ON DELETE SET NULL ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE "PayrollItem" ADD CONSTRAINT "PayrollItem_costCenterId_fkey" FOREIGN KEY ("costCenterId") REFERENCES "PayrollCostCenter"("id") ON DELETE SET NULL ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
-    `DO $$ BEGIN ALTER TABLE "EmployeeBonus" ADD CONSTRAINT "EmployeeBonus_employeeId_fkey" FOREIGN KEY ("employeeId") REFERENCES "Employee"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`
+    `DO $$ BEGIN ALTER TABLE "EmployeeBonus" ADD CONSTRAINT "EmployeeBonus_employeeId_fkey" FOREIGN KEY ("employeeId") REFERENCES "Employee"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `ALTER TYPE "PayrollStatus" ADD VALUE IF NOT EXISTS 'LOCKED';`,
+    `ALTER TYPE "PayrollStatus" ADD VALUE IF NOT EXISTS 'ARCHIVED';`,
+    `ALTER TABLE "PayrollRun" ADD COLUMN IF NOT EXISTS "lockedAt" TIMESTAMP(3);`,
+    `ALTER TABLE "PayrollRun" ADD COLUMN IF NOT EXISTS "lockedById" TEXT;`,
+    `ALTER TABLE "PayrollRun" ADD COLUMN IF NOT EXISTS "archivedAt" TIMESTAMP(3);`,
+    `ALTER TABLE "PayrollRun" ADD COLUMN IF NOT EXISTS "archivedById" TEXT;`
   ];
 
   let successCount = 0;

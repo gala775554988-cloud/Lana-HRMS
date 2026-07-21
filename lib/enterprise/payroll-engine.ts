@@ -161,6 +161,88 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
   };
 }
 
+export type RunEmployeeScope = {
+  employeeIds?: string[];
+  companyId?: string;
+  branchId?: string;
+  departmentId?: string;
+  costCenterId?: string;
+};
+
+/** Shared by every place that needs to (re)compute a run's PayrollItems for
+ * its matched employees -- initial creation (run/route.ts), Recalculate, and
+ * Duplicate. Upserts rather than replaces, so calling it again on the same
+ * run is always safe (matches the existing "DRAFT may be recomputed many
+ * times" invariant) -- never marks anything consumed, that only ever
+ * happens once, at pay time (see markPayrollSourcesConsumed above). */
+export async function computeAndUpsertPayrollItems(
+  runId: string,
+  periodStartDate: Date,
+  periodEndDate: Date,
+  scope: RunEmployeeScope
+) {
+  const employeeWhere: Record<string, unknown> = { status: "ACTIVE" };
+  if (scope.employeeIds?.length) employeeWhere.id = { in: scope.employeeIds };
+  if (scope.companyId) employeeWhere.companyId = scope.companyId;
+  if (scope.branchId) employeeWhere.branchId = scope.branchId;
+  if (scope.departmentId) employeeWhere.departmentId = scope.departmentId;
+
+  const employees = await prisma.employee.findMany({ where: employeeWhere, select: { id: true } });
+
+  const items: Array<{ employeeId: string; netPay: number; error?: string }> = [];
+  for (const employee of employees) {
+    try {
+      const breakdown = await computeEmployeePayroll(employee.id, periodStartDate, periodEndDate);
+      await prisma.payrollItem.upsert({
+        where: { payrollRunId_employeeId: { payrollRunId: runId, employeeId: employee.id } },
+        update: {
+          baseSalary: breakdown.baseSalary,
+          allowanceTotal: breakdown.allowanceTotal,
+          bonusTotal: breakdown.bonusTotal,
+          overtimeTotal: breakdown.overtimeTotal,
+          grossPay: breakdown.grossPay,
+          insuranceDeduction: breakdown.insuranceDeduction,
+          taxTotal: breakdown.taxTotal,
+          loanDeduction: breakdown.loanDeduction,
+          advanceDeduction: breakdown.advanceDeduction,
+          absenceDeduction: breakdown.absenceDeduction,
+          lateDeduction: breakdown.lateDeduction,
+          penaltyDeduction: breakdown.penaltyDeduction,
+          deductionTotal: breakdown.deductionTotal,
+          netPay: breakdown.netPay,
+          currency: breakdown.currency,
+          costCenterId: scope.costCenterId
+        },
+        create: {
+          payrollRunId: runId,
+          employeeId: employee.id,
+          baseSalary: breakdown.baseSalary,
+          allowanceTotal: breakdown.allowanceTotal,
+          bonusTotal: breakdown.bonusTotal,
+          overtimeTotal: breakdown.overtimeTotal,
+          grossPay: breakdown.grossPay,
+          insuranceDeduction: breakdown.insuranceDeduction,
+          taxTotal: breakdown.taxTotal,
+          loanDeduction: breakdown.loanDeduction,
+          advanceDeduction: breakdown.advanceDeduction,
+          absenceDeduction: breakdown.absenceDeduction,
+          lateDeduction: breakdown.lateDeduction,
+          penaltyDeduction: breakdown.penaltyDeduction,
+          deductionTotal: breakdown.deductionTotal,
+          netPay: breakdown.netPay,
+          currency: breakdown.currency,
+          costCenterId: scope.costCenterId
+        }
+      });
+      items.push({ employeeId: employee.id, netPay: breakdown.netPay });
+    } catch (error: any) {
+      items.push({ employeeId: employee.id, netPay: 0, error: error?.message || String(error) });
+    }
+  }
+
+  return { employeeCount: employees.length, items, errorCount: items.filter((i) => i.error).length };
+}
+
 /** Called exactly once, when a PayrollRun is actually paid (never on a
  * DRAFT compute/recompute) -- marks the overtime/bonus rows this breakdown
  * consumed so a later run never double-pays them, and decrements
