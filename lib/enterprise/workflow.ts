@@ -3,6 +3,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { resolveApprovalChain } from "@/lib/enterprise/hierarchy";
 import { createEnterpriseNotification, notifyUsers } from "@/lib/enterprise/notifications";
 import { recordLeaveApprovalUsage } from "@/lib/employee/leave-balance";
+import { recordLeaveTypeApprovalUsage } from "@/lib/enterprise/leave-engine";
 
 export async function createEnterpriseWorkflow(employeeId: string, type: string, entityId: string) {
   const approvers = await resolveApprovalChain(employeeId, type.toLowerCase());
@@ -51,6 +52,14 @@ export async function createEnterpriseWorkflow(employeeId: string, type: string,
       link: `/approvals?tab=outbox&highlight=${instance.id}`
     });
   }
+
+  await writeAuditLog({
+    actorUserId: employee?.userId ?? undefined,
+    action: "workflow:submit",
+    entity: "workflowInstance",
+    entityId: instance.id,
+    metadata: { type, employeeId, entityId, approverCount: approvers.length, autoApproved: !hasMandatoryStage }
+  });
 
   return instance;
 }
@@ -159,6 +168,7 @@ export async function decideWorkflowStep({
         .catch(() => null);
       if (nextLeaveStatus === "APPROVED" && updatedLeave) {
         await recordLeaveApprovalUsage(instance.employeeId, Number(updatedLeave.days)).catch(() => null);
+        await recordLeaveTypeApprovalUsage(instance.employeeId, updatedLeave.leaveTypeId, Number(updatedLeave.days), updatedLeave.startDate).catch(() => null);
       }
     }
   }

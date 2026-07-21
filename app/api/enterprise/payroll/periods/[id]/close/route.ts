@@ -27,7 +27,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!period) return NextResponse.json({ success: false, message: "Not found" }, { status: 404 });
   if (period.status === "CLOSED") return NextResponse.json({ success: false, message: "الفترة مغلقة بالفعل" }, { status: 409 });
 
-  const unsettled = period.runs.filter((run) => run.status !== "PAID" && run.status !== "CANCELLED");
+  const unsettled = period.runs.filter((run) => !["PAID", "CANCELLED", "LOCKED", "ARCHIVED"].includes(run.status));
   if (unsettled.length > 0) {
     return NextResponse.json({
       success: false,

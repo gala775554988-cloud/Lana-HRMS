@@ -20,7 +20,24 @@ type ChatMessage = {
   content: string;
   files?: UploadedFile[];
   isStreaming?: boolean;
+  /** Structured tool-call result saved alongside this message (see
+   * aIAssistantMessage.output) -- the API already returns it when loading a
+   * past conversation, but it was never rendered; formatToolOutput below
+   * turns it into a displayable fenced JSON block. */
+  output?: unknown;
 };
+
+/** Renders a tool result for display: objects/arrays become a pretty-printed
+ * JSON code block (reusing LanaMarkdownRenderer's existing code-fence
+ * support), plain strings pass through as-is. Returns null when there's
+ * nothing worth showing (empty/undefined output). */
+function formatToolOutput(result: unknown): string | null {
+  if (result === undefined || result === null) return null;
+  if (typeof result === "string") return result.trim() ? result : null;
+  if (Array.isArray(result) && result.length === 0) return null;
+  if (typeof result === "object" && Object.keys(result as object).length === 0) return null;
+  return `بيانات الطلب:\n\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``;
+}
 
 type ConversationSummary = {
   id: string;
@@ -262,24 +279,42 @@ export function LanaAiFullPageClient() {
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       let fullContent = "";
+      // The backend streams two different shapes depending on which path
+      // answered: the local orchestrator fallback hand-frames every chunk as
+      // `0:"..."\n` (AI SDK data-stream protocol), while the primary Gemini/
+      // OpenAI path (toTextStreamResponse) sends plain unframed text. Detect
+      // which one we got from the first chunk so plain text isn't silently
+      // dropped by a parser that only understood the framed format.
+      let isFramed: boolean | null = null;
 
       if (reader) {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
           const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n").filter(Boolean);
+          if (!chunk) continue;
+          if (isFramed === null) isFramed = /^\d+:/.test(chunk);
 
-          for (const line of lines) {
-            if (line.startsWith("0:")) {
-              try {
-                const textChunk = JSON.parse(line.slice(2));
-                fullContent += textChunk;
-                setMessages((prev) =>
-                  prev.map((m) => (m.id === assistantMsgId ? { ...m, content: fullContent } : m))
-                );
-              } catch {}
+          if (isFramed) {
+            const lines = chunk.split("\n").filter(Boolean);
+            for (const line of lines) {
+              const match = line.match(/^(\d+):([\s\S]*)$/);
+              if (!match) continue;
+              if (match[1] === "0") {
+                try {
+                  const textChunk = JSON.parse(match[2]);
+                  fullContent += textChunk;
+                  setMessages((prev) =>
+                    prev.map((m) => (m.id === assistantMsgId ? { ...m, content: fullContent } : m))
+                  );
+                } catch {}
+              }
             }
+          } else {
+            fullContent += chunk;
+            setMessages((prev) =>
+              prev.map((m) => (m.id === assistantMsgId ? { ...m, content: fullContent } : m))
+            );
           }
         }
       }
@@ -465,6 +500,12 @@ export function LanaAiFullPageClient() {
                   ) : (
                     <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
                   )}
+
+                  {msg.role === "assistant" && !msg.isStreaming && formatToolOutput(msg.output) ? (
+                    <div className={msg.content ? "mt-3 border-t border-slate-200 dark:border-slate-800 pt-3" : ""}>
+                      <LanaMarkdownRenderer content={formatToolOutput(msg.output)!} />
+                    </div>
+                  ) : null}
                 </div>
 
                 {msg.role === "assistant" && msg.content && !msg.isStreaming && (

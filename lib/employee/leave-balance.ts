@@ -59,3 +59,12 @@ export async function recordLeaveApprovalUsage(employeeId: string, days: number)
   const seed = await getEffectiveLeaveBalance(employeeId);
   return prisma.employeeLeaveBalance.create({ data: { employeeId, accrued: seed.accrued, used: seed.used + days } });
 }
+
+/** Symmetric with recordLeaveApprovalUsage -- called when a previously
+ * APPROVED leave request is cancelled, so the aggregate balance reflects
+ * that those days were never actually taken. */
+export async function reverseLeaveApprovalUsage(employeeId: string, days: number) {
+  const existing = await prisma.employeeLeaveBalance.findUnique({ where: { employeeId } });
+  if (!existing) return null;
+  return prisma.employeeLeaveBalance.update({ where: { employeeId }, data: { used: { decrement: days } } });
+}

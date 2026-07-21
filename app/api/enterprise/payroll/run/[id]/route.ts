@@ -1,31 +1,24 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { hasPermission } from "@/lib/rbac";
 import { writeAuditLog } from "@/lib/audit";
-import { computeEmployeePayroll, markPayrollSourcesConsumed } from "@/lib/enterprise/payroll-engine";
+import { computeEmployeePayroll, computeAndUpsertPayrollItems, markPayrollSourcesConsumed } from "@/lib/enterprise/payroll-engine";
+import { notifyRole } from "@/lib/enterprise/notifications";
+import { canManagePayroll, canApprovePayroll } from "@/lib/enterprise/payroll-permissions";
 import type { PayrollStatus } from "@prisma/client";
+
+const TRANSITION_NOTIFICATIONS: Record<string, { roles: string[]; title: string; body: (run: { name: string }) => string; type: "INFO" | "SUCCESS" | "WARNING" | "ERROR" }> = {
+  submit: { roles: ["HR_MANAGER", "SUPER_ADMIN"], title: "مسير رواتب بانتظار الاعتماد", body: (run) => `مسير "${run.name}" أُرسل للمراجعة ويحتاج اعتمادك.`, type: "INFO" },
+  approve: { roles: ["PAYROLL_OFFICER", "SUPER_ADMIN"], title: "تم اعتماد مسير الرواتب", body: (run) => `تم اعتماد مسير "${run.name}"، جاهز للصرف.`, type: "SUCCESS" },
+  pay: { roles: ["HR_MANAGER", "PAYROLL_OFFICER", "SUPER_ADMIN"], title: "تم صرف الرواتب", body: (run) => `تم صرف رواتب مسير "${run.name}" بنجاح.`, type: "SUCCESS" },
+  cancel: { roles: ["HR_MANAGER", "PAYROLL_OFFICER", "SUPER_ADMIN"], title: "تم إلغاء مسير رواتب", body: (run) => `تم إلغاء مسير "${run.name}".`, type: "WARNING" },
+  lock: { roles: ["HR_MANAGER", "SUPER_ADMIN"], title: "تم قفل مسير الرواتب", body: (run) => `تم قفل مسير "${run.name}" نهائياً بعد الصرف.`, type: "INFO" },
+  unlock: { roles: ["HR_MANAGER", "SUPER_ADMIN"], title: "تم فتح قفل مسير الرواتب", body: (run) => `تم إعادة فتح مسير "${run.name}" للتعديل.`, type: "WARNING" },
+  archive: { roles: ["HR_MANAGER", "SUPER_ADMIN"], title: "تمت أرشفة مسير الرواتب", body: (run) => `تمت أرشفة مسير "${run.name}".`, type: "INFO" }
+};
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function canManagePayroll(session: any) {
-  const roles = (session?.user?.roles as string[]) ?? [];
-  const permissions = (session?.user?.permissions as string[]) ?? [];
-  return roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER") || roles.includes("PAYROLL_OFFICER") || hasPermission(permissions, { action: "manage", resource: "payroll" });
-}
-
-/** Only HR_MANAGER/SUPER_ADMIN can approve or disburse a run -- PAYROLL_OFFICER
- * (and anyone with plain manage:payroll) can create/submit/cancel a DRAFT, but
- * the second pair of eyes on money leaving the company is a hard role check,
- * not just a permission flag. This is a deliberately simpler two-tier
- * approval (create/submit -> approve/pay) rather than the generic per-employee
- * WorkflowInstance engine, which is anchored to a single employee's org unit
- * and doesn't fit a run spanning many employees at once. */
-function canApprovePayroll(session: any) {
-  const roles = (session?.user?.roles as string[]) ?? [];
-  return roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER");
-}
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -55,7 +48,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     { gross: 0, net: 0, deductions: 0 }
   );
 
-  return NextResponse.json({ success: true, run, totals, employeeCount: run.items.length });
+  const historyRaw = await prisma.auditLog.findMany({
+    where: { entity: "payrollRun", entityId: id },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, action: true, metadata: true, createdAt: true, actor: { select: { name: true } } }
+  });
+  const history = historyRaw.map((entry) => ({
+    id: entry.id,
+    action: entry.action,
+    actorName: entry.actor?.name ?? "النظام",
+    createdAt: entry.createdAt,
+    metadata: entry.metadata
+  }));
+
+  return NextResponse.json({ success: true, run, totals, employeeCount: run.items.length, history });
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -70,11 +76,43 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const run = await prisma.payrollRun.findUnique({ where: { id } });
   if (!run) return NextResponse.json({ success: false, message: "Not found" }, { status: 404 });
 
+  // Recalculate isn't a status transition -- it just re-runs the compute
+  // engine for the run's already-matched employees. Only allowed before
+  // approval (DRAFT/PROCESSING): once APPROVED/PAID, numbers are final and
+  // must go through the controlled pay-time recompute+consume instead, never
+  // a silent recalculation that could change what was approved.
+  if (action === "recalculate") {
+    if (!["DRAFT", "PROCESSING"].includes(run.status)) {
+      return NextResponse.json({ success: false, message: `لا يمكن إعادة الاحتساب لمسير في حالة ${run.status}` }, { status: 409 });
+    }
+    if (!canManagePayroll(session)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+    if (!run.periodStartDate || !run.periodEndDate) {
+      return NextResponse.json({ success: false, message: "لا يمكن إعادة الاحتساب -- الفترة الزمنية للمسير غير محددة" }, { status: 409 });
+    }
+    const { employeeCount, items, errorCount } = await computeAndUpsertPayrollItems(id, run.periodStartDate, run.periodEndDate, {
+      companyId: run.companyId ?? undefined,
+      branchId: run.branchId ?? undefined,
+      departmentId: run.departmentId ?? undefined,
+      costCenterId: run.costCenterId ?? undefined
+    });
+    await writeAuditLog({
+      actorUserId: session.user.id,
+      action: "payroll_recalculate",
+      entity: "payrollRun",
+      entityId: id,
+      metadata: { employeeCount, errors: errorCount }
+    });
+    return NextResponse.json({ success: true, computed: items.length, errors: errorCount });
+  }
+
   const transitions: Record<string, { from: PayrollStatus[]; to: PayrollStatus; requiresApprover?: boolean }> = {
     submit: { from: ["DRAFT"], to: "PROCESSING" },
     approve: { from: ["PROCESSING"], to: "APPROVED", requiresApprover: true },
     pay: { from: ["APPROVED"], to: "PAID", requiresApprover: true },
-    cancel: { from: ["DRAFT", "PROCESSING", "APPROVED"], to: "CANCELLED" }
+    cancel: { from: ["DRAFT", "PROCESSING", "APPROVED"], to: "CANCELLED" },
+    lock: { from: ["PAID"], to: "LOCKED", requiresApprover: true },
+    unlock: { from: ["LOCKED"], to: "PAID", requiresApprover: true },
+    archive: { from: ["LOCKED", "CANCELLED"], to: "ARCHIVED", requiresApprover: true }
   };
 
   const transition = transitions[action];
@@ -91,6 +129,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (action === "submit") data.submittedAt = now;
   if (action === "approve") { data.approvedAt = now; data.approvedById = session.user.id; }
   if (action === "pay") data.paidAt = now;
+  if (action === "lock") { data.lockedAt = now; data.lockedById = session.user.id; }
+  if (action === "unlock") { data.lockedAt = null; data.lockedById = null; }
+  if (action === "archive") { data.archivedAt = now; data.archivedById = session.user.id; }
 
   // Paying is the ONE point where payroll numbers are finalized and the
   // sources they draw from are actually consumed: overtime/bonus rows get
@@ -143,6 +184,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     entityId: id,
     metadata: { from: run.status, to: transition.to, reason: body?.reason }
   });
+
+  const notification = TRANSITION_NOTIFICATIONS[action];
+  if (notification) {
+    await notifyRole(
+      notification.roles,
+      notification.title,
+      notification.body(updated),
+      notification.type,
+      `/payroll?tab=payroll-run&runId=${id}`
+    ).catch(() => undefined);
+  }
 
   return NextResponse.json({ success: true, run: updated });
 }
