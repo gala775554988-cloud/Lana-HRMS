@@ -10,6 +10,7 @@ import { getOdooEnvConfig } from "./config";
 import { OdooClient } from "./client";
 import { OdooConfigurationError } from "./auth";
 import { discoverSyncableFields, sanitizeRawRecord, SENSITIVE_FIELDS } from "./dynamic-fields";
+import { resolveEmployeeNumberFromRecord, getConfiguredEmployeeNumberField } from "./employee-numbers";
 import { syncEmployeeDocuments } from "./documents";
 import { syncEmployeeIdentitiesOnly, type IdentitySyncOutcome, type OdooIdentityRecord } from "./identity-sync";
 import { resolveOdooHospital } from "./hospital-resolver";
@@ -56,6 +57,8 @@ type RuntimeConnection = {
   uid?: number | null;
   sessionId?: string | null;
 };
+
+export type RuntimeConnectionLike = RuntimeConnection;
 
 function delegate(model: string): Delegate {
   const resolved = (prisma as unknown as Record<string, Delegate>)[model];
@@ -205,16 +208,13 @@ export async function syncEmployeeFromOdoo(odooRecord: any) {
   ).trim();
 
   // 2. Employee Number (الرقم الوظيفي في أودو)
-  // Prioritize barcode, employee_code, pin, or Odoo ID — DO NOT use registration_number here if it matches nationalId or is over 8 digits!
-  let rawEmpCode = sanitizedData.barcode || sanitizedData.employee_code || sanitizedData.pin || sanitizedData.x_studio_employee_number || sanitizedData.x_employee_code;
-  if (!rawEmpCode || rawEmpCode === nationalId || String(rawEmpCode).length > 8) {
-    if (sanitizedData.registration_number && sanitizedData.registration_number !== nationalId && String(sanitizedData.registration_number).length <= 8) {
-      rawEmpCode = sanitizedData.registration_number;
-    } else {
-      rawEmpCode = sanitizedData.id;
-    }
-  }
-  const employeeNumber = formatEmployeeCode(rawEmpCode);
+  // RESOLUTION CONTRACT: never use Odoo's internal auto-increment record.id as
+  // an employee number (that produced the sequential 3311/3312/3313 bug).
+  // Resolve from the persisted authoritative field first, then the candidate
+  // chain; if Odoo has no number at all, use the explicit ODOO-{id}
+  // placeholder which the reconciliation engine repairs on its next run.
+  const resolution = resolveEmployeeNumberFromRecord(sanitizedData, await getConfiguredEmployeeNumberField().catch(() => null));
+  const employeeNumber = resolution?.value ?? `ODOO-${sanitizedData.id}`;
 
   // استخراج النصوص الصافية من الكائنات العلائقية (Many2one tuples [id, "Name"])
   const jobTitle = extractMany2oneText(sanitizedData.job_id || sanitizedData.job_title, "غير محدد");
@@ -562,6 +562,9 @@ export class OdooSyncService {
     if (!empId) return { success: false, reason: `Local employee not found for Odoo #${odooId}` };
 
     const raw: any = mapOdooEmployeeToLana(row);
+    // Authoritative الرقم الوظيفي guard for the lazy single-employee path too.
+    const singleEmpNumResolution = resolveEmployeeNumberFromRecord(row, await getConfiguredEmployeeNumberField().catch(() => null));
+    if (singleEmpNumResolution) raw.employeeNumber = singleEmpNumResolution.value;
     const dId = many2oneId((row as any).department_id);
     const jId = many2oneId((row as any).job_id);
     const cId = many2oneId((row as any).company_id);
@@ -727,6 +730,11 @@ export class OdooSyncService {
         let pages = 0;
         let totalFetched = 0;
         let hasMore = true;
+
+        // Authoritative الرقم الوظيفي source (auto-detected by the
+        // reconciliation engine and persisted in AppSetting) -- applied to
+        // every record in this bulk path so numbers can never drift again.
+        const preferredEmployeeNumberField = await getConfiguredEmployeeNumberField().catch(() => null);
 
         const baseDomain = odooIncrementalDomain(since) as any[];
         const isIdFirst = options.mode === "ID_FIRST" || (!options.mode && !options.employeeIds?.length);
@@ -927,6 +935,11 @@ export class OdooSyncService {
           for(const row of rows) {
             try {
               const raw: any = mapOdooEmployeeToLana(row);
+              // Enforce the authoritative Odoo employee-number source on the
+              // mapped payload so the stored الرقم الوظيفي always equals the
+              // value visible in Odoo (never an internal id fallback).
+              const empNumResolution = resolveEmployeeNumberFromRecord(row, preferredEmployeeNumberField);
+              if (empNumResolution) raw.employeeNumber = empNumResolution.value;
               const dId = many2oneId((row as any).department_id);
               const jId = many2oneId((row as any).job_id);
               const cId = many2oneId((row as any).company_id);

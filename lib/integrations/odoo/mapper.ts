@@ -1,9 +1,5 @@
 import type { LanaAttendance, LanaContract, LanaDepartment, LanaEmployee, LanaLeave, LanaPayrollItem, MapperDefinition, OdooRecord, OdooWriteValues, SyncConflict, SyncEntity } from "./types";
-
-function formatEmployeeCodeHelper(code?: string | number | null): string {
-  if (code === undefined || code === null || code === "") return `ODOO-${Date.now()}`;
-  return String(code).trim();
-}
+import { resolveEmployeeNumberFromRecord } from "./employee-numbers";
 
 export const ODOO_MAPPERS: Record<string, MapperDefinition> = {
   employees: {
@@ -243,15 +239,12 @@ export function mapOdooEmployeeToLana(record: OdooRecord): Record<string, unknow
   const nationalIdStr = String(record.identification_id || record.l10n_sa_iqama_number || record.national_id || record.registration_number || `ODOO-${record.id}`).trim();
 
   // 2. Employee Number (الرقم الوظيفي المعتمد من أودو)
-  let rawEmpCode = record.barcode || record.employee_code || record.pin || record.x_studio_employee_number || record.x_employee_code;
-  if (!rawEmpCode || rawEmpCode === nationalIdStr || String(rawEmpCode).length > 8) {
-    if (record.registration_number && record.registration_number !== nationalIdStr && String(record.registration_number).length <= 8) {
-      rawEmpCode = record.registration_number;
-    } else {
-      rawEmpCode = record.id;
-    }
-  }
-  const formattedCode = formatEmployeeCodeHelper(rawEmpCode);
+  // Resolved via the shared resolver -- NEVER falls back to Odoo's internal
+  // auto-increment record.id (the source of the sequential 3311/3312/3313
+  // wrong numbers). When Odoo has no number, an explicit ODOO-{id}
+  // placeholder is emitted and repaired by the reconciliation engine.
+  const empNumResolution = resolveEmployeeNumberFromRecord(record);
+  const formattedCode = empNumResolution?.value ?? `ODOO-${record.id}`;
 
   return stripEmpty({
     employeeNumber: formattedCode,

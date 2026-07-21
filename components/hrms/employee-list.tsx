@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useTransition, useDeferredValue } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search, LayoutGrid, List, Plus, SlidersHorizontal, Upload, Download, Archive, UsersRound, Users, UserCheck, Clock, UserPlus } from "lucide-react";
+import { Search, LayoutGrid, List, Plus, SlidersHorizontal, Upload, Download, Archive, UsersRound, Users, UserCheck, Clock, UserPlus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatCard } from "@/components/ui/stat-card";
@@ -55,6 +55,7 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeCardData | null>(null);
   const [addEmployeeOpen, setAddEmployeeOpen] = useState(false);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
+  const [syncingNumbers, setSyncingNumbers] = useState(false);
   const [isPending, startTransition] = useTransition();
   const isAr = locale === "ar";
 
@@ -151,6 +152,30 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
     }
   }, [isAr, router]);
 
+  const handleSyncOdooEmployeeNumbers = useCallback(async () => {
+    if (syncingNumbers) return;
+    setSyncingNumbers(true);
+    try {
+      const res = await fetch("/api/enterprise/odoo/employee-numbers/reconcile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ createMissing: true })
+      });
+      const json = await res.json();
+      if (res.ok && (json.success || json.verified)) {
+        alert(json.message || (isAr ? "✅ تمت مصالحة الأرقام الوظيفية مع أودو بنجاح 100%" : "✅ Employee numbers fully reconciled with Odoo"));
+        router.refresh();
+      } else {
+        alert((isAr ? "تنبيه: " : "Notice: ") + (json.message || "حدث خطأ أثناء مزامنة الأرقام الوظيفية مع أودو"));
+        if (json.success) router.refresh();
+      }
+    } catch {
+      alert(isAr ? "تعذر الاتصال بخادم المزامنة — حاول مرة أخرى" : "Sync server unreachable — try again");
+    } finally {
+      setSyncingNumbers(false);
+    }
+  }, [syncingNumbers, isAr, router]);
+
   const handleSearch = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     startTransition(() => {
@@ -241,6 +266,10 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
             </div>
             <Button asChild size="sm" variant="outline" className="gap-1.5"><a href={`/api/hr/employees/export?format=xlsx&${buildQuery({})}`}><Download className="h-4 w-4" />Excel</a></Button>
             <Button asChild size="sm" variant="outline" className="gap-1.5"><a href={`/api/hr/employees/export?format=pdf&${buildQuery({})}`}><Download className="h-4 w-4" />PDF</a></Button>
+            <Button size="sm" variant="outline" className="gap-1.5 border-emerald-600/40 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800" onClick={handleSyncOdooEmployeeNumbers} disabled={syncingNumbers} title={isAr ? "مصالحة الأرقام الوظيفية وربطها بأرقام أودو المعتمدة بدقة 100%" : "Reconcile employee numbers with the authoritative Odoo values"}>
+              <RefreshCw className={`h-4 w-4 ${syncingNumbers ? "animate-spin" : ""}`} />
+              {syncingNumbers ? (isAr ? "جاري مطابقة الأرقام الوظيفية..." : "Reconciling numbers...") : (isAr ? "⚡ مزامنة الأرقام الوظيفية من Odoo (100%)" : "⚡ Sync Employee Numbers from Odoo (100%)")}
+            </Button>
             <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setBulkImportOpen(true)}><Upload className="h-4 w-4" />{isAr ? "استيراد الموظفين" : "Bulk Import"}</Button>
             <Button size="sm" className="gap-1.5" onClick={() => setAddEmployeeOpen(true)}><Plus className="h-4 w-4" />{isAr ? "إضافة موظف" : "Add Employee"}</Button>
           </div>

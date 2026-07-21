@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Users, MapPin, Briefcase, Plus, Search, LayoutGrid, Table as TableIcon, ExternalLink, Edit } from "lucide-react";
+import { Building2, Users, MapPin, Briefcase, Plus, Search, LayoutGrid, Table as TableIcon, ExternalLink, Edit, RefreshCw } from "lucide-react";
 
 type Hospital = {
   id: string;
@@ -36,7 +36,29 @@ export function HospitalsClient() {
   const [editing, setEditing] = useState<Hospital | null>(null);
   const [form, setForm] = useState({ name: "", code: "", departmentId: "", branchId: "", isActive: true });
   const [message, setMessage] = useState("");
+  const [reconciling, setReconciling] = useState(false);
+  const [reconcileMessage, setReconcileMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const handleReconcile = async () => {
+    setReconciling(true);
+    setReconcileMessage(null);
+    try {
+      const res = await fetch("/api/enterprise/hospitals/reconcile", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        setReconcileMessage(data.message);
+        load();
+        router.refresh();
+      } else {
+        setReconcileMessage(`خطأ: ${data.message}`);
+      }
+    } catch (err: any) {
+      setReconcileMessage(`خطأ في المزامنة: ${err.message || String(err)}`);
+    } finally {
+      setReconciling(false);
+    }
+  };
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -139,6 +161,16 @@ export function HospitalsClient() {
                 جدول
               </Button>
             </div>
+            <Button
+              type="button"
+              onClick={handleReconcile}
+              disabled={reconciling}
+              className="rounded-xl gap-1.5 h-10 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold shadow-sm"
+              title="مزامنة وربط كافة الموظفين بالمستشفيات وفروعهم بدقة عالية 100%"
+            >
+              <RefreshCw className={`h-4 w-4 ${reconciling ? "animate-spin" : ""}`} />
+              <span>{reconciling ? "جاري المزامنة والربط..." : "⚡ مزامنة وربط الموظفين (100%)"}</span>
+            </Button>
             <Button type="button" onClick={() => startEdit()} className="rounded-xl gap-1.5 h-10">
               <Plus className="h-4 w-4" />
               إضافة مستشفى
@@ -146,6 +178,13 @@ export function HospitalsClient() {
           </div>
         </div>
       </div>
+
+      {reconcileMessage && (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/95 p-4 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-200 text-sm font-bold flex items-center justify-between shadow-2xs">
+          <span>{reconcileMessage}</span>
+          <button onClick={() => setReconcileMessage(null)} className="text-xs underline hover:opacity-80">إغلاق</button>
+        </div>
+      )}
 
       {editing || form.name ? (
         <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">

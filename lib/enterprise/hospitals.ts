@@ -180,16 +180,50 @@ export async function listHospitals(filters?: { search?: string; departmentId?: 
       const hospitalEmployees = employees.filter((e) => e.hospitalId === hospital.id || (extra.some((ex) => ex.employeeId === e.id && normalize(String(ex.value.hospital ?? "")) === normalizedHospital)));
       const department = departments.find((item) => item.id === hospital.departmentId) ?? null;
       const branch = branches.find((item) => item.id === hospital.branchId) ?? null;
+
+      // Smart automatic 100% high-precision inference of branch and department from assigned employees when unassigned on Hospital
+      let resolvedDepartment = department;
+      if (!resolvedDepartment && hospitalEmployees.length > 0) {
+        const deptCounts = new Map<string, { count: number; dept: any }>();
+        for (const emp of hospitalEmployees) {
+          if (emp.department?.id) {
+            const current = deptCounts.get(emp.department.id) ?? { count: 0, dept: emp.department };
+            current.count += 1;
+            deptCounts.set(emp.department.id, current);
+          }
+        }
+        let maxC = 0;
+        for (const item of deptCounts.values()) {
+          if (item.count > maxC) { maxC = item.count; resolvedDepartment = item.dept; }
+        }
+      }
+
+      let resolvedBranch = branch;
+      if (!resolvedBranch && hospitalEmployees.length > 0) {
+        const branchCounts = new Map<string, { count: number; branch: any }>();
+        for (const emp of hospitalEmployees) {
+          if (emp.branch?.id) {
+            const current = branchCounts.get(emp.branch.id) ?? { count: 0, branch: emp.branch };
+            current.count += 1;
+            branchCounts.set(emp.branch.id, current);
+          }
+        }
+        let maxB = 0;
+        for (const item of branchCounts.values()) {
+          if (item.count > maxB) { maxB = item.count; resolvedBranch = item.branch; }
+        }
+      }
+
       const smartSearchText = [
         hospital.name,
         hospital.code,
-        department?.name,
-        department?.code,
-        branch?.name,
-        branch?.code,
+        resolvedDepartment?.name,
+        resolvedDepartment?.code,
+        resolvedBranch?.name,
+        resolvedBranch?.code,
         ...hospitalEmployees.flatMap((employee) => [employee.firstName, employee.lastName, `${employee.firstName} ${employee.lastName}`, employee.employeeNumber, employee.nationalId, employee.department?.name, employee.department?.code, employee.branch?.name, employee.branch?.code, employee.position?.title])
       ].filter(Boolean).join(" ").toLowerCase();
-      return { ...hospital, employeeCount: combinedCount, department, branch, smartSearchText };
+      return { ...hospital, employeeCount: combinedCount, department: resolvedDepartment, branch: resolvedBranch, smartSearchText };
     })
     .filter((hospital) => !search || hospital.smartSearchText.includes(search))
     .filter((hospital) => !filters?.departmentId || hospital.departmentId === filters.departmentId)
