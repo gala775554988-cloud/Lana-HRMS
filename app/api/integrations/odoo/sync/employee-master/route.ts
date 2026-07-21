@@ -5,6 +5,7 @@ import { hashPassword } from "@/lib/password";
 import { OdooSyncService, requireOdooIntegrationAccess } from "@/lib/integrations/odoo/sync";
 import { bulkSyncAllOdooDocuments } from "@/lib/integrations/odoo/documents";
 import { many2oneId, many2oneName } from "@/lib/integrations/odoo/mapper";
+import { resolveOdooHospital } from "@/lib/integrations/odoo/hospital-resolver";
 import type { OdooRecord } from "@/lib/integrations/odoo/types";
 import { isOdooIntegrationEnabled } from "@/lib/settings";
 
@@ -396,14 +397,9 @@ export async function POST(request: NextRequest) {
         }
         localByOdooId.set(item.odooId, employeeId);
         if (item.hospitalName) {
-          const hospital = await prisma.hospital.upsert({
-            where: { name: item.hospitalName },
-            update: {},
-            create: { name: item.hospitalName, code: ("ODOO-HOSP-" + item.hospitalName).slice(0, 191) },
-            select: { id: true }
-          }).catch(() => null);
-          if (hospital?.id) {
-            await prisma.employee.update({ where: { id: employeeId }, data: { hospitalId: hospital.id } }).catch(() => {});
+          const resolved = await resolveOdooHospital(prisma.hospital, prisma.branch, item.hospitalName);
+          if (resolved?.hospitalId) {
+            await prisma.employee.update({ where: { id: employeeId }, data: { hospitalId: resolved.hospitalId } }).catch(() => {});
           }
         }
         if (item.contractData) {

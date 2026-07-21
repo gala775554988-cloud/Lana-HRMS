@@ -12,6 +12,7 @@ import { OdooConfigurationError } from "./auth";
 import { discoverSyncableFields, sanitizeRawRecord, SENSITIVE_FIELDS } from "./dynamic-fields";
 import { syncEmployeeDocuments } from "./documents";
 import { syncEmployeeIdentitiesOnly, type IdentitySyncOutcome, type OdooIdentityRecord } from "./identity-sync";
+import { resolveOdooHospital } from "./hospital-resolver";
 import {
   asDate,
   asDateString,
@@ -231,24 +232,9 @@ export async function syncEmployeeFromOdoo(odooRecord: any) {
   let branchId: string | undefined;
   const schoolName = extractMany2oneText(sanitizedData.x_studio_school_name || sanitizedData.school || sanitizedData.work_location_id);
   if (schoolName && schoolName !== 'غير محدد' && schoolName !== 'false') {
-    try {
-      const cleanSlug = schoolName.replace(/[^a-zA-Z0-9\u0600-\u06FF]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || `HOSP-${Date.now()}`;
-      const hospitalCode = `ODOO-HOSP-${cleanSlug}`;
-      const hospital = await prisma.hospital.upsert({
-        where: { code: hospitalCode },
-        update: { name: schoolName, isActive: true },
-        create: { name: schoolName, code: hospitalCode, isActive: true }
-      });
-      hospitalId = hospital.id;
-
-      const branchCode = `HOSP-${hospital.id}`;
-      const branch = await prisma.branch.upsert({
-        where: { code: branchCode },
-        update: { name: schoolName, hospitalId: hospital.id, isActive: true },
-        create: { name: schoolName, code: branchCode, hospitalId: hospital.id, isActive: true }
-      });
-      branchId = branch.id;
-    } catch {}
+    const resolved = await resolveOdooHospital(prisma.hospital, prisma.branch, schoolName);
+    hospitalId = resolved?.hospitalId;
+    branchId = resolved?.branchId;
   } else if (branchNameRaw && branchNameRaw !== 'غير محدد') {
     try {
       const cleanBSlug = branchNameRaw.replace(/[^a-zA-Z0-9\u0600-\u06FF]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || `BR-${Date.now()}`;
@@ -585,14 +571,8 @@ export class OdooSyncService {
 
     let hospitalId: string | undefined;
     if (hospitalName) {
-      const existingH = await delegate("hospital").findFirst({ where: { name: hospitalName } }) as any;
-      if (existingH) hospitalId = existingH.id;
-      else {
-        try {
-          const createdH = await delegate("hospital").create({ data: { name: hospitalName, code: `ODOO-SCHOOL-${hospitalName}`.slice(0, 191) } }) as any;
-          hospitalId = createdH.id;
-        } catch {}
-      }
+      const resolved = await resolveOdooHospital(delegate("hospital") as any, delegate("branch") as any, hospitalName);
+      hospitalId = resolved?.hospitalId;
     }
 
     const vals = {
@@ -896,36 +876,19 @@ export class OdooSyncService {
 
           // Hospital ("school" in Odoo) has no Odoo-side id scheme of its own
           // (unlike department/job/company, which each get their own synced
-          // entity) -- resolve by exact name match instead, creating a
-          // Hospital directory row on first sight of a new name.
+          // entity) -- resolve every distinct name seen in this batch through
+          // the same canonical resolver every other sync path uses, so a
+          // hospital synced here matches the same Hospital row a single-record
+          // resync or the employee-master sync would resolve to.
           const hospitalNames = Array.from(new Set(
             rows.map((r) => many2oneName((r as any).school) || textValue((r as any).school) || many2oneName((r as any).x_studio_school_name) || textValue((r as any).x_studio_school_name)).filter(Boolean) as string[]
           ));
           const hospitalMap = new Map<string, string>();
           const hospitalBranchMap = new Map<string, string>();
-          if (hospitalNames.length > 0) {
-            try {
-              const existingHospitals = await delegate("hospital").findMany({ where: { name: { in: hospitalNames } } }) as any[];
-              for (const h of existingHospitals) hospitalMap.set(h.name, h.id);
-              const missingNames = hospitalNames.filter((name) => !hospitalMap.has(name));
-              for (const name of missingNames) {
-                try {
-                  const created = await delegate("hospital").create({ data: { name, code: `ODOO-SCHOOL-${name}`.slice(0, 191) } }) as any;
-                  hospitalMap.set(name, created.id);
-                } catch {}
-              }
-              for (const name of hospitalNames) {
-                const hospId = hospitalMap.get(name);
-                if (!hospId) continue;
-                try {
-                  let branch = await delegate("branch").findFirst({ where: { OR: [{ name }, { code: `HOSP-${hospId}`.slice(0, 191) }] } }) as any;
-                  if (!branch) {
-                    branch = await delegate("branch").create({ data: { name, code: `HOSP-${hospId}`.slice(0, 191), city: "Riyadh", isActive: true } }) as any;
-                  }
-                  if (branch?.id) hospitalBranchMap.set(name, branch.id);
-                } catch {}
-              }
-            } catch {}
+          for (const name of hospitalNames) {
+            const resolved = await resolveOdooHospital(delegate("hospital") as any, delegate("branch") as any, name);
+            if (resolved?.hospitalId) hospitalMap.set(name, resolved.hospitalId);
+            if (resolved?.branchId) hospitalBranchMap.set(name, resolved.branchId);
           }
 
           // Bulk managers - try ODOO-{id} first, then barcode lookup via Odoo read if needed (for performance, only ODOO-{id} in bulk)
