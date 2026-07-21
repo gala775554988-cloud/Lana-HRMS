@@ -157,7 +157,7 @@ export async function applyScopedWhere(resourceKey: string, baseWhere: Record<st
   if (resourceKey === "departments" && profile.employee?.departmentId) return andWhere(baseWhere, { id: profile.employee.departmentId });
 
   const employeeIdResources = new Set([
-    "documents", "contracts", "attendance", "leave-requests", "payroll-items", "loans", "overtime", "allowances", "deductions", "performance", "training-enrollments"
+    "documents", "contracts", "attendance", "leave-requests", "payroll-items", "loans", "overtime", "allowances", "deductions", "performance", "training-enrollments", "bonuses"
   ]);
   if (employeeIdResources.has(resourceKey)) return andWhere(baseWhere, { employee: employeeScope });
   if (resourceKey === "assets") return andWhere(baseWhere, { assignedEmployee: employeeScope });

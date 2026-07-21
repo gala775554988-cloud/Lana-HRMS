@@ -1732,6 +1732,7 @@ export class OdooSyncService {
             const netPay = Number(row.net_wage) || baseSalary;
             let allowanceTotal = 0;
             let deductionTotal = 0;
+            let overtimeTotal = 0;
 
             let lines: OdooRecord[] = [];
             try {
@@ -1742,8 +1743,18 @@ export class OdooSyncService {
 
             for (const line of lines) {
               const code = String(line.code || "").toUpperCase();
+              const name = String(line.name || "").toLowerCase();
               const amount = Number(line.amount) || 0;
               if (skipLineCodes.has(code) || amount === 0) continue;
+              // Odoo's standard hr_payroll overtime rule codes ("OT",
+              // "OVERTIME") aren't a normal allowance/deduction line -- fold
+              // them into overtimeTotal instead, same field the local
+              // payroll engine (lib/enterprise/payroll-engine.ts) computes
+              // for locally-created overtime requests.
+              if (code === "OT" || code === "OVERTIME" || name.includes("overtime") || name.includes("إضافي") || name.includes("اضافي")) {
+                overtimeTotal += Math.abs(amount);
+                continue;
+              }
               try {
                 const lineData = {
                   employeeId: localEmployeeId,
@@ -1778,7 +1789,8 @@ export class OdooSyncService {
               baseSalary,
               allowanceTotal,
               deductionTotal,
-              overtimeTotal: 0,
+              overtimeTotal,
+              grossPay: baseSalary + allowanceTotal + overtimeTotal,
               netPay,
               currency: "SAR",
               odooPayslipId: Number(row.id),

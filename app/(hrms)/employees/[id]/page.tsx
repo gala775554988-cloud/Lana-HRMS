@@ -129,6 +129,10 @@ export default async function EmployeeProfilePage({
     auditLogs,
     socialInsurance,
     socialInsuranceDocuments,
+    bankAccounts,
+    loans,
+    salaryAdvances,
+    bonuses,
   ] = await memoryCache(`emp-tabs:${id}`, 20_000, async () => Promise.all([
     getEmployeeSalaryProfile(id).catch(() => null),
     prisma.attendanceRecord.groupBy({
@@ -168,7 +172,7 @@ export default async function EmployeeProfilePage({
       where: { employeeId: id },
       orderBy: { createdAt: 'desc' },
       take: 10,
-      include: { payrollRun: { select: { name: true, period: true } } }
+      include: { payrollRun: { select: { name: true, period: true, status: true, paidAt: true } } }
     }).catch(() => []),
     prisma.auditLog.findMany({
       where: { entityId: id },
@@ -183,6 +187,10 @@ export default async function EmployeeProfilePage({
       where: { employeeId: id, type: 'SOCIAL_INSURANCE' },
       orderBy: { uploadedAt: 'desc' },
     }).catch(() => []),
+    prisma.employeeBankAccount.findMany({ where: { employeeId: id }, orderBy: { isPrimary: 'desc' } }).catch(() => []),
+    prisma.loan.findMany({ where: { employeeId: id }, orderBy: { issuedAt: 'desc' }, take: 10 }).catch(() => []),
+    prisma.employeeSalaryAdvance.findMany({ where: { employeeId: id }, orderBy: { createdAt: 'desc' }, take: 10 }).catch(() => []),
+    prisma.employeeBonus.findMany({ where: { employeeId: id }, orderBy: { awardedDate: 'desc' }, take: 10 }).catch(() => []),
   ]));
 
   const boundDevice = await prisma.employeeMobileDevice.findUnique({
@@ -236,6 +244,10 @@ export default async function EmployeeProfilePage({
       auditLogs={auditLogs as any}
       socialInsurance={socialInsurance as any}
       socialInsuranceDocuments={socialInsuranceDocuments as any}
+      bankAccounts={bankAccounts as any}
+      loans={loans as any}
+      salaryAdvances={salaryAdvances as any}
+      bonuses={bonuses as any}
       permissionsScopeContent={<PermissionsScope employeeId={id} />}
       deviceBinding={deviceBinding}
       canEditLeaveBalance={hasAnyRole(session, ["SUPER_ADMIN", "HR_MANAGER"])}
