@@ -1,22 +1,10 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { hasPermission } from "@/lib/rbac";
+import { canViewPayroll } from "@/lib/enterprise/payroll-permissions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function canViewPayroll(session: any) {
-  const roles = (session?.user?.roles as string[]) ?? [];
-  const permissions = (session?.user?.permissions as string[]) ?? [];
-  return (
-    roles.includes("SUPER_ADMIN") ||
-    roles.includes("HR_MANAGER") ||
-    roles.includes("PAYROLL_OFFICER") ||
-    hasPermission(permissions, { action: "view", resource: "payroll" }) ||
-    hasPermission(permissions, { action: "manage", resource: "payroll" })
-  );
-}
 
 /** Payroll Dashboard summary: run counts by status, gross/net totals for the
  * most recent run, KPIs (headcount, average net, overtime/deduction totals

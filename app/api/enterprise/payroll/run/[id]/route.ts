@@ -1,10 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { hasPermission } from "@/lib/rbac";
 import { writeAuditLog } from "@/lib/audit";
 import { computeEmployeePayroll, computeAndUpsertPayrollItems, markPayrollSourcesConsumed } from "@/lib/enterprise/payroll-engine";
 import { notifyRole } from "@/lib/enterprise/notifications";
+import { canManagePayroll, canApprovePayroll } from "@/lib/enterprise/payroll-permissions";
 import type { PayrollStatus } from "@prisma/client";
 
 const TRANSITION_NOTIFICATIONS: Record<string, { roles: string[]; title: string; body: (run: { name: string }) => string; type: "INFO" | "SUCCESS" | "WARNING" | "ERROR" }> = {
@@ -19,24 +19,6 @@ const TRANSITION_NOTIFICATIONS: Record<string, { roles: string[]; title: string;
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function canManagePayroll(session: any) {
-  const roles = (session?.user?.roles as string[]) ?? [];
-  const permissions = (session?.user?.permissions as string[]) ?? [];
-  return roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER") || roles.includes("PAYROLL_OFFICER") || hasPermission(permissions, { action: "manage", resource: "payroll" });
-}
-
-/** Only HR_MANAGER/SUPER_ADMIN can approve or disburse a run -- PAYROLL_OFFICER
- * (and anyone with plain manage:payroll) can create/submit/cancel a DRAFT, but
- * the second pair of eyes on money leaving the company is a hard role check,
- * not just a permission flag. This is a deliberately simpler two-tier
- * approval (create/submit -> approve/pay) rather than the generic per-employee
- * WorkflowInstance engine, which is anchored to a single employee's org unit
- * and doesn't fit a run spanning many employees at once. */
-function canApprovePayroll(session: any) {
-  const roles = (session?.user?.roles as string[]) ?? [];
-  return roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER");
-}
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();

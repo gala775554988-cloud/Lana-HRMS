@@ -1,18 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { hasPermission } from "@/lib/rbac";
 import { writeAuditLog } from "@/lib/audit";
 import { computeAndUpsertPayrollItems } from "@/lib/enterprise/payroll-engine";
+import { canManagePayroll } from "@/lib/enterprise/payroll-permissions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function canManagePayroll(session: any) {
-  const roles = (session?.user?.roles as string[]) ?? [];
-  const permissions = (session?.user?.permissions as string[]) ?? [];
-  return roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER") || roles.includes("PAYROLL_OFFICER") || hasPermission(permissions, { action: "manage", resource: "payroll" });
-}
 
 /** Duplicate copies a run's scope (branch/department/cost center) into a new
  * DRAFT run for a different period, then computes it via the same engine as

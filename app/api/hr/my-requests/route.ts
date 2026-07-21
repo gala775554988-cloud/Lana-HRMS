@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { createWorkflow } from "@/lib/employee/workflow";
 import { formatApiError } from "@/lib/errors";
+import { detectLeaveConflict } from "@/lib/enterprise/leave-engine";
 
 export async function POST(request: Request) {
   try {
@@ -146,12 +147,49 @@ export async function POST(request: Request) {
           );
         }
 
+        if (leaveType.genderRestriction && employee.gender && leaveType.genderRestriction !== employee.gender) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                id: `VAL-${Date.now().toString(36)}`,
+                category: "validation",
+                name: "Leave Type Not Applicable",
+                message: `نوع الإجازة "${leaveType.name}" غير متاح لجنسك`,
+                cause: "هذا النوع من الإجازات مقيد بجنس محدد",
+                suggestion: "اختر نوع إجازة آخر",
+              },
+            },
+            { status: 400 }
+          );
+        }
+
+        const requestStartDate = new Date(data.startDate);
+        const requestEndDate = new Date(data.endDate);
+        const conflict = await detectLeaveConflict(employeeId, requestStartDate, requestEndDate);
+        if (conflict) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                id: `VAL-${Date.now().toString(36)}`,
+                category: "validation",
+                name: "Leave Conflict",
+                message: `لديك طلب إجازة آخر (${conflict.leaveType.name}) يتعارض مع هذه التواريخ`,
+                cause: "تتعارض هذه الفترة مع إجازة أخرى معتمدة أو قيد الانتظار",
+                suggestion: "اختر تواريخ لا تتعارض مع إجازاتك الأخرى",
+              },
+            },
+            { status: 409 }
+          );
+        }
+
         result = await prisma.leaveRequest.create({
           data: {
             employeeId,
             leaveTypeId: leaveType.id,
-            startDate: new Date(data.startDate),
-            endDate: new Date(data.endDate),
+            startDate: requestStartDate,
+            endDate: requestEndDate,
             days: Number(data.days) || 1,
             reason: data.reason || "",
             status: "PENDING",

@@ -41,7 +41,7 @@ export type UserPermissionStore = {
 // enforcement point. A plain "manage:X" grant from before this existed still
 // implies all four (hasPermission in lib/rbac.ts), so nothing already
 // configured breaks; these are additive, finer-grained keys.
-export const GRANULAR_RESOURCES = ["employees", "contracts", "attendance", "insurance", "hospitals", "social-insurance"] as const;
+export const GRANULAR_RESOURCES = ["employees", "contracts", "attendance", "insurance", "hospitals", "social-insurance", "payroll", "leave"] as const;
 
 function granularPermissions(resource: string): PermissionKey[] {
   return [`read:${resource}`, `create:${resource}`, `edit:${resource}`, `delete:${resource}`] as PermissionKey[];
@@ -55,8 +55,8 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
   // structurally sub-elements of a hospital in this org model.
   { key: "hospitals", title: "Hospitals", permissions: [...granularPermissions("hospitals"), "manage:hospitals"] },
   { key: "attendance", title: "Attendance", permissions: [...granularPermissions("attendance"), "manage:attendance"] },
-  { key: "leaves", title: "Leaves", permissions: ["read:leave", "manage:leave"] },
-  { key: "payroll", title: "Payroll", permissions: ["read:payroll", "manage:payroll", "read:loans", "manage:loans", "read:allowances", "manage:allowances", "read:deductions", "manage:deductions"] },
+  { key: "leaves", title: "Leaves", permissions: [...granularPermissions("leave"), "manage:leave"] },
+  { key: "payroll", title: "Payroll", permissions: [...granularPermissions("payroll"), "manage:payroll", "read:loans", "manage:loans", "read:allowances", "manage:allowances", "read:deductions", "manage:deductions"] },
   { key: "insurance", title: "Insurance", permissions: [...granularPermissions("insurance"), "manage:insurance"] },
   { key: "social-insurance", title: "Social Insurance", permissions: [...granularPermissions("social-insurance"), "manage:social-insurance"] },
   { key: "residency", title: "Residency", permissions: ["read:residency", "manage:residency"] },

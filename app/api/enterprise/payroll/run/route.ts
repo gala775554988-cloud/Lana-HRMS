@@ -1,18 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { hasPermission } from "@/lib/rbac";
 import { computeAndUpsertPayrollItems } from "@/lib/enterprise/payroll-engine";
+import { canManagePayroll } from "@/lib/enterprise/payroll-permissions";
 import { writeAuditLog } from "@/lib/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function canManagePayroll(session: any) {
-  const roles = (session?.user?.roles as string[]) ?? [];
-  const permissions = (session?.user?.permissions as string[]) ?? [];
-  return roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER") || roles.includes("PAYROLL_OFFICER") || hasPermission(permissions, { action: "manage", resource: "payroll" });
-}
 
 /** Creates (or reuses, if still DRAFT) a PayrollRun for a period and computes
  * every matched employee's PayrollItem via the payroll engine. Safe to call
