@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireOdooIntegrationAccess, hasInternalSyncToken } from "@/lib/integrations/odoo/sync";
+import { many2oneName } from "@/lib/integrations/odoo/mapper";
 import { writeAuditLog } from "@/lib/audit";
 import { execSync } from "child_process";
 import fs from "fs";
@@ -16,6 +17,15 @@ function clean(value: unknown) {
   return String(value).trim();
 }
 
+// work_location_id (and any other many2one field) arrives from Odoo as a
+// [id, "Name"] tuple. Passing that straight through clean()'s String(value)
+// runs Array.prototype.toString(), which joins with a comma -- producing a
+// corrupted "12,مستشفى الملك فهد" instead of the real name. Resolve the
+// many2one text first, exactly like every other Odoo sync path does.
+function cleanOdooField(value: unknown) {
+  return clean(many2oneName(value) ?? value);
+}
+
 function extractHospitalName(emp: any): string | null {
   const raw = (emp.odooRawData as any) || {};
   const candidates = [
@@ -24,7 +34,7 @@ function extractHospitalName(emp: any): string | null {
     clean(raw.x_studio_school_name),
     clean(raw.school),
     clean(raw.x_hospital),
-    clean(raw.work_location_id)
+    cleanOdooField(raw.work_location_id)
   ];
   for (const c of candidates) {
     if (c && c !== "false" && c !== "0" && c !== "غير محدد" && c.length > 2 && !c.startsWith("[")) {

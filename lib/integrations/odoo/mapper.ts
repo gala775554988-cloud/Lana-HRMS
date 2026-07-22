@@ -280,6 +280,12 @@ export function mapOdooEmployeeToLana(record: OdooRecord): Record<string, unknow
     // Hospital directory. Resolved by name in the sync service since Hospital
     // has no Odoo-side id scheme of its own (unlike department/job/company).
     _hospitalName: many2oneName(record.school) || textValue(record.school),
+    // work_location_id ("Work Location" column in Odoo's UI) mirrors the
+    // school field on instances where hospitals are modeled that way instead
+    // -- stored directly so downstream reconciliation doesn't have to dig
+    // through odooRawData's raw many2one tuple.
+    workLocationName: many2oneName(record.work_location_id) || textValue(record.work_location_id) || undefined,
+    odooWorkLocationId: many2oneId(record.work_location_id),
     _odooId: record.id,
     _odooName: record.name
   });
