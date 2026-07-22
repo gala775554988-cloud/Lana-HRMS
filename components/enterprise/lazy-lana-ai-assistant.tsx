@@ -10,7 +10,7 @@ const LanaAiAssistant = dynamic(
 );
 
 export function LazyLanaAiAssistant() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
@@ -23,8 +23,13 @@ export function LazyLanaAiAssistant() {
     return () => window.clearTimeout(timer);
   }, []);
 
-  // لا يظهر المكون إلا إذا وُجدت جلسة نشطة
-  if (!session || !enabled) return null;
+  // Require the literal "authenticated" status, not just a truthy session
+  // object -- this is the same explicit check used for the sidebar's Lana AI
+  // nav item (components/hrms/app-shell.tsx's showLanaAI). Every public page
+  // (login, forgot/reset-password, verify-email, the signed-out landing
+  // page) renders through this same root layout, so this is the only gate
+  // keeping the widget off those pages.
+  if (status !== "authenticated" || !session?.user || !enabled) return null;
 
   return <LanaAiAssistant />;
 }
