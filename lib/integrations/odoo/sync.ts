@@ -1060,38 +1060,45 @@ export class OdooSyncService {
                   if(values.email) existingByEmail.set(values.email, updated);
                   if(values.nationalId) existingByNationalId.set(values.nationalId, updated);
 
-                  // Ensure user account exists for existing employee (if not, create)
+                  // Ensure user account exists for existing employee (if not, link/create)
                   try {
                     const empWithUser = await prisma.employee.findUnique({ where: { id: existing.id }, include: { user: true } });
-                    if ((!empWithUser?.userId || !empWithUser?.user) && values.nationalId) {
-                      const nationalId = String(values.nationalId);
-                      if (nationalId && nationalId.trim() !== "" && nationalId.toUpperCase() !== "NA") {
-                        const existingUserByUsername = await prisma.user.findFirst({ where: { username: nationalId } });
-                        if (!existingUserByUsername) {
-                          const last4 = nationalId.slice(-4);
-                          const { hashPassword } = await import("@/lib/password");
-                          const passwordHash = await hashPassword(last4);
-                          const newUser = await prisma.user.create({
-                            data: {
-                              username: nationalId,
-                              email: values.email ? String(values.email).toLowerCase() : `employee.${nationalId}@lana.local`,
-                              name: `${values.firstName} ${values.lastName}`.trim(),
-                              passwordHash,
-                              isActive: true,
-                              emailVerified: new Date(),
-                              mustChangePassword: true,
-                              passwordChanged: false,
-                            }
-                          });
-                          await prisma.employee.update({ where: { id: existing.id }, data: { userId: newUser.id } });
-                          const employeeRole = await prisma.role.findUnique({ where: { name: "EMPLOYEE" } });
-                          if (employeeRole) {
-                            await prisma.userRole.upsert({
-                              where: { userId_roleId: { userId: newUser.id, roleId: employeeRole.id } },
-                              update: {},
-                              create: { userId: newUser.id, roleId: employeeRole.id }
-                            });
+                    if (!empWithUser?.userId || !empWithUser?.user) {
+                      const resolution = await this.resolveUserForEmployee({
+                        employeeId: existing.id,
+                        nationalId: values.nationalId ? String(values.nationalId) : null,
+                        email: values.email ? String(values.email) : null
+                      });
+                      if (resolution.action === "link_existing") {
+                        await prisma.employee.update({ where: { id: existing.id }, data: { userId: resolution.userId } });
+                        await this.log("ODOO_USER_LINKED", `تم ربط الموظف الموجود ${odooId} بحساب مستخدم موجود مسبقاً (تفادي إنشاء حساب مكرر)`, { odooId, userId: resolution.userId }).catch(()=>{});
+                      } else if (resolution.action === "skip_conflict") {
+                        await this.log("ODOO_USER_CONFLICT", `الموظف ${odooId} له بريد/هوية تطابق حساباً مرتبطاً بموظف آخر بالفعل -- لم يتم أي تعديل تلقائي، يحتاج مراجعة يدوية`, { odooId, existingUserId: resolution.existingUserId }).catch(()=>{});
+                      } else if (resolution.action === "create_new" && values.nationalId) {
+                        const nationalId = String(values.nationalId);
+                        const last4 = nationalId.slice(-4);
+                        const { hashPassword } = await import("@/lib/password");
+                        const passwordHash = await hashPassword(last4);
+                        const newUser = await prisma.user.create({
+                          data: {
+                            username: nationalId,
+                            email: values.email ? String(values.email).toLowerCase() : `employee.${nationalId}@lana.local`,
+                            name: `${values.firstName} ${values.lastName}`.trim(),
+                            passwordHash,
+                            isActive: true,
+                            emailVerified: new Date(),
+                            mustChangePassword: true,
+                            passwordChanged: false,
                           }
+                        });
+                        await prisma.employee.update({ where: { id: existing.id }, data: { userId: newUser.id } });
+                        const employeeRole = await prisma.role.findUnique({ where: { name: "EMPLOYEE" } });
+                        if (employeeRole) {
+                          await prisma.userRole.upsert({
+                            where: { userId_roleId: { userId: newUser.id, roleId: employeeRole.id } },
+                            update: {},
+                            create: { userId: newUser.id, roleId: employeeRole.id }
+                          });
                         }
                       }
                     }
@@ -1108,57 +1115,66 @@ export class OdooSyncService {
                   if(values.email) existingByEmail.set(values.email, created);
                   if(values.nationalId) existingByNationalId.set(values.nationalId, created);
 
-                  // Create user account automatically for new Odoo employee (Requirement 9)
+                  // Create/link user account automatically for new Odoo employee (Requirement 9)
                   // Username = nationalId, Password = last 4 digits, mustChangePassword = true
                   try {
-                    const nationalId = values.nationalId ? String(values.nationalId) : null;
-                    if (!nationalId || nationalId.trim() === "" || nationalId.toUpperCase() === "NA") {
+                    const resolution = await this.resolveUserForEmployee({
+                      employeeId: localEmployeeId!,
+                      nationalId: values.nationalId ? String(values.nationalId) : null,
+                      email: values.email ? String(values.email) : null
+                    });
+
+                    if (resolution.action === "skip_no_national_id") {
                       // Requirement 10: No nationalId - don't create account, log in report
-                      result.operations.push({ 
-                        operation: "skip", 
-                        model: "user", 
-                        localId: localEmployeeId, 
-                        externalId: odooId, 
-                        reason: "لم يتم إنشاء حساب لأن رقم الهوية غير موجود." 
+                      result.operations.push({
+                        operation: "skip",
+                        model: "user",
+                        localId: localEmployeeId,
+                        externalId: odooId,
+                        reason: "لم يتم إنشاء حساب لأن رقم الهوية غير موجود."
                       });
                       await this.log("ODOO_USER_SKIP", `لم يتم إنشاء حساب لـ Odoo ${odooId} (${values.firstName} ${values.lastName}) لأن رقم الهوية غير موجود`, { odooId, employeeId: localEmployeeId }).catch(()=>{});
+                    } else if (resolution.action === "link_existing") {
+                      await prisma.employee.update({ where: { id: localEmployeeId }, data: { userId: resolution.userId } });
+                      result.operations.push({ operation: "update", model: "user", localId: localEmployeeId, externalId: odooId, reason: "تم الربط بحساب مستخدم موجود مسبقاً بدل إنشاء حساب مكرر" });
+                      await this.log("ODOO_USER_LINKED", `تم ربط الموظف الجديد ${odooId} بحساب مستخدم موجود مسبقاً (تفادي إنشاء حساب مكرر)`, { odooId, employeeId: localEmployeeId, userId: resolution.userId }).catch(()=>{});
+                    } else if (resolution.action === "skip_conflict") {
+                      result.operations.push({ operation: "skip", model: "user", localId: localEmployeeId, externalId: odooId, reason: "يوجد حساب آخر مرتبط بموظف مختلف بنفس الهوية/البريد -- يحتاج مراجعة يدوية" });
+                      await this.log("ODOO_USER_CONFLICT", `الموظف الجديد ${odooId} له بريد/هوية تطابق حساباً مرتبطاً بموظف آخر بالفعل -- لم يتم إنشاء حساب، يحتاج مراجعة يدوية`, { odooId, employeeId: localEmployeeId, existingUserId: resolution.existingUserId }).catch(()=>{});
                     } else {
+                      const nationalId = String(values.nationalId);
                       const last4 = nationalId.slice(-4);
                       const { hashPassword } = await import("@/lib/password");
                       const passwordHash = await hashPassword(last4);
-                      
-                      // Check if user already exists by username (nationalId)
-                      const existingUser = await prisma.user.findFirst({ where: { username: nationalId } });
-                      if (!existingUser) {
-                        const newUser = await prisma.user.create({
-                          data: {
-                            username: nationalId,
-                            email: values.email ? String(values.email).toLowerCase() : `employee.${nationalId}@lana.local`,
-                            name: `${values.firstName} ${values.lastName}`.trim(),
-                            passwordHash,
-                            isActive: true,
-                            emailVerified: new Date(),
-                            mustChangePassword: true,
-                            passwordChanged: false,
-                          }
-                        });
 
-                        await prisma.employee.update({
-                          where: { id: localEmployeeId },
-                          data: { userId: newUser.id }
-                        });
-
-                        const employeeRole = await prisma.role.findUnique({ where: { name: "EMPLOYEE" } });
-                        if (employeeRole) {
-                          await prisma.userRole.upsert({
-                            where: { userId_roleId: { userId: newUser.id, roleId: employeeRole.id } },
-                            update: {},
-                            create: { userId: newUser.id, roleId: employeeRole.id }
-                          });
+                      const newUser = await prisma.user.create({
+                        data: {
+                          username: nationalId,
+                          email: values.email ? String(values.email).toLowerCase() : `employee.${nationalId}@lana.local`,
+                          name: `${values.firstName} ${values.lastName}`.trim(),
+                          passwordHash,
+                          isActive: true,
+                          emailVerified: new Date(),
+                          mustChangePassword: true,
+                          passwordChanged: false,
                         }
+                      });
 
-                        await this.log("ODOO_USER_CREATED", `تم إنشاء حساب لـ Odoo ${odooId} - username: ${nationalId}, password: ${last4}`, { odooId, employeeId: localEmployeeId, username: nationalId }).catch(()=>{});
+                      await prisma.employee.update({
+                        where: { id: localEmployeeId },
+                        data: { userId: newUser.id }
+                      });
+
+                      const employeeRole = await prisma.role.findUnique({ where: { name: "EMPLOYEE" } });
+                      if (employeeRole) {
+                        await prisma.userRole.upsert({
+                          where: { userId_roleId: { userId: newUser.id, roleId: employeeRole.id } },
+                          update: {},
+                          create: { userId: newUser.id, roleId: employeeRole.id }
+                        });
                       }
+
+                      await this.log("ODOO_USER_CREATED", `تم إنشاء حساب لـ Odoo ${odooId} - username: ${nationalId}, password: ${last4}`, { odooId, employeeId: localEmployeeId, username: nationalId }).catch(()=>{});
                     }
                   } catch (userErr) {
                     const uMsg = userErr instanceof Error ? userErr.message : String(userErr);
@@ -1798,6 +1814,54 @@ export class OdooSyncService {
     if (value === undefined || value === null || value === "") return undefined;
     const rows = await this.client.search_read(model, [[field, "=", value]], fields, { limit: 1 });
     return rows[0];
+  }
+
+  // Decides how to attach a User account to a synced Employee without ever
+  // creating a second, disconnected identity for someone who already has one
+  // (e.g. a manually-provisioned admin account later matched by Odoo sync).
+  // Previously this only checked User.username === nationalId; a matching
+  // pre-existing account by email was invisible to it, so sync would create a
+  // brand-new User + Employee pair for a real person who already had an
+  // account -- the concrete mechanism behind the "two profiles per person" bug.
+  private async resolveUserForEmployee(params: {
+    employeeId: string;
+    nationalId: string | null;
+    email?: string | null;
+  }): Promise<
+    | { action: "skip_no_national_id" }
+    | { action: "link_existing"; userId: string }
+    | { action: "skip_conflict"; existingUserId: string }
+    | { action: "create_new" }
+  > {
+    const nationalId = params.nationalId?.trim();
+    if (!nationalId || nationalId.toUpperCase() === "NA") {
+      return { action: "skip_no_national_id" };
+    }
+
+    const normalizedEmail = params.email ? String(params.email).trim().toLowerCase() : null;
+
+    const candidate =
+      (await prisma.user.findFirst({
+        where: { username: nationalId },
+        select: { id: true, employeeProfile: { select: { id: true } } }
+      })) ||
+      (normalizedEmail
+        ? await prisma.user.findFirst({
+            where: { email: { equals: normalizedEmail, mode: "insensitive" } },
+            select: { id: true, employeeProfile: { select: { id: true } } }
+          })
+        : null);
+
+    if (!candidate) return { action: "create_new" };
+
+    if (candidate.employeeProfile && candidate.employeeProfile.id !== params.employeeId) {
+      // Already linked to a different Employee record -- a genuine identity
+      // conflict. Never silently modify or steal the link (CLAUDE.md: no data
+      // modification for duplicates); surface for manual review instead.
+      return { action: "skip_conflict", existingUserId: candidate.id };
+    }
+
+    return { action: "link_existing", userId: candidate.id };
   }
 
   private async findOdooEmployeeId(employee?: LanaEmployee | null) {

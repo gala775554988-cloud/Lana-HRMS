@@ -281,11 +281,14 @@ export function LanaAiFullPageClient() {
       let fullContent = "";
       // The backend streams two different shapes depending on which path
       // answered: the local orchestrator fallback hand-frames every chunk as
-      // `0:"..."\n` (AI SDK data-stream protocol), while the primary Gemini/
-      // OpenAI path (toTextStreamResponse) sends plain unframed text. Detect
-      // which one we got from the first chunk so plain text isn't silently
-      // dropped by a parser that only understood the framed format.
-      let isFramed: boolean | null = null;
+      // `0:"..."\n` (AI SDK data-stream protocol) and marks it with the
+      // X-Vercel-AI-Data-Stream response header, while the primary Gemini/
+      // OpenAI path (toTextStreamResponse) sends plain unframed text and
+      // never sets that header. Trust the header, not the chunk content --
+      // sniffing the first chunk for a leading "\d+:" misfires on any real
+      // reply that happens to start with a number and colon (e.g. a time
+      // like "10:15"), silently discarding the rest of the plain-text stream.
+      const isFramed = response.headers.get("X-Vercel-AI-Data-Stream") === "v1";
 
       if (reader) {
         while (true) {
@@ -293,7 +296,6 @@ export function LanaAiFullPageClient() {
           if (done) break;
           const chunk = decoder.decode(value, { stream: true });
           if (!chunk) continue;
-          if (isFramed === null) isFramed = /^\d+:/.test(chunk);
 
           if (isFramed) {
             const lines = chunk.split("\n").filter(Boolean);

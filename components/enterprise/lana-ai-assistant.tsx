@@ -325,27 +325,45 @@ export function LanaAiAssistant() {
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       let fullContent = "";
+      // The backend streams two different shapes depending on which path
+      // answered: the local orchestrator fallback hand-frames every chunk as
+      // `0:"..."\n` (AI SDK data-stream protocol) and marks it with the
+      // X-Vercel-AI-Data-Stream response header, while the primary Gemini/
+      // OpenAI path (toTextStreamResponse) sends plain unframed text and
+      // never sets that header. This used to only ever parse the framed
+      // format, so a plain-text Gemini reply (the common case) was silently
+      // dropped in full unless it happened to start with "0:".
+      const isFramed = response.headers.get("X-Vercel-AI-Data-Stream") === "v1";
 
       if (reader) {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
           const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n").filter(Boolean);
+          if (!chunk) continue;
 
-          for (const line of lines) {
-            if (line.startsWith("0:")) {
-              try {
-                const textChunk = JSON.parse(line.slice(2));
-                fullContent += textChunk;
-                setMessages((prev) =>
-                  prev.map((m) => (m.id === assistantMsgId ? { ...m, content: fullContent } : m))
-                );
-                scrollToBottom("auto");
-              } catch {}
-            } else if (line.startsWith("e:") || line.startsWith("3:")) {
-              // stream stop or error
+          if (isFramed) {
+            const lines = chunk.split("\n").filter(Boolean);
+            for (const line of lines) {
+              if (line.startsWith("0:")) {
+                try {
+                  const textChunk = JSON.parse(line.slice(2));
+                  fullContent += textChunk;
+                  setMessages((prev) =>
+                    prev.map((m) => (m.id === assistantMsgId ? { ...m, content: fullContent } : m))
+                  );
+                  scrollToBottom("auto");
+                } catch {}
+              } else if (line.startsWith("e:") || line.startsWith("3:")) {
+                // stream stop or error
+              }
             }
+          } else {
+            fullContent += chunk;
+            setMessages((prev) =>
+              prev.map((m) => (m.id === assistantMsgId ? { ...m, content: fullContent } : m))
+            );
+            scrollToBottom("auto");
           }
         }
       }

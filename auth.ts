@@ -218,6 +218,39 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             console.error("[Auth][SESSION_PERMISSIONS_ERROR] Stack trace:", permErr?.stack || permErr);
             (session.user as any).permissions = [];
           }
+          // Lightweight employee-link summary so any session -- admin or
+          // employee -- can show its OWN real job-profile data (used by the
+          // "ملفي" overlay) instead of session-only fields, without needing a
+          // separate lookup on every consuming page. null means genuinely
+          // unlinked, not a fetch failure (caught separately below).
+          try {
+            const employee = await prisma.employee.findFirst({
+              where: { userId: token.sub },
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                employeeNumber: true,
+                profilePhotoUrl: true,
+                position: { select: { title: true } },
+                department: { select: { name: true } },
+              },
+            });
+            (session.user as any).employeeProfile = employee
+              ? {
+                  id: employee.id,
+                  firstName: employee.firstName,
+                  lastName: employee.lastName,
+                  employeeNumber: employee.employeeNumber,
+                  profilePhotoUrl: employee.profilePhotoUrl,
+                  positionTitle: employee.position?.title ?? null,
+                  departmentName: employee.department?.name ?? null,
+                }
+              : null;
+          } catch (empErr: any) {
+            console.error("[Auth][SESSION_EMPLOYEE_PROFILE_ERROR] Stack trace:", empErr?.stack || empErr);
+            (session.user as any).employeeProfile = null;
+          }
         }
       } catch (sessionErr: any) {
         console.error("[Auth][SESSION_FATAL_ERROR] Stack trace:", sessionErr?.stack || sessionErr);
