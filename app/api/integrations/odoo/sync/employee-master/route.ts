@@ -137,9 +137,24 @@ async function ensureEmployeeUser(employeeId: string, values: { nationalId: stri
   const employee = await prisma.employee.findUnique({ where: { id: employeeId }, select: { userId: true } });
   if (employee?.userId) return { created: false, reason: "already-linked" };
 
-  const existingUser = await prisma.user.findFirst({ where: { username: nationalId } });
-  if (existingUser) {
-    await prisma.employee.update({ where: { id: employeeId }, data: { userId: existingUser.id } });
+  const normalizedEmail = values.email ? values.email.trim().toLowerCase() : null;
+
+  // Match by username (nationalId) first, then by email -- checking email too
+  // prevents creating a second, disconnected User for someone who already has
+  // an account (e.g. a manually-provisioned admin) that just isn't linked yet.
+  const candidate =
+    (await prisma.user.findFirst({ where: { username: nationalId }, select: { id: true, employeeProfile: { select: { id: true } } } })) ||
+    (normalizedEmail
+      ? await prisma.user.findFirst({ where: { email: { equals: normalizedEmail, mode: "insensitive" } }, select: { id: true, employeeProfile: { select: { id: true } } } })
+      : null);
+
+  if (candidate) {
+    if (candidate.employeeProfile && candidate.employeeProfile.id !== employeeId) {
+      // Already linked to a different Employee -- a genuine identity conflict.
+      // Never silently steal the link; leave for manual review.
+      return { created: false, reason: "conflict-different-employee" };
+    }
+    await prisma.employee.update({ where: { id: employeeId }, data: { userId: candidate.id } });
     return { created: false, reason: "linked-existing-user" };
   }
 

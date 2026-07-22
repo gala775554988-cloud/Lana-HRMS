@@ -11,7 +11,7 @@ import {
   DollarSign, Package, Megaphone, BarChart3, Settings,
   Shield, GitPullRequest, Sparkles, Menu, X, PlugZap,
   CalendarClock, Fingerprint,
-  Umbrella, User, Mail, ShieldCheck, Landmark
+  Umbrella, User, Mail, ShieldCheck, Landmark, Briefcase, AlertTriangle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/brand/brand-logo";
@@ -306,6 +306,7 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
         userName={session.user?.name}
         userEmail={session.user?.email}
         userRoles={userRoles}
+        employeeProfile={session.user?.employeeProfile ?? null}
         onLogout={handleLogout}
       />
 
@@ -405,6 +406,7 @@ function ProfileOverlay({
   userName,
   userEmail,
   userRoles,
+  employeeProfile,
   onLogout
 }: {
   open: boolean;
@@ -412,6 +414,15 @@ function ProfileOverlay({
   userName?: string | null;
   userEmail?: string | null;
   userRoles: string[];
+  employeeProfile?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    employeeNumber: string;
+    profilePhotoUrl: string | null;
+    positionTitle: string | null;
+    departmentName: string | null;
+  } | null;
   onLogout: () => void;
 }) {
   if (!open) return null;
@@ -459,6 +470,40 @@ function ProfileOverlay({
             ))}
           </div>
         </div>
+
+        {/* الملف الوظيفي: real Employee data when this account is linked to
+            one, or an honest "not linked" notice -- never fabricated data. */}
+        {employeeProfile ? (
+          <div className="border-t border-slate-100 dark:border-slate-800 p-4">
+            <div className="flex items-center gap-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 p-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                <Briefcase className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-black text-slate-800 dark:text-slate-100 truncate">
+                  {employeeProfile.positionTitle || "بدون مسمى وظيفي"}
+                </p>
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">
+                  {employeeProfile.departmentName || "بدون قسم"} · رقم الموظف {employeeProfile.employeeNumber}
+                </p>
+              </div>
+            </div>
+            <Link
+              href={`/employees/${employeeProfile.id}`}
+              onClick={onClose}
+              className="mt-2 flex items-center justify-center gap-2 rounded-2xl px-3.5 py-2 text-xs font-bold text-primary hover:bg-primary/8 transition-colors"
+            >
+              <span>عرض ملفي الوظيفي الكامل</span>
+            </Link>
+          </div>
+        ) : (
+          <div className="border-t border-slate-100 dark:border-slate-800 p-4">
+            <div className="flex items-start gap-2.5 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 p-3 text-amber-800 dark:text-amber-300">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <p className="text-xs font-bold leading-relaxed">لا يوجد ملف موظف مرتبط بهذا الحساب حالياً</p>
+            </div>
+          </div>
+        )}
 
         <div className="bg-white dark:bg-slate-900 p-4 space-y-1.5">
           <Link

@@ -40,6 +40,111 @@ type ApiResponse = {
   totalEmployees: number;
 };
 
+type IdentityLinkEmployee = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  employeeNumber: string;
+  nationalId: string;
+  email: string | null;
+  department: string;
+  position: string;
+  status: string;
+};
+
+type IdentityLinkMatch = {
+  matchType: "email" | "name";
+  matchValue: string;
+  user: { id: string; name: string | null; email: string | null; username: string | null; isActive: boolean; createdAt: string };
+  employees: IdentityLinkEmployee[];
+};
+
+type IdentityLinksResponse = {
+  success: boolean;
+  matches: IdentityLinkMatch[];
+  totalMatches: number;
+  byMatchType: { email: number; name: number };
+  totalUnlinkedUsers: number;
+  totalUnlinkedEmployees: number;
+};
+
+function IdentityLinkGaps() {
+  const [data, setData] = useState<IdentityLinksResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetch("/api/employees/duplicates/identity-links")
+      .then((res) => res.json())
+      .then((json) => { if (!cancelled && json.success) setData(json); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <AlertTriangle className="h-5 w-5 text-amber-600" />
+          حسابات وملفات وظيفية منفصلة لنفس الشخص (غير مرتبطة)
+        </CardTitle>
+        <p className="text-xs text-muted-foreground mt-1">
+          حساب مستخدم (User) بلا ملف وظيفي، وملف وظيفي (Employee) بلا حساب مستخدم، يتطابقان بالبريد أو الاسم -- على الأغلب نفس الشخص بسجلّين منفصلين. هذه قائمة للمراجعة فقط، لا يتم أي دمج تلقائي.
+        </p>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="p-8 text-center">جاري التحميل...</div>
+        ) : !data || data.totalMatches === 0 ? (
+          <div className="p-8 text-center text-muted-foreground">
+            لا توجد حالات مطابقة حالياً ({data?.totalUnlinkedUsers ?? 0} حساب بلا ملف وظيفي، {data?.totalUnlinkedEmployees ?? 0} ملف وظيفي بلا حساب)
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-md border">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/60">
+                <tr>
+                  <th className="px-3 py-2 text-right">نوع التطابق</th>
+                  <th className="px-3 py-2 text-right">حساب المستخدم (User)</th>
+                  <th className="px-3 py-2 text-right">الملف الوظيفي المرشح (Employee)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {data.matches.map((m) => (
+                  <tr key={`${m.matchType}-${m.matchValue}-${m.user.id}`} className="hover:bg-muted/40">
+                    <td className="px-3 py-2">
+                      <span className="rounded-full bg-amber-100 px-2 py-1 text-xs">{m.matchType === "email" ? "بريد" : "اسم"}</span>
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="rounded border p-2 bg-amber-50/50">
+                        <span className="font-medium">{m.user.name || "—"}</span>
+                        <span className="text-xs text-muted-foreground block">{m.user.email || "لا بريد"} ({m.user.username || "—"})</span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="space-y-1">
+                        {m.employees.map((e) => (
+                          <div key={e.id} className="flex items-center gap-2 rounded border p-2 bg-amber-50/50">
+                            <span className="font-medium">{e.firstName} {e.lastName}</span>
+                            <span className="text-xs text-muted-foreground">({e.employeeNumber}, {e.nationalId}, {e.email || "لا بريد"})</span>
+                            <span className="text-xs">{e.department}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function DuplicateAccounts() {
   const [data, setData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -228,6 +333,8 @@ export function DuplicateAccounts() {
           )}
         </CardContent>
       </Card>
+
+      <IdentityLinkGaps />
     </div>
   );
 }
