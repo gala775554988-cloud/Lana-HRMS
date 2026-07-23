@@ -1389,7 +1389,15 @@ export class OdooSyncService {
         for (const row of rows) {
           try {
             const values = mapOdooDepartmentToLana(row);
-            const existing = await delegate("department").findFirst({ where: { code: String(values.code) } });
+            // Prefer the dedicated odooId unique key (now populated by
+            // mapOdooDepartmentToLana) over the synthetic ODOO-DEPT-{id}
+            // code; fall back to code for departments synced before this
+            // fix, whose odooId is still null, so they get linked rather
+            // than duplicated.
+            const existing =
+              (typeof values.odooId === "number"
+                ? await delegate("department").findFirst({ where: { odooId: values.odooId } })
+                : null) ?? (await delegate("department").findFirst({ where: { code: String(values.code) } }));
             if (existing && this.hasWriteDateConflict(existing.updatedAt, row.write_date, existing, row, mapper.fieldMap)) {
               await this.conflict(options.mappingId, "departments", objectId(existing.id), String(row.id), existing, row, result);
               continue;
