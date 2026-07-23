@@ -296,7 +296,20 @@ export function mapLanaDepartmentToOdoo(department: LanaDepartment): OdooWriteVa
 }
 
 export function mapOdooDepartmentToLana(record: OdooRecord): Record<string, unknown> {
-  return stripEmpty({ name: textValue(record.name) || `Odoo Department ${record.id}`, code: `ODOO-DEPT-${record.id}`, isActive: record.active !== false });
+  // odooId/odooWriteDate/odooActive mirror the same fields on Employee --
+  // declared in schema.prisma for exactly this linking purpose but never
+  // populated here previously. The `code` (ODOO-DEPT-{id}) match used
+  // elsewhere in the sync (bulk employee deptMap prefetch) stays as-is; this
+  // only fills in metadata that was silently left empty despite already
+  // being fetched.
+  return stripEmpty({
+    name: textValue(record.name) || `Odoo Department ${record.id}`,
+    code: `ODOO-DEPT-${record.id}`,
+    isActive: record.active !== false,
+    odooId: typeof record.id === "number" ? record.id : Number(record.id) || undefined,
+    odooWriteDate: asDate(record.write_date),
+    odooActive: record.active !== false
+  });
 }
 
 export function mapLanaAttendanceToOdoo(attendance: LanaAttendance, odooEmployeeId?: number): OdooWriteValues {
