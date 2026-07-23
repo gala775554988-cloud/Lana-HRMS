@@ -103,6 +103,50 @@ async function ensureDbSchema() {
     `ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "sponsor" TEXT;`,
     `ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "odooRawData" JSONB;`,
     `ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "odooRawDataSyncedAt" TIMESTAMP(3);`,
+    // These 5 were added to prisma/schema.prisma by migration
+    // 20260714033000_round3_hospital_costcenter_shifts but never propagated
+    // here -- since this script (not `prisma migrate deploy`) is the only
+    // thing that actually touches production's schema, that migration never
+    // took effect on the live database. Confirmed missing by checking a dev
+    // DB that had received the full Prisma migration history for comparison.
+    `ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "hospitalId" TEXT;`,
+    `ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "workLocationName" TEXT;`,
+    `ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "odooWorkLocationId" INTEGER;`,
+    `ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "costCenter" TEXT;`,
+    `ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "analyticAccount" TEXT;`,
+    `CREATE INDEX IF NOT EXISTS "Employee_hospitalId_idx" ON "Employee"("hospitalId");`,
+    `DO $$ BEGIN ALTER TABLE "Employee" ADD CONSTRAINT "Employee_hospitalId_fkey" FOREIGN KEY ("hospitalId") REFERENCES "Hospital"("id") ON DELETE SET NULL ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    // Same migration also created these two tables -- also never propagated here.
+    `CREATE TABLE IF NOT EXISTS "Shift" (
+      "id" TEXT NOT NULL,
+      "name" TEXT NOT NULL,
+      "code" TEXT NOT NULL,
+      "startTime" TEXT NOT NULL,
+      "endTime" TEXT NOT NULL,
+      "daysOfWeek" TEXT NOT NULL,
+      "isActive" BOOLEAN NOT NULL DEFAULT true,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL,
+      CONSTRAINT "Shift_pkey" PRIMARY KEY ("id")
+    );`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "Shift_code_key" ON "Shift"("code");`,
+    `CREATE INDEX IF NOT EXISTS "Shift_isActive_idx" ON "Shift"("isActive");`,
+    `CREATE TABLE IF NOT EXISTS "ShiftAssignment" (
+      "id" TEXT NOT NULL,
+      "employeeId" TEXT NOT NULL,
+      "shiftId" TEXT NOT NULL,
+      "effectiveFrom" TIMESTAMP(3) NOT NULL,
+      "effectiveTo" TIMESTAMP(3),
+      "isActive" BOOLEAN NOT NULL DEFAULT true,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL,
+      CONSTRAINT "ShiftAssignment_pkey" PRIMARY KEY ("id")
+    );`,
+    `CREATE INDEX IF NOT EXISTS "ShiftAssignment_employeeId_idx" ON "ShiftAssignment"("employeeId");`,
+    `CREATE INDEX IF NOT EXISTS "ShiftAssignment_shiftId_idx" ON "ShiftAssignment"("shiftId");`,
+    `CREATE INDEX IF NOT EXISTS "ShiftAssignment_effectiveFrom_idx" ON "ShiftAssignment"("effectiveFrom");`,
+    `DO $$ BEGIN ALTER TABLE "ShiftAssignment" ADD CONSTRAINT "ShiftAssignment_employeeId_fkey" FOREIGN KEY ("employeeId") REFERENCES "Employee"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE "ShiftAssignment" ADD CONSTRAINT "ShiftAssignment_shiftId_fkey" FOREIGN KEY ("shiftId") REFERENCES "Shift"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `ALTER TABLE "EmployeeDocument" ADD COLUMN IF NOT EXISTS "source" TEXT NOT NULL DEFAULT 'MANUAL';`,
     `ALTER TABLE "EmployeeDocument" ADD COLUMN IF NOT EXISTS "odooAttachmentId" INTEGER;`,
     `CREATE UNIQUE INDEX IF NOT EXISTS "EmployeeDocument_odooAttachmentId_key" ON "EmployeeDocument"("odooAttachmentId");`,
