@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Session } from "next-auth";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { hasPermission } from "@/lib/rbac";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// Employee Portal is view-only for documents (employees never upload/delete
+// their own official records -- those are Odoo-sourced/HR-managed). Only
+// callers holding the same manage:documents grant already required to reach
+// the admin employee-profile document manager may mutate through this route.
+function canManageDocuments(session: Session) {
+  return hasPermission(session.user.permissions, { action: "manage", resource: "documents" }, session.user.roles as string[] | undefined);
+}
 
 const allowedExtensions = new Set([".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".zip", ".rar", ".png", ".jpg", ".jpeg", ".webp", ".mp4", ".mov", ".txt", ".csv", ".xml"]);
 
@@ -19,6 +29,7 @@ async function folders(employeeId: string) {
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+  if (!canManageDocuments(session)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
 
   const contentType = request.headers.get("content-type") || "";
   if (contentType.includes("application/json")) {
@@ -56,6 +67,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+  if (!canManageDocuments(session)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
   const id = request.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ success: false, message: "id required" }, { status: 400 });
   await prisma.employeeDocument.delete({ where: { id } });
