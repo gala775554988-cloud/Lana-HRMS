@@ -1,10 +1,17 @@
 import { PrismaClient } from '@prisma/client';
 
 async function ensureDbSchema() {
+  // This runs inside vercel-build (the build step), not a serverless function
+  // invocation -- Vercel build steps tolerate minutes, not seconds. The old
+  // 25s budget was tight enough that a cold Neon compute plus 150+ sequential
+  // DDL round trips could silently truncate the list before it reached
+  // statements appended later (e.g. PayrollItem.bonusTotal), which is exactly
+  // what caused the confirmed production 500s on /employee/salary and
+  // /employee/notifications -- those columns never got a chance to run.
   setTimeout(() => {
-    console.log('[ensure-db-schema] 25s timeout reached, safely exiting so Vercel build can proceed without hang...');
+    console.log('[ensure-db-schema] 90s timeout reached, safely exiting so Vercel build can proceed without hang...');
     process.exit(0);
-  }, 25000);
+  }, 90000);
 
   const rawUrl = process.env.POSTGRES_PRISMA_URL || process.env.DIRECT_URL || process.env.DATABASE_URL || "";
   let url = rawUrl.trim();
@@ -31,6 +38,11 @@ async function ensureDbSchema() {
   });
 
   const sqlStatements = [
+    // Confirmed-broken-in-production columns first (Vercel error logs showed
+    // "column does not exist" for both), so they run even if this list ever
+    // grows large enough to risk truncation again before reaching the end.
+    `ALTER TABLE "Notification" ADD COLUMN IF NOT EXISTS "link" TEXT;`,
+    `ALTER TABLE "PayrollItem" ADD COLUMN IF NOT EXISTS "bonusTotal" DECIMAL(12,2) NOT NULL DEFAULT 0;`,
     `CREATE TABLE IF NOT EXISTS "HrPermissionScope" (
       "id" TEXT NOT NULL,
       "userId" TEXT NOT NULL,
