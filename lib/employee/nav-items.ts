@@ -53,7 +53,7 @@ export const EMPLOYEE_NAV_GROUPS: EmployeeNavGroup[] = [
     key: "myData",
     label: "بياناتي",
     items: [
-      { href: "/employee/profile", label: "ملفي الشخصي", icon: User },
+      { href: "/employee/profile", label: "ملفي", icon: User },
       { href: "/employee/salary", label: "الرواتب", icon: DollarSign },
       { href: "/employee/assets", label: "العهد", icon: Package },
       { href: "/employee/documents", label: "المستندات", icon: FolderOpen },

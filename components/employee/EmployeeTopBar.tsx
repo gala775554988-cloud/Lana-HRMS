@@ -8,7 +8,6 @@ import { signOut } from 'next-auth/react';
 import { BrandLogo } from '@/components/brand/brand-logo';
 import { ClientLanguageToggle } from '@/components/i18n/client-language-toggle';
 import { NotificationBell } from '@/components/enterprise/notification-bell';
-import { PortalMenu } from '@/components/portal-menu';
 
 interface Props {
   user: any;
@@ -49,10 +48,8 @@ export function EmployeeTopBar({ user, employee }: Props) {
           subtitleClassName="text-slate-500 dark:text-slate-400"
         />
 
-        <PortalMenu className="hidden lg:flex mx-2 shrink" />
-
         {/* Search */}
-        <div className="hidden md:flex lg:hidden xl:flex flex-1 min-w-0 max-w-xs">
+        <div className="hidden md:flex flex-1 min-w-0 max-w-md">
           <div className="relative w-full">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input
