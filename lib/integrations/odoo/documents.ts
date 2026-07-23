@@ -21,7 +21,19 @@ export type DocumentSyncResult = {
 };
 
 function sanitizeFileName(name: string) {
-  return name.replace(/[^a-zA-Z0-9._-\u0600-\u06FF\s]/g, "_").trim().slice(0, 180) || "document.pdf";
+  const trimmed = String(name ?? "").trim();
+  if (!trimmed) return "document.pdf";
+  // Only strip characters that are actually unsafe in a filename (path
+  // separators, Windows-reserved chars, control chars). The previous version
+  // whitelisted ASCII + \u0600-\u06FF only, so any Arabic presentation-form or
+  // mis-encoded character outside that narrow range (real names from Odoo do
+  // contain these) got replaced one-for-one with "_", producing names like
+  // "pdf._____" instead of the real Arabic filename.
+  const cleaned = trimmed
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")
+    .replace(/_{2,}/g, "_")
+    .replace(/^[_.\s]+|[_.\s]+$/g, "");
+  return cleaned.slice(0, 180) || "document.pdf";
 }
 
 /**
@@ -131,8 +143,15 @@ export async function bulkSyncAllOdooDocuments(client: OdooClient, limit = 2000,
         }
       }
 
-      await prisma.employeeDocument.create({
-        data: {
+      // upsert, not create: the importedIds pre-check above is a snapshot
+      // taken before this loop started, so two overlapping sync runs (bulk +
+      // per-employee, or two concurrent triggers) can both decide the same
+      // attachment "isn't imported yet" and both reach this point. upsert on
+      // the unique odooAttachmentId turns that race into a harmless update
+      // instead of a duplicate row.
+      await prisma.employeeDocument.upsert({
+        where: { odooAttachmentId: attachment.id },
+        create: {
           employeeId: localEmployeeId,
           type: "ODOO_ATTACHMENT",
           name: attachment.name || fileName,
@@ -143,6 +162,13 @@ export async function bulkSyncAllOdooDocuments(client: OdooClient, limit = 2000,
           status: "VERIFIED",
           source: "ODOO",
           odooAttachmentId: attachment.id,
+        },
+        update: {
+          name: attachment.name || fileName,
+          fileUrl,
+          fileName,
+          mimeType,
+          sizeBytes: attachment.file_size ?? buffer.byteLength,
         },
       });
       result.imported += 1;
@@ -210,8 +236,12 @@ export async function syncEmployeeDocuments(client: OdooClient, odooEmployeeId: 
         }
       }
 
-      await prisma.employeeDocument.create({
-        data: {
+      // upsert (see bulkSyncAllOdooDocuments for why): the importedIds
+      // pre-check is a snapshot, so overlapping sync runs for the same
+      // attachment must resolve to an update, never a duplicate insert.
+      await prisma.employeeDocument.upsert({
+        where: { odooAttachmentId: attachment.id },
+        create: {
           employeeId: localEmployeeId,
           type: "ODOO_ATTACHMENT",
           name: attachment.name || fileName,
@@ -222,6 +252,13 @@ export async function syncEmployeeDocuments(client: OdooClient, odooEmployeeId: 
           status: "VERIFIED",
           source: "ODOO",
           odooAttachmentId: attachment.id,
+        },
+        update: {
+          name: attachment.name || fileName,
+          fileUrl,
+          fileName,
+          mimeType,
+          sizeBytes: attachment.file_size ?? buffer.byteLength,
         },
       });
       result.imported += 1;
