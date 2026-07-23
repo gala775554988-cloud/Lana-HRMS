@@ -43,3 +43,7 @@ next-env.d.ts
 .env*
 .localperf/
 .env.local
+
+# local-only attendance bridge config/state (secrets + sync cursor, never committed)
+scripts/zkbio-attendance-sync.env
+scripts/zkbio-attendance-sync.state.json
