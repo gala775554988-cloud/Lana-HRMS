@@ -321,8 +321,13 @@ export function LanaAiFullPageClient() {
         }
       }
 
+      // An empty fullContent is never a legitimate successful reply -- it
+      // means the provider call failed after the server had already
+      // committed to a 200 streaming response (see the route's onError
+      // handler for the actual logged reason). Show a real failure message
+      // instead of a canned success-sounding string.
       setMessages((prev) =>
-        prev.map((m) => (m.id === assistantMsgId ? { ...m, content: fullContent || "تم تنفيذ الطلب.", isStreaming: false } : m))
+        prev.map((m) => (m.id === assistantMsgId ? { ...m, content: fullContent || "تعذّر الحصول على رد من المساعد الذكي حالياً. يرجى المحاولة مرة أخرى بعد قليل.", isStreaming: false } : m))
       );
     } catch (err: any) {
       if (err.name !== "AbortError") {
