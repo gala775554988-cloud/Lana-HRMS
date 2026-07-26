@@ -38,9 +38,11 @@ async function ensureDbSchema() {
   });
 
   const sqlStatements = [
-    // Confirmed-broken-in-production columns first (Vercel error logs showed
-    // "column does not exist" for both), so they run even if this list ever
-    // grows large enough to risk truncation again before reaching the end.
+    // Production-critical columns must run before the large legacy DDL list.
+    // They directly back employee-portal screens; keeping all four together
+    // prevents a build timeout from leaving one module unusable.
+    `ALTER TABLE "LeaveType" ADD COLUMN IF NOT EXISTS "genderRestriction" TEXT;`,
+    `ALTER TABLE "OvertimeRequest" ADD COLUMN IF NOT EXISTS "amount" DECIMAL(12,2);`,
     `ALTER TABLE "Notification" ADD COLUMN IF NOT EXISTS "link" TEXT;`,
     `ALTER TABLE "PayrollItem" ADD COLUMN IF NOT EXISTS "bonusTotal" DECIMAL(12,2) NOT NULL DEFAULT 0;`,
     `CREATE TABLE IF NOT EXISTS "HrPermissionScope" (
@@ -217,11 +219,9 @@ async function ensureDbSchema() {
     `ALTER TABLE "Deduction" ADD COLUMN IF NOT EXISTS "category" TEXT NOT NULL DEFAULT 'OTHER';`,
     `ALTER TABLE "EmployeeBankAccount" ADD COLUMN IF NOT EXISTS "swift" TEXT;`,
     `ALTER TABLE "EmployeeSalaryAdvance" ADD COLUMN IF NOT EXISTS "paidInstallments" INTEGER NOT NULL DEFAULT 0;`,
-    `ALTER TABLE "OvertimeRequest" ADD COLUMN IF NOT EXISTS "amount" DECIMAL(12,2);`,
     `ALTER TABLE "OvertimeRequest" ADD COLUMN IF NOT EXISTS "includedInPayrollAt" TIMESTAMP(3);`,
     `ALTER TABLE "PayrollItem" ADD COLUMN IF NOT EXISTS "absenceDeduction" DECIMAL(12,2) NOT NULL DEFAULT 0;`,
     `ALTER TABLE "PayrollItem" ADD COLUMN IF NOT EXISTS "advanceDeduction" DECIMAL(12,2) NOT NULL DEFAULT 0;`,
-    `ALTER TABLE "PayrollItem" ADD COLUMN IF NOT EXISTS "bonusTotal" DECIMAL(12,2) NOT NULL DEFAULT 0;`,
     `ALTER TABLE "PayrollItem" ADD COLUMN IF NOT EXISTS "costCenterId" TEXT;`,
     `ALTER TABLE "PayrollItem" ADD COLUMN IF NOT EXISTS "grossPay" DECIMAL(12,2) NOT NULL DEFAULT 0;`,
     `ALTER TABLE "PayrollItem" ADD COLUMN IF NOT EXISTS "insuranceDeduction" DECIMAL(12,2) NOT NULL DEFAULT 0;`,
@@ -265,7 +265,6 @@ async function ensureDbSchema() {
     `ALTER TABLE "PayrollRun" ADD COLUMN IF NOT EXISTS "lockedById" TEXT;`,
     `ALTER TABLE "PayrollRun" ADD COLUMN IF NOT EXISTS "archivedAt" TIMESTAMP(3);`,
     `ALTER TABLE "PayrollRun" ADD COLUMN IF NOT EXISTS "archivedById" TEXT;`,
-    `ALTER TABLE "LeaveType" ADD COLUMN IF NOT EXISTS "genderRestriction" TEXT;`,
     `ALTER TABLE "LeaveType" ADD COLUMN IF NOT EXISTS "carryOverLimit" INTEGER;`,
     `CREATE TABLE IF NOT EXISTS "EmployeeLeaveTypeBalance" (
       "id" TEXT NOT NULL,
