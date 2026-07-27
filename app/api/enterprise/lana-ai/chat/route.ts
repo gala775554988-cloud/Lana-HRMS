@@ -323,6 +323,19 @@ export async function POST(request: NextRequest) {
           // this, execution stopped right after a tool call and never
           // synthesized the tool result into a real answer.
           stopWhen: stepCountIs(5),
+          // streamText() commits to a 200 streaming response immediately --
+          // toTextStreamResponse() is already returned by the time the
+          // provider actually rejects the request (invalid/expired API key,
+          // quota exceeded, network failure to Gemini/OpenAI). The outer
+          // try/catch below only ever catches errors thrown by calling
+          // streamText() itself, never this kind of async, in-stream error --
+          // so without this callback, a real provider failure produced a
+          // silently empty response body with zero server-side visibility
+          // into why (this was the actual root cause of Lana AI always
+          // showing the client's generic "no content" fallback message).
+          onError: ({ error }) => {
+            console.error("[LanaAI] Gemini/OpenAI stream error:", error instanceof Error ? error.message : error);
+          },
           onFinish: async ({ text, toolCalls, toolResults }) => {
             await prisma.aIAssistantMessage.create({
               data: {

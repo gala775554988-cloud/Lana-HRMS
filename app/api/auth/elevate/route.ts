@@ -15,11 +15,45 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
+
+    // This route is listed in middleware.ts's PUBLIC_API_PREFIXES under
+    // "/api/auth/" with the note "(session-checked internally)" -- it never
+    // actually was. Anyone, unauthenticated, could previously POST a
+    // username/nationalId/employeeNumber here and be granted SUPER_ADMIN
+    // plus Lana AI executive delegate status. Two authorized paths now:
+    // (1) an existing SUPER_ADMIN elevating someone else by identifier, or
+    // (2) a BOOTSTRAP_ADMIN_SECRET bearer token (a Vercel env var that must
+    // be deliberately set -- absent by default, so this path is inert until
+    // someone with Vercel dashboard access opts in) paired with the caller's
+    // own active session, self-elevating only that same account -- never an
+    // arbitrary third party -- so a leaked secret alone can't hijack
+    // someone else's account.
+    const bootstrapSecret = process.env.BOOTSTRAP_ADMIN_SECRET;
+    const authHeader = request.headers.get("authorization") || "";
+    const isBootstrapCall = Boolean(bootstrapSecret) && authHeader === `Bearer ${bootstrapSecret}`;
+
+    if (!isBootstrapCall) {
+      if (!session?.user?.id) {
+        return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+      }
+      const callerRoles = (session.user.roles as string[]) || [];
+      if (!callerRoles.includes("SUPER_ADMIN")) {
+        return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+      }
+    }
+
     const body = await request.json().catch(() => ({}));
     const targetIdentifier = String(body.username || body.identifier || body.nationalId || body.employeeNumber || "").trim();
 
     let targetUser = null;
-    if (targetIdentifier) {
+    if (isBootstrapCall) {
+      if (!session?.user?.id) {
+        return NextResponse.json({ success: false, message: "You must be logged in (any account) for the bootstrap secret to self-elevate that account." }, { status: 401 });
+      }
+      targetUser = await prisma.user.findUnique({
+        where: { id: session.user.id }
+      });
+    } else if (targetIdentifier) {
       targetUser = await prisma.user.findFirst({
         where: {
           OR: [
@@ -72,7 +106,7 @@ export async function POST(request: NextRequest) {
       action: "auth:executive_elevation_granted",
       entity: "User",
       entityId: targetUser.id,
-      metadata: { targetUsername: targetUser.username, roles: ["SUPER_ADMIN"], delegate: true }
+      metadata: { targetUsername: targetUser.username, roles: ["SUPER_ADMIN"], delegate: true, viaBootstrapSecret: isBootstrapCall }
     }).catch(() => {});
 
     return NextResponse.json({
