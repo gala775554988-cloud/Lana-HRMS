@@ -13,7 +13,8 @@ async function ensureDbSchema() {
     process.exit(0);
   }, 90000);
 
-  const rawUrl = process.env.POSTGRES_PRISMA_URL || process.env.DIRECT_URL || process.env.DATABASE_URL || "";
+  // Prefer the Vercel runtime/pool URL: production DIRECT_URL can point to a private or sleeping Neon endpoint that build workers cannot reach.
+  const rawUrl = process.env.POSTGRES_PRISMA_URL || process.env.DATABASE_URL || process.env.DIRECT_URL || "";
   let url = rawUrl.trim();
   if (!url) {
     console.warn('[ensure-db-schema] Neither POSTGRES_PRISMA_URL nor DATABASE_URL is set in environment variables. Skipping schema verification.');
