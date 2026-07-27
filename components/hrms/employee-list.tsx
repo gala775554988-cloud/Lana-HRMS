@@ -80,6 +80,8 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
     ["nationality", isAr ? "الجنسية" : "Nationality"],
     ["employmentType", isAr ? "نوع التوظيف" : "Employment Type"],
     ["manager", isAr ? "المدير المباشر" : "Direct Manager"],
+    ["sponsor", isAr ? "الكفيل" : "Sponsor"],
+    ["nationalId", isAr ? "رقم الإقامة / الهوية" : "Iqama / ID Number"],
     ["hireDate", isAr ? "تاريخ التعيين" : "Hire Date"]
   ] as const, [isAr]);
 

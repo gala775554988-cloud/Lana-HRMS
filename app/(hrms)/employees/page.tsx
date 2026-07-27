@@ -47,6 +47,8 @@ function buildFastEmployeeWhere(query: Query) {
     position: one(query.position)?.trim(),
     nationality: one(query.nationality)?.trim(),
     employmentType: one(query.employmentType)?.trim(),
+    sponsor: one(query.sponsor)?.trim(),
+    nationalId: one(query.nationalId)?.trim(),
     hireDate: one(query.hireDate)?.trim(),
     status: one(query.status)?.trim(),
   };
@@ -87,6 +89,8 @@ function buildFastEmployeeWhere(query: Query) {
   if (filters.position || filters.section) and.push({ position: { title: { contains: filters.position || filters.section, mode: "insensitive" } } });
   if (filters.nationality) and.push({ nationality: { name: { contains: filters.nationality, mode: "insensitive" } } });
   if (filters.employmentType) and.push({ employmentType: { name: { contains: filters.employmentType, mode: "insensitive" } } });
+  if (filters.sponsor) and.push({ sponsor: { contains: filters.sponsor, mode: "insensitive" } });
+  if (filters.nationalId) and.push({ nationalId: { contains: filters.nationalId, mode: "insensitive" } });
   if (filters.hireDate) {
     const start = new Date(filters.hireDate);
     if (!Number.isNaN(start.getTime())) {
@@ -214,7 +218,7 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
       const page = positiveNumber(query.page, 1);
       const pageSize = Math.min(Math.max(positiveNumber(query.pageSize, 24), 12), 50);
       const search = one(query.search) ?? "";
-      const filters = Object.fromEntries(["department", "hospital", "branch", "project", "section", "position", "nationality", "employmentType", "manager", "hireDate", "status"].map((field) => [field, one(query[field])])) as Record<string, string | undefined>;
+      const filters = Object.fromEntries(["department", "hospital", "branch", "project", "section", "position", "nationality", "employmentType", "manager", "sponsor", "nationalId", "hireDate", "status"].map((field) => [field, one(query[field])])) as Record<string, string | undefined>;
       const data = await listModuleRecords({ resourceKey: "employees", page, pageSize, search, filters });
       directoryContent = <EmployeeList resource={resource} records={data.records as any[]} totalCount={data.total} page={data.page} pageCount={data.pageCount} search={search} filters={filters} pageSize={pageSize} dictionary={dictionary} locale={locale} />;
     } else {

@@ -294,6 +294,8 @@ export async function listModuleRecords(input: QueryInput) {
     relationContains("position", "title", filters.position || filters.section);
     relationContains("employmentType", "name", filters.employmentType);
     relationContains("nationality", "name", filters.nationality);
+    if (filters.sponsor) employeeAnd.push({ sponsor: { contains: filters.sponsor, mode: "insensitive" } });
+    if (filters.nationalId) employeeAnd.push({ nationalId: { contains: filters.nationalId, mode: "insensitive" } });
     if (filters.hospital) {
       const employeeIds = await getEmployeeIdsByHospital(filters.hospital);
       employeeAnd.push({ id: { in: employeeIds.length ? employeeIds : ["__NO_HOSPITAL_MATCH__"] } });

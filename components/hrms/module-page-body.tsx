@@ -105,7 +105,7 @@ export async function ModulePageBody({
 
   const filters = Object.fromEntries(resource.filterFields.map((field) => [field, typeof getParam(field) === "string" ? getParam(field) as string : undefined]));
   if (resourceKey === "employees") {
-    ["department", "hospital", "branch", "project", "section", "position", "nationality", "employmentType", "manager", "hireDate"].forEach((field) => {
+    ["department", "hospital", "branch", "project", "section", "position", "nationality", "employmentType", "manager", "sponsor", "nationalId", "hireDate"].forEach((field) => {
       if (typeof query[field] === "string") filters[field] = query[field] as string;
     });
     const tab = typeof query.tab === "string" ? query.tab : "all";
