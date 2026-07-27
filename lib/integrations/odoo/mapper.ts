@@ -376,7 +376,14 @@ export function mapOdooContractToLana(record: OdooRecord, employeeId?: string): 
     endDate: asDateString(record.date_end, true),
     salaryAmount: decimalNumber(record.wage) ?? 0,
     currency: "USD",
-    status: mapContractStateToLana(record.state)
+    status: mapContractStateToLana(record.state),
+    odooStructureType: many2oneName(record.structure_type_id) || many2oneName(record.struct_id) || textValue(record.structure_type_id) || textValue(record.struct_id),
+    salaryDetails: {
+      wage: decimalNumber(record.wage) ?? 0,
+      structureType: many2oneName(record.structure_type_id) || many2oneName(record.struct_id) || null,
+      salaryGrade: many2oneName(record.salary_grade_id) || null,
+      allowance: decimalNumber(record.allowance) ?? undefined,
+    }
   });
 }
 

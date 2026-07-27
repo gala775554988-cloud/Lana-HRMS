@@ -78,7 +78,7 @@ const HOSPITAL_FIELD_CANDIDATES = [
 const EXTENDED_PROFILE_FIELD_CANDIDATES = [
   "employee_english_name", "iqamah_job_name", "birthday", "gender", "marital",
   "join_date", "first_contract_date", "work_location_name", "employee_working_status",
-  "hr_presence_state", "is_absent", "tz", "category_ids", "bank_name", "iban", "branch_id"
+  "hr_presence_state", "is_absent", "tz", "category_ids", "branch_id"
 ];
 
 const ANALYTIC_FIELD_CANDIDATES = [
@@ -323,8 +323,6 @@ export async function POST(request: NextRequest) {
         parentOdooId: many2oneId(row.parent_id),
         hospitalName,
         contractData: employeeIdToContract.get(odooId),
-        bankName: clean((row as any).bank_name) || null,
-        iban: clean((row as any).iban) || null,
         existing,
         data: {
           odooId,
@@ -361,6 +359,28 @@ export async function POST(request: NextRequest) {
         } as any,
       };
     });
+
+    // Validate the complete batch before any write. A bad reference or missing
+    // critical identity value blocks the batch and is logged for review rather
+    // than producing partial, silent updates.
+    const validationErrors = plan.flatMap((item) => {
+      const issues: string[] = [];
+      if (!item.odooId || !Number.isInteger(item.odooId)) issues.push("Missing or invalid Odoo employee id");
+      if (!clean(item.data.employeeNumber)) issues.push("Missing employee number");
+      if (!clean(item.data.nationalId)) issues.push("Missing national ID / Iqama");
+      if (!clean(item.data.firstName) || !clean(item.data.lastName)) issues.push("Missing employee name");
+      if (!(item.data.hireDate instanceof Date) || Number.isNaN(item.data.hireDate.getTime())) issues.push("Missing or invalid hire date");
+      if (item.contractData) {
+        if (!Number(item.contractData.id)) issues.push("Contract record has no Odoo id");
+        if (!dateValue(item.contractData.date_start)) issues.push("Contract has no valid start date");
+        if (!Number.isFinite(Number(item.contractData.wage))) issues.push("Contract has invalid wage");
+      }
+      return issues.map((message) => ({ odooId: item.odooId, employeeNumber: item.data.employeeNumber, message }));
+    });
+    if (validationErrors.length) {
+      await prisma.integrationLog.create({ data: { level: "ERROR", action: "ODOO_EMPLOYEE_MASTER_VALIDATION", message: `Odoo employee master sync blocked: ${validationErrors.length} validation error(s)`, metadata: { errors: validationErrors.slice(0, 100) } as any } }).catch(() => undefined);
+      return NextResponse.json({ success: false, blocked: true, message: "Sync blocked by pre-write validation", validationErrors: validationErrors.slice(0, 100) }, { status: 422 });
+    }
 
     for (const item of plan) {
       const email = item.data.email;
@@ -433,13 +453,8 @@ export async function POST(request: NextRequest) {
           created += 1;
         }
         localByOdooId.set(item.odooId, employeeId);
-        // Financial fields are intentionally stored only in the dedicated bank
-        // account relation, never in odooRawData or a browser-facing payload.
-        if (item.bankName && item.iban) {
-          const primary = await prisma.employeeBankAccount.findFirst({ where: { employeeId, isPrimary: true }, select: { id: true } });
-          if (primary) await prisma.employeeBankAccount.update({ where: { id: primary.id }, data: { bank: item.bankName, iban: item.iban } });
-          else await prisma.employeeBankAccount.create({ data: { employeeId, bank: item.bankName, iban: item.iban, isPrimary: true } });
-        }
+        // Bank account and IBAN data are explicitly excluded from the Odoo
+        // request, plan, logs, raw snapshots, and all Prisma writes.
         if (item.hospitalName) {
           const resolved = await resolveOdooHospital(prisma.hospital, prisma.branch, item.hospitalName);
           if (resolved?.hospitalId) {
@@ -468,7 +483,7 @@ export async function POST(request: NextRequest) {
               endDate: dateValue(cData.date_end) || undefined,
               odooRawData: cData
             }
-          }).catch(() => {});
+          });
         }
         if (!body.skipUserProvisioning) {
           const userResult = await ensureEmployeeUser(employeeId, item.data).catch((error) => ({ created: false, reason: error instanceof Error ? error.message : String(error) }));

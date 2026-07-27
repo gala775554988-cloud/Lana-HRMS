@@ -486,7 +486,7 @@ export class OdooSyncService {
     const entity = options.entity ?? "all";
     if (entity === "all") {
       const results: SyncResult[] = [];
-      for (const current of ["companies", "departments", "jobs", "employees", "contracts", "attendance", "leave"] as SyncEntity[]) {
+      for (const current of ["companies", "departments", "jobs", "employees", "contracts", "payroll", "attendance", "leave"] as SyncEntity[]) {
         results.push(await this.sync({ ...options, entity: current }));
       }
       return mergeResults("all", direction, Boolean(options.dryRun), results, options.tenantId);
@@ -1603,7 +1603,9 @@ export class OdooSyncService {
         }
       }
       if (direction === "ODOO_TO_LANA" || direction === "BIDIRECTIONAL") {
-        const rows = await this.client.search_read(mapper.odooModel, odooIncrementalDomain(since), mapper.odooFields, { limit: batchSize, order: "write_date asc" });
+        const contractFieldMeta = await this.client.fieldsGet(mapper.odooModel, [], ["string", "type"]).catch(() => ({} as Record<string, unknown>));
+        const compensationFields = ["structure_type_id", "struct_id", "salary_grade_id", "allowance"].filter((field) => field in contractFieldMeta);
+        const rows = await this.client.search_read(mapper.odooModel, odooIncrementalDomain(since), [...mapper.odooFields, ...compensationFields], { limit: batchSize, order: "write_date asc" });
         result.cursor = maxCursor(rows, since);
         for (const row of rows) {
           try {

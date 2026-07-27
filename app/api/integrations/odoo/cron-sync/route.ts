@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     const connectionId = request.nextUrl.searchParams.get("connectionId") || undefined;
     const resyncResult = await fullResyncFromOdoo({ wipeAndSync: false, connectionId }).catch((err) => ({ error: err.message || String(err) }));
     const service = await OdooSyncService.forConnection(connectionId);
-    const result = await service.sync({ entity: "all", direction: "BIDIRECTIONAL" });
+    const result = await service.sync({ entity: "all", direction: "ODOO_TO_LANA" });
     // Daily guaranteed reconciliation: الأرقام الوظيفية والـ odooId تبقى مطابقة
     // لأودو 100% كل يوم دون أي تدخل يدوي. يصلح أي انجراف ناتج عن تعديلات
     // إدارية مباشرة أو مزامنة ناقصة سابقة.

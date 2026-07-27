@@ -10,3 +10,7 @@ ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "hrPresenceState" TEXT;
 ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "isAbsent" BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "odooTimezone" TEXT DEFAULT 'Asia/Riyadh';
 ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS "odooTags" JSONB;
+
+-- Normalized, non-bank payroll contract metadata from Odoo.
+ALTER TABLE "EmployeeContract" ADD COLUMN IF NOT EXISTS "odooStructureType" TEXT;
+ALTER TABLE "EmployeeContract" ADD COLUMN IF NOT EXISTS "salaryDetails" JSONB;

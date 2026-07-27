@@ -500,6 +500,8 @@ model EmployeeContract {
   odooEmployeeId Int?
   odooWriteDate  DateTime?
   odooState      String?
+  odooStructureType String?
+  salaryDetails  Json?
   odooRawData    Json?
 
   @@index([employeeId])
