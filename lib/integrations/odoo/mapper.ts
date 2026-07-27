@@ -265,6 +265,17 @@ export function mapOdooEmployeeToLana(record: OdooRecord): Record<string, unknow
     // depending on how their instance is configured -- prefer the most
     // specific/readable one available.
     sponsor: textValue(record.sponsor_name) || textValue(record.sponsor) || many2oneName(record.sponsor_id) || textValue(record.sponsor_id),
+    employeeEnglishName: textValue(record.employee_english_name),
+    iqamahJobName: textValue(record.iqamah_job_name),
+    workPhone: textValue(record.work_phone),
+    mobilePhone: textValue(record.mobile_phone),
+    maritalStatus: textValue(record.marital),
+    firstContractDate: asDate(record.first_contract_date),
+    workingStatus: many2oneName(record.employee_working_status) || textValue(record.employee_working_status),
+    hrPresenceState: textValue(record.hr_presence_state),
+    isAbsent: record.is_absent === true,
+    odooTimezone: textValue(record.tz) || "Asia/Riyadh",
+    odooTags: Array.isArray(record.category_ids) ? record.category_ids : undefined,
     analyticAccount: many2oneName(record.analytic_account) || textValue(record.analytic_account),
     status: record.active === false ? "INACTIVE" : "ACTIVE",
     lastActiveDate,

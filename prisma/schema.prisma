@@ -350,6 +350,17 @@ model Employee {
   projectId              String?
   // Odoo sync fields
   sponsor                String? // كفيل / Sponsor name synced from Odoo
+  employeeEnglishName    String?
+  iqamahJobName          String?
+  workPhone              String?
+  mobilePhone            String?
+  maritalStatus          String?
+  firstContractDate      DateTime?
+  workingStatus          String?
+  hrPresenceState        String?
+  isAbsent               Boolean                 @default(false)
+  odooTimezone           String?                 @default("Asia/Riyadh")
+  odooTags               Json?
   hospitalId             String? // Real FK, replaces the old freeform employee.extra AppSetting hospital string
   costCenter             String? // Freeform for now -- Odoo field mapping deferred pending real custom field name
   analyticAccount        String? // Freeform for now -- Odoo field mapping deferred pending real custom field name

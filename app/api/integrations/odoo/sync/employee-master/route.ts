@@ -75,6 +75,12 @@ const HOSPITAL_FIELD_CANDIDATES = [
   "work_location"
 ];
 
+const EXTENDED_PROFILE_FIELD_CANDIDATES = [
+  "employee_english_name", "iqamah_job_name", "birthday", "gender", "marital",
+  "join_date", "first_contract_date", "work_location_name", "employee_working_status",
+  "hr_presence_state", "is_absent", "tz", "category_ids", "bank_name", "iban", "branch_id"
+];
+
 const ANALYTIC_FIELD_CANDIDATES = [
   "analytic_account",
   "analytic_account_id",
@@ -203,6 +209,7 @@ export async function POST(request: NextRequest) {
     const sponsorFields = SPONSOR_FIELD_CANDIDATES.filter((field) => fieldsMeta[field]);
     const hospitalFields = HOSPITAL_FIELD_CANDIDATES.filter((field) => fieldsMeta[field]);
     const analyticFields = ANALYTIC_FIELD_CANDIDATES.filter((field) => fieldsMeta[field]);
+    const extendedProfileFields = EXTENDED_PROFILE_FIELD_CANDIDATES.filter((field) => fieldsMeta[field]);
     const fields = [
       "id",
       "name",
@@ -225,6 +232,7 @@ export async function POST(request: NextRequest) {
       ...sponsorFields,
       ...hospitalFields,
       ...analyticFields,
+      ...extendedProfileFields,
     ];
 
     const rows: MasterRow[] = [];
@@ -315,6 +323,8 @@ export async function POST(request: NextRequest) {
         parentOdooId: many2oneId(row.parent_id),
         hospitalName,
         contractData: employeeIdToContract.get(odooId),
+        bankName: clean((row as any).bank_name) || null,
+        iban: clean((row as any).iban) || null,
         existing,
         data: {
           odooId,
@@ -326,8 +336,20 @@ export async function POST(request: NextRequest) {
           phone: phoneFrom(row),
           profilePhotoUrl: (row as any).image_1920 ? (String((row as any).image_1920).startsWith("data:") ? String((row as any).image_1920) : `data:image/jpeg;base64,${(row as any).image_1920}`) : undefined,
           sponsor: sponsorValue(row as Record<string, unknown>, sponsorFields),
+          employeeEnglishName: clean((row as any).employee_english_name) || undefined,
+          iqamahJobName: clean((row as any).iqamah_job_name) || undefined,
+          workPhone: clean((row as any).work_phone) || undefined,
+          mobilePhone: clean((row as any).mobile_phone) || undefined,
+          maritalStatus: clean((row as any).marital) || undefined,
+          firstContractDate: dateValue((row as any).first_contract_date),
+          workingStatus: many2oneName((row as any).employee_working_status) || clean((row as any).employee_working_status) || undefined,
+          hrPresenceState: clean((row as any).hr_presence_state) || undefined,
+          isAbsent: Boolean((row as any).is_absent),
+          odooTimezone: clean((row as any).tz) || "Asia/Riyadh",
+          odooTags: Array.isArray((row as any).category_ids) ? (row as any).category_ids : undefined,
+          workLocationName: clean((row as any).work_location_name) || many2oneName((row as any).work_location_id) || undefined,
           costCenter: costCenterVal || undefined,
-          hireDate: dateValue(row.first_contract_date) || dateValue(row.create_date) || new Date(),
+          hireDate: dateValue((row as any).join_date) || dateValue(row.first_contract_date) || dateValue(row.create_date) || new Date(),
           status: row.active === false ? "INACTIVE" : "ACTIVE",
           odooWriteDate: dateValue(row.write_date),
           odooCreateDate: dateValue(row.create_date),
@@ -411,6 +433,13 @@ export async function POST(request: NextRequest) {
           created += 1;
         }
         localByOdooId.set(item.odooId, employeeId);
+        // Financial fields are intentionally stored only in the dedicated bank
+        // account relation, never in odooRawData or a browser-facing payload.
+        if (item.bankName && item.iban) {
+          const primary = await prisma.employeeBankAccount.findFirst({ where: { employeeId, isPrimary: true }, select: { id: true } });
+          if (primary) await prisma.employeeBankAccount.update({ where: { id: primary.id }, data: { bank: item.bankName, iban: item.iban } });
+          else await prisma.employeeBankAccount.create({ data: { employeeId, bank: item.bankName, iban: item.iban, isPrimary: true } });
+        }
         if (item.hospitalName) {
           const resolved = await resolveOdooHospital(prisma.hospital, prisma.branch, item.hospitalName);
           if (resolved?.hospitalId) {
