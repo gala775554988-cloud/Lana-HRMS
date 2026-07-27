@@ -150,7 +150,9 @@ const ODOO_HOSPITALS_MASTER = [
 
 async function seedMasterOdooHospitals() {
   console.log("[seed:hospitals] Starting 100% precision seeding of 115+ official Odoo hospitals directory...");
-  const rawUrl = process.env.DIRECT_URL || process.env.DATABASE_URL || "";
+  // Vercel build workers can reach the pooled runtime URL while a configured
+  // direct Neon endpoint may be private or suspended.
+  const rawUrl = process.env.DATABASE_URL || process.env.DIRECT_URL || "";
   if (!rawUrl) {
     console.warn("[seed:hospitals] Neither DATABASE_URL nor DIRECT_URL is configured. Skipping direct database insert.");
     return;

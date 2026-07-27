@@ -8,7 +8,7 @@ async function ensureDbSchema() {
   // statements appended later (e.g. PayrollItem.bonusTotal), which is exactly
   // what caused the confirmed production 500s on /employee/salary and
   // /employee/notifications -- those columns never got a chance to run.
-  setTimeout(() => {
+  const safetyTimeout = setTimeout(() => {
     console.log('[ensure-db-schema] 90s timeout reached, safely exiting so Vercel build can proceed without hang...');
     process.exit(0);
   }, 90000);
@@ -298,6 +298,7 @@ async function ensureDbSchema() {
   }
 
   await client.$disconnect();
+  clearTimeout(safetyTimeout);
   console.log(`[ensure-db-schema] Schema check finished. Executed ${successCount}/${sqlStatements.length} DDL statements cleanly.`);
 }
 
