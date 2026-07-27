@@ -8,7 +8,7 @@ import { getHrmsModule } from "@/config/hrms";
 import { listModuleRecords } from "@/lib/hrms/actions";
 import { getRequestDictionary } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
-import { EmployeeList } from "@/components/hrms/employee-list";
+import { EmployeeList, type EmployeeFilterOptions } from "@/components/hrms/employee-list";
 import { MergedModuleTabs } from "@/components/hrms/merged-module-tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Network, Users, UsersRound, Building2 } from "lucide-react";
@@ -24,6 +24,35 @@ const getCachedEmployeeTotal = unstable_cache(
   async () => prisma.employee.count({ where: { status: { not: "INACTIVE" } } }).catch(() => 0),
   ["employees-active-total-count-v1"],
   { revalidate: 60 }
+);
+
+
+const getEmployeeFilterOptions = unstable_cache(
+  async (): Promise<EmployeeFilterOptions> => {
+    const [departments, branches, hospitals, projects, positions, nationalities, employmentTypes, managers] = await Promise.all([
+      prisma.department.findMany({ where: { isActive: true }, select: { name: true }, orderBy: { name: "asc" }, take: 1000 }),
+      prisma.branch.findMany({ where: { isActive: true }, select: { name: true }, orderBy: { name: "asc" }, take: 1000 }),
+      prisma.hospital.findMany({ where: { isActive: true }, select: { name: true }, orderBy: { name: "asc" }, take: 1000 }),
+      prisma.project.findMany({ where: { isActive: true }, select: { name: true }, orderBy: { name: "asc" }, take: 1000 }),
+      prisma.position.findMany({ where: { isActive: true }, select: { title: true }, orderBy: { title: "asc" }, take: 1000 }),
+      prisma.nationality.findMany({ where: { isActive: true }, select: { name: true }, orderBy: { name: "asc" }, take: 1000 }),
+      prisma.employmentType.findMany({ where: { isActive: true }, select: { name: true }, orderBy: { name: "asc" }, take: 1000 }),
+      prisma.employee.findMany({ where: { status: { not: "INACTIVE" } }, select: { id: true, employeeNumber: true, firstName: true, lastName: true }, orderBy: [{ firstName: "asc" }, { lastName: "asc" }], take: 1000 }),
+    ]);
+    const named = (rows: Array<{ name: string }>) => rows.map(({ name }) => ({ value: name, label: name }));
+    return {
+      department: named(departments),
+      branch: named(branches),
+      hospital: named(hospitals),
+      project: named(projects),
+      position: positions.map(({ title }) => ({ value: title, label: title })),
+      nationality: named(nationalities),
+      employmentType: named(employmentTypes),
+      manager: managers.map((manager) => ({ value: manager.id, label: `${manager.firstName} ${manager.lastName} · ${manager.employeeNumber}` })),
+    };
+  },
+  ["employee-filter-options-v1"],
+  { revalidate: 300 }
 );
 
 function one(value: string | string[] | undefined) {
@@ -89,6 +118,7 @@ function buildFastEmployeeWhere(query: Query) {
   if (filters.position || filters.section) and.push({ position: { title: { contains: filters.position || filters.section, mode: "insensitive" } } });
   if (filters.nationality) and.push({ nationality: { name: { contains: filters.nationality, mode: "insensitive" } } });
   if (filters.employmentType) and.push({ employmentType: { name: { contains: filters.employmentType, mode: "insensitive" } } });
+  if (one(query.manager)?.trim()) and.push({ managerId: one(query.manager)?.trim() });
   if (filters.sponsor) and.push({ sponsor: { contains: filters.sponsor, mode: "insensitive" } });
   if (filters.nationalId) and.push({ nationalId: { contains: filters.nationalId, mode: "insensitive" } });
   if (filters.hireDate) {
@@ -211,6 +241,7 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
   const activeTab = one(query.tab) ?? "directory";
   const hospitalFilterId = one(query.hospitalId)?.trim() || one(query.hospital)?.trim();
   const hospitalName = hospitalFilterId ? (await prisma.hospital.findUnique({ where: { id: hospitalFilterId } }).catch(() => null))?.name || hospitalFilterId : null;
+  const filterOptions = activeTab === "directory" ? await getEmployeeFilterOptions().catch(() => ({})) : {};
 
   let directoryContent: React.ReactNode = null;
   if (activeTab === "directory") {
@@ -220,14 +251,14 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
       const search = one(query.search) ?? "";
       const filters = Object.fromEntries(["department", "hospital", "branch", "project", "section", "position", "nationality", "employmentType", "manager", "sponsor", "nationalId", "hireDate", "status"].map((field) => [field, one(query[field])])) as Record<string, string | undefined>;
       const data = await listModuleRecords({ resourceKey: "employees", page, pageSize, search, filters });
-      directoryContent = <EmployeeList resource={resource} records={data.records as any[]} totalCount={data.total} page={data.page} pageCount={data.pageCount} search={search} filters={filters} pageSize={pageSize} dictionary={dictionary} locale={locale} />;
+      directoryContent = <EmployeeList resource={resource} records={data.records as any[]} totalCount={data.total} page={data.page} pageCount={data.pageCount} search={search} filters={filters} pageSize={pageSize} dictionary={dictionary} locale={locale} filterOptions={filterOptions} />;
     } else {
       const data = await getFastEmployees(query);
       if (data.shouldFallback) {
         const dataFallback = await listModuleRecords({ resourceKey: "employees", page: data.page, pageSize: data.pageSize, search: data.search, filters: data.filters });
-        directoryContent = <EmployeeList resource={resource} records={dataFallback.records as any[]} totalCount={dataFallback.total} page={dataFallback.page} pageCount={dataFallback.pageCount} search={data.search} filters={data.filters} pageSize={data.pageSize} dictionary={dictionary} locale={locale} />;
+        directoryContent = <EmployeeList resource={resource} records={dataFallback.records as any[]} totalCount={dataFallback.total} page={dataFallback.page} pageCount={dataFallback.pageCount} search={data.search} filters={data.filters} pageSize={data.pageSize} dictionary={dictionary} locale={locale} filterOptions={filterOptions} />;
       } else {
-        directoryContent = <EmployeeList resource={resource} records={data.records as any[]} totalCount={data.total} page={data.page} pageCount={data.pageCount} search={data.search} filters={data.filters} pageSize={data.pageSize} dictionary={dictionary} locale={locale} />;
+        directoryContent = <EmployeeList resource={resource} records={data.records as any[]} totalCount={data.total} page={data.page} pageCount={data.pageCount} search={data.search} filters={data.filters} pageSize={data.pageSize} dictionary={dictionary} locale={locale} filterOptions={filterOptions} />;
       }
     }
   }

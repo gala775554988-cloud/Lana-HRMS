@@ -313,6 +313,7 @@ export async function listModuleRecords(input: QueryInput) {
       const manager = await prisma.employee.findFirst({
         where: {
           OR: [
+            { id: filters.manager },
             { employeeNumber: { equals: filters.manager, mode: "insensitive" } },
             { nationalId: { equals: filters.manager, mode: "insensitive" } },
             { firstName: { contains: filters.manager, mode: "insensitive" } },

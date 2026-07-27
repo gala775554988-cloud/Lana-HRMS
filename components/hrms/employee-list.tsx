@@ -29,6 +29,9 @@ const EmployeeBulkImportDialog = dynamic(() => import("@/components/hrms/employe
 type ViewMode = "card" | "table";
 type TabType = "all" | "active" | "archived" | "duplicates";
 
+type FilterOption = { value: string; label: string };
+export type EmployeeFilterOptions = Partial<Record<string, FilterOption[]>>;
+
 interface EmployeeListProps {
   resource: HrmsModule;
   records: EmployeeCardData[];
@@ -41,9 +44,10 @@ interface EmployeeListProps {
   dictionary: Dictionary;
   locale: Locale;
   fromHref?: string;
+  filterOptions?: EmployeeFilterOptions;
 }
 
-export function EmployeeList({ resource, records, totalCount, page, pageCount, search: initialSearch, filters = {}, pageSize, dictionary, locale, fromHref }: EmployeeListProps) {
+export function EmployeeList({ resource, records, totalCount, page, pageCount, search: initialSearch, filters = {}, pageSize, dictionary, locale, fromHref, filterOptions = {} }: EmployeeListProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const activeTab = (searchParams.get("tab") as TabType) || "all";
@@ -277,18 +281,52 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
           </div>
         </div>
         {filtersOpen ? (
-          <form onSubmit={handleApplyFilters} className="mt-4 rounded-2xl border border-primary/80 bg-primary/30 p-4 shadow-inner shadow-white/60 dark:border-primary/40 dark:bg-primary/10">
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-              {filterFields.map(([name, label]) => (
-                <label key={name} className="grid gap-1 text-sm">
-                  <span className="text-muted-foreground">{label}</span>
-                  <Input name={name} type={name === "hireDate" ? "date" : "text"} defaultValue={filters[name] ?? ""} />
-                </label>
-              ))}
+          <form onSubmit={handleApplyFilters} className="mt-4 w-full rounded-2xl border border-slate-100 bg-white p-6 shadow-xl shadow-slate-200/50 dark:border-slate-800 dark:bg-slate-950 dark:shadow-slate-950/40">
+            <div className="mb-6 flex items-center justify-between border-b border-slate-100 pb-4 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">{isAr ? "تصفية الموظفين المتقدمة" : "Advanced employee filters"}</h3>
+              </div>
+              <Button type="button" variant="ghost" size="sm" onClick={handleResetFilters} className="text-slate-500 hover:bg-transparent hover:text-indigo-600 dark:hover:text-indigo-400">
+                {isAr ? "إعادة تعيين الكل" : "Reset all"}
+              </Button>
             </div>
-            <div className="mt-4 flex gap-2">
-              <Button type="submit">تطبيق</Button>
-              <Button type="button" variant="outline" onClick={handleResetFilters}>إعادة تعيين</Button>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-4">
+              {filterFields.map(([name, label]) => {
+                const options = filterOptions[name] ?? [];
+                const listId = `employee-filter-${name}`;
+                const isDate = name === "hireDate";
+                const isStatus = name === "status";
+                const isFreeText = name === "sponsor" || name === "nationalId" || name === "section";
+                const placeholder = name === "sponsor"
+                  ? (isAr ? "ابحث باسم الكفيل" : "Search sponsor")
+                  : name === "nationalId"
+                    ? (isAr ? "ابحث برقم الإقامة أو الهوية" : "Search Iqama or ID")
+                    : isDate ? "" : (isAr ? `اختر ${label}` : `Select ${label}`);
+                return (
+                  <label key={name} className="block text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    <span className="mb-1.5 block">{label}</span>
+                    {isStatus ? (
+                      <select name={name} defaultValue={filters[name] ?? ""} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 transition-all focus:border-indigo-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+                        <option value="">{isAr ? "نشط / غير نشط" : "Any status"}</option>
+                        <option value="ACTIVE">{isAr ? "نشط" : "Active"}</option>
+                        <option value="ON_LEAVE">{isAr ? "في إجازة" : "On leave"}</option>
+                        <option value="TERMINATED">{isAr ? "منتهي الخدمة" : "Terminated"}</option>
+                        <option value="INACTIVE">{isAr ? "غير نشط" : "Inactive"}</option>
+                      </select>
+                    ) : (
+                      <>
+                        <Input name={name} type={isDate ? "date" : "text"} list={!isDate && !isFreeText && options.length ? listId : undefined} defaultValue={filters[name] ?? ""} placeholder={placeholder} className="w-full rounded-xl border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 transition-all placeholder:text-slate-400 focus:border-indigo-600 focus:bg-white focus-visible:ring-2 focus-visible:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+                        {!isDate && !isFreeText && options.length ? <datalist id={listId}>{options.map((option) => <option key={`${option.value}-${option.label}`} value={option.value}>{option.label}</option>)}</datalist> : null}
+                      </>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+            <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+              <Button type="button" variant="outline" onClick={() => setFiltersOpen(false)} className="rounded-xl border-slate-200 px-5 py-2.5 text-slate-600 hover:bg-slate-50">{isAr ? "إلغاء" : "Cancel"}</Button>
+              <Button type="submit" className="rounded-xl bg-indigo-600 px-6 py-2.5 text-white shadow-lg shadow-indigo-600/20 hover:bg-indigo-700">{isAr ? "تطبيق الفلترة" : "Apply filters"}</Button>
             </div>
           </form>
         ) : null}
