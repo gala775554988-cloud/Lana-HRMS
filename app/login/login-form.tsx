@@ -97,7 +97,7 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
         className={`relative border-b-2 pb-1.5 pt-3 focus-within:border-primary ${passwordError ? "border-destructive" : "border-slate-200 dark:border-slate-700"}`}
       >
         <div className="flex items-center justify-end">
-          <span className="text-xs font-medium text-[#A3A8A9]">إذا نسيت كلمة المرور يرجى مراجعة إدارة الموارد البشرية</span>
+          <span className="text-xs font-medium text-primary">إذا نسيت كلمة المرور يرجى مراجعة إدارة الموارد البشرية</span>
         </div>
         <div className="relative">
           <Input
@@ -123,9 +123,7 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
         <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{dictionary?.auth?.rememberTitle || "تذكر مساحة العمل"}</span>
       </label>
       <Button
-        // White text on #A3A8A9 is ~2.4:1 (fails WCAG AA); dark slate text on
-        // this grey is ~7.4:1, so the label stays readable.
-        className="h-12 w-full rounded-lg bg-[#A3A8A9] text-sm font-semibold text-slate-900 shadow-lg shadow-slate-400/30 hover:bg-[#8F9495] active:scale-95"
+        className="h-12 w-full rounded-lg text-sm font-semibold shadow-lg shadow-primary/20 active:scale-95"
         type="submit"
         disabled={isPending}
       >

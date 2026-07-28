@@ -271,18 +271,18 @@ export async function CompanyOverview({ locale, dictionary, showCharts = true, s
   const currencyLocale = { en: "en-US", ar: "ar-SA" } as const;
   const d = dictionary?.dashboard || {};
   const cards: Array<{ title: string; value: number | string; icon: LucideIcon; hint: string; tone: string; badgeText?: string }> = [
-    { title: d.kpiActiveEmployees || "الموظفون النشطون", value: employees, icon: Users, hint: d.kpiActiveEmployeesHint || "حالة رأس المال البشري", tone: "from-[#F4708F] to-[#F2B366]", badgeText: d.kpiLiveBadge || "مباشر" },
-    { title: d.kpiDepartments || "الإدارات", value: departments, icon: Building2, hint: d.kpiDepartmentsHint || "إجمالي الإدارات النشطة", tone: "from-[#9CA8B0] to-[#F4708F]" },
-    { title: d.kpiBranches || "الفروع", value: branches, icon: Building2, hint: d.kpiBranchesHint || "المواقع التشغيلية", tone: "from-[#F2B366] to-[#F4708F]" },
-    { title: d.kpiHospitals || "المستشفيات", value: hospitals, icon: Hospital, hint: d.kpiHospitalsHint || "توزيع الكوادر الطبية", tone: "from-[#F4708F] to-[#9CA8B0]", badgeText: d.kpiMedicalBadge || "القطاع الطبي" },
-    { title: d.kpiContracts || "العقود", value: contracts, icon: FileText, hint: d.kpiContractsHint || "العقود السارية حالياً", tone: "from-[#9CA8B0] to-[#F2B366]" },
-    { title: d.kpiRequestsToday || "الطلبات اليوم", value: requestsToday, icon: GitPullRequest, hint: d.kpiRequestsTodayHint || "طلبات جديدة منذ بداية اليوم", tone: "from-[#F2B366] to-[#9CA8B0]" },
-    { title: d.kpiPendingApprovals || "الموافقات المعلقة", value: pendingApprovals, icon: Clock3, hint: d.kpiPendingApprovalsHint || "تتطلب إجراء إداري", tone: "from-[#F2B366] to-[#E2955A]", badgeText: pendingApprovals > 0 ? (d.kpiUrgentBadge || "عاجل") : undefined },
-    { title: d.kpiPendingLeave || "طلبات الإجازة المعلقة", value: pendingLeave, icon: Calendar, hint: d.kpiPendingLeaveHint || "في انتظار موافقة المدير", tone: "from-[#E2955A] to-[#F4708F]" },
-    { title: d.kpiAttendanceToday || "حضور اليوم", value: attendanceToday, icon: Clock3, hint: d.kpiAttendanceTodayHint || "إجمالي سجلات الدخول اليوم", tone: "from-[#E2955A] to-[#9CA8B0]" },
-    { title: d.kpiLateToday || "المتأخرون اليوم", value: lateToday, icon: TimerReset, hint: d.kpiLateTodayHint || "حالات التأخر المسجلة", tone: "from-[#F4708F] to-[#E2955A]" },
-    { title: d.kpiTotalPayroll || "إجمالي مسير الرواتب", value: new Intl.NumberFormat(currencyLocale[locale || "ar"], { style: "currency", currency: "SAR", maximumFractionDigits: 0 }).format(payrollSum), icon: WalletCards, hint: d.kpiTotalPayrollHint || "الرواتب المدفوعة حتى الآن", tone: "from-[#F4708F] to-[#9CA8B0]" },
-    { title: d.kpiOvertimePending || "طلبات الإضافي المعلقة", value: overtimePending, icon: TimerReset, hint: d.kpiOvertimePendingHint || "ساعات إضافية بانتظار الاعتماد", tone: "from-[#F2B366] to-[#F4708F]" }
+    { title: d.kpiActiveEmployees || "الموظفون النشطون", value: employees, icon: Users, hint: d.kpiActiveEmployeesHint || "حالة رأس المال البشري", tone: "from-[#3D4042] to-[#52575A]", badgeText: d.kpiLiveBadge || "مباشر" },
+    { title: d.kpiDepartments || "الإدارات", value: departments, icon: Building2, hint: d.kpiDepartmentsHint || "إجمالي الإدارات النشطة", tone: "from-[#6B7072] to-[#3D4042]" },
+    { title: d.kpiBranches || "الفروع", value: branches, icon: Building2, hint: d.kpiBranchesHint || "المواقع التشغيلية", tone: "from-[#52575A] to-[#3D4042]" },
+    { title: d.kpiHospitals || "المستشفيات", value: hospitals, icon: Hospital, hint: d.kpiHospitalsHint || "توزيع الكوادر الطبية", tone: "from-[#3D4042] to-[#6B7072]", badgeText: d.kpiMedicalBadge || "القطاع الطبي" },
+    { title: d.kpiContracts || "العقود", value: contracts, icon: FileText, hint: d.kpiContractsHint || "العقود السارية حالياً", tone: "from-[#6B7072] to-[#52575A]" },
+    { title: d.kpiRequestsToday || "الطلبات اليوم", value: requestsToday, icon: GitPullRequest, hint: d.kpiRequestsTodayHint || "طلبات جديدة منذ بداية اليوم", tone: "from-[#52575A] to-[#6B7072]" },
+    { title: d.kpiPendingApprovals || "الموافقات المعلقة", value: pendingApprovals, icon: Clock3, hint: d.kpiPendingApprovalsHint || "تتطلب إجراء إداري", tone: "from-[#52575A] to-[#63686A]", badgeText: pendingApprovals > 0 ? (d.kpiUrgentBadge || "عاجل") : undefined },
+    { title: d.kpiPendingLeave || "طلبات الإجازة المعلقة", value: pendingLeave, icon: Calendar, hint: d.kpiPendingLeaveHint || "في انتظار موافقة المدير", tone: "from-[#63686A] to-[#3D4042]" },
+    { title: d.kpiAttendanceToday || "حضور اليوم", value: attendanceToday, icon: Clock3, hint: d.kpiAttendanceTodayHint || "إجمالي سجلات الدخول اليوم", tone: "from-[#63686A] to-[#6B7072]" },
+    { title: d.kpiLateToday || "المتأخرون اليوم", value: lateToday, icon: TimerReset, hint: d.kpiLateTodayHint || "حالات التأخر المسجلة", tone: "from-[#3D4042] to-[#63686A]" },
+    { title: d.kpiTotalPayroll || "إجمالي مسير الرواتب", value: new Intl.NumberFormat(currencyLocale[locale || "ar"], { style: "currency", currency: "SAR", maximumFractionDigits: 0 }).format(payrollSum), icon: WalletCards, hint: d.kpiTotalPayrollHint || "الرواتب المدفوعة حتى الآن", tone: "from-[#3D4042] to-[#6B7072]" },
+    { title: d.kpiOvertimePending || "طلبات الإضافي المعلقة", value: overtimePending, icon: TimerReset, hint: d.kpiOvertimePendingHint || "ساعات إضافية بانتظار الاعتماد", tone: "from-[#52575A] to-[#3D4042]" }
   ];
 
   return (
