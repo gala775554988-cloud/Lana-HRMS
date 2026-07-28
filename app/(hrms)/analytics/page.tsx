@@ -270,19 +270,19 @@ export async function CompanyOverview({ locale, dictionary, showCharts = true, s
 
   const currencyLocale = { en: "en-US", ar: "ar-SA" } as const;
   const d = dictionary?.dashboard || {};
-  const cards: Array<{ title: string; value: number | string; icon: LucideIcon; hint: string; tone: string; badgeText?: string }> = [
-    { title: d.kpiActiveEmployees || "الموظفون النشطون", value: employees, icon: Users, hint: d.kpiActiveEmployeesHint || "حالة رأس المال البشري", tone: "from-[#3D4042] to-[#52575A]", badgeText: d.kpiLiveBadge || "مباشر" },
-    { title: d.kpiDepartments || "الإدارات", value: departments, icon: Building2, hint: d.kpiDepartmentsHint || "إجمالي الإدارات النشطة", tone: "from-[#6B7072] to-[#3D4042]" },
-    { title: d.kpiBranches || "الفروع", value: branches, icon: Building2, hint: d.kpiBranchesHint || "المواقع التشغيلية", tone: "from-[#52575A] to-[#3D4042]" },
-    { title: d.kpiHospitals || "المستشفيات", value: hospitals, icon: Hospital, hint: d.kpiHospitalsHint || "توزيع الكوادر الطبية", tone: "from-[#3D4042] to-[#6B7072]", badgeText: d.kpiMedicalBadge || "القطاع الطبي" },
-    { title: d.kpiContracts || "العقود", value: contracts, icon: FileText, hint: d.kpiContractsHint || "العقود السارية حالياً", tone: "from-[#6B7072] to-[#52575A]" },
-    { title: d.kpiRequestsToday || "الطلبات اليوم", value: requestsToday, icon: GitPullRequest, hint: d.kpiRequestsTodayHint || "طلبات جديدة منذ بداية اليوم", tone: "from-[#52575A] to-[#6B7072]" },
-    { title: d.kpiPendingApprovals || "الموافقات المعلقة", value: pendingApprovals, icon: Clock3, hint: d.kpiPendingApprovalsHint || "تتطلب إجراء إداري", tone: "from-[#52575A] to-[#63686A]", badgeText: pendingApprovals > 0 ? (d.kpiUrgentBadge || "عاجل") : undefined },
-    { title: d.kpiPendingLeave || "طلبات الإجازة المعلقة", value: pendingLeave, icon: Calendar, hint: d.kpiPendingLeaveHint || "في انتظار موافقة المدير", tone: "from-[#63686A] to-[#3D4042]" },
-    { title: d.kpiAttendanceToday || "حضور اليوم", value: attendanceToday, icon: Clock3, hint: d.kpiAttendanceTodayHint || "إجمالي سجلات الدخول اليوم", tone: "from-[#63686A] to-[#6B7072]" },
-    { title: d.kpiLateToday || "المتأخرون اليوم", value: lateToday, icon: TimerReset, hint: d.kpiLateTodayHint || "حالات التأخر المسجلة", tone: "from-[#3D4042] to-[#63686A]" },
-    { title: d.kpiTotalPayroll || "إجمالي مسير الرواتب", value: new Intl.NumberFormat(currencyLocale[locale || "ar"], { style: "currency", currency: "SAR", maximumFractionDigits: 0 }).format(payrollSum), icon: WalletCards, hint: d.kpiTotalPayrollHint || "الرواتب المدفوعة حتى الآن", tone: "from-[#3D4042] to-[#6B7072]" },
-    { title: d.kpiOvertimePending || "طلبات الإضافي المعلقة", value: overtimePending, icon: TimerReset, hint: d.kpiOvertimePendingHint || "ساعات إضافية بانتظار الاعتماد", tone: "from-[#52575A] to-[#3D4042]" }
+  const cards: Array<{ title: string; value: number | string; icon: LucideIcon; hint: string; tone: string; badgeText?: string; variant?: "solid" }> = [
+    { title: d.kpiActiveEmployees || "الموظفون النشطون", value: employees, icon: Users, hint: d.kpiActiveEmployeesHint || "حالة رأس المال البشري", tone: "from-[#F4708F] to-[#F2B366]", badgeText: d.kpiLiveBadge || "مباشر", variant: "solid" as const },
+    { title: d.kpiDepartments || "الإدارات", value: departments, icon: Building2, hint: d.kpiDepartmentsHint || "إجمالي الإدارات النشطة", tone: "from-[#9CA8B0] to-[#F4708F]" },
+    { title: d.kpiBranches || "الفروع", value: branches, icon: Building2, hint: d.kpiBranchesHint || "المواقع التشغيلية", tone: "from-[#F2B366] to-[#F4708F]" },
+    { title: d.kpiHospitals || "المستشفيات", value: hospitals, icon: Hospital, hint: d.kpiHospitalsHint || "توزيع الكوادر الطبية", tone: "from-[#F4708F] to-[#9CA8B0]", badgeText: d.kpiMedicalBadge || "القطاع الطبي" },
+    { title: d.kpiContracts || "العقود", value: contracts, icon: FileText, hint: d.kpiContractsHint || "العقود السارية حالياً", tone: "from-[#9CA8B0] to-[#F2B366]" },
+    { title: d.kpiRequestsToday || "الطلبات اليوم", value: requestsToday, icon: GitPullRequest, hint: d.kpiRequestsTodayHint || "طلبات جديدة منذ بداية اليوم", tone: "from-[#F2B366] to-[#9CA8B0]" },
+    { title: d.kpiPendingApprovals || "الموافقات المعلقة", value: pendingApprovals, icon: Clock3, hint: d.kpiPendingApprovalsHint || "تتطلب إجراء إداري", tone: "from-[#F2B366] to-[#E2955A]", badgeText: pendingApprovals > 0 ? (d.kpiUrgentBadge || "عاجل") : undefined },
+    { title: d.kpiPendingLeave || "طلبات الإجازة المعلقة", value: pendingLeave, icon: Calendar, hint: d.kpiPendingLeaveHint || "في انتظار موافقة المدير", tone: "from-[#E2955A] to-[#F4708F]" },
+    { title: d.kpiAttendanceToday || "حضور اليوم", value: attendanceToday, icon: Clock3, hint: d.kpiAttendanceTodayHint || "إجمالي سجلات الدخول اليوم", tone: "from-[#E2955A] to-[#9CA8B0]" },
+    { title: d.kpiLateToday || "المتأخرون اليوم", value: lateToday, icon: TimerReset, hint: d.kpiLateTodayHint || "حالات التأخر المسجلة", tone: "from-[#F4708F] to-[#E2955A]" },
+    { title: d.kpiTotalPayroll || "إجمالي مسير الرواتب", value: new Intl.NumberFormat(currencyLocale[locale || "ar"], { style: "currency", currency: "SAR", maximumFractionDigits: 0 }).format(payrollSum), icon: WalletCards, hint: d.kpiTotalPayrollHint || "الرواتب المدفوعة حتى الآن", tone: "from-[#F4708F] to-[#9CA8B0]" },
+    { title: d.kpiOvertimePending || "طلبات الإضافي المعلقة", value: overtimePending, icon: TimerReset, hint: d.kpiOvertimePendingHint || "ساعات إضافية بانتظار الاعتماد", tone: "from-[#F2B366] to-[#F4708F]" }
   ];
 
   return (
@@ -299,13 +299,44 @@ export async function CompanyOverview({ locale, dictionary, showCharts = true, s
   }
 }
 
+// Rose/gold brand identity hardcoded as literals (not the shared --primary
+// token) so this KPI grid's look never depends on what --primary resolves
+// to elsewhere in the app.
+const KPI_BRAND_GRADIENT = "linear-gradient(135deg, #F4708F 0%, #F2B366 55%, #9CA8B0 100%)";
+
 function KpiCard({
-  title, value, icon: Icon, hint, tone, badgeText, index
+  title, value, icon: Icon, hint, tone, badgeText, index, variant
 }: {
-  title: string; value: number | string; icon: LucideIcon; hint: string; tone: string; badgeText?: string; index: number;
+  title: string; value: number | string; icon: LucideIcon; hint: string; tone: string; badgeText?: string; index: number; variant?: "solid";
 }) {
+  if (variant === "solid") {
+    return (
+      <Card className="group relative overflow-hidden rounded-2xl border-0 p-0 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-xl" style={{ animationDelay: `${index * 35}ms`, background: KPI_BRAND_GRADIENT }}>
+        <CardContent className="relative p-6 lana-slide-up">
+          <div className="relative flex items-start justify-between gap-4">
+            <div className="space-y-2 flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-xs font-extrabold text-white/80 uppercase tracking-wide truncate">{title}</p>
+                {badgeText && (
+                  <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold text-white">
+                    {badgeText}
+                  </span>
+                )}
+              </div>
+              <div className="text-2xl sm:text-3xl font-black tracking-tight text-white truncate">{value}</div>
+              <p className="text-xs font-semibold text-white/75 truncate">{hint}</p>
+            </div>
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/20 text-white transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3">
+              <Icon className="h-5 w-5" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <Card className="glass-card-premium group relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl" style={{ animationDelay: `${index * 35}ms` }}>
+    <Card className="glass-card-premium group relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:border-[#F4708F]/40 hover:shadow-xl" style={{ animationDelay: `${index * 35}ms` }}>
       <CardContent className="relative p-6 lana-slide-up">
         <div className={`absolute -left-10 -top-10 h-32 w-32 rounded-full bg-gradient-to-br ${tone} opacity-10 blur-2xl transition-opacity duration-300 group-hover:opacity-25 pointer-events-none`} />
         <div className="relative flex items-start justify-between gap-4">
@@ -313,7 +344,7 @@ function KpiCard({
             <div className="flex items-center gap-2">
               <p className="text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wide truncate">{title}</p>
               {badgeText && (
-                <span className="rounded-full bg-primary/8 px-2 py-0.5 text-[10px] font-bold text-primary dark:bg-primary/80 dark:text-primary/30">
+                <span className="rounded-full bg-[#FDEDF1] px-2 py-0.5 text-[10px] font-bold text-[#D9557A] dark:bg-[#3D1F26] dark:text-[#F4A6BC]">
                   {badgeText}
                 </span>
               )}
@@ -321,7 +352,7 @@ function KpiCard({
             <div className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-slate-100 truncate">{value}</div>
             <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 truncate">{hint}</p>
           </div>
-          <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br ${tone} text-white shadow-lg shadow-primary/15 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3`}>
+          <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br ${tone} text-white shadow-lg shadow-[#F4708F]/15 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3`}>
             <Icon className="h-5 w-5" />
           </div>
         </div>

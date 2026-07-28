@@ -664,11 +664,15 @@ export function LanaAiAssistant() {
           type="button"
           onClick={() => setOpen(true)}
           aria-label="مساعد Lana AI"
-          className="group relative flex items-center gap-2.5 rounded-3xl bg-gradient-to-r from-secondary via-secondary to-purple-700 px-4 py-3 text-white shadow-xl shadow-secondary/30 transition-all duration-300 hover:scale-105 hover:shadow-2xl active:scale-95"
+          // Brand gradient hardcoded (not --secondary/--primary) so this
+          // floating button's identity is fixed regardless of the shared
+          // tokens elsewhere in the app.
+          className="group relative flex items-center gap-2.5 rounded-3xl px-4 py-3 text-white shadow-xl transition-all duration-300 hover:scale-105 hover:shadow-2xl active:scale-95"
+          style={{ background: "linear-gradient(90deg, #F4708F 0%, #F2B366 55%, #9CA8B0 100%)", boxShadow: "0 20px 25px -5px rgb(244 112 143 / 0.3), 0 8px 10px -6px rgb(244 112 143 / 0.3)" }}
         >
           <div className="relative grid h-8 w-8 place-items-center rounded-2xl bg-white/20 backdrop-blur-md">
             <Sparkles className="h-4 w-4 text-amber-300" />
-            <span className="absolute -top-1 -end-1 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-secondary animate-pulse" />
+            <span className="absolute -top-1 -end-1 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-[#F4708F] animate-pulse" />
           </div>
           <span className="font-bold text-sm tracking-wide">Lana</span>
         </button>
