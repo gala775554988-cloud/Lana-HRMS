@@ -56,8 +56,8 @@ export default async function CentralDashboardPage() {
         href: "/employees",
         icon: Users,
         badge: "دليل الموظفين",
-        gradient: "from-teal-600 via-emerald-600 to-teal-700",
-        bgLight: "bg-teal-50/70 border-teal-200/80 hover:border-teal-400 dark:bg-teal-950/30 dark:border-teal-800/60"
+        gradient: "from-violet-700 via-violet-600 to-violet-800",
+        bgLight: "bg-violet-50/70 border-violet-200/80 hover:border-violet-400 dark:bg-violet-950/30 dark:border-violet-800/60"
       },
       {
         title: "مركز الموافقات والطلبات",
@@ -65,8 +65,8 @@ export default async function CentralDashboardPage() {
         href: "/approvals",
         icon: GitPullRequest,
         badge: "مباشر",
-        gradient: "from-amber-500 via-orange-500 to-red-500",
-        bgLight: "bg-amber-50/70 border-amber-200/80 hover:border-amber-400 dark:bg-amber-950/30 dark:border-amber-800/60"
+        gradient: "from-fuchsia-600 via-fuchsia-500 to-pink-600",
+        bgLight: "bg-fuchsia-50/70 border-fuchsia-200/80 hover:border-fuchsia-400 dark:bg-fuchsia-950/30 dark:border-fuchsia-800/60"
       },
       {
         title: "المستشفيات ومواقع التشغيل",
@@ -74,8 +74,8 @@ export default async function CentralDashboardPage() {
         href: "/hospitals",
         icon: Hospital,
         badge: "القطاع الطبي",
-        gradient: "from-indigo-600 via-purple-600 to-pink-600",
-        bgLight: "bg-indigo-50/70 border-indigo-200/80 hover:border-indigo-400 dark:bg-indigo-950/30 dark:border-indigo-800/60"
+        gradient: "from-violet-600 via-purple-600 to-fuchsia-600",
+        bgLight: "bg-purple-50/70 border-purple-200/80 hover:border-purple-400 dark:bg-purple-950/30 dark:border-purple-800/60"
       },
       {
         title: "مسير الرواتب والمالية",
@@ -83,32 +83,33 @@ export default async function CentralDashboardPage() {
         href: "/payroll",
         icon: WalletCards,
         badge: "المالية والرواتب",
-        gradient: "from-blue-600 via-cyan-600 to-teal-600",
-        bgLight: "bg-blue-50/70 border-blue-200/80 hover:border-blue-400 dark:bg-blue-950/30 dark:border-blue-800/60"
+        gradient: "from-violet-500 via-violet-600 to-purple-700",
+        bgLight: "bg-violet-50/70 border-violet-200/80 hover:border-violet-400 dark:bg-violet-950/30 dark:border-violet-800/60"
       }
     ];
 
     return (
       <div className="space-y-8 pb-10">
         {/* Pro Max Executive Header Card */}
-        <div className="relative overflow-hidden rounded-3xl border border-teal-200/80 bg-gradient-to-br from-white via-teal-50/40 to-emerald-50/60 p-6 sm:p-8 shadow-xl shadow-teal-900/5 dark:border-slate-800 dark:from-slate-900 dark:via-slate-900/90 dark:to-teal-950/30">
-          <div className="absolute -left-12 -top-12 h-48 w-48 rounded-full bg-gradient-to-br from-teal-500/15 to-emerald-500/10 blur-3xl pointer-events-none" />
-          
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-700 via-violet-600 to-fuchsia-600 p-6 sm:p-8 shadow-xl shadow-violet-900/20">
+          <div className="absolute -left-12 -top-12 h-48 w-48 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 end-10 h-40 w-40 rounded-full bg-white/5 blur-2xl pointer-events-none" />
+
           <div className="relative flex flex-col justify-between gap-6 md:flex-row md:items-center">
             <div className="space-y-2.5">
               <div className="flex flex-wrap items-center gap-2.5">
-                <Badge className="bg-gradient-to-r from-teal-600 to-emerald-600 px-3 py-1 text-xs font-black text-white shadow-sm">
-                  👑 لوحة التحكم المركزية Pro Max
-                </Badge>
-                <span className="flex items-center gap-1.5 rounded-full bg-emerald-100/90 px-3 py-1 text-xs font-extrabold text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-800">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+                <span className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">
+                  <span className="h-2 w-2 rounded-full bg-emerald-300 animate-ping" />
                   <span>المزامنة والتشغيل الفوري متصل بأعلى كفاءة</span>
                 </span>
+                <Badge className="bg-white px-3 py-1 text-xs font-black text-violet-700 shadow-sm hover:bg-white">
+                  👑 لوحة التحكم المركزية Pro Max
+                </Badge>
               </div>
-              <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-slate-100">
-                أهلاً بك، <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 via-emerald-600 to-indigo-600">{session?.user?.name || "الإدارة التنفيذية"}</span>
+              <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white">
+                أهلاً بك، <span>{session?.user?.name || "الإدارة التنفيذية"}</span>
               </h1>
-              <p className="text-sm font-semibold text-slate-600 dark:text-slate-300 max-w-2xl leading-relaxed">
+              <p className="text-sm font-semibold text-violet-100 max-w-2xl leading-relaxed">
                 مركز التحكم التنفيذي Pro Max لمنصة لانا الطبية؛ رصد لحظي لحركة الكوادر، الاعتمادات، الرواتب، وتكامل بيانات Odoo لحظياً.
               </p>
             </div>
@@ -116,16 +117,16 @@ export default async function CentralDashboardPage() {
             <div className="flex flex-wrap items-center gap-3 shrink-0">
               <Link
                 href="/employees?action=create"
-                className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-teal-600 to-emerald-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-teal-600/25 transition-all hover:scale-105 hover:shadow-xl active:scale-95"
+                className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black text-violet-700 shadow-lg transition-all hover:scale-105 hover:bg-violet-50 hover:shadow-xl active:scale-95"
               >
                 <Users className="h-4.5 w-4.5" />
                 <span>إضافة موظف جديد</span>
               </Link>
               <Link
                 href="/attendance"
-                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/90 px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                className="inline-flex items-center gap-2 rounded-2xl border border-white/30 bg-white/5 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-white/10"
               >
-                <CalendarClock className="h-4.5 w-4.5 text-teal-600 dark:text-teal-400" />
+                <CalendarClock className="h-4.5 w-4.5" />
                 <span>مراقبة الحضور</span>
               </Link>
             </div>
@@ -136,7 +137,7 @@ export default async function CentralDashboardPage() {
         <div className="space-y-3">
           <div className="flex items-center justify-between px-1">
             <h2 className="text-base font-extrabold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-              <Activity className="h-4.5 w-4.5 text-teal-600 dark:text-teal-400" />
+              <Activity className="h-4.5 w-4.5 text-violet-600 dark:text-violet-400" />
               <span>الوصول السريع للأنظمة المركزية</span>
             </h2>
             <span className="text-xs font-bold text-slate-400 dark:text-slate-500">اختر الوحدة المطلوبة للانتقال المباشر</span>
@@ -159,7 +160,7 @@ export default async function CentralDashboardPage() {
                       {item.badge}
                     </Badge>
                   </div>
-                  <h3 className="text-base font-black text-slate-900 dark:text-slate-100 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors flex items-center justify-between">
+                  <h3 className="text-base font-black text-slate-900 dark:text-slate-100 group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors flex items-center justify-between">
                     <span>{item.title}</span>
                     <ArrowUpRight className="h-4 w-4 opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                   </h3>
