@@ -12,12 +12,12 @@ import { Badge } from "@/components/ui/badge";
 
 export const dynamic = "force-dynamic";
 
-// Brand gradient (rose -> gold -> slate-blue), the dashboard's own fixed
+// Brand gradient (emerald -> gold -> slate-blue), the dashboard's own fixed
 // identity -- kept as hardcoded hex literals (not the shared --primary
 // token) so this page's look never depends on what --primary resolves to
 // elsewhere in the app. Kept as a literal gradient string since Tailwind
 // has no single utility for a precise 3-stop percentage gradient.
-const BRAND_GRADIENT = "linear-gradient(90deg, #F4708F 0%, #F2B366 55%, #9CA8B0 100%)";
+const BRAND_GRADIENT = "linear-gradient(90deg, #1F8A5F 0%, #F2B366 55%, #9CA8B0 100%)";
 
 export const metadata = {
   title: "لوحة التحكم المركزية — Pro Max Executive Hub | Lana HRMS",
@@ -68,8 +68,8 @@ export default async function CentralDashboardPage() {
         description: "توزيع الكوادر الطبية على مواقع المستشفيات الفعلية.",
         icon: Hospital,
         badge: "القطاع الطبي",
-        color: "#F4708F",
-        bgLight: "bg-rose-50 border-rose-200 hover:border-rose-400 dark:bg-slate-900 dark:border-rose-900",
+        color: "#1F8A5F",
+        bgLight: "bg-emerald-50 border-emerald-200 hover:border-emerald-400 dark:bg-slate-900 dark:border-emerald-900",
         data: orgGroups?.hospitals ?? { total: 0, items: [], href: "/hospitals" }
       },
       {
@@ -115,7 +115,7 @@ export default async function CentralDashboardPage() {
                   <span className="h-2 w-2 rounded-full bg-emerald-300 animate-ping" />
                   <span>المزامنة والتشغيل الفوري متصل بأعلى كفاءة</span>
                 </span>
-                <Badge className="bg-white px-3 py-1 text-xs font-black shadow-sm hover:bg-white" style={{ color: "#D9557A" }}>
+                <Badge className="bg-white px-3 py-1 text-xs font-black shadow-sm hover:bg-white" style={{ color: "#146C48" }}>
                   👑 لوحة التحكم المركزية Pro Max
                 </Badge>
               </div>
@@ -131,7 +131,7 @@ export default async function CentralDashboardPage() {
               <Link
                 href="/employees?action=create"
                 className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black shadow-lg transition-all hover:scale-105 hover:bg-slate-50 hover:shadow-xl active:scale-95"
-                style={{ color: "#D9557A" }}
+                style={{ color: "#146C48" }}
               >
                 <Users className="h-4.5 w-4.5" />
                 <span>إضافة موظف جديد</span>
@@ -151,7 +151,7 @@ export default async function CentralDashboardPage() {
         <div className="space-y-3">
           <div className="flex items-center justify-between px-1">
             <h2 className="text-base font-extrabold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-              <Activity className="h-4.5 w-4.5" style={{ color: "#F4708F" }} />
+              <Activity className="h-4.5 w-4.5" style={{ color: "#1F8A5F" }} />
               <span>الوحدات التنظيمية الرئيسية</span>
             </h2>
             <span className="text-xs font-bold text-slate-400 dark:text-slate-500">أعداد حية من قاعدة البيانات</span>
