@@ -51,7 +51,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     page += 1;
   } while (page <= pageCount && page <= 50);
 
-  const columns = Array.from(new Set(["id", ...resource.tableFields, ...resource.fields.map((field) => field.name), "createdAt", "updatedAt"]));
+  const allColumns = Array.from(new Set(["id", ...resource.tableFields, ...resource.fields.map((field) => field.name), "createdAt", "updatedAt"]));
+  // Custom export (components/hrms/export-data-modal.tsx) lets the user pick
+  // and order a subset of columns instead of always dumping every one --
+  // only ever restrict to fields this module actually exposes, in the order
+  // requested, ignoring anything unrecognized.
+  const requestedFields = searchParams.get("fields");
+  const validRequestedFields = requestedFields?.split(",").map((f) => f.trim()).filter((f) => allColumns.includes(f));
+  const columns = validRequestedFields && validRequestedFields.length > 0 ? validRequestedFields : allColumns;
   const rows = allRecords.map((record) => Object.fromEntries(columns.map((column) => [column, flattenValue(record[column])] )));
   const baseName = `${safeFilename(resource.key)}-${new Date().toISOString().slice(0, 10)}`;
 
