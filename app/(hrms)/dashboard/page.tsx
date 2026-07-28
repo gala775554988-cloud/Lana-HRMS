@@ -3,10 +3,11 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { getRequestDictionary } from "@/lib/i18n-server";
 import { CompanyOverview, OverviewSkeleton } from "@/app/(hrms)/analytics/page";
+import { getExecutiveHubOrgGroups, type OrgGroupCard } from "@/lib/enterprise/dashboard-org-groups";
 import {
-  Users, Building2, GitPullRequest, WalletCards, ShieldCheck, Sparkles,
-  ArrowUpRight, Clock3, Activity, CheckCircle2, Hospital, CalendarClock, AlertTriangle, RefreshCw
+  Users, ArrowUpRight, Activity, Hospital, Wrench, Syringe, Landmark, CalendarClock, AlertTriangle
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 export const dynamic = "force-dynamic";
@@ -53,43 +54,51 @@ export default async function CentralDashboardPage() {
   try {
     const session = await auth().catch((e: any) => { console.error("Dashboard auth error:", e); return null; });
     const { locale, dictionary } = await getRequestDictionary().catch(() => ({ locale: "ar" as const, dictionary: {} as any }));
+    const orgGroups = await getExecutiveHubOrgGroups().catch(() => null);
 
-    const quickShortcuts = [
+    const orgCards: Array<{
+      key: string; title: string; description: string; icon: LucideIcon; badge: string; color: string;
+      bgLight: string; data: OrgGroupCard;
+    }> = [
       {
-        title: "مسير الرواتب والمالية",
-        description: "إصدار الرواتب الشهرية، السلف، الاستقطاعات، والبدلات.",
-        href: "/payroll",
-        icon: WalletCards,
-        badge: "المالية والرواتب",
-        color: "#F4708F",
-        bgLight: "bg-rose-50/70 border-rose-200/80 hover:border-rose-400 dark:bg-rose-950/30 dark:border-rose-800/60"
-      },
-      {
-        title: "المستشفيات ومواقع التشغيل",
-        description: "توزيع الكوادر الطبية والفروع وإحصاءات الحضور الميداني.",
-        href: "/hospitals",
+        key: "hospitals",
+        title: "المستشفيات",
+        description: "توزيع الكوادر الطبية على مواقع المستشفيات الفعلية.",
         icon: Hospital,
         badge: "القطاع الطبي",
+        color: "#F4708F",
+        bgLight: "bg-rose-50 border-rose-200 hover:border-rose-400 dark:bg-slate-900 dark:border-rose-900",
+        data: orgGroups?.hospitals ?? { total: 0, items: [], href: "/hospitals" }
+      },
+      {
+        key: "operations",
+        title: "التشغيل",
+        description: "المشاريع والخدمات اللوجستية ومحطات المعالجة والبيئة ومكافحة العدوى.",
+        icon: Wrench,
+        badge: "العمليات التشغيلية",
         color: "#F2B366",
-        bgLight: "bg-amber-50/70 border-amber-200/80 hover:border-amber-400 dark:bg-amber-950/30 dark:border-amber-800/60"
+        bgLight: "bg-amber-50 border-amber-200 hover:border-amber-400 dark:bg-slate-900 dark:border-amber-900",
+        data: orgGroups?.operations ?? { total: 0, items: [], href: "/branches?tab=departments" }
       },
       {
-        title: "مركز الموافقات والطلبات",
-        description: "إدارة الإجازات، العمل الإضافي، وسلسلة الاعتمادات التنفيذية.",
-        href: "/approvals",
-        icon: GitPullRequest,
-        badge: "مباشر",
+        key: "medical-supplies",
+        title: "المستلزمات الطبية",
+        description: "الأجهزة والمستلزمات الطبية، الصيانة، والمشتريات الطبية.",
+        icon: Syringe,
+        badge: "الإمداد الطبي",
         color: "#E2955A",
-        bgLight: "bg-orange-50/70 border-orange-200/80 hover:border-orange-400 dark:bg-orange-950/30 dark:border-orange-800/60"
+        bgLight: "bg-orange-50 border-orange-200 hover:border-orange-400 dark:bg-slate-900 dark:border-orange-900",
+        data: orgGroups?.medicalSupplies ?? { total: 0, items: [], href: "/branches?tab=departments" }
       },
       {
-        title: "إدارة الموظفين والعقود",
-        description: "سجل الموظفين، العقود، التأمين، وتحديث الملفات الشخصية.",
-        href: "/employees",
-        icon: Users,
-        badge: "دليل الموظفين",
+        key: "main-administration",
+        title: "الإدارة الرئيسية",
+        description: "الإدارة والمالية وإدارة التوريد وتقنية المعلومات والمراجع.",
+        icon: Landmark,
+        badge: "الإدارة المركزية",
         color: "#9CA8B0",
-        bgLight: "bg-slate-50/70 border-slate-200/80 hover:border-slate-400 dark:bg-slate-950/30 dark:border-slate-800/60"
+        bgLight: "bg-slate-50 border-slate-200 hover:border-slate-400 dark:bg-slate-900 dark:border-slate-700",
+        data: orgGroups?.mainAdministration ?? { total: 0, items: [], href: "/branches?tab=departments" }
       }
     ];
 
@@ -136,52 +145,76 @@ export default async function CentralDashboardPage() {
           </div>
         </div>
 
-        {/* Quick Navigation Shortcuts Grid */}
+        {/* Organizational Units Grid (real Hospital/Department data) */}
         <div className="space-y-3">
           <div className="flex items-center justify-between px-1">
             <h2 className="text-base font-extrabold text-slate-800 dark:text-slate-200 flex items-center gap-2">
               <Activity className="h-4.5 w-4.5" style={{ color: "#F4708F" }} />
-              <span>الوصول السريع للأنظمة المركزية</span>
+              <span>الوحدات التنظيمية الرئيسية</span>
             </h2>
-            <span className="text-xs font-bold text-slate-400 dark:text-slate-500">اختر الوحدة المطلوبة للانتقال المباشر</span>
+            <span className="text-xs font-bold text-slate-400 dark:text-slate-500">أعداد حية من قاعدة البيانات</span>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {quickShortcuts.map((item, index) => {
-              const Icon = item.icon;
+            {orgCards.map((card, index) => {
+              const Icon = card.icon;
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`group relative overflow-hidden rounded-3xl border p-5 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl ${item.bgLight}`}
+                <div
+                  key={card.key}
+                  className={`group relative overflow-hidden rounded-3xl border p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${card.bgLight}`}
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div
                       className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-white shadow-md transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6"
-                      style={{ backgroundColor: item.color }}
+                      style={{ backgroundColor: card.color }}
                     >
                       <Icon className="h-6 w-6" />
                     </div>
-                    <Badge variant="outline" className="text-[10px] font-extrabold border-slate-300/80 bg-white/80 dark:border-slate-700 dark:bg-slate-900/80">
-                      {item.badge}
+                    <Badge variant="outline" className="text-[10px] font-extrabold border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900">
+                      {card.badge}
                     </Badge>
                   </div>
-                  <h3 className="text-base font-black text-slate-900 dark:text-slate-100 transition-colors flex items-center justify-between">
-                    <span className="group-hover:opacity-80">{item.title}</span>
-                    <ArrowUpRight className="h-4 w-4 opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" style={{ color: item.color }} />
-                  </h3>
-                  <p className="mt-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400 leading-relaxed">
-                    {item.description}
+                  <h3 className="text-base font-black text-slate-900 dark:text-slate-100">{card.title}</h3>
+                  <p className="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-400 leading-relaxed">
+                    {card.description}
                   </p>
-                </Link>
+                  <div className="mt-3 flex items-baseline gap-1.5">
+                    <span className="text-2xl font-black tracking-tight text-slate-900 dark:text-slate-100">{card.data.total.toLocaleString("ar-SA")}</span>
+                    <span className="text-xs font-bold text-slate-400 dark:text-slate-500">موظف</span>
+                  </div>
+                  <div className="mt-3 max-h-36 space-y-0.5 overflow-y-auto rounded-xl bg-white p-1.5 dark:bg-slate-950">
+                    {card.data.items.length === 0 ? (
+                      <p className="px-2 py-2 text-[11px] font-semibold text-slate-400 dark:text-slate-500">لا توجد بيانات مطابقة بعد</p>
+                    ) : (
+                      card.data.items.map((item) => (
+                        <Link
+                          key={item.id}
+                          href={item.href}
+                          className="flex items-center justify-between rounded-lg px-2 py-1.5 text-[11px] font-semibold text-slate-600 transition-colors hover:bg-white dark:text-slate-400 dark:hover:bg-slate-900"
+                        >
+                          <span className="truncate">{item.name}</span>
+                          <span className="shrink-0 font-black text-slate-800 dark:text-slate-200">{item.count.toLocaleString("ar-SA")}</span>
+                        </Link>
+                      ))
+                    )}
+                  </div>
+                  <Link
+                    href={card.data.href}
+                    className="mt-3 flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-black text-white shadow-sm transition-transform group-hover:scale-[1.02]"
+                    style={{ backgroundColor: card.color }}
+                  >
+                    <span>فتح القسم</span>
+                    <ArrowUpRight className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
               );
             })}
           </div>
         </div>
 
-        {/* Company Overview (KPIs, Live Metrics, Lana AI Executive Insights) */}
+        {/* Company Overview (KPIs, Live Metrics) */}
         <Suspense fallback={<OverviewSkeleton />}>
-          <CompanyOverview locale={locale || "ar"} dictionary={dictionary || {}} showCharts={false} />
+          <CompanyOverview locale={locale || "ar"} dictionary={dictionary || {}} showCharts={false} showAiSummary={false} />
         </Suspense>
       </div>
     );

@@ -190,7 +190,7 @@ async function BranchHospitalBreakdown() {
   }
 }
 
-export async function CompanyOverview({ locale, dictionary, showCharts = true }: { locale: Locale; dictionary: Dictionary; showCharts?: boolean }) {
+export async function CompanyOverview({ locale, dictionary, showCharts = true, showAiSummary = true }: { locale: Locale; dictionary: Dictionary; showCharts?: boolean; showAiSummary?: boolean }) {
   try {
     const monthRanges = lastNMonthRanges(8);
 
@@ -271,23 +271,23 @@ export async function CompanyOverview({ locale, dictionary, showCharts = true }:
   const currencyLocale = { en: "en-US", ar: "ar-SA" } as const;
   const d = dictionary?.dashboard || {};
   const cards: Array<{ title: string; value: number | string; icon: LucideIcon; hint: string; tone: string; badgeText?: string }> = [
-    { title: d.kpiActiveEmployees || "الموظفون النشطون", value: employees, icon: Users, hint: d.kpiActiveEmployeesHint || "حالة رأس المال البشري", tone: "from-primary to-purple-600", badgeText: d.kpiLiveBadge || "مباشر" },
-    { title: d.kpiDepartments || "الإدارات", value: departments, icon: Building2, hint: d.kpiDepartmentsHint || "إجمالي الإدارات النشطة", tone: "from-blue-600 to-primary" },
-    { title: d.kpiBranches || "الفروع", value: branches, icon: Building2, hint: d.kpiBranchesHint || "المواقع التشغيلية", tone: "from-purple-600 to-pink-600" },
-    { title: d.kpiHospitals || "المستشفيات", value: hospitals, icon: Hospital, hint: d.kpiHospitalsHint || "توزيع الكوادر الطبية", tone: "from-emerald-600 to-teal-600", badgeText: d.kpiMedicalBadge || "القطاع الطبي" },
-    { title: d.kpiContracts || "العقود", value: contracts, icon: FileText, hint: d.kpiContractsHint || "العقود السارية حالياً", tone: "from-cyan-600 to-blue-600" },
-    { title: d.kpiRequestsToday || "الطلبات اليوم", value: requestsToday, icon: GitPullRequest, hint: d.kpiRequestsTodayHint || "طلبات جديدة منذ بداية اليوم", tone: "from-violet-600 to-purple-600" },
-    { title: d.kpiPendingApprovals || "الموافقات المعلقة", value: pendingApprovals, icon: Clock3, hint: d.kpiPendingApprovalsHint || "تتطلب إجراء إداري", tone: "from-amber-500 to-orange-600", badgeText: pendingApprovals > 0 ? (d.kpiUrgentBadge || "عاجل") : undefined },
-    { title: d.kpiPendingLeave || "طلبات الإجازة المعلقة", value: pendingLeave, icon: Calendar, hint: d.kpiPendingLeaveHint || "في انتظار موافقة المدير", tone: "from-orange-500 to-red-600" },
-    { title: d.kpiAttendanceToday || "حضور اليوم", value: attendanceToday, icon: Clock3, hint: d.kpiAttendanceTodayHint || "إجمالي سجلات الدخول اليوم", tone: "from-teal-600 to-emerald-600" },
-    { title: d.kpiLateToday || "المتأخرون اليوم", value: lateToday, icon: TimerReset, hint: d.kpiLateTodayHint || "حالات التأخر المسجلة", tone: "from-rose-600 to-red-600" },
-    { title: d.kpiTotalPayroll || "إجمالي مسير الرواتب", value: new Intl.NumberFormat(currencyLocale[locale || "ar"], { style: "currency", currency: "SAR", maximumFractionDigits: 0 }).format(payrollSum), icon: WalletCards, hint: d.kpiTotalPayrollHint || "الرواتب المدفوعة حتى الآن", tone: "from-primary to-slate-900" },
-    { title: d.kpiOvertimePending || "طلبات الإضافي المعلقة", value: overtimePending, icon: TimerReset, hint: d.kpiOvertimePendingHint || "ساعات إضافية بانتظار الاعتماد", tone: "from-fuchsia-600 to-purple-600" }
+    { title: d.kpiActiveEmployees || "الموظفون النشطون", value: employees, icon: Users, hint: d.kpiActiveEmployeesHint || "حالة رأس المال البشري", tone: "from-[#F4708F] to-[#F2B366]", badgeText: d.kpiLiveBadge || "مباشر" },
+    { title: d.kpiDepartments || "الإدارات", value: departments, icon: Building2, hint: d.kpiDepartmentsHint || "إجمالي الإدارات النشطة", tone: "from-[#9CA8B0] to-[#F4708F]" },
+    { title: d.kpiBranches || "الفروع", value: branches, icon: Building2, hint: d.kpiBranchesHint || "المواقع التشغيلية", tone: "from-[#F2B366] to-[#F4708F]" },
+    { title: d.kpiHospitals || "المستشفيات", value: hospitals, icon: Hospital, hint: d.kpiHospitalsHint || "توزيع الكوادر الطبية", tone: "from-[#F4708F] to-[#9CA8B0]", badgeText: d.kpiMedicalBadge || "القطاع الطبي" },
+    { title: d.kpiContracts || "العقود", value: contracts, icon: FileText, hint: d.kpiContractsHint || "العقود السارية حالياً", tone: "from-[#9CA8B0] to-[#F2B366]" },
+    { title: d.kpiRequestsToday || "الطلبات اليوم", value: requestsToday, icon: GitPullRequest, hint: d.kpiRequestsTodayHint || "طلبات جديدة منذ بداية اليوم", tone: "from-[#F2B366] to-[#9CA8B0]" },
+    { title: d.kpiPendingApprovals || "الموافقات المعلقة", value: pendingApprovals, icon: Clock3, hint: d.kpiPendingApprovalsHint || "تتطلب إجراء إداري", tone: "from-[#F2B366] to-[#E2955A]", badgeText: pendingApprovals > 0 ? (d.kpiUrgentBadge || "عاجل") : undefined },
+    { title: d.kpiPendingLeave || "طلبات الإجازة المعلقة", value: pendingLeave, icon: Calendar, hint: d.kpiPendingLeaveHint || "في انتظار موافقة المدير", tone: "from-[#E2955A] to-[#F4708F]" },
+    { title: d.kpiAttendanceToday || "حضور اليوم", value: attendanceToday, icon: Clock3, hint: d.kpiAttendanceTodayHint || "إجمالي سجلات الدخول اليوم", tone: "from-[#E2955A] to-[#9CA8B0]" },
+    { title: d.kpiLateToday || "المتأخرون اليوم", value: lateToday, icon: TimerReset, hint: d.kpiLateTodayHint || "حالات التأخر المسجلة", tone: "from-[#F4708F] to-[#E2955A]" },
+    { title: d.kpiTotalPayroll || "إجمالي مسير الرواتب", value: new Intl.NumberFormat(currencyLocale[locale || "ar"], { style: "currency", currency: "SAR", maximumFractionDigits: 0 }).format(payrollSum), icon: WalletCards, hint: d.kpiTotalPayrollHint || "الرواتب المدفوعة حتى الآن", tone: "from-[#F4708F] to-[#9CA8B0]" },
+    { title: d.kpiOvertimePending || "طلبات الإضافي المعلقة", value: overtimePending, icon: TimerReset, hint: d.kpiOvertimePendingHint || "ساعات إضافية بانتظار الاعتماد", tone: "from-[#F2B366] to-[#F4708F]" }
   ];
 
   return (
     <div className="space-y-8">
-      <LanaAnalytics />
+      {showAiSummary ? <LanaAnalytics /> : null}
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((card, index) => <KpiCard key={card.title} {...card} index={index} />)}
       </div>
