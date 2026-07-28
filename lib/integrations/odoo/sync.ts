@@ -1603,24 +1603,54 @@ export class OdooSyncService {
         }
       }
       if (direction === "ODOO_TO_LANA" || direction === "BIDIRECTIONAL") {
+        // id > lastOdooId pagination (matches syncEmployees's proven pattern),
+        // not a single capped batch -- the previous single search_read here,
+        // limited to `batchSize` rows ordered by write_date asc with no
+        // cursor advancement between runs, re-fetched the exact same oldest
+        // ~100 contracts on every cron invocation forever (resolveSince only
+        // returns a cursor when options.incremental is explicitly set, which
+        // the cron path never does), so any employee whose contract wasn't
+        // among that first page never synced -- this was the actual cause of
+        // ~1209 employees showing "no contract" on the payroll dashboard
+        // despite Odoo having complete, correct contract/wage data.
         const contractFieldMeta = await this.client.fieldsGet(mapper.odooModel, [], ["string", "type"]).catch(() => ({} as Record<string, unknown>));
         const compensationFields = ["structure_type_id", "struct_id", "salary_grade_id", "allowance"].filter((field) => field in contractFieldMeta);
-        const rows = await this.client.search_read(mapper.odooModel, odooIncrementalDomain(since), [...mapper.odooFields, ...compensationFields], { limit: batchSize, order: "write_date asc" });
-        result.cursor = maxCursor(rows, since);
-        for (const row of rows) {
-          try {
-            const localEmployeeId = await this.findLocalEmployeeId(row.employee_id);
-            if (!localEmployeeId) { result.skipped += 1; continue; }
-            const values = mapOdooContractToLana(row, localEmployeeId);
-            const existing = await delegate("employeeContract").findFirst({ where: { contractNumber: String(values.contractNumber) } });
-            if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.lanaModel, localId: objectId(existing?.id), externalId: row.id, values });
-            else if (existing) { await delegate("employeeContract").update({ where: { id: existing.id }, data: values }); result.updated += 1; }
-            else { await delegate("employeeContract").create({ data: values }); result.created += 1; }
-            result.pulled += 1;
-          } catch (err: unknown) {
-            result.skipped += 1;
-            result.errors.push({ id: String(row.id), message: err instanceof Error ? err.message : String(err), details: err });
+        const fetchFields = [...mapper.odooFields, ...compensationFields];
+
+        const baseDomain = odooIncrementalDomain(since) as any[];
+        let lastOdooId = 0;
+        let hasMore = true;
+        const deadline = Date.now() + 60_000;
+        while (hasMore && Date.now() < deadline) {
+          const domain: any[] = [...baseDomain];
+          if (lastOdooId > 0) domain.push(["id", ">", lastOdooId]);
+          const rows = await this.client.search_read(mapper.odooModel, domain, fetchFields, {
+            limit: batchSize,
+            order: "id asc",
+            context: { active_test: false },
+          } as any);
+          if (!rows || rows.length === 0) { hasMore = false; break; }
+          result.cursor = maxCursor(rows, since) || result.cursor;
+          lastOdooId = Number(rows[rows.length - 1]?.id || lastOdooId);
+
+          for (const row of rows) {
+            try {
+              const localEmployeeId = await this.findLocalEmployeeId(row.employee_id);
+              if (!localEmployeeId) { result.skipped += 1; continue; }
+              const values = mapOdooContractToLana(row, localEmployeeId);
+              const existing = await delegate("employeeContract").findFirst({ where: { contractNumber: String(values.contractNumber) } });
+              if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.lanaModel, localId: objectId(existing?.id), externalId: row.id, values });
+              else if (existing) { await delegate("employeeContract").update({ where: { id: existing.id }, data: values }); result.updated += 1; }
+              else { await delegate("employeeContract").create({ data: values }); result.created += 1; }
+              result.pulled += 1;
+            } catch (err: unknown) {
+              result.skipped += 1;
+              result.errors.push({ id: String(row.id), message: err instanceof Error ? err.message : String(err), details: err });
+              continue; // ContinueOnError
+            }
           }
+
+          if (rows.length < batchSize) { hasMore = false; }
         }
       }
       return this.finishHistory(history?.id, result);
