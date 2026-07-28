@@ -11,6 +11,11 @@ import { Badge } from "@/components/ui/badge";
 
 export const dynamic = "force-dynamic";
 
+// Brand gradient (rose -> gold -> slate-blue), matches app/globals.css's
+// --primary/--secondary token hues; kept as a literal gradient string since
+// Tailwind has no single utility for a precise 3-stop percentage gradient.
+const BRAND_GRADIENT = "linear-gradient(90deg, #F4708F 0%, #F2B366 55%, #9CA8B0 100%)";
+
 export const metadata = {
   title: "لوحة التحكم المركزية — Pro Max Executive Hub | Lana HRMS",
   description: "المستشعر الذكي وإدارة الموارد البشرية التنفيذية لمنصات لانا الطبية والتشغيلية."
@@ -51,22 +56,13 @@ export default async function CentralDashboardPage() {
 
     const quickShortcuts = [
       {
-        title: "إدارة الموظفين والعقود",
-        description: "سجل الموظفين، العقود، التأمين، وتحديث الملفات الشخصية.",
-        href: "/employees",
-        icon: Users,
-        badge: "دليل الموظفين",
-        gradient: "from-violet-700 via-violet-600 to-violet-800",
-        bgLight: "bg-violet-50/70 border-violet-200/80 hover:border-violet-400 dark:bg-violet-950/30 dark:border-violet-800/60"
-      },
-      {
-        title: "مركز الموافقات والطلبات",
-        description: "إدارة الإجازات، العمل الإضافي، وسلسلة الاعتمادات التنفيذية.",
-        href: "/approvals",
-        icon: GitPullRequest,
-        badge: "مباشر",
-        gradient: "from-fuchsia-600 via-fuchsia-500 to-pink-600",
-        bgLight: "bg-fuchsia-50/70 border-fuchsia-200/80 hover:border-fuchsia-400 dark:bg-fuchsia-950/30 dark:border-fuchsia-800/60"
+        title: "مسير الرواتب والمالية",
+        description: "إصدار الرواتب الشهرية، السلف، الاستقطاعات، والبدلات.",
+        href: "/payroll",
+        icon: WalletCards,
+        badge: "المالية والرواتب",
+        color: "#F4708F",
+        bgLight: "bg-rose-50/70 border-rose-200/80 hover:border-rose-400 dark:bg-rose-950/30 dark:border-rose-800/60"
       },
       {
         title: "المستشفيات ومواقع التشغيل",
@@ -74,42 +70,48 @@ export default async function CentralDashboardPage() {
         href: "/hospitals",
         icon: Hospital,
         badge: "القطاع الطبي",
-        gradient: "from-violet-600 via-purple-600 to-fuchsia-600",
-        bgLight: "bg-purple-50/70 border-purple-200/80 hover:border-purple-400 dark:bg-purple-950/30 dark:border-purple-800/60"
+        color: "#F2B366",
+        bgLight: "bg-amber-50/70 border-amber-200/80 hover:border-amber-400 dark:bg-amber-950/30 dark:border-amber-800/60"
       },
       {
-        title: "مسير الرواتب والمالية",
-        description: "إصدار الرواتب الشهرية، السلف، الاستقطاعات، والبدلات.",
-        href: "/payroll",
-        icon: WalletCards,
-        badge: "المالية والرواتب",
-        gradient: "from-violet-500 via-violet-600 to-purple-700",
-        bgLight: "bg-violet-50/70 border-violet-200/80 hover:border-violet-400 dark:bg-violet-950/30 dark:border-violet-800/60"
+        title: "مركز الموافقات والطلبات",
+        description: "إدارة الإجازات، العمل الإضافي، وسلسلة الاعتمادات التنفيذية.",
+        href: "/approvals",
+        icon: GitPullRequest,
+        badge: "مباشر",
+        color: "#E2955A",
+        bgLight: "bg-orange-50/70 border-orange-200/80 hover:border-orange-400 dark:bg-orange-950/30 dark:border-orange-800/60"
+      },
+      {
+        title: "إدارة الموظفين والعقود",
+        description: "سجل الموظفين، العقود، التأمين، وتحديث الملفات الشخصية.",
+        href: "/employees",
+        icon: Users,
+        badge: "دليل الموظفين",
+        color: "#9CA8B0",
+        bgLight: "bg-slate-50/70 border-slate-200/80 hover:border-slate-400 dark:bg-slate-950/30 dark:border-slate-800/60"
       }
     ];
 
     return (
       <div className="space-y-8 pb-10">
         {/* Pro Max Executive Header Card */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-700 via-violet-600 to-fuchsia-600 p-6 sm:p-8 shadow-xl shadow-violet-900/20">
-          <div className="absolute -left-12 -top-12 h-48 w-48 rounded-full bg-white/10 blur-3xl pointer-events-none" />
-          <div className="absolute bottom-0 end-10 h-40 w-40 rounded-full bg-white/5 blur-2xl pointer-events-none" />
-
+        <div className="relative overflow-hidden rounded-3xl p-6 sm:p-8 shadow-xl" style={{ background: BRAND_GRADIENT }}>
           <div className="relative flex flex-col justify-between gap-6 md:flex-row md:items-center">
             <div className="space-y-2.5">
               <div className="flex flex-wrap items-center gap-2.5">
-                <span className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">
+                <span className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-white" style={{ backgroundColor: "#E2955A" }}>
                   <span className="h-2 w-2 rounded-full bg-emerald-300 animate-ping" />
                   <span>المزامنة والتشغيل الفوري متصل بأعلى كفاءة</span>
                 </span>
-                <Badge className="bg-white px-3 py-1 text-xs font-black text-violet-700 shadow-sm hover:bg-white">
+                <Badge className="bg-white px-3 py-1 text-xs font-black shadow-sm hover:bg-white" style={{ color: "#D9557A" }}>
                   👑 لوحة التحكم المركزية Pro Max
                 </Badge>
               </div>
               <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white">
                 أهلاً بك، <span>{session?.user?.name || "الإدارة التنفيذية"}</span>
               </h1>
-              <p className="text-sm font-semibold text-violet-100 max-w-2xl leading-relaxed">
+              <p className="text-sm font-semibold text-white/90 max-w-2xl leading-relaxed">
                 مركز التحكم التنفيذي Pro Max لمنصة لانا الطبية؛ رصد لحظي لحركة الكوادر، الاعتمادات، الرواتب، وتكامل بيانات Odoo لحظياً.
               </p>
             </div>
@@ -117,14 +119,15 @@ export default async function CentralDashboardPage() {
             <div className="flex flex-wrap items-center gap-3 shrink-0">
               <Link
                 href="/employees?action=create"
-                className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black text-violet-700 shadow-lg transition-all hover:scale-105 hover:bg-violet-50 hover:shadow-xl active:scale-95"
+                className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black shadow-lg transition-all hover:scale-105 hover:bg-slate-50 hover:shadow-xl active:scale-95"
+                style={{ color: "#D9557A" }}
               >
                 <Users className="h-4.5 w-4.5" />
                 <span>إضافة موظف جديد</span>
               </Link>
               <Link
                 href="/attendance"
-                className="inline-flex items-center gap-2 rounded-2xl border border-white/30 bg-white/5 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-white/10"
+                className="inline-flex items-center gap-2 rounded-2xl border border-white px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-white/20"
               >
                 <CalendarClock className="h-4.5 w-4.5" />
                 <span>مراقبة الحضور</span>
@@ -137,7 +140,7 @@ export default async function CentralDashboardPage() {
         <div className="space-y-3">
           <div className="flex items-center justify-between px-1">
             <h2 className="text-base font-extrabold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-              <Activity className="h-4.5 w-4.5 text-violet-600 dark:text-violet-400" />
+              <Activity className="h-4.5 w-4.5" style={{ color: "#F4708F" }} />
               <span>الوصول السريع للأنظمة المركزية</span>
             </h2>
             <span className="text-xs font-bold text-slate-400 dark:text-slate-500">اختر الوحدة المطلوبة للانتقال المباشر</span>
@@ -153,16 +156,19 @@ export default async function CentralDashboardPage() {
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
                   <div className="flex items-start justify-between gap-3 mb-3">
-                    <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br ${item.gradient} text-white shadow-md transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6`}>
+                    <div
+                      className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-white shadow-md transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6"
+                      style={{ backgroundColor: item.color }}
+                    >
                       <Icon className="h-6 w-6" />
                     </div>
                     <Badge variant="outline" className="text-[10px] font-extrabold border-slate-300/80 bg-white/80 dark:border-slate-700 dark:bg-slate-900/80">
                       {item.badge}
                     </Badge>
                   </div>
-                  <h3 className="text-base font-black text-slate-900 dark:text-slate-100 group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors flex items-center justify-between">
-                    <span>{item.title}</span>
-                    <ArrowUpRight className="h-4 w-4 opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                  <h3 className="text-base font-black text-slate-900 dark:text-slate-100 transition-colors flex items-center justify-between">
+                    <span className="group-hover:opacity-80">{item.title}</span>
+                    <ArrowUpRight className="h-4 w-4 opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" style={{ color: item.color }} />
                   </h3>
                   <p className="mt-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400 leading-relaxed">
                     {item.description}
