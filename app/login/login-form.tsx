@@ -67,11 +67,11 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
           <AlertDescription>{message}</AlertDescription>
         </Alert>
       ) : null}
-      {/* Login page uses a scoped rose (#F4708F) accent -- not the shared
+      {/* Login page uses a scoped emerald (#1F8A5F) accent -- not the shared
           --primary token -- so this page's identity stays fixed regardless
           of what --primary resolves to elsewhere in the app. */}
       <div
-        className={`relative border-b-2 pb-1.5 pt-3 focus-within:border-[#F4708F] ${identifierError ? "border-destructive" : "border-slate-200 dark:border-slate-700"}`}
+        className={`relative border-b-2 pb-1.5 pt-3 focus-within:border-[#1F8A5F] ${identifierError ? "border-destructive" : "border-slate-200 dark:border-slate-700"}`}
       >
         <div className="relative">
           <Input
@@ -87,7 +87,7 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
           />
           <Label
             htmlFor="identifier"
-            className="pointer-events-none absolute start-0 top-1 origin-left rtl:origin-right -translate-y-5 scale-75 text-xs font-bold uppercase tracking-wider text-slate-500 transition-all duration-300 ease-in-out peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100 peer-placeholder-shown:text-sm peer-placeholder-shown:font-medium peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-placeholder-shown:text-slate-400 peer-focus:-translate-y-5 peer-focus:scale-75 peer-focus:text-xs peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-[#F4708F] dark:text-slate-400 dark:peer-placeholder-shown:text-slate-500"
+            className="pointer-events-none absolute start-0 top-1 origin-left rtl:origin-right -translate-y-5 scale-75 text-xs font-bold uppercase tracking-wider text-slate-500 transition-all duration-300 ease-in-out peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100 peer-placeholder-shown:text-sm peer-placeholder-shown:font-medium peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-placeholder-shown:text-slate-400 peer-focus:-translate-y-5 peer-focus:scale-75 peer-focus:text-xs peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-[#1F8A5F] dark:text-slate-400 dark:peer-placeholder-shown:text-slate-500"
           >
             اسم المستخدم أو رقم الهوية
           </Label>
@@ -97,7 +97,7 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
         {form.formState.errors.identifier ? <p className="text-xs text-destructive" role="alert">{form.formState.errors.identifier.message}</p> : null}
       </div>
       <div
-        className={`relative border-b-2 pb-1.5 pt-3 focus-within:border-[#F4708F] ${passwordError ? "border-destructive" : "border-slate-200 dark:border-slate-700"}`}
+        className={`relative border-b-2 pb-1.5 pt-3 focus-within:border-[#1F8A5F] ${passwordError ? "border-destructive" : "border-slate-200 dark:border-slate-700"}`}
       >
         <div className="flex items-center justify-end">
           {/* One of two elements on this page that stays grey (#A3A8A9) --
@@ -116,7 +116,7 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
           />
           <Label
             htmlFor="password"
-            className="pointer-events-none absolute start-0 top-1 origin-left rtl:origin-right -translate-y-5 scale-75 text-xs font-bold uppercase tracking-wider text-slate-500 transition-all duration-300 ease-in-out peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100 peer-placeholder-shown:text-sm peer-placeholder-shown:font-medium peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-placeholder-shown:text-slate-400 peer-focus:-translate-y-5 peer-focus:scale-75 peer-focus:text-xs peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-[#F4708F] dark:text-slate-400 dark:peer-placeholder-shown:text-slate-500"
+            className="pointer-events-none absolute start-0 top-1 origin-left rtl:origin-right -translate-y-5 scale-75 text-xs font-bold uppercase tracking-wider text-slate-500 transition-all duration-300 ease-in-out peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100 peer-placeholder-shown:text-sm peer-placeholder-shown:font-medium peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-placeholder-shown:text-slate-400 peer-focus:-translate-y-5 peer-focus:scale-75 peer-focus:text-xs peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-[#1F8A5F] dark:text-slate-400 dark:peer-placeholder-shown:text-slate-500"
           >
             {dictionary?.auth?.password || "كلمة المرور"}
           </Label>
@@ -124,7 +124,7 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
         </div>
       </div>
       <label className="flex cursor-pointer items-center gap-2.5 select-none">
-        <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} className="h-4 w-4 rounded border-input text-[#F4708F] focus-visible:ring-[#F4708F]" />
+        <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} className="h-4 w-4 rounded border-input text-[#1F8A5F] focus-visible:ring-[#1F8A5F]" />
         <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{dictionary?.auth?.rememberTitle || "تذكر مساحة العمل"}</span>
       </label>
       <Button
