@@ -63,7 +63,7 @@ app/
 
 #### Styling
 - Tailwind CSS with shadcn/ui
-- Colors: rose primary (#F4708F), gold secondary (#F2B366), rose→gold→slate-blue (#9CA8B0) brand gradient for hero surfaces, slate neutral, amber for warnings, red for errors
+- Colors: muted grey primary (#A3A8A9), darker grey secondary, monochrome grey identity app-wide, slate neutral, amber for warnings, red for errors
 - Dark mode ready: use `dark:` variants
 - Responsive: Mobile First, grid with `sm:`, `lg:`, `xl:`
 - No inline styles, use `cn()` utility

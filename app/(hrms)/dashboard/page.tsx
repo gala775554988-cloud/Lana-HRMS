@@ -12,10 +12,11 @@ import { Badge } from "@/components/ui/badge";
 
 export const dynamic = "force-dynamic";
 
-// Brand gradient (rose -> gold -> slate-blue), matches app/globals.css's
-// --primary/--secondary token hues; kept as a literal gradient string since
-// Tailwind has no single utility for a precise 3-stop percentage gradient.
-const BRAND_GRADIENT = "linear-gradient(90deg, #F4708F 0%, #F2B366 55%, #9CA8B0 100%)";
+// Monochrome grey brand gradient (dark enough throughout for the white
+// banner text to stay >=4.5:1 contrast); kept as a literal gradient string
+// since Tailwind has no single utility for a precise 3-stop percentage
+// gradient.
+const BRAND_GRADIENT = "linear-gradient(90deg, #3D4042 0%, #52575A 55%, #6B7072 100%)";
 
 export const metadata = {
   title: "لوحة التحكم المركزية — Pro Max Executive Hub | Lana HRMS",
@@ -66,8 +67,8 @@ export default async function CentralDashboardPage() {
         description: "توزيع الكوادر الطبية على مواقع المستشفيات الفعلية.",
         icon: Hospital,
         badge: "القطاع الطبي",
-        color: "#F4708F",
-        bgLight: "bg-rose-50 border-rose-200 hover:border-rose-400 dark:bg-slate-900 dark:border-rose-900",
+        color: "#3D4042",
+        bgLight: "bg-zinc-50 border-zinc-300 hover:border-zinc-500 dark:bg-slate-900 dark:border-zinc-700",
         data: orgGroups?.hospitals ?? { total: 0, items: [], href: "/hospitals" }
       },
       {
@@ -76,8 +77,8 @@ export default async function CentralDashboardPage() {
         description: "المشاريع والخدمات اللوجستية ومحطات المعالجة والبيئة ومكافحة العدوى.",
         icon: Wrench,
         badge: "العمليات التشغيلية",
-        color: "#F2B366",
-        bgLight: "bg-amber-50 border-amber-200 hover:border-amber-400 dark:bg-slate-900 dark:border-amber-900",
+        color: "#52575A",
+        bgLight: "bg-gray-50 border-gray-300 hover:border-gray-500 dark:bg-slate-900 dark:border-gray-700",
         data: orgGroups?.operations ?? { total: 0, items: [], href: "/branches?tab=departments" }
       },
       {
@@ -86,8 +87,8 @@ export default async function CentralDashboardPage() {
         description: "الأجهزة والمستلزمات الطبية، الصيانة، والمشتريات الطبية.",
         icon: Syringe,
         badge: "الإمداد الطبي",
-        color: "#E2955A",
-        bgLight: "bg-orange-50 border-orange-200 hover:border-orange-400 dark:bg-slate-900 dark:border-orange-900",
+        color: "#63686A",
+        bgLight: "bg-stone-50 border-stone-300 hover:border-stone-500 dark:bg-slate-900 dark:border-stone-700",
         data: orgGroups?.medicalSupplies ?? { total: 0, items: [], href: "/branches?tab=departments" }
       },
       {
@@ -96,7 +97,7 @@ export default async function CentralDashboardPage() {
         description: "الإدارة والمالية وإدارة التوريد وتقنية المعلومات والمراجع.",
         icon: Landmark,
         badge: "الإدارة المركزية",
-        color: "#9CA8B0",
+        color: "#6B7072",
         bgLight: "bg-slate-50 border-slate-200 hover:border-slate-400 dark:bg-slate-900 dark:border-slate-700",
         data: orgGroups?.mainAdministration ?? { total: 0, items: [], href: "/branches?tab=departments" }
       }
@@ -109,11 +110,11 @@ export default async function CentralDashboardPage() {
           <div className="relative flex flex-col justify-between gap-6 md:flex-row md:items-center">
             <div className="space-y-2.5">
               <div className="flex flex-wrap items-center gap-2.5">
-                <span className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-white" style={{ backgroundColor: "#E2955A" }}>
+                <span className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-white" style={{ backgroundColor: "#52575A" }}>
                   <span className="h-2 w-2 rounded-full bg-emerald-300 animate-ping" />
                   <span>المزامنة والتشغيل الفوري متصل بأعلى كفاءة</span>
                 </span>
-                <Badge className="bg-white px-3 py-1 text-xs font-black shadow-sm hover:bg-white" style={{ color: "#D9557A" }}>
+                <Badge className="bg-white px-3 py-1 text-xs font-black shadow-sm hover:bg-white" style={{ color: "#3D4042" }}>
                   👑 لوحة التحكم المركزية Pro Max
                 </Badge>
               </div>
@@ -129,7 +130,7 @@ export default async function CentralDashboardPage() {
               <Link
                 href="/employees?action=create"
                 className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black shadow-lg transition-all hover:scale-105 hover:bg-slate-50 hover:shadow-xl active:scale-95"
-                style={{ color: "#D9557A" }}
+                style={{ color: "#3D4042" }}
               >
                 <Users className="h-4.5 w-4.5" />
                 <span>إضافة موظف جديد</span>
@@ -149,7 +150,7 @@ export default async function CentralDashboardPage() {
         <div className="space-y-3">
           <div className="flex items-center justify-between px-1">
             <h2 className="text-base font-extrabold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-              <Activity className="h-4.5 w-4.5" style={{ color: "#F4708F" }} />
+              <Activity className="h-4.5 w-4.5" style={{ color: "#52575A" }} />
               <span>الوحدات التنظيمية الرئيسية</span>
             </h2>
             <span className="text-xs font-bold text-slate-400 dark:text-slate-500">أعداد حية من قاعدة البيانات</span>
