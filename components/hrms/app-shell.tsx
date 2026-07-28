@@ -147,9 +147,9 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
   if (status === "loading") {
     return (
       <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
-        <div className="hidden h-screen w-[284px] shrink-0 border-e border-primary/10 bg-white/80 backdrop-blur-xl lg:block dark:border-slate-800/80 dark:bg-slate-950/80" />
+        <div className="hidden h-screen w-[284px] shrink-0 border-e border-primary/10 bg-white lg:block dark:border-slate-800/80 dark:bg-slate-950" />
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="h-16 shrink-0 border-b border-border/80 bg-white/90 dark:bg-slate-950/90" />
+          <div className="h-16 shrink-0 border-b border-border/80 bg-white dark:bg-slate-950" />
           <main className="min-w-0 flex-1 overflow-y-auto p-4 lg:p-8">{children}</main>
         </div>
       </div>
@@ -312,7 +312,7 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
 
       <div className="flex min-w-0 flex-1 flex-col h-screen">
       {/* Cleaned Pro Max Header (Smart Search removed per requirement #2) */}
-      <header className="sticky top-0 z-30 shrink-0 border-b border-primary/10 bg-white/90 shadow-2xs shadow-primary/5 backdrop-blur-2xl dark:border-slate-800/80 dark:bg-slate-950/90 dark:shadow-slate-950/40">
+      <header className="sticky top-0 z-30 shrink-0 border-b border-primary/10 bg-white shadow-2xs shadow-primary/5 dark:border-slate-800/80 dark:bg-slate-950 dark:shadow-slate-950/40">
         <div className="flex h-16 items-center justify-between gap-4 px-4 lg:px-6">
           <div className="flex items-center gap-3">
             <button
