@@ -63,7 +63,7 @@ app/
 
 #### Styling
 - Tailwind CSS with shadcn/ui
-- Colors: indigo primary (#4F46E5), slate neutral, amber for warnings, red for errors
+- Colors: muted grey primary (#A3A8A9), darker grey secondary, monochrome grey identity app-wide, slate neutral, amber for warnings, red for errors
 - Dark mode ready: use `dark:` variants
 - Responsive: Mobile First, grid with `sm:`, `lg:`, `xl:`
 - No inline styles, use `cn()` utility

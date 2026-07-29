@@ -372,8 +372,16 @@ export function mapOdooContractToLana(record: OdooRecord, employeeId?: string): 
     employeeId,
     contractNumber: record.name || `ODOO-${record.id}`,
     title: record.name || `Odoo Contract ${record.id}`,
-    startDate: asDateString(record.date_start, true) || new Date(),
-    endDate: asDateString(record.date_end, true),
+    // startDate/endDate are DateTime fields in Prisma -- every other
+    // ODOO_TO_LANA mapper in this file correctly uses asDate() (a real Date
+    // object) for these; this one used asDateString(..., true) (a bare
+    // "YYYY-MM-DD" string), which Prisma's DateTime validator rejects
+    // outright ("premature end of input. Expected ISO-8601 DateTime"). That
+    // made every single EmployeeContract create/update throw unconditionally
+    // -- the actual reason virtually the entire active employee population
+    // showed up with "no contract" despite Odoo having complete data.
+    startDate: asDate(record.date_start) || new Date(),
+    endDate: asDate(record.date_end),
     salaryAmount: decimalNumber(record.wage) ?? 0,
     currency: "USD",
     status: mapContractStateToLana(record.state),
