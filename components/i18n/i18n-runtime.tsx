@@ -84,7 +84,30 @@ export function I18nRuntime({ initialLocale }: { initialLocale: Locale }) {
     setLocale(activeLocale);
   }, [initialLocale]);
 
+  // Keep the runtime listener active even when the server-rendered locale is
+  // already correct. The translation pass itself is deliberately deferred
+  // until a client override is requested; mutating server-rendered text on
+  // the initial mount can race streamed Suspense content and break hydration.
   useEffect(() => {
+    const onLocaleChange = (event: Event) => {
+      const next = normalizeLocale((event as CustomEvent<{ locale: Locale }>).detail?.locale);
+      setLocale(next);
+    };
+    const onStorage = () => setLocale(getStoredLocale(initialLocale));
+    window.addEventListener("lana-locale-change", onLocaleChange);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("lana-locale-change", onLocaleChange);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [initialLocale]);
+
+  useEffect(() => {
+    // The server already rendered this locale. Do not let a client-side DOM
+    // walker rewrite it during hydration; React must remain the sole owner
+    // of that initial DOM tree.
+    if (locale === initialLocale) return;
+
     document.documentElement.lang = locale;
     document.documentElement.dir = resolvedLocale.dir;
     document.documentElement.dataset.locale = locale;
@@ -145,16 +168,8 @@ export function I18nRuntime({ initialLocale }: { initialLocale: Locale }) {
 
     observer.observe(document.body, { childList: true, subtree: true, characterData: true });
 
-    const onLocaleChange = (event: Event) => {
-      const next = normalizeLocale((event as CustomEvent<{ locale: Locale }>).detail?.locale);
-      setLocale(next);
-    };
-    window.addEventListener("lana-locale-change", onLocaleChange);
-    window.addEventListener("storage", () => setLocale(getStoredLocale(locale)));
-
     return () => {
       observer.disconnect();
-      window.removeEventListener("lana-locale-change", onLocaleChange);
     };
   }, [locale, resolvedLocale.dir, initialLocale]);
 
