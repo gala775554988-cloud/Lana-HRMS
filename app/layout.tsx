@@ -71,6 +71,11 @@ export const viewport: Viewport = {
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const requestHeaders = await headers().catch(() => null);
   const cookieStore = await cookies().catch(() => null);
+  // Seed the client SessionProvider with the same server session used by the
+  // protected layouts. Without this, AppShell can SSR in its loading state
+  // but hydrate as authenticated (or vice versa), which changes the shell's
+  // DOM tree and triggers React hydration error #418 on /dashboard.
+  const session = await auth().catch(() => null);
   const headerLocale = requestHeaders?.get("x-lana-locale");
   const cookieLocale = cookieStore?.get("lana-locale")?.value;
   const locale = normalizeLocale(headerLocale ?? cookieLocale);
@@ -78,7 +83,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   return (
     <html lang={locale} dir={getDirection(locale)} className="light" style={{ colorScheme: "light" }} suppressHydrationWarning>
       <body>
-        <SessionProvider refetchOnWindowFocus={false} refetchWhenOffline={false}>
+        <SessionProvider session={session} refetchOnWindowFocus={false} refetchWhenOffline={false}>
           <QueryProvider>
             <ThemeProvider>
               <PWARegister />
