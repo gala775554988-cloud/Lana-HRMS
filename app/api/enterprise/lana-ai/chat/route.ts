@@ -13,6 +13,35 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 180;
 
+/** Translates a raw Gemini/OpenAI provider failure (invalid key, quota/rate
+ * limit, network error) into a specific, actionable message instead of the
+ * client's old one-size-fits-all "تعذر الحصول على رد" fallback. Called from
+ * inside the manual stream loop below, where the real error is available. */
+function describeProviderError(err: unknown, ar: boolean): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  const status = Number((err as any)?.statusCode ?? (err as any)?.status ?? (err as any)?.response?.status ?? NaN);
+  const lower = raw.toLowerCase();
+
+  if (status === 401 || status === 403 || /api key not valid|invalid.{0,10}api key|permission_denied|unauthenticated/.test(lower)) {
+    return ar
+      ? `⚠️ تعذر الاتصال بمحرك الذكاء الاصطناعي: مفتاح Gemini API غير صالح أو منتهي الصلاحية. يرجى مراجعة متغير GEMINI_API_KEY في إعدادات الخادم.\n\nتفاصيل تقنية: ${raw}`
+      : `⚠️ Could not reach the AI engine: the Gemini API key is invalid or expired. Please check the GEMINI_API_KEY server setting.\n\nTechnical detail: ${raw}`;
+  }
+  if (status === 429 || /quota|rate limit|resource_exhausted|too many requests/.test(lower)) {
+    return ar
+      ? `⚠️ تم تجاوز الحد المسموح من الطلبات (Rate Limit / Quota Exceeded) على واجهة Gemini API. يرجى المحاولة خلال دقيقة.\n\nتفاصيل تقنية: ${raw}`
+      : `⚠️ The Gemini API rate limit/quota was exceeded. Please try again in a minute.\n\nTechnical detail: ${raw}`;
+  }
+  if (/network|fetch failed|enotfound|econnrefused|econnreset|timed? ?out/.test(lower)) {
+    return ar
+      ? `⚠️ تعذر الاتصال بخادم Gemini بسبب مشكلة في الشبكة. يرجى المحاولة لاحقاً.\n\nتفاصيل تقنية: ${raw}`
+      : `⚠️ Could not reach the Gemini server due to a network issue. Please try again later.\n\nTechnical detail: ${raw}`;
+  }
+  return ar
+    ? `⚠️ حدث خطأ أثناء الاتصال بمحرك الذكاء الاصطناعي: ${raw}`
+    : `⚠️ An error occurred while contacting the AI engine: ${raw}`;
+}
+
 /**
 /**
  * AI-First Semantic Orchestrator when running locally without OPENAI_API_KEY.
@@ -311,6 +340,14 @@ export async function POST(request: NextRequest) {
     if (model) {
       try {
         const systemPrompt = getLanaSystemPrompt(authContext);
+        const isAr = /[\u0600-\u06FF]/.test(lastMessage);
+
+        // The AI SDK's own retry logic (e.g. Gemini free-tier quota errors)
+        // can exhaust its retries and end the stream cleanly -- with zero
+        // chunks and nothing thrown into our for-await loop below -- so
+        // onError is often the ONLY place the real failure reason is ever
+        // observable. Captured here so the empty-stream branch can use it.
+        let capturedProviderError: unknown = null;
 
         const result = streamText({
           model,
@@ -323,17 +360,13 @@ export async function POST(request: NextRequest) {
           // this, execution stopped right after a tool call and never
           // synthesized the tool result into a real answer.
           stopWhen: stepCountIs(5),
-          // streamText() commits to a 200 streaming response immediately --
-          // toTextStreamResponse() is already returned by the time the
-          // provider actually rejects the request (invalid/expired API key,
-          // quota exceeded, network failure to Gemini/OpenAI). The outer
-          // try/catch below only ever catches errors thrown by calling
-          // streamText() itself, never this kind of async, in-stream error --
-          // so without this callback, a real provider failure produced a
-          // silently empty response body with zero server-side visibility
-          // into why (this was the actual root cause of Lana AI always
-          // showing the client's generic "no content" fallback message).
+          // Default is 2 retries (3 attempts total). Retrying a 429 against
+          // an already-exhausted quota just burns more of that same quota
+          // and prolongs recovery, so a rate-limited key fails fast instead
+          // of digging the hole deeper.
+          maxRetries: 1,
           onError: ({ error }) => {
+            capturedProviderError = error;
             console.error("[LanaAI] Gemini/OpenAI stream error:", error instanceof Error ? error.message : error);
           },
           onFinish: async ({ text, toolCalls, toolResults }) => {
@@ -353,9 +386,58 @@ export async function POST(request: NextRequest) {
           }
         });
 
-        const response = (result as any).toDataStreamResponse ? (result as any).toDataStreamResponse() : (result as any).toTextStreamResponse();
-        response.headers.set("X-Conversation-Id", conversationId);
-        return response;
+        // streamText() commits to a 200 streaming response immediately, so a
+        // provider rejection (invalid/expired API key, quota exceeded,
+        // network failure) only ever surfaces once we actually pull from
+        // result.textStream below -- never as a throw out of streamText()
+        // itself. Consuming it ourselves (instead of calling
+        // toTextStreamResponse()) lets us catch that in-flight failure and
+        // write a real, specific reason into the response body instead of
+        // silently closing the stream and leaving the client to show its
+        // generic "no content" fallback message.
+        const encoder = new TextEncoder();
+        let sawChunk = false;
+        const manualStream = new ReadableStream<Uint8Array>({
+          async start(controller) {
+            try {
+              for await (const chunk of result.textStream) {
+                sawChunk = true;
+                controller.enqueue(encoder.encode(chunk));
+              }
+              if (!sawChunk) {
+                // The SDK can swallow a provider failure internally (e.g. it
+                // exhausts its own retry attempts on a Gemini quota error)
+                // and end the stream with nothing thrown -- onError above is
+                // then the only place the real reason was ever visible.
+                const emptyMsg = capturedProviderError
+                  ? describeProviderError(capturedProviderError, isAr)
+                  : (isAr
+                    ? "⚠️ لم يُرجع محرك الذكاء الاصطناعي أي محتوى لهذا الطلب (قد يكون تم حظره بواسطة مرشحات الأمان). يرجى إعادة صياغة السؤال."
+                    : "⚠️ The AI engine returned no content for this request (it may have been blocked by safety filters). Please rephrase your question.");
+                controller.enqueue(encoder.encode(emptyMsg));
+                await prisma.aIAssistantMessage.create({
+                  data: { conversationId: conversationId!, role: "assistant", content: emptyMsg }
+                }).catch(() => {});
+              }
+            } catch (streamErr) {
+              console.error("[LanaAI] provider stream failed mid-flight:", streamErr instanceof Error ? streamErr.message : streamErr);
+              const message = describeProviderError(streamErr, isAr);
+              controller.enqueue(encoder.encode(message));
+              await prisma.aIAssistantMessage.create({
+                data: { conversationId: conversationId!, role: "assistant", content: message }
+              }).catch(() => {});
+            } finally {
+              controller.close();
+            }
+          }
+        });
+
+        return new Response(manualStream, {
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+            "X-Conversation-Id": conversationId
+          }
+        });
       } catch (externalErr) {
         // Fallback to local intelligent stream if the LLM API call fails/times out
       }
