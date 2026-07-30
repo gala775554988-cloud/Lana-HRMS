@@ -50,6 +50,16 @@ test.describe("Employee portal end-to-end flow", () => {
 
     const errors = trackPageHealth(page);
 
+    // Smoke tests must not consume real production device slots. Device-limit
+    // behavior is covered separately; this suite validates portal routing and
+    // rendering using the explicit no-binding sentinel accepted by the app.
+    await page.addInitScript(() => {
+      window.localStorage.setItem(
+        "lana_mobile_secure_device_uuid",
+        "mobile-session-fallback"
+      );
+    });
+
     await test.step("Direct HR grants route the employee into the admin shell", async () => {
       await login(page, account!);
       await page.waitForURL(/\/(?:dashboard|hr\/dashboard|manager\/dashboard)(?:\/|$)/, {
@@ -67,6 +77,10 @@ test.describe("Employee portal end-to-end flow", () => {
         page.getByRole("textbox", { name: "بحث بالاسم أو الرقم الوظيفي..." })
       ).toBeVisible({ timeout: 20_000 });
       await expect(page.getByRole("button", { name: "الفلاتر" })).toBeVisible();
+      const allEmployees = page.getByRole("button", { name: /جميع الموظفين/ });
+      await expect(allEmployees).toBeVisible();
+      const countMatch = (await allEmployees.innerText()).match(/\((\d+)\)/);
+      expect(Number(countMatch?.[1] ?? 0)).toBeGreaterThan(1);
       await expectHealthyPage(page, errors, "/employees");
     });
 
