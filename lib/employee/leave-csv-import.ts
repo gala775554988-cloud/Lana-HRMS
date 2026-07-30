@@ -122,15 +122,22 @@ export async function planLeaveCsvImport(csv: string) {
         const sourceHireDate = toDateKey(row.join_date);
         const sourceDepartment = normalize(row.department_id);
         const sourceJob = normalize(row.job_id);
+        const dateMatches = sourceHireDate
+          ? matches.filter((candidate) => candidate.hireDate.toISOString().slice(0, 10) === sourceHireDate)
+          : [];
         const exactProfileMatches = matches.filter((candidate) => {
           const candidateHireDate = candidate.hireDate.toISOString().slice(0, 10);
           return (!sourceHireDate || candidateHireDate === sourceHireDate)
             && (!sourceDepartment || normalize(candidate.department?.name) === sourceDepartment)
             && (!sourceJob || normalize(candidate.position?.title) === sourceJob);
         });
+        // A unique exact join date is a stronger source-identity signal than
+        // blank/legacy department and job fields in Odoo exports.
         if (exactProfileMatches.length === 1) {
           employee = exactProfileMatches[0];
-        } else {
+        } else if (dateMatches.length === 1) {
+          employee = dateMatches[0];
+        } else { 
           skipped.push({
             row: row.rowIndex,
             id: row.ID,
