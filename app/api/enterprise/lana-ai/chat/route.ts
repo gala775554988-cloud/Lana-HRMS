@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { createScopedHrTools, type ToolAuthContext } from "@/lib/ai/tools";
 import { getLanaSystemPrompt } from "@/lib/ai/system-prompt";
 import { isLanaDelegate } from "@/lib/enterprise/lana-delegates";
-import { getLanaApiKey, getGeminiApiKey, getGeminiModel } from "@/lib/settings";
+import { getLanaApiKey, getGeminiApiKeyPool, getGeminiModel } from "@/lib/settings";
 import { streamText, stepCountIs } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -40,6 +40,18 @@ function describeProviderError(err: unknown, ar: boolean): string {
   return ar
     ? `⚠️ حدث خطأ أثناء الاتصال بمحرك الذكاء الاصطناعي: ${raw}`
     : `⚠️ An error occurred while contacting the AI engine: ${raw}`;
+}
+
+/** Fisher-Yates shuffle (non-mutating) -- randomizes the order the Gemini
+ * key pool is tried in, so load spreads roughly evenly across separate
+ * quotas instead of always hammering the first key in the list. */
+function shuffleArray<T>(items: T[]): T[] {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
 }
 
 /**
@@ -324,111 +336,125 @@ export async function POST(request: NextRequest) {
       content: m.content
     }));
 
-    // 3. Execution: Gemini is the primary Lana AI provider (GEMINI_API_KEY /
-    // GOOGLE_GENERATIVE_AI_API_KEY / GOOGLE_API_KEY from the deploy
-    // environment -- see getGeminiApiKey). OpenAI stays as a fallback
-    // provider so an existing deployment that only has lana.ai.apiKey/
-    // OPENAI_API_KEY configured keeps working unchanged.
-    const geminiKey = getGeminiApiKey();
-    const openAiKey = geminiKey ? "" : (await getLanaApiKey() || process.env.OPENAI_API_KEY || "").trim();
-    const model = geminiKey
-      ? createGoogleGenerativeAI({ apiKey: geminiKey })(getGeminiModel())
-      : openAiKey
-        ? createOpenAI({ apiKey: openAiKey })((process.env.OPENAI_MODEL || "").trim() || "gpt-4o-mini")
-        : null;
+    // 3. Execution: Gemini is the primary Lana AI provider. getGeminiApiKeyPool()
+    // reads GEMINI_API_KEYS (comma/newline-separated) when set, falling back
+    // to the single GEMINI_API_KEY / GOOGLE_GENERATIVE_AI_API_KEY /
+    // GOOGLE_API_KEY otherwise. Each key has its own separate rate/quota
+    // allowance, so a random attempt order plus failover to the next key on
+    // ANY error (invalid key, quota, network) spreads load across them and
+    // means one exhausted/bad key doesn't take the assistant down while a
+    // sibling key still has headroom. OpenAI stays a fallback provider, used
+    // only when no Gemini key at all is configured, so an existing
+    // deployment with just lana.ai.apiKey/OPENAI_API_KEY keeps working
+    // unchanged.
+    const geminiKeys = getGeminiApiKeyPool();
+    const openAiKey = geminiKeys.length ? "" : (await getLanaApiKey() || process.env.OPENAI_API_KEY || "").trim();
 
-    if (model) {
+    type ProviderAttempt = { provider: "gemini"; key: string } | { provider: "openai"; key: string };
+    const attempts: ProviderAttempt[] = geminiKeys.length
+      ? shuffleArray(geminiKeys).map((key) => ({ provider: "gemini" as const, key }))
+      : openAiKey
+        ? [{ provider: "openai" as const, key: openAiKey }]
+        : [];
+
+    if (attempts.length) {
       try {
         const systemPrompt = getLanaSystemPrompt(authContext);
         const isAr = /[\u0600-\u06FF]/.test(lastMessage);
-
-        // The AI SDK's own retry logic (e.g. Gemini free-tier quota errors)
-        // can exhaust its retries and end the stream cleanly -- with zero
-        // chunks and nothing thrown into our for-await loop below -- so
-        // onError is often the ONLY place the real failure reason is ever
-        // observable. Captured here so the empty-stream branch can use it.
-        let capturedProviderError: unknown = null;
-
-        const result = streamText({
-          model,
-          system: systemPrompt,
-          messages: formattedMessages.length ? (formattedMessages as any) : (messages as any),
-          tools: tools as any,
-          toolChoice: "auto" as any,
-          temperature: 0.3,
-          // v6 "ai" replaced maxSteps with stopWhen(stepCountIs(N)) -- without
-          // this, execution stopped right after a tool call and never
-          // synthesized the tool result into a real answer.
-          stopWhen: stepCountIs(5),
-          // Default is 2 retries (3 attempts total). Retrying a 429 against
-          // an already-exhausted quota just burns more of that same quota
-          // and prolongs recovery, so a rate-limited key fails fast instead
-          // of digging the hole deeper.
-          maxRetries: 1,
-          onError: ({ error }) => {
-            capturedProviderError = error;
-            console.error("[LanaAI] Gemini/OpenAI stream error:", error instanceof Error ? error.message : error);
-          },
-          onFinish: async ({ text, toolCalls, toolResults }) => {
-            await prisma.aIAssistantMessage.create({
-              data: {
-                conversationId: conversationId!,
-                role: "assistant",
-                content: text || "Done",
-                toolCalls: toolCalls ? (toolCalls as any) : undefined,
-                output: toolResults ? (toolResults as any) : undefined
-              }
-            }).catch(() => {});
-            await prisma.aIAssistantConversation.update({
-              where: { id: conversationId! },
-              data: { updatedAt: new Date() }
-            }).catch(() => {});
-          }
-        });
+        const encoder = new TextEncoder();
 
         // streamText() commits to a 200 streaming response immediately, so a
         // provider rejection (invalid/expired API key, quota exceeded,
         // network failure) only ever surfaces once we actually pull from
-        // result.textStream below -- never as a throw out of streamText()
-        // itself. Consuming it ourselves (instead of calling
-        // toTextStreamResponse()) lets us catch that in-flight failure and
-        // write a real, specific reason into the response body instead of
-        // silently closing the stream and leaving the client to show its
-        // generic "no content" fallback message.
-        const encoder = new TextEncoder();
-        let sawChunk = false;
+        // result.textStream -- never as a throw out of streamText() itself.
+        // Consuming it ourselves (instead of calling toTextStreamResponse())
+        // lets us catch that in-flight failure per attempt and move on to
+        // the next key in the pool before ever giving up.
         const manualStream = new ReadableStream<Uint8Array>({
           async start(controller) {
-            try {
-              for await (const chunk of result.textStream) {
-                sawChunk = true;
-                controller.enqueue(encoder.encode(chunk));
+            let sawChunk = false;
+            let lastError: unknown = null;
+
+            for (const attempt of attempts) {
+              const model = attempt.provider === "gemini"
+                ? createGoogleGenerativeAI({ apiKey: attempt.key })(getGeminiModel())
+                : createOpenAI({ apiKey: attempt.key })((process.env.OPENAI_MODEL || "").trim() || "gpt-4o-mini");
+
+              // The AI SDK's own retry logic (e.g. Gemini free-tier quota
+              // errors) can exhaust its retries and end the stream cleanly --
+              // with zero chunks and nothing thrown into the for-await loop
+              // below -- so onError is often the only place the real
+              // failure reason for THIS attempt is ever observable.
+              let capturedProviderError: unknown = null;
+
+              const result = streamText({
+                model,
+                system: systemPrompt,
+                messages: formattedMessages.length ? (formattedMessages as any) : (messages as any),
+                tools: tools as any,
+                toolChoice: "auto" as any,
+                temperature: 0.3,
+                // v6 "ai" replaced maxSteps with stopWhen(stepCountIs(N)) --
+                // without this, execution stopped right after a tool call
+                // and never synthesized the tool result into a real answer.
+                stopWhen: stepCountIs(5),
+                // Default is 2 retries (3 attempts total) against the SAME
+                // key. Retrying a 429 against an already-exhausted quota
+                // just burns more of that same quota -- better to fail this
+                // key fast and move on to the next one in the pool.
+                maxRetries: 1,
+                onError: ({ error }) => {
+                  capturedProviderError = error;
+                  console.error(`[LanaAI] ${attempt.provider} stream error:`, error instanceof Error ? error.message : error);
+                },
+                onFinish: async ({ text, toolCalls, toolResults }) => {
+                  await prisma.aIAssistantMessage.create({
+                    data: {
+                      conversationId: conversationId!,
+                      role: "assistant",
+                      content: text || "Done",
+                      toolCalls: toolCalls ? (toolCalls as any) : undefined,
+                      output: toolResults ? (toolResults as any) : undefined
+                    }
+                  }).catch(() => {});
+                  await prisma.aIAssistantConversation.update({
+                    where: { id: conversationId! },
+                    data: { updatedAt: new Date() }
+                  }).catch(() => {});
+                }
+              });
+
+              try {
+                for await (const chunk of result.textStream) {
+                  sawChunk = true;
+                  controller.enqueue(encoder.encode(chunk));
+                }
+                if (sawChunk) {
+                  controller.close();
+                  return;
+                }
+                // Zero chunks, nothing thrown: the SDK swallowed the failure
+                // internally -- fall through to the next attempt using
+                // whatever onError captured as the reason so far.
+                lastError = capturedProviderError || lastError;
+              } catch (streamErr) {
+                console.error(`[LanaAI] ${attempt.provider} stream failed mid-flight:`, streamErr instanceof Error ? streamErr.message : streamErr);
+                lastError = streamErr;
               }
-              if (!sawChunk) {
-                // The SDK can swallow a provider failure internally (e.g. it
-                // exhausts its own retry attempts on a Gemini quota error)
-                // and end the stream with nothing thrown -- onError above is
-                // then the only place the real reason was ever visible.
-                const emptyMsg = capturedProviderError
-                  ? describeProviderError(capturedProviderError, isAr)
-                  : (isAr
-                    ? "⚠️ لم يُرجع محرك الذكاء الاصطناعي أي محتوى لهذا الطلب (قد يكون تم حظره بواسطة مرشحات الأمان). يرجى إعادة صياغة السؤال."
-                    : "⚠️ The AI engine returned no content for this request (it may have been blocked by safety filters). Please rephrase your question.");
-                controller.enqueue(encoder.encode(emptyMsg));
-                await prisma.aIAssistantMessage.create({
-                  data: { conversationId: conversationId!, role: "assistant", content: emptyMsg }
-                }).catch(() => {});
-              }
-            } catch (streamErr) {
-              console.error("[LanaAI] provider stream failed mid-flight:", streamErr instanceof Error ? streamErr.message : streamErr);
-              const message = describeProviderError(streamErr, isAr);
-              controller.enqueue(encoder.encode(message));
-              await prisma.aIAssistantMessage.create({
-                data: { conversationId: conversationId!, role: "assistant", content: message }
-              }).catch(() => {});
-            } finally {
-              controller.close();
             }
+
+            // Every key in the pool failed -- show the real, specific
+            // reason from the last attempt instead of a generic message.
+            const message = lastError
+              ? describeProviderError(lastError, isAr)
+              : (isAr
+                ? "⚠️ لم يُرجع محرك الذكاء الاصطناعي أي محتوى لهذا الطلب (قد يكون تم حظره بواسطة مرشحات الأمان). يرجى إعادة صياغة السؤال."
+                : "⚠️ The AI engine returned no content for this request (it may have been blocked by safety filters). Please rephrase your question.");
+            controller.enqueue(encoder.encode(message));
+            await prisma.aIAssistantMessage.create({
+              data: { conversationId: conversationId!, role: "assistant", content: message }
+            }).catch(() => {});
+            controller.close();
           }
         });
 
