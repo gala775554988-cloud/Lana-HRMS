@@ -111,8 +111,8 @@ export function MultiDeviceAccessClient({ users }: { users: AdminUser[] }) {
             <UserPlus className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-base font-black text-slate-900 dark:text-slate-100">إضافة موظف أو اختيار موظف في خانة تعدد الأجهزة وصلاحية فك الارتباط</h3>
-            <p className="text-xs text-muted-foreground font-semibold mt-0.5">اختر أي موظف بالمنصة لتمنحه فوراً صلاحية الدخول من أكثر من جهاز ويظهر في الجدول بالأسفل للتحكم بفك ارتباطه بضغطة زر:</p>
+            <h3 className="text-base font-black text-slate-900 dark:text-slate-100">إدارة أجهزة الموظفين وصلاحية فك الارتباط</h3>
+            <p className="text-xs text-muted-foreground font-semibold mt-0.5">يسمح النظام لجميع الموظفين بالدخول من جهازين. اختر موظفاً لإظهاره في الجدول فوراً أو لفك ارتباط أجهزته عند الحاجة:</p>
           </div>
         </div>
 
@@ -135,13 +135,13 @@ export function MultiDeviceAccessClient({ users }: { users: AdminUser[] }) {
             className="bg-gradient-to-r from-primary to-teal-600 hover:from-primary/90 hover:to-teal-700 text-white font-black rounded-2xl h-11 px-6 shrink-0 shadow-lg shadow-primary/20"
           >
             {pendingId === selectedNewUserId ? <Loader2 className="h-4 w-4 animate-spin me-2" /> : <UserPlus className="h-4 w-4 me-2" />}
-            <span>إضافة الموظف ومنحه الصلاحية فوراً</span>
+            <span>إضافة الموظف إلى إدارة الأجهزة</span>
           </Button>
         </div>
       </div>
 
       <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4 text-xs font-semibold text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
-        أي موظف تقوم بإضافته أو منحه صلاحية تعدد الأجهزة يظهر في الجدول أدناه، وبإمكانك تشغيل أو إيقاف تعدد الأجهزة له، أو الضغط على زر <strong>(🔓 فك ارتباط جهاز الموظف الآن)</strong> للسماح له بالدخول من جهاز جديد فوراً.
+        كل حساب موظف مسموح له بجهازين افتراضياً. يظهر الموظفون المرتبطون في الجدول أدناه، ويمكنك إيقاف الجهاز الثاني لحساب محدد أو الضغط على زر <strong>(🔓 فك ارتباط أجهزة الموظف الآن)</strong> لإتاحة تسجيل جهازين جديدين فوراً.
       </div>
 
       {error ? (
@@ -155,7 +155,7 @@ export function MultiDeviceAccessClient({ users }: { users: AdminUser[] }) {
             <tr>
               <th className="px-5 py-4 text-start font-extrabold text-slate-700 dark:text-slate-200">الموظف / المسؤول</th>
               <th className="px-5 py-4 text-start font-extrabold text-slate-700 dark:text-slate-200">الصلاحيات والمنصب</th>
-              <th className="px-5 py-4 text-center font-extrabold text-slate-700 dark:text-slate-200 w-36">تعدد الأجهزة</th>
+              <th className="px-5 py-4 text-center font-extrabold text-slate-700 dark:text-slate-200 w-36">السماح بجهازين</th>
               <th className="px-5 py-4 text-center font-extrabold text-slate-700 dark:text-slate-200 w-56">فك ارتباط الأجهزة (Unbind)</th>
             </tr>
           </thead>

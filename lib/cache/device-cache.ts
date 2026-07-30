@@ -2,7 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { clearMemoryCache } from "@/lib/cache/memory-cache";
 import { writeAuditLog } from "@/lib/audit";
 
-const DEVICE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in memory/cache
+const DEVICE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+export const MAX_EMPLOYEE_DEVICES = 2;
 
 type DeviceVerificationResult = {
   allowed: boolean;
@@ -11,44 +12,46 @@ type DeviceVerificationResult = {
   isNewBinding?: boolean;
 };
 
-// High-speed in-memory LRU fallback (< 5ms) when Redis is not configured
-const deviceMemoryMap = new Map<string, { deviceId: string; expiresAt: number }>();
+// A small process-local cache is only an optimization. The database remains
+// authoritative, particularly when a second device is being registered.
+const deviceMemoryMap = new Map<string, { deviceIds: string[]; expiresAt: number }>();
 
-function getCachedDevice(key: string): string | null {
+function getCachedDevices(key: string): string[] | null {
   const entry = deviceMemoryMap.get(key);
   if (!entry) return null;
   if (Date.now() > entry.expiresAt) {
     deviceMemoryMap.delete(key);
     return null;
   }
-  return entry.deviceId;
+  return entry.deviceIds;
 }
 
-function setCachedDevice(key: string, deviceId: string, ttlMs: number) {
-  deviceMemoryMap.set(key, { deviceId, expiresAt: Date.now() + ttlMs });
+function setCachedDevices(key: string, deviceIds: string[]) {
+  deviceMemoryMap.set(key, {
+    deviceIds: Array.from(new Set(deviceIds)),
+    expiresAt: Date.now() + DEVICE_CACHE_TTL_MS,
+  });
 }
 
-function deleteCachedDevice(key: string) {
+function deleteCachedDevices(key: string) {
   deviceMemoryMap.delete(key);
   clearMemoryCache(key);
 }
 
-/**
- * Freeze attempt & send instant notification to HR/Admin when a device mismatch occurs.
- */
+/** Audit a blocked attempt without exposing device identifiers to clients. */
 export async function notifyAdminOnUnauthorizedDeviceAttempt(
   employeeId: string,
   attemptedDeviceId: string,
-  boundDeviceId?: string
+  boundDeviceId?: string,
+  maxDevices = MAX_EMPLOYEE_DEVICES
 ): Promise<void> {
   try {
     const employee = await prisma.employee.findUnique({
       where: { id: employeeId },
-      select: { id: true, firstName: true, lastName: true, employeeNumber: true, userId: true }
+      select: { id: true, firstName: true, lastName: true, employeeNumber: true, userId: true },
     });
     if (!employee) return;
 
-    // 1. Audit Log Freeze Entry
     await writeAuditLog({
       actorUserId: employee.userId || "SYSTEM",
       action: "auth:device_binding_blocked",
@@ -58,158 +61,150 @@ export async function notifyAdminOnUnauthorizedDeviceAttempt(
         employeeId,
         attemptedDeviceId,
         boundDeviceId,
-        reason: "Unauthorized device attempt frozen"
-      }
+        maxDevices,
+        reason: "Employee device limit reached",
+      },
     }).catch(() => {});
 
-    // 2. Security Notification for HR / Admins
     await prisma.notification.create({
       data: {
-        title: "تنبيه أمني: محاولة دخول من جهاز غير مصرح به",
-        body: `حاول الموظف ${employee.firstName} ${employee.lastName} (رقم وظيفي: ${employee.employeeNumber}) الدخول من جهاز جديد غير مرتبط بحسابه (${attemptedDeviceId.slice(0, 10)}...). تم تجميد المحاولة أمنياً.`,
+        title: "تنبيه أمني: تجاوز الحد المسموح للأجهزة",
+        body: `حاول الموظف ${employee.firstName} ${employee.lastName} (رقم وظيفي: ${employee.employeeNumber}) تسجيل الدخول من جهاز إضافي بعد بلوغ حد الجهازين.`,
         type: "WARNING",
-        userId: null
-      }
+        userId: null,
+      },
     }).catch(() => {});
-  } catch (err) {
-    // Non-blocking notification failsafe
+  } catch {
+    // Auditing/notification must never change the authentication decision.
   }
 }
 
-const MULTI_DEVICE_ROLES = new Set(["SUPER_ADMIN", "MANAGER"]);
-const MULTI_DEVICE_OVERRIDE_TTL_MS = 5 * 60 * 1000; // short TTL: an admin revoking the flag should take effect quickly
-const multiDeviceOverrideMemoryMap = new Map<string, { value: boolean; expiresAt: number }>();
-
-/**
- * Request A: Permission Override for "تعدد الأجهزة" (multi-device access).
- * SUPER_ADMIN / MANAGER roles, or a user explicitly flagged via
- * `User.canUseMultipleDevices` (toggled from the Permissions admin
- * dashboard), skip the single-device lock entirely below.
- */
-async function hasMultiDeviceOverride(employeeId: string): Promise<boolean> {
-  const cacheKey = `multi_device_override:${employeeId}`;
-  const cached = multiDeviceOverrideMemoryMap.get(cacheKey);
-  if (cached && Date.now() <= cached.expiresAt) return cached.value;
-
+/** The global policy is two devices; an administrator may explicitly reduce
+ * one account to a single device through the device-management switch. */
+async function getAllowedDeviceLimit(employeeId: string): Promise<number> {
   try {
     const employee = await prisma.employee.findUnique({
       where: { id: employeeId },
-      select: {
-        user: {
-          select: {
-            canUseMultipleDevices: true,
-            roles: { select: { role: { select: { name: true } } } }
-          }
-        }
-      }
+      select: { user: { select: { canUseMultipleDevices: true } } },
     });
-    const user = employee?.user;
-    const override = Boolean(user?.canUseMultipleDevices) || Boolean(user?.roles.some((r) => MULTI_DEVICE_ROLES.has(r.role.name)));
-    multiDeviceOverrideMemoryMap.set(cacheKey, { value: override, expiresAt: Date.now() + MULTI_DEVICE_OVERRIDE_TTL_MS });
-    return override;
+    return employee?.user?.canUseMultipleDevices === false ? 1 : MAX_EMPLOYEE_DEVICES;
   } catch {
-    return false;
+    return MAX_EMPLOYEE_DEVICES;
   }
 }
 
 /**
- * Ultra-fast Redis / In-Memory device binding verification & cache (`< 50ms`).
- * - First checks high-speed memory/Redis cache (`device_binding:${employeeId}`).
- * - If found in cache and `cachedDeviceId === deviceId`, grants entry instantly without hitting SQL!
- * - If found in cache and `cachedDeviceId !== deviceId`, rejects instantly with 403 & triggers freeze notification.
- * - If cache miss, queries SQL index (`@@index([employeeId, deviceId])`).
- * - If no device bound in SQL (`!bound`), auto-binds this UUID on first punch/login and caches it!
+ * Verify a known device or bind one of up to two devices for every employee.
+ * The unique deviceId constraint still prevents one physical/browser device
+ * from being silently attached to multiple employee accounts.
  */
-export async function verifyOrBindEmployeeDevice(employeeId: string, deviceId?: string | null, platform = "mobile"): Promise<DeviceVerificationResult> {
+export async function verifyOrBindEmployeeDevice(
+  employeeId: string,
+  deviceId?: string | null,
+  platform = "mobile"
+): Promise<DeviceVerificationResult> {
   const cleanDeviceId = (deviceId || "").trim();
-  if (!cleanDeviceId || cleanDeviceId === "unknown" || cleanDeviceId === "server-side" || cleanDeviceId === "mobile-session-fallback") {
+  if (
+    !cleanDeviceId ||
+    cleanDeviceId === "unknown" ||
+    cleanDeviceId === "server-side" ||
+    cleanDeviceId === "mobile-session-fallback"
+  ) {
     return { allowed: true, reason: "WEB_OR_UNBOUND_SESSION" };
   }
 
-  if (await hasMultiDeviceOverride(employeeId)) {
-    return { allowed: true, reason: "MULTI_DEVICE_OVERRIDE" };
-  }
-
+  const maxDevices = await getAllowedDeviceLimit(employeeId);
   const cacheKey = `device_binding:${employeeId}`;
-
-  // 1. Instant Cache Check (< 5ms)
-  const cachedDeviceId = getCachedDevice(cacheKey);
-  if (cachedDeviceId) {
-    if (cachedDeviceId === cleanDeviceId) {
-      return { allowed: true, boundDeviceId: cachedDeviceId, reason: "DEVICE_VERIFIED_CACHE_HIT" };
-    }
-    notifyAdminOnUnauthorizedDeviceAttempt(employeeId, cleanDeviceId, cachedDeviceId).catch(() => {});
+  const cachedDeviceIds = getCachedDevices(cacheKey);
+  if (cachedDeviceIds?.includes(cleanDeviceId)) {
     return {
-      allowed: false,
-      boundDeviceId: cachedDeviceId,
-      reason: "حسابك مرتبط بجهاز آخر. يرجى مراجعة الموارد البشرية لإعادة التعيين."
+      allowed: true,
+      boundDeviceId: cleanDeviceId,
+      reason: "DEVICE_VERIFIED_CACHE_HIT",
     };
   }
 
-  // 2. High-speed SQL Index check (composite index on employeeId, deviceId)
   try {
-    const boundDevice = await prisma.employeeMobileDevice.findUnique({
-      where: { employeeId }
+    const boundDevices = await prisma.employeeMobileDevice.findMany({
+      where: { employeeId },
+      orderBy: { createdAt: "asc" },
+      take: maxDevices,
     });
+    const deviceIds = boundDevices.map((device) => device.deviceId);
 
-    if (!boundDevice) {
-      // 3. First time login/punch -> auto-bind this UUID (`getOrCreateMobileDeviceUUID`) to the employee
-      try {
-        await prisma.employeeMobileDevice.create({
-          data: {
-            employeeId,
-            deviceId: cleanDeviceId,
-            platform
-          }
-        });
-      } catch (bindErr) {
-        notifyAdminOnUnauthorizedDeviceAttempt(employeeId, cleanDeviceId, "ANOTHER_EMPLOYEE_DEVICE").catch(() => {});
-        return {
-          allowed: false,
-          reason: "هذا الجهاز مسجل ومربوط بحساب موظف آخر بالفعل. يرجى مراجعة الموارد البشرية لإعادة التعيين."
-        };
+    const matchedDevice = boundDevices.find((device) => device.deviceId === cleanDeviceId);
+    if (matchedDevice) {
+      prisma.employeeMobileDevice
+        .update({
+          where: { id: matchedDevice.id },
+          data: { lastSeenAt: new Date(), platform },
+        })
+        .catch(() => {});
+      setCachedDevices(cacheKey, deviceIds);
+      return {
+        allowed: true,
+        boundDeviceId: cleanDeviceId,
+        reason: "DEVICE_VERIFIED_SQL_HIT",
+      };
+    }
+
+    if (boundDevices.length >= maxDevices) {
+      setCachedDevices(cacheKey, deviceIds);
+      notifyAdminOnUnauthorizedDeviceAttempt(employeeId, cleanDeviceId, deviceIds[0], maxDevices).catch(() => {});
+      return {
+        allowed: false,
+        boundDeviceId: deviceIds[0],
+        reason: `تم الوصول إلى الحد المسموح وهو ${maxDevices === 1 ? "جهاز واحد" : "جهازان"}. استخدم أحد الأجهزة المرتبطة أو اطلب فك الارتباط من الموارد البشرية.`,
+      };
+    }
+
+    try {
+      await prisma.employeeMobileDevice.create({
+        data: { employeeId, deviceId: cleanDeviceId, platform },
+      });
+      const nextDeviceIds = [...deviceIds, cleanDeviceId];
+      setCachedDevices(cacheKey, nextDeviceIds);
+      return {
+        allowed: true,
+        boundDeviceId: cleanDeviceId,
+        reason: "DEVICE_AUTO_BOUND_SUCCESS",
+        isNewBinding: true,
+      };
+    } catch {
+      // A concurrent login can bind the second slot first. Re-read once so a
+      // valid concurrent registration is not reported as a generic failure.
+      const currentDevices = await prisma.employeeMobileDevice.findMany({
+        where: { employeeId },
+        orderBy: { createdAt: "asc" },
+        take: maxDevices,
+      });
+      const currentIds = currentDevices.map((device) => device.deviceId);
+      setCachedDevices(cacheKey, currentIds);
+      if (currentIds.includes(cleanDeviceId)) {
+        return { allowed: true, boundDeviceId: cleanDeviceId, reason: "DEVICE_CONCURRENT_BIND_SUCCESS" };
       }
-      setCachedDevice(cacheKey, cleanDeviceId, DEVICE_CACHE_TTL_MS);
-      return { allowed: true, boundDeviceId: cleanDeviceId, reason: "DEVICE_AUTO_BOUND_SUCCESS", isNewBinding: true };
+      notifyAdminOnUnauthorizedDeviceAttempt(employeeId, cleanDeviceId, currentIds[0], maxDevices).catch(() => {});
+      return {
+        allowed: false,
+        boundDeviceId: currentIds[0],
+        reason: `تعذر ربط الجهاز الجديد. قد يكون مسجلاً لحساب آخر أو تم بلوغ حد ${maxDevices === 1 ? "الجهاز الواحد" : "الجهازين"}.`,
+      };
     }
-
-    if (boundDevice.deviceId === cleanDeviceId) {
-      prisma.employeeMobileDevice.update({
-        where: { id: boundDevice.id },
-        data: { lastSeenAt: new Date(), platform }
-      }).catch(() => {});
-
-      setCachedDevice(cacheKey, cleanDeviceId, DEVICE_CACHE_TTL_MS);
-      return { allowed: true, boundDeviceId: cleanDeviceId, reason: "DEVICE_VERIFIED_SQL_HIT" };
-    }
-
-    setCachedDevice(cacheKey, boundDevice.deviceId, DEVICE_CACHE_TTL_MS);
-    notifyAdminOnUnauthorizedDeviceAttempt(employeeId, cleanDeviceId, boundDevice.deviceId).catch(() => {});
-    return {
-      allowed: false,
-      boundDeviceId: boundDevice.deviceId,
-      reason: "حسابك مرتبط بجهاز آخر. يرجى مراجعة الموارد البشرية لإعادة التعيين."
-    };
-  } catch (error) {
+  } catch {
+    // Preserve availability if the device store is temporarily unavailable.
     return { allowed: true, reason: "DEVICE_CHECK_FAILSAFE_ALLOWED" };
   }
 }
 
-/**
- * Called after an admin toggles `User.canUseMultipleDevices` (or a role
- * assignment changes) so the in-memory override cache doesn't serve a stale
- * decision for up to `MULTI_DEVICE_OVERRIDE_TTL_MS`.
- */
+/** Kept for callers that invalidate device permission/binding state. */
 export function invalidateMultiDeviceOverrideCache(): void {
-  multiDeviceOverrideMemoryMap.clear();
+  deviceMemoryMap.clear();
 }
 
-/**
- * Admin utility to unbind/reset an employee's mobile device instantly and purge Redis/cache.
- */
+/** Remove all registered devices for an employee, allowing two fresh binds. */
 export async function unbindEmployeeDevice(employeeId: string): Promise<boolean> {
   const cacheKey = `device_binding:${employeeId}`;
-  deleteCachedDevice(cacheKey);
+  deleteCachedDevices(cacheKey);
   try {
     await prisma.employeeMobileDevice.deleteMany({ where: { employeeId } });
     return true;

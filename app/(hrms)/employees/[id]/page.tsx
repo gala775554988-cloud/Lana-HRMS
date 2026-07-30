@@ -193,8 +193,9 @@ export default async function EmployeeProfilePage({
     prisma.employeeBonus.findMany({ where: { employeeId: id }, orderBy: { awardedDate: 'desc' }, take: 10 }).catch(() => []),
   ]));
 
-  const boundDevice = await prisma.employeeMobileDevice.findUnique({
+  const boundDevice = await prisma.employeeMobileDevice.findFirst({
     where: { employeeId: id },
+    orderBy: { lastSeenAt: "desc" },
     select: { deviceId: true, platform: true, lastSeenAt: true, createdAt: true },
   }).catch(() => null);
   const deviceBinding = boundDevice

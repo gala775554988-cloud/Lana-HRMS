@@ -27,7 +27,7 @@ model User {
   lockedReason            String?
   lockedAt                DateTime?
   lockedById              String?
-  canUseMultipleDevices   Boolean                  @default(false)
+  canUseMultipleDevices   Boolean                  @default(true)
   sidebarHue              Int                      @default(270) // درجة وتدرج ألوان الـ Sidebar التفاعلي (Range Slider)
   currentChallenge        String?                  @db.Text // FIDO2 / WebAuthn Challenge
   loginAttempts           Int                      @default(0)
@@ -421,7 +421,7 @@ model Employee {
   leaveTypeBalances      EmployeeLeaveTypeBalance[]
   attendanceRecords      AttendanceRecord[]
   preferences            EmployeePreference?
-  mobileDevice           EmployeeMobileDevice?
+  mobileDevices          EmployeeMobileDevice[]
   workflowInstances      WorkflowInstance[]
   expenseRequests        ExpenseRequest[]
   letterRequests         LetterRequest[]
@@ -2125,7 +2125,7 @@ model MobilePlatformRecord {
 
 model EmployeeMobileDevice {
   id               String   @id @default(cuid())
-  employeeId       String   @unique
+  employeeId       String
   deviceId         String   @unique
   platform         String   @default("mobile")
   fcmToken         String?
@@ -2135,7 +2135,8 @@ model EmployeeMobileDevice {
   updatedAt        DateTime @updatedAt
   employee         Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
-  @@index([employeeId, deviceId])
+  @@unique([employeeId, deviceId])
+  @@index([employeeId])
   @@index([deviceId])
 }
 

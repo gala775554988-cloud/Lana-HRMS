@@ -43,6 +43,13 @@ async function ensureDbSchema() {
     // They directly back employee-portal screens; keeping all four together
     // prevents a build timeout from leaving one module unusable.
     `ALTER TABLE "LeaveType" ADD COLUMN IF NOT EXISTS "genderRestriction" TEXT;`,
+    // Global two-device policy. These are idempotent and preserve existing
+    // device rows while making room for one additional device per employee.
+    `DROP INDEX IF EXISTS "EmployeeMobileDevice_employeeId_key";`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "EmployeeMobileDevice_employeeId_deviceId_key" ON "EmployeeMobileDevice"("employeeId", "deviceId");`,
+    `CREATE INDEX IF NOT EXISTS "EmployeeMobileDevice_employeeId_idx" ON "EmployeeMobileDevice"("employeeId");`,
+    `ALTER TABLE "User" ALTER COLUMN "canUseMultipleDevices" SET DEFAULT true;`,
+    `UPDATE "User" SET "canUseMultipleDevices" = true WHERE "canUseMultipleDevices" = false;`,
     `ALTER TABLE "OvertimeRequest" ADD COLUMN IF NOT EXISTS "amount" DECIMAL(12,2);`,
     `ALTER TABLE "Notification" ADD COLUMN IF NOT EXISTS "link" TEXT;`,
     `ALTER TABLE "PayrollItem" ADD COLUMN IF NOT EXISTS "bonusTotal" DECIMAL(12,2) NOT NULL DEFAULT 0;`,
@@ -83,11 +90,11 @@ async function ensureDbSchema() {
       "updatedAt" TIMESTAMP(3) NOT NULL,
       CONSTRAINT "EmployeeMobileDevice_pkey" PRIMARY KEY ("id")
     );`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS "EmployeeMobileDevice_employeeId_key" ON "EmployeeMobileDevice"("employeeId");`,
     `CREATE UNIQUE INDEX IF NOT EXISTS "EmployeeMobileDevice_deviceId_key" ON "EmployeeMobileDevice"("deviceId");`,
-    `CREATE INDEX IF NOT EXISTS "EmployeeMobileDevice_employeeId_deviceId_idx" ON "EmployeeMobileDevice"("employeeId", "deviceId");`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "EmployeeMobileDevice_employeeId_deviceId_key" ON "EmployeeMobileDevice"("employeeId", "deviceId");`,
+    `CREATE INDEX IF NOT EXISTS "EmployeeMobileDevice_employeeId_idx" ON "EmployeeMobileDevice"("employeeId");`,
     `CREATE INDEX IF NOT EXISTS "EmployeeMobileDevice_deviceId_idx" ON "EmployeeMobileDevice"("deviceId");`,
-    `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "canUseMultipleDevices" BOOLEAN NOT NULL DEFAULT false;`,
+    `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "canUseMultipleDevices" BOOLEAN NOT NULL DEFAULT true;`,
     `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "sidebarHue" INTEGER NOT NULL DEFAULT 270;`,
     `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "currentChallenge" TEXT;`,
     `CREATE TABLE IF NOT EXISTS "BiometricCredential" ("id" TEXT NOT NULL, "userId" TEXT NOT NULL, "credentialID" TEXT NOT NULL, "publicKey" BYTEA NOT NULL, "counter" BIGINT NOT NULL DEFAULT 0, "deviceType" TEXT, "backedUp" BOOLEAN NOT NULL DEFAULT false, "transports" TEXT[], "deviceName" TEXT, "lastUsedAt" TIMESTAMP(3), "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "BiometricCredential_pkey" PRIMARY KEY ("id"));`,
