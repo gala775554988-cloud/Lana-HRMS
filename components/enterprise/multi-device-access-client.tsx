@@ -115,7 +115,7 @@ export function MultiDeviceAccessClient({ users }: { users: AdminUser[] }) {
           </div>
           <div>
             <h3 className="text-base font-black text-slate-900 dark:text-slate-100">إدارة أجهزة الموظفين وصلاحية فك الارتباط</h3>
-            <p className="text-xs text-muted-foreground font-semibold mt-0.5">يسمح النظام لجميع الموظفين بالدخول من جهازين. اختر موظفاً لإظهاره في الجدول فوراً أو لفك ارتباط أجهزته عند الحاجة:</p>
+            <p className="text-xs text-muted-foreground font-semibold mt-0.5">يسمح النظام لجميع الموظفين بالدخول من أي عدد من الأجهزة. اختر موظفاً لإظهاره في الجدول فوراً أو لفك ارتباط أجهزته عند الحاجة:</p>
           </div>
         </div>
 
@@ -144,7 +144,7 @@ export function MultiDeviceAccessClient({ users }: { users: AdminUser[] }) {
       </div>
 
       <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4 text-xs font-semibold text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
-        كل حساب موظف مسموح له بجهازين افتراضياً. يظهر الموظفون المرتبطون في الجدول أدناه، ويمكنك إيقاف الجهاز الثاني لحساب محدد أو الضغط على زر <strong>(🔓 فك ارتباط أجهزة الموظف الآن)</strong> لإتاحة تسجيل جهازين جديدين فوراً.
+        كل حساب موظف مسموح له بالدخول من أي عدد من الأجهزة. يظهر الموظفون المرتبطون في الجدول أدناه، ويمكنك إزالة حساب من قائمة الإدارة أو الضغط على زر <strong>(🔓 فك ارتباط أجهزة الموظف الآن)</strong> لمسح روابط أجهزته عند الحاجة.
       </div>
 
       {error ? (
@@ -158,7 +158,7 @@ export function MultiDeviceAccessClient({ users }: { users: AdminUser[] }) {
             <tr>
               <th className="px-5 py-4 text-start font-extrabold text-slate-700 dark:text-slate-200">الموظف / المسؤول</th>
               <th className="px-5 py-4 text-start font-extrabold text-slate-700 dark:text-slate-200">الصلاحيات والمنصب</th>
-              <th className="px-5 py-4 text-center font-extrabold text-slate-700 dark:text-slate-200 w-36">السماح بجهازين</th>
+              <th className="px-5 py-4 text-center font-extrabold text-slate-700 dark:text-slate-200 w-36">إدارة الحساب</th>
               <th className="px-5 py-4 text-center font-extrabold text-slate-700 dark:text-slate-200 w-56">فك ارتباط الأجهزة (Unbind)</th>
             </tr>
           </thead>

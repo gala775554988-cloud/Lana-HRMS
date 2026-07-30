@@ -3,7 +3,6 @@ import { clearMemoryCache } from "@/lib/cache/memory-cache";
 import { writeAuditLog } from "@/lib/audit";
 
 const DEVICE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-export const MAX_EMPLOYEE_DEVICES = 2;
 
 type DeviceVerificationResult = {
   allowed: boolean;
@@ -42,8 +41,7 @@ function deleteCachedDevices(key: string) {
 export async function notifyAdminOnUnauthorizedDeviceAttempt(
   employeeId: string,
   attemptedDeviceId: string,
-  boundDeviceId?: string,
-  maxDevices = MAX_EMPLOYEE_DEVICES
+  boundDeviceId?: string
 ): Promise<void> {
   try {
     const employee = await prisma.employee.findUnique({
@@ -61,15 +59,14 @@ export async function notifyAdminOnUnauthorizedDeviceAttempt(
         employeeId,
         attemptedDeviceId,
         boundDeviceId,
-        maxDevices,
-        reason: "Employee device limit reached",
+        reason: "Device belongs to another employee",
       },
     }).catch(() => {});
 
     await prisma.notification.create({
       data: {
-        title: "تنبيه أمني: تجاوز الحد المسموح للأجهزة",
-        body: `حاول الموظف ${employee.firstName} ${employee.lastName} (رقم وظيفي: ${employee.employeeNumber}) تسجيل الدخول من جهاز إضافي بعد بلوغ حد الجهازين.`,
+        title: "تنبيه أمني: جهاز مرتبط بحساب آخر",
+        body: `حاول الموظف ${employee.firstName} ${employee.lastName} (رقم وظيفي: ${employee.employeeNumber}) استخدام جهاز مرتبط بحساب موظف آخر.`,
         type: "WARNING",
         userId: null,
       },
@@ -79,24 +76,10 @@ export async function notifyAdminOnUnauthorizedDeviceAttempt(
   }
 }
 
-/** The global policy is two devices; an administrator may explicitly reduce
- * one account to a single device through the device-management switch. */
-async function getAllowedDeviceLimit(employeeId: string): Promise<number> {
-  try {
-    const employee = await prisma.employee.findUnique({
-      where: { id: employeeId },
-      select: { user: { select: { canUseMultipleDevices: true } } },
-    });
-    return employee?.user?.canUseMultipleDevices === false ? 1 : MAX_EMPLOYEE_DEVICES;
-  } catch {
-    return MAX_EMPLOYEE_DEVICES;
-  }
-}
-
 /**
- * Verify a known device or bind one of up to two devices for every employee.
- * The unique deviceId constraint still prevents one physical/browser device
- * from being silently attached to multiple employee accounts.
+ * Every employee may use any number of devices. A device remains globally
+ * unique, so one browser/device UUID cannot be silently attached to a second
+ * employee account.
  */
 export async function verifyOrBindEmployeeDevice(
   employeeId: string,
@@ -113,85 +96,39 @@ export async function verifyOrBindEmployeeDevice(
     return { allowed: true, reason: "WEB_OR_UNBOUND_SESSION" };
   }
 
-  const maxDevices = await getAllowedDeviceLimit(employeeId);
   const cacheKey = `device_binding:${employeeId}`;
-  const cachedDeviceIds = getCachedDevices(cacheKey);
-  if (cachedDeviceIds?.includes(cleanDeviceId)) {
-    return {
-      allowed: true,
-      boundDeviceId: cleanDeviceId,
-      reason: "DEVICE_VERIFIED_CACHE_HIT",
-    };
+  if (getCachedDevices(cacheKey)?.includes(cleanDeviceId)) {
+    return { allowed: true, boundDeviceId: cleanDeviceId, reason: "DEVICE_VERIFIED_CACHE_HIT" };
   }
 
   try {
     const boundDevices = await prisma.employeeMobileDevice.findMany({
       where: { employeeId },
       orderBy: { createdAt: "asc" },
-      take: maxDevices,
     });
     const deviceIds = boundDevices.map((device) => device.deviceId);
-
     const matchedDevice = boundDevices.find((device) => device.deviceId === cleanDeviceId);
     if (matchedDevice) {
-      prisma.employeeMobileDevice
-        .update({
-          where: { id: matchedDevice.id },
-          data: { lastSeenAt: new Date(), platform },
-        })
-        .catch(() => {});
+      prisma.employeeMobileDevice.update({ where: { id: matchedDevice.id }, data: { lastSeenAt: new Date(), platform } }).catch(() => {});
       setCachedDevices(cacheKey, deviceIds);
-      return {
-        allowed: true,
-        boundDeviceId: cleanDeviceId,
-        reason: "DEVICE_VERIFIED_SQL_HIT",
-      };
-    }
-
-    if (boundDevices.length >= maxDevices) {
-      setCachedDevices(cacheKey, deviceIds);
-      notifyAdminOnUnauthorizedDeviceAttempt(employeeId, cleanDeviceId, deviceIds[0], maxDevices).catch(() => {});
-      return {
-        allowed: false,
-        boundDeviceId: deviceIds[0],
-        reason: `تم الوصول إلى الحد المسموح وهو ${maxDevices === 1 ? "جهاز واحد" : "جهازان"}. استخدم أحد الأجهزة المرتبطة أو اطلب فك الارتباط من الموارد البشرية.`,
-      };
+      return { allowed: true, boundDeviceId: cleanDeviceId, reason: "DEVICE_VERIFIED_SQL_HIT" };
     }
 
     try {
-      await prisma.employeeMobileDevice.create({
-        data: { employeeId, deviceId: cleanDeviceId, platform },
-      });
-      const nextDeviceIds = [...deviceIds, cleanDeviceId];
-      setCachedDevices(cacheKey, nextDeviceIds);
-      return {
-        allowed: true,
-        boundDeviceId: cleanDeviceId,
-        reason: "DEVICE_AUTO_BOUND_SUCCESS",
-        isNewBinding: true,
-      };
+      await prisma.employeeMobileDevice.create({ data: { employeeId, deviceId: cleanDeviceId, platform } });
+      setCachedDevices(cacheKey, [...deviceIds, cleanDeviceId]);
+      return { allowed: true, boundDeviceId: cleanDeviceId, reason: "DEVICE_AUTO_BOUND_SUCCESS", isNewBinding: true };
     } catch {
-      // A concurrent login can bind the second slot first. Re-read once so a
-      // valid concurrent registration is not reported as a generic failure.
-      const currentDevices = await prisma.employeeMobileDevice.findMany({
-        where: { employeeId },
-        orderBy: { createdAt: "asc" },
-        take: maxDevices,
-      });
-      const currentIds = currentDevices.map((device) => device.deviceId);
-      setCachedDevices(cacheKey, currentIds);
-      if (currentIds.includes(cleanDeviceId)) {
+      // A simultaneous login may have inserted this UUID first. Re-read once;
+      // if it belongs to another account, reject only that unsafe reuse.
+      const existing = await prisma.employeeMobileDevice.findUnique({ where: { deviceId: cleanDeviceId } });
+      if (existing?.employeeId === employeeId) {
         return { allowed: true, boundDeviceId: cleanDeviceId, reason: "DEVICE_CONCURRENT_BIND_SUCCESS" };
       }
-      notifyAdminOnUnauthorizedDeviceAttempt(employeeId, cleanDeviceId, currentIds[0], maxDevices).catch(() => {});
-      return {
-        allowed: false,
-        boundDeviceId: currentIds[0],
-        reason: `تعذر ربط الجهاز الجديد. قد يكون مسجلاً لحساب آخر أو تم بلوغ حد ${maxDevices === 1 ? "الجهاز الواحد" : "الجهازين"}.`,
-      };
+      notifyAdminOnUnauthorizedDeviceAttempt(employeeId, cleanDeviceId, existing?.deviceId).catch(() => {});
+      return { allowed: false, boundDeviceId: existing?.deviceId, reason: "هذا الجهاز مسجل لحساب موظف آخر. يرجى فك ارتباطه أولاً." };
     }
   } catch {
-    // Preserve availability if the device store is temporarily unavailable.
     return { allowed: true, reason: "DEVICE_CHECK_FAILSAFE_ALLOWED" };
   }
 }
