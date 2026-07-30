@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { inferEnterpriseRolesFromPosition } from "@/lib/enterprise/role-inference";
+import { getCachedEffectivePermissions } from "@/lib/enterprise/permissions";
 
 // Approval routing and employee-visibility scoping (buildEmployeeScopeWhere/
 // resolveApprovalChain) no longer read this store -- they're driven by two
@@ -67,6 +68,9 @@ export type AccessProfile = {
   } | null;
   isSuperAdmin: boolean;
   isHrManager: boolean;
+  // A direct read/manage employees grant is module-wide access. It must not
+  // be reduced back to the user's own record after they enter the HR shell.
+  canViewAllEmployees: boolean;
 };
 
 export async function getAccessProfile(userId: string, roles: string[] = []): Promise<AccessProfile> {
@@ -75,12 +79,16 @@ export async function getAccessProfile(userId: string, roles: string[] = []): Pr
     select: { id: true, userId: true, departmentId: true, branchId: true, hospitalId: true, projectId: true, position: { select: { title: true } } }
   });
   const effectiveRoles = Array.from(new Set([...roles, ...inferEnterpriseRolesFromPosition(employee?.position?.title)]));
+  const effectivePermissions = await getCachedEffectivePermissions(userId, effectiveRoles).catch(() => []);
+  const canViewAllEmployees = effectivePermissions.includes("read:employees") || effectivePermissions.includes("manage:employees");
+
   return {
     userId,
     roles: effectiveRoles,
     employee,
     isSuperAdmin: effectiveRoles.includes("SUPER_ADMIN"),
-    isHrManager: effectiveRoles.includes("HR_MANAGER")
+    isHrManager: effectiveRoles.includes("HR_MANAGER"),
+    canViewAllEmployees
   };
 }
 
@@ -112,7 +120,7 @@ async function getActiveSupervisorAssignments(employeeId: string) {
 }
 
 export async function buildEmployeeScopeWhere(profile: AccessProfile): Promise<Prisma.EmployeeWhereInput> {
-  if (profile.isSuperAdmin || profile.isHrManager) return {};
+  if (profile.isSuperAdmin || profile.isHrManager || profile.canViewAllEmployees) return {};
   if (!profile.employee) return { id: "__NO_EMPLOYEE_SCOPE__" };
 
   const scopes: Prisma.EmployeeWhereInput[] = [{ id: profile.employee.id }];

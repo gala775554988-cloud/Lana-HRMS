@@ -336,7 +336,7 @@ export async function listModuleRecords(input: QueryInput) {
   // Skip expensive hierarchy/profile queries for SUPER_ADMIN (no scope restrictions)
   const roles = (session.user.roles as string[]) ?? [];
   const accessProfile = roles.includes("SUPER_ADMIN")
-    ? { isSuperAdmin: true, isHrManager: false, userId: session.user.id, roles, employee: null }
+    ? { isSuperAdmin: true, isHrManager: false, canViewAllEmployees: true, userId: session.user.id, roles, employee: null }
     : await getAccessProfile(session.user.id, roles);
   const where = await applyScopedWhere(resource.key, baseWhere, accessProfile);
 

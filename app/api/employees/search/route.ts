@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
   const roles = (session.user.roles as string[]) ?? [];
   const accessProfile = roles.includes("SUPER_ADMIN")
-    ? { isSuperAdmin: true, isHrManager: false, userId: session.user.id, roles, employee: null, store: {} as any }
+    ? { isSuperAdmin: true, isHrManager: false, canViewAllEmployees: true, userId: session.user.id, roles, employee: null, store: {} as any }
     : await getAccessProfile(session.user.id, roles);
 
   const baseWhere = {
