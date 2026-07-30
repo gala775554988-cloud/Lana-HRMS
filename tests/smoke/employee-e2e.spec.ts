@@ -41,7 +41,7 @@ async function visit(page: Page, path: string) {
 test.describe("Employee portal end-to-end flow", () => {
   test.setTimeout(180_000);
 
-  test("employee signs in, views personal portal, attendance, requests, and cannot enter admin HRMS", async ({ page }) => {
+  test("employee with direct HR grants enters the admin shell and retains personal portal access", async ({ page }) => {
     const account = getAccount("EMPLOYEE");
     test.skip(
       !account,
@@ -50,9 +50,27 @@ test.describe("Employee portal end-to-end flow", () => {
 
     const errors = trackPageHealth(page);
 
-    await test.step("Employee login lands in the employee portal", async () => {
+    await test.step("Direct HR grants route the employee into the admin shell", async () => {
       await login(page, account!);
-      await page.waitForURL(/\/employee(?:\/|$)/, { timeout: 20_000 });
+      await page.waitForURL(/\/(?:dashboard|hr\/dashboard|manager\/dashboard)(?:\/|$)/, {
+        timeout: 20_000,
+      });
+      await expect(page.getByRole("link", { name: "الموظفون" })).toBeVisible({
+        timeout: 20_000,
+      });
+      await expectHealthyPage(page, errors, "direct-permission login redirect");
+    });
+
+    await test.step("Granted employee can open the permitted HR directory", async () => {
+      await visit(page, "/employees");
+      await expect(
+        page.getByRole("textbox", { name: "بحث بالاسم أو الرقم الوظيفي..." })
+      ).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByRole("button", { name: "الفلاتر" })).toBeVisible();
+      await expectHealthyPage(page, errors, "/employees");
+    });
+
+    await test.step("Employee still retains access to their personal portal", async () => {
       await visit(page, "/employee/dashboard");
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible({
         timeout: 20_000,
@@ -81,10 +99,17 @@ test.describe("Employee portal end-to-end flow", () => {
       await expectHealthyPage(page, errors, "/employee/leave/new");
     });
 
-    await test.step("Employee is kept out of the admin employee directory", async () => {
-      await visit(page, "/employees");
-      await page.waitForURL(/\/employee(?:\/|$)/, { timeout: 20_000 });
-      await expectHealthyPage(page, errors, "admin access guard");
+    await test.step("Granted employee can render the requests workspace", async () => {
+      await visit(page, "/request-center");
+      await expect(
+        page.getByRole("tab", { name: "استقبال الطلبات" })
+      ).toBeVisible({ timeout: 20_000 });
+      await expect(
+        page.getByRole("textbox", {
+          name: "بحث سريع: الاسم، الرقم، الهوية، القسم، الفرع، المشروع، نوع الطلب",
+        })
+      ).toBeVisible();
+      await expectHealthyPage(page, errors, "/request-center");
     });
   });
 });
