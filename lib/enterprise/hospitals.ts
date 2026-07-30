@@ -27,6 +27,16 @@ function slug(value: string) {
   return cleaned || `HOSPITAL-${Date.now()}`;
 }
 
+// The Hospitals module is a clinical hospital directory, not a generic Odoo
+// work-location/department list. Only names explicitly identified as a
+// hospital are shown; branches, departments, numeric placeholders, clinics,
+// labs, and other operating locations stay in their own modules.
+function isExplicitHospitalName(name: string) {
+  const value = name.trim();
+  if (!value || /^\d+$/.test(value)) return false;
+  return value.includes("مستشفى") || /\bhospital\b/i.test(value);
+}
+
 function normalizeStore(value: unknown): HospitalStore {
   if (!value || typeof value !== "object") return { version: 1, hospitals: {} };
   const raw = value as Partial<HospitalStore>;
@@ -172,6 +182,7 @@ export async function listHospitals(filters?: { search?: string; departmentId?: 
   const search = normalize(filters?.search);
   const isActive = filters?.isActive;
   const items = Array.from(byName.values())
+    .filter((hospital) => isExplicitHospitalName(hospital.name))
     .map((hospital) => {
       const normalizedHospital = normalize(hospital.name);
       const sqlEmployeesCount = employees.filter((e) => e.hospitalId === hospital.id).length;
