@@ -7,6 +7,31 @@ import { invalidateMultiDeviceOverrideCache } from "@/lib/cache/device-cache";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// This is a UI-management list, not the device-binding table itself. It
+// records only accounts an administrator explicitly added in the Devices tab,
+// so the page never becomes an unhelpful list of every employee.
+const MANAGED_USERS_SETTING = "enterprise.multiDeviceManagedUsers";
+
+async function getManagedUserIds() {
+  const setting = await prisma.appSetting.findUnique({ where: { key: MANAGED_USERS_SETTING } }).catch(() => null);
+  const value = setting?.value;
+  return Array.isArray(value)
+    ? Array.from(new Set(value.filter((id): id is string => typeof id === "string")))
+    : [];
+}
+
+async function saveManagedUserIds(userIds: string[]) {
+  await prisma.appSetting.upsert({
+    where: { key: MANAGED_USERS_SETTING },
+    update: { value: userIds },
+    create: {
+      key: MANAGED_USERS_SETTING,
+      value: userIds,
+      description: "Users explicitly shown in the device-management dashboard",
+    },
+  });
+}
+
 /**
  * Add a new user/employee to the multi-device + unbind control table and
  * grant `canUseMultipleDevices` immediately (Request: "إضافة الموظف ومنحه
@@ -46,6 +71,10 @@ export async function POST(request: NextRequest) {
   }).catch(() => null);
   if (!target) {
     return NextResponse.json({ success: false, message: "المستخدم غير موجود" }, { status: 404 });
+  }
+  const managedUserIds = await getManagedUserIds();
+  if (enabled && !managedUserIds.includes(userId)) {
+    await saveManagedUserIds([...managedUserIds, userId]);
   }
   invalidateMultiDeviceOverrideCache();
 
@@ -100,6 +129,12 @@ export async function PATCH(request: NextRequest) {
   }
 
   await prisma.user.update({ where: { id: userId }, data: { canUseMultipleDevices: enabled } });
+  const managedUserIds = await getManagedUserIds();
+  await saveManagedUserIds(
+    enabled
+      ? Array.from(new Set([...managedUserIds, userId]))
+      : managedUserIds.filter((id) => id !== userId)
+  );
   invalidateMultiDeviceOverrideCache();
 
   await writeAuditLog({

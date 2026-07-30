@@ -38,6 +38,9 @@ export function MultiDeviceAccessClient({ users }: { users: AdminUser[] }) {
       if (!json.success) {
         setRows(previous);
         setError(json.message || "تعذر تحديث الصلاحية");
+      } else if (!enabled) {
+        // Disabling removes the account from this explicitly managed list.
+        setRows((current) => current.filter((row) => row.id !== userId));
       }
     } catch {
       setRows(previous);

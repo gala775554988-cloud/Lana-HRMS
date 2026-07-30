@@ -51,11 +51,17 @@ export default async function PermissionsPage({ searchParams }: { searchParams: 
 
   let devicesContent: React.ReactNode = null;
   if (activeTab === "devices") {
-    // Every linked employee is covered by the two-device policy. Previously
-    // this table only loaded admin/manager roles, so a newly added employee
-    // disappeared after refresh even though their access flag was saved.
+    // This table intentionally contains only users explicitly added through
+    // the device-management search control, not every employee in the HRMS.
+    const managedSetting = await prisma.appSetting.findUnique({
+      where: { key: "enterprise.multiDeviceManagedUsers" },
+      select: { value: true }
+    }).catch(() => null);
+    const managedUserIds = Array.isArray(managedSetting?.value)
+      ? managedSetting.value.filter((id): id is string => typeof id === "string")
+      : [];
     const admins = await prisma.user.findMany({
-      where: { employeeProfile: { isNot: null } },
+      where: { id: { in: managedUserIds } },
       select: {
         id: true,
         name: true,
