@@ -101,6 +101,7 @@ export async function middleware(request: NextRequest) {
     });
     const loggedIn = !!token;
     const roles: string[] = (token?.roles as string[]) ?? [];
+    const hasGrantedAdminAccess = Boolean((token as any)?.hasGrantedAdminAccess);
 
     if (isApi) {
       if (!loggedIn) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
@@ -108,7 +109,7 @@ export async function middleware(request: NextRequest) {
     }
 
     if (loggedIn && (isRoot || p.startsWith("/login") || p.startsWith("/forgot-password") || p.startsWith("/reset-password") || p.startsWith("/verify-email"))) {
-      return NextResponse.redirect(new URL(resolveRoleDashboard(roles), request.url));
+      return NextResponse.redirect(new URL(resolveRoleDashboard(roles, hasGrantedAdminAccess), request.url));
     }
     if (!loggedIn) {
       // "/" renders its own public landing page for signed-out visitors
@@ -123,7 +124,7 @@ export async function middleware(request: NextRequest) {
     // here for every subsequent page request, not just the first redirect,
     // so a pure-EMPLOYEE session can never reach an admin-shell path by
     // typing the URL directly.
-    if (!isEmployeeSafePath(p) && resolveRoleDashboard(roles) === DEFAULT_LOGIN_REDIRECT) {
+    if (!isEmployeeSafePath(p) && resolveRoleDashboard(roles, hasGrantedAdminAccess) === DEFAULT_LOGIN_REDIRECT) {
       return NextResponse.redirect(new URL(DEFAULT_LOGIN_REDIRECT, request.url));
     }
 

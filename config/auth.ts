@@ -9,16 +9,23 @@ export const DEFAULT_LOGIN_REDIRECT = "/employee/dashboard";
 const HR_DASHBOARD_ROLES = ["HR_MANAGER", "HR", "PAYROLL_MANAGER", "RECRUITER"];
 const MANAGER_DASHBOARD_ROLES = ["MANAGER", "DEPARTMENT_MANAGER", "BRANCH_MANAGER", "SUPERVISOR", "PROJECT_MANAGER"];
 
-export function resolveRoleDashboard(userRoles?: string[] | null): string {
+export function resolveRoleDashboard(
+  userRoles?: string[] | null,
+  hasGrantedAdminAccess = false
+): string {
   if (!userRoles || !Array.isArray(userRoles)) return DEFAULT_LOGIN_REDIRECT;
   const roleSet = new Set(userRoles);
 
   // SUPER_ADMIN is always sent to the Central Executive Dashboard.
   if (roleSet.has("SUPER_ADMIN")) return "/dashboard";
 
-  // Any normal user that has EMPLOYEE must land in the Employee Portal, even if
-  // a position-title inference added HR_MANAGER/DEPARTMENT_MANAGER. This was the
-  // real reason some employee accounts still rendered the old HR layout.
+  // Direct per-user grants are intentionally independent of a user's job
+  // role. An EMPLOYEE who was granted access to an HR module must enter the
+  // admin shell, otherwise the role-only redirect strands them in the
+  // employee portal even though their permissions are valid.
+  if (hasGrantedAdminAccess) return "/dashboard";
+
+  // Employees with no additional admin grant stay in the Employee Portal.
   if (roleSet.has("EMPLOYEE")) return "/employee/dashboard";
 
   // HR-type roles get the HR Dashboard (company-wide employee/contract/

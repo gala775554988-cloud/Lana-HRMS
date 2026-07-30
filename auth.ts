@@ -5,7 +5,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations/auth";
 import { verifyPassword, hashPassword } from "@/lib/password";
-import { getCachedEffectivePermissions } from "@/lib/enterprise/permissions";
+import { getCachedEffectivePermissions, PERMISSION_TEMPLATES } from "@/lib/enterprise/permissions";
 import { verifyOrBindEmployeeDevice } from "@/lib/cache/device-cache";
 
 async function getAuthorization(userId: string) {
@@ -15,7 +15,26 @@ async function getAuthorization(userId: string) {
   });
   const roles = Array.from(new Set(assignments.map((a) => a.role.name)));
   if (roles.length === 0) roles.push("EMPLOYEE");
-  return { roles };
+
+  // Keep a compact routing flag in the JWT, not the full permission list.
+  // Middleware runs at the edge and cannot query the permission store, but it
+  // must distinguish an ordinary employee from one who has been granted an
+  // HR/admin module through the per-user permissions screen.
+  let hasGrantedAdminAccess = false;
+  try {
+    const effectivePermissions = await getCachedEffectivePermissions(userId, roles);
+    const employeeBaseline = new Set<string>(PERMISSION_TEMPLATES.EMPLOYEE);
+    hasGrantedAdminAccess = effectivePermissions.some(
+      (permission) => !employeeBaseline.has(permission)
+    );
+  } catch (error) {
+    // Permission lookups must never turn a valid login into a failed login.
+    // The server-side route/layout checks remain the authority if this lookup
+    // is temporarily unavailable.
+    console.error("[Auth][AUTHORIZATION_PERMISSION_LOOKUP_ERROR]", error);
+  }
+
+  return { roles, hasGrantedAdminAccess };
 }
 
 async function findUserByUsernameOrEmail(value: string, lower: string) {
@@ -164,11 +183,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
 
           await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }).catch(() => {});
-          const { roles } = await getAuthorization(user.id);
-          // Only store roles in JWT, not permissions (too large → cookie chunking → middleware break)
+          const { roles, hasGrantedAdminAccess } = await getAuthorization(user.id);
+          // Store roles plus one compact access-routing flag in the JWT. The
+          // complete permission list stays server-side to avoid cookie bloat.
           return {
             id: user.id, name: user.name, email: user.email, image: user.image,
             roles,
+            hasGrantedAdminAccess,
             mustChangePassword: user.mustChangePassword ?? false,
             passwordChanged: user.passwordChanged ?? false,
           };
@@ -189,11 +210,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.email = user.email ?? undefined;
           token.picture = user.image ?? undefined;
           token.roles = (user as any).roles ?? [];
+          (token as any).hasGrantedAdminAccess = (user as any).hasGrantedAdminAccess ?? false;
           (token as any).mustChangePassword = (user as any).mustChangePassword ?? false;
           (token as any).passwordChanged = (user as any).passwordChanged ?? false;
         }
         if (trigger === "update" && token.sub) {
-          try { const authz = await getAuthorization(token.sub); token.roles = authz.roles; } catch (e: any) { console.error("[Auth][JWT_UPDATE_ERROR]", e?.stack || e); }
+          try {
+            const authz = await getAuthorization(token.sub);
+            token.roles = authz.roles;
+            (token as any).hasGrantedAdminAccess = authz.hasGrantedAdminAccess;
+          } catch (e: any) {
+            console.error("[Auth][JWT_UPDATE_ERROR]", e?.stack || e);
+          }
         }
       } catch (jwtErr: any) {
         console.error("[Auth][JWT_FATAL_ERROR] Stack trace:", jwtErr?.stack || jwtErr);
@@ -209,6 +237,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           session.user.email = token.email ?? session.user.email;
           session.user.image = token.picture ?? session.user.image;
           (session.user as any).roles = token.roles ?? [];
+          (session.user as any).hasGrantedAdminAccess = (token as any).hasGrantedAdminAccess ?? false;
           (session.user as any).mustChangePassword = (token as any).mustChangePassword ?? false;
           (session.user as any).passwordChanged = (token as any).passwordChanged ?? false;
           const roles: string[] = token.roles ?? [];
