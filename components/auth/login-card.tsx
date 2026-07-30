@@ -34,11 +34,11 @@ export function LoginCard({ dictionary }: { dictionary: Dictionary }) {
             href="/"
             size="hero"
             showText={false}
-            logoClassName="border-slate-300 shadow-2xl shadow-[#1F8A5F]/10 ring-4 ring-white/80 dark:border-slate-700 dark:ring-slate-800"
+            logoClassName="border-slate-300 shadow-2xl shadow-[#1E3A64]/10 ring-4 ring-white/80 dark:border-slate-700 dark:ring-slate-800"
             imageClassName="p-2"
           />
           <h1 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 sm:text-3xl">
-            Lana <span className="font-medium text-[#1F8A5F]">HRMS</span>
+            Lana <span className="font-medium text-[#1E3A64]">HRMS</span>
           </h1>
         </div>
         <p className="mt-3 text-sm font-medium text-slate-400 dark:text-slate-500">البوابة الموحدة لدخول الموظفين والمسؤولين</p>

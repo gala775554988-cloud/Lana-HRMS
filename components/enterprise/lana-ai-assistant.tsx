@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
+import { LanaMarkdown } from "@/components/enterprise/lana-markdown";
 
 type UploadedFile = {
   name: string;
@@ -22,146 +23,6 @@ type ChatMessage = {
   files?: UploadedFile[];
   isStreaming?: boolean;
 };
-
-function LanaMarkdownRenderer({ content, onConfirmAction }: { content: string; onConfirmAction?: (cmd: string) => void }) {
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-
-  function copyCode(code: string, idx: number) {
-    navigator.clipboard.writeText(code);
-    setCopiedIndex(idx);
-    setTimeout(() => setCopiedIndex(null), 2000);
-  }
-
-  // Check if content contains a Double Validation JSON preview
-  if (content.includes('"doubleValidation": true') || content.includes('"doubleValidation":true') || content.includes("AWAITING_EXECUTIVE_CONFIRMATION")) {
-    try {
-      const jsonMatch = content.match(/\{[\s\S]*?"doubleValidation"[\s\S]*?\}/);
-      if (jsonMatch) {
-        const previewObj = JSON.parse(jsonMatch[0]);
-        return (
-          <div className="space-y-4 my-2 p-5 rounded-3xl border-2 border-amber-400/80 bg-gradient-to-br from-amber-50/90 via-white to-amber-100/50 dark:from-amber-950/60 dark:via-slate-900 dark:to-amber-900/40 text-slate-900 dark:text-slate-100 shadow-xl" dir="rtl">
-            <div className="flex items-center justify-between border-b border-amber-300/60 dark:border-amber-800 pb-3">
-              <div className="flex items-center gap-2.5">
-                <span className="grid h-10 w-10 place-items-center rounded-2xl bg-amber-500 text-white font-black text-base shadow-sm">👑</span>
-                <div>
-                  <h4 className="text-base font-black text-amber-950 dark:text-amber-200">{previewObj.previewTitle || "ملخص تنفيذي (Execution Preview) — التثبيت المزدوج"}</h4>
-                  <p className="text-xs font-bold text-amber-800 dark:text-amber-300 mt-0.5">يتطلب هذا الإجراء مصادقتك المباشرة (Double-Validation) قبل التنفيذ في قاعدة البيانات</p>
-                </div>
-              </div>
-              <span className="px-3 py-1 rounded-xl bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-100 text-xs font-black shrink-0">بانتظار الاعتماد</span>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white/90 dark:bg-slate-950/80 border border-amber-200 dark:border-amber-800/80 space-y-3">
-              <p className="text-sm font-extrabold leading-relaxed text-slate-800 dark:text-slate-200">{previewObj.previewMessage}</p>
-              {previewObj.payload ? (
-                <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border text-xs font-semibold">
-                  {Object.entries(previewObj.payload).map(([k, v]) => (
-                    <div key={k} className="truncate">
-                      <span className="text-muted-foreground block text-[10px] uppercase font-bold">{k}:</span>
-                      <span className="font-black text-primary truncate block mt-0.5">{String(v || "-")}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => onConfirmAction && onConfirmAction("إلغاء الإجراء وتجاهل التعديل")}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-100 transition"
-              >
-                ✖ إلغاء الإجراء
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (onConfirmAction) {
-                    if (previewObj.actionType === "ESCALATE_WORKFLOW") {
-                      onConfirmAction(`قم فوراً بتنفيذ دالة confirmAndExecuteEscalation للطلب رقم (${previewObj.payload?.requestId}) وتوجيهه للمسؤول (${previewObj.payload?.targetManagerId}) والآن`);
-                    } else if (previewObj.actionType === "MODIFY_DB") {
-                      onConfirmAction(`قم فوراً بتنفيذ دالة confirmAndExecuteModifyDB على جدول (${previewObj.payload?.table}) بالعملية (${previewObj.payload?.operation}) والاستعلام (${previewObj.payload?.query}) والآن`);
-                    } else {
-                      onConfirmAction("تأكيد واعتماد الإجراء وتنفيذه فوراً في قاعدة البيانات");
-                    }
-                  }
-                }}
-                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 via-primary to-emerald-600 hover:from-amber-700 hover:to-emerald-700 text-white font-black text-xs shadow-md transition"
-              >
-                ✓ اعتماد وتنفيذ الإجراء في قاعدة البيانات الآن
-              </button>
-            </div>
-          </div>
-        );
-      }
-    } catch {}
-  }
-
-  // Split into code blocks vs regular text
-  const parts = content.split(/(```[\s\S]*?```)/g);
-
-  return (
-    <div className="space-y-2.5 text-sm leading-relaxed">
-      {parts.map((part, idx) => {
-        if (part.startsWith("```") && part.endsWith("```")) {
-          const lines = part.slice(3, -3).trim().split("\n");
-          const lang = lines[0]?.match(/^[a-zA-Z0-9_-]+$/) ? lines[0] : "";
-          const code = lang ? lines.slice(1).join("\n") : lines.join("\n");
-
-          return (
-            <div key={idx} className="my-2 overflow-hidden rounded-xl border border-slate-700 bg-slate-950 text-slate-100 dark:border-slate-800">
-              <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900/80 px-3 py-1.5 text-xs text-slate-400">
-                <span className="font-mono lowercase">{lang || "كود"}</span>
-                <button
-                  type="button"
-                  onClick={() => copyCode(code, idx)}
-                  className="flex items-center gap-1.5 rounded px-2 py-0.5 text-xs transition hover:bg-slate-800 hover:text-white"
-                >
-                  {copiedIndex === idx ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
-                  <span>{copiedIndex === idx ? "تم النسخ" : "نسخ الكود"}</span>
-                </button>
-              </div>
-              <pre className="overflow-x-auto p-3 text-xs font-mono leading-normal text-emerald-300">
-                <code>{code}</code>
-              </pre>
-            </div>
-          );
-        }
-
-        // Format bold, italic, bullet lists
-        return (
-          <div key={idx} className="whitespace-pre-wrap break-words">
-            {part.split("\n").map((line, lIdx) => {
-              const trimmed = line.trim();
-              if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
-                return (
-                  <div key={lIdx} className="flex items-start gap-2 ms-2 my-1">
-                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-secondary" />
-                    <span>{trimmed.slice(2)}</span>
-                  </div>
-                );
-              }
-              if (/^\d+\.\s/.test(trimmed)) {
-                const numMatch = trimmed.match(/^(\d+\.)\s+(.*)/);
-                return (
-                  <div key={lIdx} className="flex items-start gap-2 ms-2 my-1">
-                    <span className="font-bold text-secondary dark:text-secondary/50 shrink-0">{numMatch?.[1]}</span>
-                    <span>{numMatch?.[2] || trimmed}</span>
-                  </div>
-                );
-              }
-              return (
-                <p key={lIdx} className={lIdx > 0 ? "mt-1.5" : ""}>
-                  {line}
-                </p>
-              );
-            })}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 export function LanaAiAssistant() {
   const { data: session, status } = useSession();
@@ -523,7 +384,7 @@ export function LanaAiAssistant() {
 
                     {msg.role === "assistant" ? (
                       msg.content ? (
-                        <LanaMarkdownRenderer content={msg.content} onConfirmAction={(cmd) => send(cmd)} />
+                        <LanaMarkdown content={msg.content} onConfirmAction={(cmd) => send(cmd)} />
                       ) : (
                         <div className="flex items-center gap-2 py-1 text-secondary dark:text-secondary/50">
                           <span className="flex gap-1">
@@ -668,11 +529,11 @@ export function LanaAiAssistant() {
           // floating button's identity is fixed regardless of the shared
           // tokens elsewhere in the app.
           className="group relative flex items-center gap-2.5 rounded-3xl px-4 py-3 text-white shadow-xl transition-all duration-300 hover:scale-105 hover:shadow-2xl active:scale-95"
-          style={{ background: "linear-gradient(90deg, #1F8A5F 0%, #F2B366 55%, #9CA8B0 100%)", boxShadow: "0 20px 25px -5px rgb(31 138 95 / 0.3), 0 8px 10px -6px rgb(31 138 95 / 0.3)" }}
+          style={{ background: "linear-gradient(90deg, #1E3A64 0%, #2E4E7E 55%, #707070 100%)", boxShadow: "0 20px 25px -5px rgb(30 58 100 / 0.3), 0 8px 10px -6px rgb(30 58 100 / 0.3)" }}
         >
           <div className="relative grid h-8 w-8 place-items-center rounded-2xl bg-white/20 backdrop-blur-md">
             <Sparkles className="h-4 w-4 text-amber-300" />
-            <span className="absolute -top-1 -end-1 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-[#1F8A5F] animate-pulse" />
+            <span className="absolute -top-1 -end-1 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-[#1E3A64] animate-pulse" />
           </div>
           <span className="font-bold text-sm tracking-wide">Lana</span>
         </button>
