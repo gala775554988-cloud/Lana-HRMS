@@ -24,6 +24,18 @@ const asNumber = (value: unknown) => {
   const parsed = Number.parseFloat(toLatinDigits(value).replace(/,/g, "").trim());
   return Number.isFinite(parsed) ? parsed : null;
 };
+const toDateKey = (value: unknown) => {
+  const text = toLatinDigits(value).trim();
+  if (!text) return "";
+  const parts = text.split("/").map(Number);
+  // The supplied Odoo export uses month/day/year for Latin-digit dates.
+  if (parts.length === 3 && parts.every(Number.isFinite)) {
+    const [month, day, year] = parts;
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+  const date = new Date(text);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+};
 
 function parseSemicolonRow(line: string) {
   const fields: string[] = [];
@@ -59,7 +71,18 @@ export function parseLeaveCsv(csv: string): CsvRow[] {
 export async function planLeaveCsvImport(csv: string) {
   const records = parseLeaveCsv(csv);
   const employees = await prisma.employee.findMany({
-    select: { id: true, employeeNumber: true, odooId: true, firstName: true, lastName: true, odooRawData: true, leaveBalance: { select: { accrued: true, used: true } } },
+    select: {
+      id: true,
+      employeeNumber: true,
+      odooId: true,
+      firstName: true,
+      lastName: true,
+      hireDate: true,
+      department: { select: { name: true } },
+      position: { select: { title: true } },
+      odooRawData: true,
+      leaveBalance: { select: { accrued: true, used: true } },
+    },
   });
   const byEmployeeNumber = new Map<string, (typeof employees)[number]>();
   for (const employee of employees) {
@@ -96,13 +119,26 @@ export async function planLeaveCsvImport(csv: string) {
       const matches = byName.get(sourceName) ?? [];
       if (matches.length === 1) employee = matches[0];
       else if (matches.length > 1) {
-        skipped.push({
-          row: row.rowIndex,
-          id: row.ID,
-          name: row.name,
-          reason: `ambiguous employee name; candidates: ${matches.map((candidate) => `${candidate.employeeNumber} (Odoo ${candidate.odooId ?? "-"})`).join(", ")}`,
+        const sourceHireDate = toDateKey(row.join_date);
+        const sourceDepartment = normalize(row.department_id);
+        const sourceJob = normalize(row.job_id);
+        const exactProfileMatches = matches.filter((candidate) => {
+          const candidateHireDate = candidate.hireDate.toISOString().slice(0, 10);
+          return (!sourceHireDate || candidateHireDate === sourceHireDate)
+            && (!sourceDepartment || normalize(candidate.department?.name) === sourceDepartment)
+            && (!sourceJob || normalize(candidate.position?.title) === sourceJob);
         });
-        continue;
+        if (exactProfileMatches.length === 1) {
+          employee = exactProfileMatches[0];
+        } else {
+          skipped.push({
+            row: row.rowIndex,
+            id: row.ID,
+            name: row.name,
+            reason: `ambiguous employee name; candidates: ${matches.map((candidate) => `${candidate.employeeNumber} (Odoo ${candidate.odooId ?? "-"}, ${candidate.hireDate.toISOString().slice(0, 10)}, ${candidate.department?.name ?? "-"}, ${candidate.position?.title ?? "-"})`).join(", ")}`,
+          });
+          continue;
+        }
       }
     }
     if (!employee) {
