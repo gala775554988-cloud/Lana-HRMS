@@ -14,6 +14,12 @@ type PlannedLeaveImport = {
 const arabicDigits = "٠١٢٣٤٥٦٧٨٩";
 const toLatinDigits = (value: unknown) => String(value ?? "").replace(/[٠-٩]/g, (digit) => String(arabicDigits.indexOf(digit)));
 const normalize = (value: unknown) => toLatinDigits(value).trim().replace(/\s+/g, " ").toLowerCase();
+const employeeIdKeys = (value: unknown) => {
+  const normalized = normalize(value);
+  if (!normalized) return [];
+  const noLeadingZeros = normalized.replace(/^0+/, "") || "0";
+  return Array.from(new Set([normalized, noLeadingZeros, `00${noLeadingZeros}`]));
+};
 const asNumber = (value: unknown) => {
   const parsed = Number.parseFloat(toLatinDigits(value).replace(/,/g, "").trim());
   return Number.isFinite(parsed) ? parsed : null;
@@ -55,8 +61,14 @@ export async function planLeaveCsvImport(csv: string) {
   const employees = await prisma.employee.findMany({
     select: { id: true, employeeNumber: true, odooId: true, firstName: true, lastName: true, odooRawData: true, leaveBalance: { select: { accrued: true, used: true } } },
   });
-  const byEmployeeNumber = new Map(employees.map((employee) => [normalize(employee.employeeNumber), employee]));
-  const byOdooId = new Map(employees.filter((employee) => employee.odooId !== null).map((employee) => [String(employee.odooId), employee]));
+  const byEmployeeNumber = new Map<string, (typeof employees)[number]>();
+  for (const employee of employees) {
+    for (const key of employeeIdKeys(employee.employeeNumber)) byEmployeeNumber.set(key, employee);
+  }
+  const byOdooId = new Map<string, (typeof employees)[number]>();
+  for (const employee of employees.filter((employee) => employee.odooId !== null)) {
+    for (const key of employeeIdKeys(employee.odooId)) byOdooId.set(key, employee);
+  }
   const byName = new Map<string, typeof employees>();
   for (const employee of employees) {
     const key = normalize(`${employee.firstName} ${employee.lastName}`);
@@ -68,11 +80,18 @@ export async function planLeaveCsvImport(csv: string) {
   for (const row of records) {
     const sourceId = normalize(row.ID);
     const sourceName = normalize(row.name);
+    // CSV exports sometimes contain a trailing separator-only row.
+    if (!sourceId && !sourceName) continue;
     const accrued = asNumber(row["عدد الأيام المستحقة"]);
     const used = asNumber(row["كم المدة المقطوعة"]);
     const remaining = asNumber(row["المدة المتبقية"]);
     const monthsAccrued = asNumber(row["عددالاشهر المستحقة"]);
-    let employee = byEmployeeNumber.get(sourceId) || byOdooId.get(sourceId);
+    // Non-employee header/admin rows in the export have no identifier and no
+    // leave values; they are intentionally not employee entitlement rows.
+    if (!sourceId && [accrued, used, remaining, monthsAccrued].every((value) => value === null)) continue;
+    let employee = employeeIdKeys(sourceId)
+      .map((key) => byEmployeeNumber.get(key) || byOdooId.get(key))
+      .find(Boolean);
     if (!employee && sourceName) {
       const matches = byName.get(sourceName) ?? [];
       if (matches.length === 1) employee = matches[0];
