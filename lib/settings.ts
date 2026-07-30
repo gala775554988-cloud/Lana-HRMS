@@ -63,6 +63,25 @@ export function getGeminiApiKey(): string {
   return (process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_API_KEY || "").trim();
 }
 
+/** Optional multi-key pool: GEMINI_API_KEYS, comma or newline separated.
+ * Each Gemini API key carries its own separate rate/quota allowance, so
+ * spreading requests across several (see chat/route.ts's random-order,
+ * failover-on-quota-error attempt loop) multiplies the assistant's real
+ * throughput -- but ONLY if the keys belong to separate Google Cloud
+ * projects/billing accounts; keys created under the same project commonly
+ * share one quota pool, in which case rotating between them buys nothing.
+ * Falls back to the single getGeminiApiKey() when GEMINI_API_KEYS isn't
+ * set, so an existing single-key deployment is unaffected. */
+export function getGeminiApiKeyPool(): string[] {
+  const multi = (process.env.GEMINI_API_KEYS || "")
+    .split(/[,\n]/)
+    .map((key) => key.trim())
+    .filter(Boolean);
+  if (multi.length) return multi;
+  const single = getGeminiApiKey();
+  return single ? [single] : [];
+}
+
 /** "gemini-flash-latest" auto-tracks Google's current stable flash release
  * instead of a pinned version string that Google periodically retires for
  * new API keys (e.g. "gemini-2.5-flash" started 404ing for new projects). */

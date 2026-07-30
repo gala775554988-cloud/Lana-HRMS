@@ -6,6 +6,7 @@ import {
   Paperclip, FileText, Image as ImageIcon, FileSpreadsheet, MessageSquare, Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LanaMarkdown } from "@/components/enterprise/lana-markdown";
 
 type UploadedFile = {
   name: string;
@@ -28,7 +29,7 @@ type ChatMessage = {
 };
 
 /** Renders a tool result for display: objects/arrays become a pretty-printed
- * JSON code block (reusing LanaMarkdownRenderer's existing code-fence
+ * JSON code block (reusing the shared LanaMarkdown component's code-fence
  * support), plain strings pass through as-is. Returns null when there's
  * nothing worth showing (empty/undefined output). */
 function formatToolOutput(result: unknown): string | null {
@@ -44,79 +45,6 @@ type ConversationSummary = {
   title: string;
   createdAt: string;
 };
-
-function LanaMarkdownRenderer({ content }: { content: string }) {
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-
-  function copyCode(code: string, idx: number) {
-    navigator.clipboard.writeText(code);
-    setCopiedIndex(idx);
-    setTimeout(() => setCopiedIndex(null), 2000);
-  }
-
-  const parts = content.split(/(```[\s\S]*?```)/g);
-
-  return (
-    <div className="space-y-3 text-sm leading-relaxed">
-      {parts.map((part, idx) => {
-        if (part.startsWith("```") && part.endsWith("```")) {
-          const lines = part.slice(3, -3).trim().split("\n");
-          const lang = lines[0]?.match(/^[a-zA-Z0-9_-]+$/) ? lines[0] : "";
-          const code = lang ? lines.slice(1).join("\n") : lines.join("\n");
-
-          return (
-            <div key={idx} className="my-3 overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 text-slate-100 dark:border-slate-800 shadow-lg">
-              <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900/80 px-4 py-2 text-xs text-slate-400">
-                <span className="font-mono lowercase">{lang || "code"}</span>
-                <button
-                  type="button"
-                  onClick={() => copyCode(code, idx)}
-                  className="flex items-center gap-1.5 rounded px-2.5 py-1 text-xs transition hover:bg-slate-800 hover:text-white"
-                >
-                  {copiedIndex === idx ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-                  <span>{copiedIndex === idx ? "تم النسخ" : "نسخ الكود"}</span>
-                </button>
-              </div>
-              <pre className="overflow-x-auto p-4 text-xs font-mono leading-normal text-emerald-300">
-                <code>{code}</code>
-              </pre>
-            </div>
-          );
-        }
-
-        return (
-          <div key={idx} className="whitespace-pre-wrap break-words">
-            {part.split("\n").map((line, lIdx) => {
-              const trimmed = line.trim();
-              if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
-                return (
-                  <div key={lIdx} className="flex items-start gap-2.5 ms-3 my-1">
-                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-secondary" />
-                    <span>{trimmed.slice(2)}</span>
-                  </div>
-                );
-              }
-              if (/^\d+\.\s/.test(trimmed)) {
-                const numMatch = trimmed.match(/^(\d+\.)\s+(.*)/);
-                return (
-                  <div key={lIdx} className="flex items-start gap-2.5 ms-3 my-1">
-                    <span className="font-bold text-secondary dark:text-secondary/50 shrink-0">{numMatch?.[1]}</span>
-                    <span>{numMatch?.[2] || trimmed}</span>
-                  </div>
-                );
-              }
-              return (
-                <p key={lIdx} className={lIdx > 0 ? "mt-2" : ""}>
-                  {line}
-                </p>
-              );
-            })}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 export function LanaAiFullPageClient() {
   const [input, setInput] = useState("");
@@ -493,7 +421,7 @@ export function LanaAiFullPageClient() {
 
                   {msg.role === "assistant" ? (
                     msg.content ? (
-                      <LanaMarkdownRenderer content={msg.content} />
+                      <LanaMarkdown content={msg.content} />
                     ) : (
                       <div className="flex items-center gap-2 py-2 text-secondary dark:text-secondary/50">
                         <span className="flex gap-1.5">
@@ -510,7 +438,7 @@ export function LanaAiFullPageClient() {
 
                   {msg.role === "assistant" && !msg.isStreaming && formatToolOutput(msg.output) ? (
                     <div className={msg.content ? "mt-3 border-t border-slate-200 dark:border-slate-800 pt-3" : ""}>
-                      <LanaMarkdownRenderer content={formatToolOutput(msg.output)!} />
+                      <LanaMarkdown content={formatToolOutput(msg.output)!} />
                     </div>
                   ) : null}
                 </div>
