@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { hasAnyRole } from "@/lib/rbac";
 import { writeAuditLog } from "@/lib/audit";
-import { setEmployeeLeaveAccrued, getEffectiveLeaveBalance } from "@/lib/employee/leave-balance";
+import { setEmployeeLeaveBalance, getEffectiveLeaveBalance } from "@/lib/employee/leave-balance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,17 +18,23 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { employeeId, accrued } = body;
+    const { employeeId, accrued, used, monthsAccrued } = body;
     const accruedNumber = Number(accrued);
+    const usedNumber = Number(used);
+    const monthsNumber = monthsAccrued === undefined ? undefined : Number(monthsAccrued);
 
     if (!employeeId || typeof employeeId !== "string") {
       return NextResponse.json({ success: false, message: "employeeId required" }, { status: 400 });
     }
-    if (!Number.isFinite(accruedNumber)) {
-      return NextResponse.json({ success: false, message: "قيمة الرصيد غير صالحة" }, { status: 400 });
+    if (!Number.isFinite(accruedNumber) || !Number.isFinite(usedNumber) || (monthsNumber !== undefined && (!Number.isFinite(monthsNumber) || monthsNumber < 0))) {
+      return NextResponse.json({ success: false, message: "قيم رصيد الإجازة غير صالحة" }, { status: 400 });
     }
 
-    await setEmployeeLeaveAccrued(employeeId, accruedNumber);
+    await setEmployeeLeaveBalance(employeeId, {
+      accrued: accruedNumber,
+      used: usedNumber,
+      monthsAccrued: monthsNumber,
+    });
     const balance = await getEffectiveLeaveBalance(employeeId);
 
     await writeAuditLog({
@@ -36,7 +42,7 @@ export async function POST(request: NextRequest) {
       action: "leave-balance:update",
       entity: "employee",
       entityId: employeeId,
-      metadata: { accrued: accruedNumber }
+      metadata: { accrued: accruedNumber, used: usedNumber, remaining: accruedNumber - usedNumber, monthsAccrued: monthsNumber }
     });
 
     return NextResponse.json({ success: true, message: "تم تحديث رصيد الإجازات بنجاح", data: balance });

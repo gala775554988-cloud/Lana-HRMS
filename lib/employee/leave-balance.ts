@@ -36,13 +36,53 @@ export async function getEffectiveLeaveBalance(employeeId: string): Promise<Leav
  * touches it, so a manual correction to the entitlement can't accidentally
  * erase real usage history.
  */
-export async function setEmployeeLeaveAccrued(employeeId: string, accrued: number) {
-  const existing = await prisma.employeeLeaveBalance.findUnique({ where: { employeeId } });
-  if (existing) {
-    return prisma.employeeLeaveBalance.update({ where: { employeeId }, data: { accrued } });
+export async function setEmployeeLeaveBalance(
+  employeeId: string,
+  values: { accrued: number; used: number; monthsAccrued?: number }
+) {
+  const { accrued, used, monthsAccrued } = values;
+  const balance = await prisma.employeeLeaveBalance.upsert({
+    where: { employeeId },
+    update: { accrued, used },
+    create: { employeeId, accrued, used },
+  });
+
+  // Keep only the import/edit metadata alongside the employee's existing Odoo
+  // snapshot. The structured EmployeeLeaveBalance table remains the source of
+  // truth for entitlement and usage calculations.
+  if (monthsAccrued !== undefined) {
+    const employee = await prisma.employee.findUnique({
+      where: { id: employeeId },
+      select: { odooRawData: true },
+    });
+    const raw = (employee?.odooRawData as Record<string, unknown> | null) ?? {};
+    const existingCsv = (raw._csvLeaveData as Record<string, unknown> | undefined) ?? {};
+    await prisma.employee.update({
+      where: { id: employeeId },
+      data: {
+        odooRawData: {
+          ...raw,
+          _csvLeaveData: {
+            ...existingCsv,
+            monthsAccrued,
+            daysAccrued: accrued,
+            daysUsed: used,
+            daysRemaining: accrued - used,
+            updatedAt: new Date().toISOString(),
+            source: "MANUAL_HR_EDIT",
+          },
+        },
+      },
+    });
   }
+
+  return balance;
+}
+
+/** Backward-compatible entitlement-only helper used by existing callers. */
+export async function setEmployeeLeaveAccrued(employeeId: string, accrued: number) {
   const seed = await getEffectiveLeaveBalance(employeeId);
-  return prisma.employeeLeaveBalance.create({ data: { employeeId, accrued, used: seed.used } });
+  return setEmployeeLeaveBalance(employeeId, { accrued, used: seed.used });
 }
 
 /**

@@ -100,16 +100,18 @@ export function EmployeeProfileDashboard({
   const [unbinding, setUnbinding] = useState(false);
   const [leaveBalanceState, setLeaveBalanceState] = useState(leaveBalance);
   const [editingBalanceId, setEditingBalanceId] = useState<string | null>(null);
-  const [balanceDraft, setBalanceDraft] = useState("");
+  const [balanceDraft, setBalanceDraft] = useState({ accrued: "", used: "", monthsAccrued: "" });
   const [savingBalance, setSavingBalance] = useState(false);
   const [siEditOpen, setSiEditOpen] = useState(false);
   const [siUploading, setSiUploading] = useState(false);
   const siFileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSaveLeaveBalance = async () => {
-    const accrued = Number(balanceDraft);
-    if (!Number.isFinite(accrued)) {
-      alert(isAr ? "قيمة الرصيد غير صالحة" : "Invalid balance value");
+    const accrued = Number(balanceDraft.accrued);
+    const used = Number(balanceDraft.used);
+    const monthsAccrued = Number(balanceDraft.monthsAccrued);
+    if (!Number.isFinite(accrued) || !Number.isFinite(used) || !Number.isFinite(monthsAccrued) || monthsAccrued < 0) {
+      alert(isAr ? "تحقق من إجمالي الرصيد والمدة المستخدمة وعدد الأشهر" : "Check accrued, used, and accrued-month values");
       return;
     }
     setSavingBalance(true);
@@ -117,12 +119,14 @@ export function EmployeeProfileDashboard({
       const res = await fetch("/api/employees/leave-balance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ employeeId: employee.id, accrued }),
+        body: JSON.stringify({ employeeId: employee.id, accrued, used, monthsAccrued }),
       });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.message || "فشل التحديث");
       setLeaveBalanceState((prev) =>
-        prev.map((lt: any) => (lt.id === "annual" ? { ...lt, annualLimit: json.data.accrued, used: json.data.used, remaining: json.data.remaining } : lt))
+        prev.map((lt: any) => lt.id === "annual"
+          ? { ...lt, annualLimit: json.data.accrued, used: json.data.used, remaining: json.data.remaining, monthsAccrued }
+          : lt)
       );
       setEditingBalanceId(null);
     } catch (error) {
@@ -659,7 +663,14 @@ export function EmployeeProfileDashboard({
                             size="sm"
                             variant="ghost"
                             className="h-7 px-2 text-[11px]"
-                            onClick={() => { setEditingBalanceId(lt.id); setBalanceDraft(String(lt.annualLimit ?? "")); }}
+                            onClick={() => {
+                              setEditingBalanceId(lt.id);
+                              setBalanceDraft({
+                                accrued: String(lt.annualLimit ?? 0),
+                                used: String(lt.used ?? 0),
+                                monthsAccrued: String(lt.monthsAccrued ?? 0),
+                              });
+                            }}
                           >
                             <Edit className="h-3 w-3 ml-1" />تعديل
                           </Button>
@@ -667,18 +678,30 @@ export function EmployeeProfileDashboard({
                       </div>
                     </div>
                     {isEditing ? (
-                      <div className="flex items-center gap-2 pt-1 border-t border-slate-200/60 dark:border-slate-800">
-                        <Input
-                          type="number"
-                          value={balanceDraft}
-                          onChange={(e) => setBalanceDraft(e.target.value)}
-                          className="h-9 text-sm"
-                          placeholder="الرصيد الكلي (أيام)"
-                        />
-                        <Button size="sm" disabled={savingBalance} onClick={handleSaveLeaveBalance}>
-                          <Save className="h-3.5 w-3.5 ml-1" />حفظ
-                        </Button>
-                        <Button size="sm" variant="outline" disabled={savingBalance} onClick={() => setEditingBalanceId(null)}>إلغاء</Button>
+                      <div className="grid gap-3 pt-3 border-t border-slate-200/60 dark:border-slate-800">
+                        <div className="grid grid-cols-3 gap-2">
+                          <label className="space-y-1 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                            <span>الأشهر المستحقة</span>
+                            <Input type="number" min="0" value={balanceDraft.monthsAccrued} onChange={(e) => setBalanceDraft((draft) => ({ ...draft, monthsAccrued: e.target.value }))} className="h-9 text-sm" />
+                          </label>
+                          <label className="space-y-1 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                            <span>إجمالي المستحق</span>
+                            <Input type="number" value={balanceDraft.accrued} onChange={(e) => setBalanceDraft((draft) => ({ ...draft, accrued: e.target.value }))} className="h-9 text-sm" />
+                          </label>
+                          <label className="space-y-1 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                            <span>المدة المستخدمة</span>
+                            <Input type="number" value={balanceDraft.used} onChange={(e) => setBalanceDraft((draft) => ({ ...draft, used: e.target.value }))} className="h-9 text-sm" />
+                          </label>
+                        </div>
+                        <p className="rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                          المتبقي بعد الحفظ: <strong>{Number(balanceDraft.accrued || 0) - Number(balanceDraft.used || 0)} يوم</strong>
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Button size="sm" disabled={savingBalance} onClick={handleSaveLeaveBalance}>
+                            <Save className="h-3.5 w-3.5 ml-1" />حفظ جميع القيم
+                          </Button>
+                          <Button size="sm" variant="outline" disabled={savingBalance} onClick={() => setEditingBalanceId(null)}>إلغاء</Button>
+                        </div>
                       </div>
                     ) : lt.remaining !== undefined ? (
                       <div className="grid grid-cols-3 gap-2 text-center pt-1 border-t border-slate-200/60 dark:border-slate-800">
