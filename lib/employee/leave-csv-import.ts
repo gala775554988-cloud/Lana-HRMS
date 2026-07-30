@@ -88,7 +88,7 @@ export async function planLeaveCsvImport(csv: string) {
     const monthsAccrued = asNumber(row["عددالاشهر المستحقة"]);
     // Non-employee header/admin rows in the export have no identifier and no
     // leave values; they are intentionally not employee entitlement rows.
-    if (!sourceId && [accrued, used, remaining, monthsAccrued].every((value) => value === null)) continue;
+    if (!sourceId && (sourceName === "system administrator" || [accrued, used, remaining, monthsAccrued].every((value) => value === null))) continue;
     let employee = employeeIdKeys(sourceId)
       .map((key) => byEmployeeNumber.get(key) || byOdooId.get(key))
       .find(Boolean);
@@ -96,7 +96,12 @@ export async function planLeaveCsvImport(csv: string) {
       const matches = byName.get(sourceName) ?? [];
       if (matches.length === 1) employee = matches[0];
       else if (matches.length > 1) {
-        skipped.push({ row: row.rowIndex, id: row.ID, name: row.name, reason: "ambiguous employee name" });
+        skipped.push({
+          row: row.rowIndex,
+          id: row.ID,
+          name: row.name,
+          reason: `ambiguous employee name; candidates: ${matches.map((candidate) => `${candidate.employeeNumber} (Odoo ${candidate.odooId ?? "-"})`).join(", ")}`,
+        });
         continue;
       }
     }
