@@ -1,6 +1,5 @@
 import { getRequestDictionary } from "@/lib/i18n-server";
 import { LoginHeroContainer } from "@/components/auth/login-hero-container";
-import "@/lib/error-interceptor";
 
 export const dynamic = "force-dynamic";
 

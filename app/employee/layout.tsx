@@ -7,7 +7,6 @@ import { EmployeeTopBar } from "@/components/employee/EmployeeTopBar";
 import { EmployeeDesktopSidebar } from "@/components/employee/EmployeeDesktopSidebar";
 import { EmployeeMobileSidebar } from "@/components/employee/EmployeeMobileSidebar";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
-import "@/lib/error-interceptor";
 
 export const dynamic = "force-dynamic";
 
