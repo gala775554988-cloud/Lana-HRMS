@@ -21,15 +21,35 @@ type PermissionTreeAction = { key: string; action: string; label: string };
 type PermissionTreeFeature = { resource: string; label: string; granular: boolean; actions: PermissionTreeAction[] };
 type PermissionTreeCategory = { key: string; title: string; features: PermissionTreeFeature[]; allPermissions: string[] };
 
+const ROLE_LABELS: Record<string, string> = {
+  SUPER_ADMIN: "مدير النظام",
+  HR_MANAGER: "مدير الموارد البشرية",
+  BRANCH_MANAGER: "مدير فرع",
+  DEPARTMENT_MANAGER: "مدير إدارة",
+  PROJECT_MANAGER: "مدير مشروع",
+  SUPERVISOR: "مشرف فريق",
+  PAYROLL_MANAGER: "مدير الرواتب",
+  PAYROLL_OFFICER: "مسؤول الرواتب",
+  INSURANCE_OFFICER: "مسؤول التأمين الطبي",
+  SOCIAL_INSURANCE_OFFICER: "مسؤول التأمينات الاجتماعية",
+  RESIDENCY_OFFICER: "مسؤول الإقامات",
+  REQUESTS_OFFICER: "مسؤول الطلبات",
+  WAREHOUSE_OFFICER: "مسؤول العهد والأصول",
+  RECRUITER: "مسؤول التوظيف",
+  EMPLOYEE: "موظف"
+};
+
 export function RolesManagementClient() {
   const [roles, setRoles] = useState<RoleRow[]>([]);
   const [tree, setTree] = useState<PermissionTreeCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [templateKeys, setTemplateKeys] = useState<string[]>([]);
 
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
+  const [newTemplateKey, setNewTemplateKey] = useState("");
 
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
@@ -52,6 +72,7 @@ export function RolesManagementClient() {
       .then((data) => {
         setRoles(data.roles ?? []);
         setTree(data.tree ?? []);
+        setTemplateKeys(data.templateKeys ?? []);
       })
       .catch((error) => setMessage(error.message))
       .finally(() => setLoading(false));
@@ -69,13 +90,15 @@ export function RolesManagementClient() {
         body: JSON.stringify({
           name: newName.trim(),
           description: newDescription.trim() || undefined,
-          permissionKeys: sourceRole?.permissionKeys ?? []
+          templateKey: !sourceRole && newTemplateKey ? newTemplateKey : undefined,
+          permissionKeys: sourceRole?.permissionKeys
         })
       });
       const data = await response.json();
       if (!data.success) { setMessage(data.message || "فشل إنشاء الدور"); return; }
       setNewName("");
       setNewDescription("");
+      setNewTemplateKey("");
       setCreating(false);
       setMessage(`تم إنشاء الدور "${data.role.name}" بنجاح`);
       load();
@@ -222,12 +245,13 @@ export function RolesManagementClient() {
           <CardContent className="space-y-3">
             {creating ? (
               <div className="space-y-2 rounded-2xl border border-primary/30 bg-primary/5 p-3">
-                <Input placeholder="اسم الدور (مثال: BRANCH_SUPERVISOR)" value={newName} onChange={(e) => setNewName(e.target.value)} />
+                <Input placeholder="اسم الدور (مثال: مشرف فرع الرياض)" value={newName} onChange={(e) => setNewName(e.target.value)} />
                 <Input placeholder="الوصف (اختياري)" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} />
+                {!duplicateSource ? <select aria-label="قالب الصلاحيات" value={newTemplateKey} onChange={(event) => setNewTemplateKey(event.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">ابدأ بدون صلاحيات</option>{templateKeys.filter((key) => key !== "SUPER_ADMIN").map((key) => <option key={key} value={key}>قالب {ROLE_LABELS[key] ?? key}</option>)}</select> : null}
                 {duplicateSource ? <p className="text-xs text-muted-foreground">سيتم نسخ {duplicateSource.permissionKeys.length} صلاحية من "{duplicateSource.name}"</p> : null}
                 <div className="flex gap-2">
                   <Button type="button" size="sm" disabled={!newName.trim() || saving} onClick={() => createRole(duplicateSource ?? undefined)}>حفظ</Button>
-                  <Button type="button" size="sm" variant="outline" onClick={() => { setCreating(false); setDuplicateSource(null); setNewName(""); setNewDescription(""); }}>إلغاء</Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => { setCreating(false); setDuplicateSource(null); setNewName(""); setNewDescription(""); setNewTemplateKey(""); }}>إلغاء</Button>
                 </div>
               </div>
             ) : (
@@ -248,13 +272,14 @@ export function RolesManagementClient() {
                   >
                     <span className="min-w-0">
                       <span className="flex items-center gap-1.5">
-                        <span className="truncate text-sm font-bold">{role.name}</span>
+                        <span className="truncate text-sm font-bold">{ROLE_LABELS[role.name] ?? role.name}</span>
                         {role.isSystem ? <Badge variant="outline" className="text-[10px]">نظامي</Badge> : null}
                       </span>
                       <span className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
                         <span className="flex items-center gap-1"><Users className="h-3 w-3" />{role.userCount}</span>
                         <span>{role.permissionKeys.length} صلاحية</span>
                       </span>
+                      {ROLE_LABELS[role.name] ? <span className="mt-0.5 block text-[10px] text-muted-foreground" dir="ltr">{role.name}</span> : null}
                     </span>
                     <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${selectedRoleId === role.id ? "rotate-180" : ""}`} />
                   </button>
@@ -284,7 +309,8 @@ export function RolesManagementClient() {
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
-                      <span className="text-base font-black">{selectedRole.name}</span>
+                      <span className="text-base font-black">{ROLE_LABELS[selectedRole.name] ?? selectedRole.name}</span>
+                      {ROLE_LABELS[selectedRole.name] ? <Badge variant="outline" dir="ltr">{selectedRole.name}</Badge> : null}
                       {selectedRole.description ? <span className="text-xs text-muted-foreground">{selectedRole.description}</span> : null}
                     </div>
                   )}
