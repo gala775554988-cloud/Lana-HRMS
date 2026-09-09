@@ -16,6 +16,16 @@ function round2(value: number) {
   return Math.round(value * 100) / 100;
 }
 
+function timeToMinutes(value?: string | null) {
+  const [hours, minutes] = String(value || "09:00").split(":").map(Number);
+  return (Number.isFinite(hours) ? hours : 9) * 60 + (Number.isFinite(minutes) ? minutes : 0);
+}
+
+function riyadhMinutes(value: Date) {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Riyadh", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(value);
+  return Number(parts.find((part) => part.type === "hour")?.value || 0) * 60 + Number(parts.find((part) => part.type === "minute")?.value || 0);
+}
+
 export type PayrollBreakdown = {
   baseSalary: number;
   allowanceTotal: number;
@@ -92,7 +102,23 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
     prisma.socialInsuranceRecord.findUnique({ where: { employeeId }, select: { status: true, employeeContributionAmount: true } }),
     prisma.loan.findMany({ where: { employeeId, status: "ACTIVE" } }),
     prisma.employeeSalaryAdvance.findMany({ where: { employeeId, status: "APPROVED" } }),
-    prisma.attendanceRecord.findMany({ where: { employeeId, workDate: { gte: periodStart, lte: periodEnd }, status: { in: ["ABSENT", "LATE", "HALF_DAY"] } }, select: { status: true } })
+    prisma.attendanceRecord.findMany({
+      where: { employeeId, workDate: { gte: periodStart, lte: periodEnd }, status: { in: ["ABSENT", "LATE", "HALF_DAY"] } },
+      select: {
+        status: true,
+        workDate: true,
+        checkIn: true,
+        employee: {
+          select: {
+            shiftAssignments: {
+              where: { isActive: true },
+              orderBy: { effectiveFrom: "desc" },
+              include: { shift: { select: { startTime: true } } }
+            }
+          }
+        }
+      }
+    })
   ]);
 
   const allowanceTotal = round2(allowances.reduce((sum, a) => sum + Number(a.amount), 0) + profileAllowanceTotal);
@@ -129,9 +155,14 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
 
   const dailyRate = baseSalary > 0 ? baseSalary / 30 : 0;
   const absenceDays = attendance.filter((a) => a.status === "ABSENT").length + attendance.filter((a) => a.status === "HALF_DAY").length * 0.5;
-  const lateDays = attendance.filter((a) => a.status === "LATE").length;
   const absenceDeduction = round2(absenceDays * dailyRate);
-  const lateDeduction = round2(lateDays * (dailyRate / 4));
+  const hourlyRate = baseSalary > 0 ? baseSalary / 240 : 0;
+  const lateDeduction = round2(attendance.filter((row) => row.status === "LATE").reduce((sum, row) => {
+    if (!row.checkIn) return sum + dailyRate / 4;
+    const assignment = row.employee.shiftAssignments.find((item) => item.effectiveFrom <= row.workDate && (!item.effectiveTo || item.effectiveTo >= row.workDate));
+    const lateMinutes = Math.max(0, riyadhMinutes(row.checkIn) - timeToMinutes(assignment?.shift.startTime));
+    return sum + Math.min(dailyRate, hourlyRate * (lateMinutes / 60));
+  }, 0));
 
   const grossPay = round2(baseSalary + allowanceTotal + overtimeTotal + bonusTotal);
   const deductionTotal = round2(

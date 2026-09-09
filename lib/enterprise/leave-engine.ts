@@ -22,13 +22,14 @@ function yearBounds(year: number) {
 /** A hire-year employee only accrues their share of the year remaining
  * after their hire date -- full annualLimit would over-grant someone hired
  * in November. Every later year gets the full annualLimit. */
-function proratedAccrual(annualLimit: number, hireDate: Date, year: number) {
+function proratedAccrual(annualLimit: number, serviceStart: Date, serviceEnd: Date | null, year: number) {
   const { start, end } = yearBounds(year);
-  if (hireDate <= start) return annualLimit;
-  if (hireDate > end) return 0;
-  const totalDaysInYear = (end.getTime() - start.getTime()) / 86_400_000;
-  const daysEmployedThisYear = (end.getTime() - hireDate.getTime()) / 86_400_000;
-  return round2(annualLimit * (daysEmployedThisYear / totalDaysInYear));
+  const activeFrom = serviceStart > start ? serviceStart : start;
+  const activeTo = serviceEnd && serviceEnd < end ? serviceEnd : end;
+  if (activeFrom > end || activeTo < start || activeTo < activeFrom) return 0;
+  const totalDaysInYear = Math.floor((end.getTime() - start.getTime()) / 86_400_000) + 1;
+  const activeDays = Math.floor((activeTo.getTime() - activeFrom.getTime()) / 86_400_000) + 1;
+  return round2(annualLimit * (activeDays / totalDaysInYear));
 }
 
 /** Gets (initializing on first read) an employee's per-type balance row for
@@ -39,16 +40,43 @@ function proratedAccrual(annualLimit: number, hireDate: Date, year: number) {
  * calculation" enterprise leave systems provide instead of a static number
  * an admin has to re-enter every year. */
 export async function getOrInitLeaveTypeBalance(employeeId: string, leaveTypeId: string, year = new Date().getFullYear()): Promise<LeaveTypeBalanceRow> {
-  const [leaveType, employee, existing] = await Promise.all([
+  const { start, end } = yearBounds(year);
+  const [leaveType, employee, existing, approvedUsage] = await Promise.all([
     prisma.leaveType.findUniqueOrThrow({ where: { id: leaveTypeId } }),
-    prisma.employee.findUniqueOrThrow({ where: { id: employeeId }, select: { hireDate: true } }),
-    prisma.employeeLeaveTypeBalance.findUnique({ where: { employeeId_leaveTypeId_year: { employeeId, leaveTypeId, year } } })
+    prisma.employee.findUniqueOrThrow({
+      where: { id: employeeId },
+      select: {
+        hireDate: true,
+        firstContractDate: true,
+        contracts: {
+          where: { startDate: { lte: end }, OR: [{ endDate: null }, { endDate: { gte: start } }] },
+          orderBy: [{ status: "asc" }, { startDate: "desc" }],
+          take: 1,
+          select: { startDate: true, endDate: true }
+        }
+      }
+    }),
+    prisma.employeeLeaveTypeBalance.findUnique({ where: { employeeId_leaveTypeId_year: { employeeId, leaveTypeId, year } } }),
+    prisma.leaveRequest.aggregate({
+      where: { employeeId, leaveTypeId, status: "APPROVED", startDate: { gte: start, lte: end } },
+      _sum: { days: true }
+    })
   ]);
 
+  const contract = employee.contracts[0];
+  const serviceStart = contract?.startDate ?? employee.firstContractDate ?? employee.hireDate;
+  const serviceEnd = contract?.endDate ?? null;
+  const accrued = proratedAccrual(leaveType.annualLimit ?? 0, serviceStart, serviceEnd, year);
+  const used = Number(approvedUsage._sum.days ?? 0);
+
   if (existing) {
-    const accrued = Number(existing.accrued);
-    const used = Number(existing.used);
     const carriedOver = Number(existing.carriedOver);
+    if (Number(existing.accrued) !== accrued || Number(existing.used) !== used) {
+      await prisma.employeeLeaveTypeBalance.update({
+        where: { employeeId_leaveTypeId_year: { employeeId, leaveTypeId, year } },
+        data: { accrued, used }
+      });
+    }
     return {
       leaveTypeId,
       leaveTypeName: leaveType.name,
@@ -61,9 +89,6 @@ export async function getOrInitLeaveTypeBalance(employeeId: string, leaveTypeId:
     };
   }
 
-  const annualLimit = leaveType.annualLimit ?? 0;
-  const accrued = proratedAccrual(annualLimit, employee.hireDate, year);
-
   const priorYear = await prisma.employeeLeaveTypeBalance.findUnique({
     where: { employeeId_leaveTypeId_year: { employeeId, leaveTypeId, year: year - 1 } }
   });
@@ -73,7 +98,7 @@ export async function getOrInitLeaveTypeBalance(employeeId: string, leaveTypeId:
     carriedOver = Math.max(0, Math.min(priorRemaining, leaveType.carryOverLimit));
   }
 
-  await prisma.employeeLeaveTypeBalance.create({ data: { employeeId, leaveTypeId, year, accrued, used: 0, carriedOver } });
+  await prisma.employeeLeaveTypeBalance.create({ data: { employeeId, leaveTypeId, year, accrued, used, carriedOver } });
 
   return {
     leaveTypeId,
@@ -81,9 +106,9 @@ export async function getOrInitLeaveTypeBalance(employeeId: string, leaveTypeId:
     leaveTypeCode: leaveType.code,
     isPaid: leaveType.isPaid,
     accrued,
-    used: 0,
+    used,
     carriedOver,
-    remaining: round2(accrued + carriedOver)
+    remaining: round2(accrued + carriedOver - used)
   };
 }
 
@@ -99,25 +124,18 @@ export async function getAllLeaveTypeBalances(employeeId: string, forDate = new 
  * aggregate recordLeaveApprovalUsage, which keeps running unchanged for
  * anything still reading only the old aggregate). Increments `used` on the
  * per-type/per-year row for the year the leave actually starts in. */
-export async function recordLeaveTypeApprovalUsage(employeeId: string, leaveTypeId: string, days: number, startDate: Date) {
+export async function recordLeaveTypeApprovalUsage(employeeId: string, leaveTypeId: string, _days: number, startDate: Date) {
   const year = startDate.getFullYear();
   await getOrInitLeaveTypeBalance(employeeId, leaveTypeId, year);
-  return prisma.employeeLeaveTypeBalance.update({
-    where: { employeeId_leaveTypeId_year: { employeeId, leaveTypeId, year } },
-    data: { used: { increment: days } }
-  });
+  return prisma.employeeLeaveTypeBalance.findUnique({ where: { employeeId_leaveTypeId_year: { employeeId, leaveTypeId, year } } });
 }
 
 /** Reverses a previously-recorded approval (e.g. an approved request is later
  * cancelled) -- symmetric with recordLeaveTypeApprovalUsage. */
-export async function reverseLeaveTypeApprovalUsage(employeeId: string, leaveTypeId: string, days: number, startDate: Date) {
+export async function reverseLeaveTypeApprovalUsage(employeeId: string, leaveTypeId: string, _days: number, startDate: Date) {
   const year = startDate.getFullYear();
-  const existing = await prisma.employeeLeaveTypeBalance.findUnique({ where: { employeeId_leaveTypeId_year: { employeeId, leaveTypeId, year } } });
-  if (!existing) return null;
-  return prisma.employeeLeaveTypeBalance.update({
-    where: { employeeId_leaveTypeId_year: { employeeId, leaveTypeId, year } },
-    data: { used: { decrement: days } }
-  });
+  await getOrInitLeaveTypeBalance(employeeId, leaveTypeId, year);
+  return prisma.employeeLeaveTypeBalance.findUnique({ where: { employeeId_leaveTypeId_year: { employeeId, leaveTypeId, year } } });
 }
 
 /** True if this employee already has a PENDING or APPROVED leave request

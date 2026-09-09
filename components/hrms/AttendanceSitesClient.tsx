@@ -23,12 +23,13 @@ const blank: Omit<Site, "id"> = { name: "", latitude: 24.7136, longitude: 46.675
 export function AttendanceSitesClient({ initialSites }: { initialSites: Site[] }) {
   const [sites, setSites] = useState<Site[]>(initialSites);
   const [form, setForm] = useState<any>(blank);
+  const [showForm, setShowForm] = useState(false);
   const [pending, startTransition] = useTransition();
 
   useEffect(() => setSites(initialSites), [initialSites]);
 
-  function edit(site: Site) { setForm(site); window.scrollTo({ top: 0, behavior: "smooth" }); }
-  function reset() { setForm(blank); }
+  function edit(site: Site) { setForm(site); setShowForm(true); window.scrollTo({ top: 0, behavior: "smooth" }); }
+  function reset() { setForm(blank); setShowForm(false); }
   function save() {
     startTransition(async () => {
       const res = await fetch('/api/attendance/sites', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
@@ -50,18 +51,21 @@ export function AttendanceSitesClient({ initialSites }: { initialSites: Site[] }
 
   return (
     <div className="space-y-6" dir="rtl">
-      <div>
-        <h1 className="text-3xl font-black">مواقع حضور المشاريع والمستشفيات</h1>
-        <p className="text-muted-foreground">اربط الموظفين بالموقع بمجرد كتابة اسم المستشفى/الفرع/الإدارة/الكفيل، بدون إضافة حقول جديدة في قاعدة البيانات.</p>
+      <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">مواقع الحضور</h1>
+          <p className="mt-1 text-sm text-muted-foreground">حدد نطاقات الحضور واربط كل موقع بالفرع أو القسم أو المستشفى.</p>
+        </div>
+        <Button onClick={() => { setForm(blank); setShowForm(true); }}><Plus className="ml-2 h-4 w-4" />إضافة موقع</Button>
       </div>
 
-      <Card className="rounded-3xl">
+      {showForm ? <Card className="rounded-2xl">
         <CardHeader><CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5 text-primary" />إضافة / تعديل موقع</CardTitle></CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-3">
-          <Input placeholder="اسم الموقع / المستشفى" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <Input type="number" step="any" placeholder="Latitude" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: Number(e.target.value) })} />
-          <Input type="number" step="any" placeholder="Longitude" value={form.longitude} onChange={(e) => setForm({ ...form, longitude: Number(e.target.value) })} />
-          <Input type="number" placeholder="النطاق بالمتر" value={form.radiusMeters} onChange={(e) => setForm({ ...form, radiusMeters: Number(e.target.value) })} />
+          <label className="space-y-1 text-sm"><span>اسم الموقع</span><Input placeholder="مثال: مستشفى الملك فهد" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
+          <label className="space-y-1 text-sm"><span>خط العرض</span><Input type="number" step="any" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: Number(e.target.value) })} /></label>
+          <label className="space-y-1 text-sm"><span>خط الطول</span><Input type="number" step="any" value={form.longitude} onChange={(e) => setForm({ ...form, longitude: Number(e.target.value) })} /></label>
+          <label className="space-y-1 text-sm"><span>نطاق السماح بالمتر</span><Input type="number" value={form.radiusMeters} onChange={(e) => setForm({ ...form, radiusMeters: Number(e.target.value) })} /></label>
           <select className="h-10 rounded-md border bg-background px-3" value={form.assignmentType} onChange={(e) => setForm({ ...form, assignmentType: e.target.value })}>
             <option value="hospital">حسب اسم المستشفى/الموقع</option>
             <option value="branch">حسب الفرع</option>
@@ -74,10 +78,10 @@ export function AttendanceSitesClient({ initialSites }: { initialSites: Site[] }
           <label className="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm"><input type="checkbox" checked={Boolean(form.requirePhoto)} onChange={(e) => setForm({ ...form, requirePhoto: e.target.checked })} /> يتطلب صورة تحقق</label>
           <div className="flex gap-2 md:col-span-3">
             <Button disabled={pending || !form.name || !form.assignmentValue} onClick={save}><Save className="ml-2 h-4 w-4" />حفظ الموقع</Button>
-            <Button variant="outline" onClick={reset}><Plus className="ml-2 h-4 w-4" />جديد</Button>
+            <Button variant="outline" onClick={reset}>إلغاء</Button>
           </div>
         </CardContent>
-      </Card>
+      </Card> : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {sites.map((site) => (

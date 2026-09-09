@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import type { Dictionary } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
 import { EmployeePhotoUpload } from "./employee-photo-upload";
+import { UserSearchSelect } from "./user-search-select";
 import { calculateInsuranceDeduction, calculateNetSalary, calculateTotalSalary, salaryProfileFields, salaryProfileLabels } from "@/lib/employee/salary-profile";
 
 export function ModuleForm({ resource, dictionary, initialValues, recordId, locale = "en" }: { resource: HrmsModule; dictionary: Dictionary; initialValues?: Record<string, unknown>; recordId?: string; locale?: Locale }) {
@@ -165,7 +166,13 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
           return (
             <div key={field.name} className={field.type === "textarea" ? "space-y-2 md:col-span-2" : "space-y-2"}>
               <Label htmlFor={field.name}>{label}{field.required && <span className="text-destructive mr-1">*</span>}</Label>
-              {isInsuranceForm && field.name === "documentUrl" ? (
+              {field.name === "employeeId" ? (
+                <UserSearchSelect
+                  value={String(form.watch(field.name) || "")}
+                  onChange={(userId, _label, employee) => form.setValue(field.name, employee?.id || userId || "", { shouldDirty: true, shouldValidate: true })}
+                  placeholder="ابحث باسم الموظف أو رقمه الوظيفي أو هويته..."
+                />
+              ) : isInsuranceForm && field.name === "documentUrl" ? (
                 <div className="space-y-2">
                   <input
                     id={field.name}

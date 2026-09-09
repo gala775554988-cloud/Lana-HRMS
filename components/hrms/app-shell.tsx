@@ -11,7 +11,7 @@ import {
   DollarSign, Package, Megaphone, BarChart3, Settings,
   Shield, GitPullRequest, Menu, X, PlugZap, Search,
   CalendarClock, Fingerprint,
-  Umbrella, User, Mail, ShieldCheck, Landmark, Briefcase, AlertTriangle
+  Umbrella, User, Mail, ShieldCheck, Briefcase
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/brand/brand-logo";
@@ -48,8 +48,7 @@ const navItems: Array<{ href: string; label: string; icon: typeof LayoutDashboar
   { href: "/hospitals", label: "المستشفيات", icon: Building2, resource: "hospitals" },
   { href: "/request-center", label: "الطلبات", icon: GitPullRequest, resource: ["leave", "requests"] },
   { href: "/permissions", label: "الصلاحيات", icon: Shield, resource: "permissions" },
-  { href: "/insurance", label: "التأمين", icon: Umbrella, resource: "insurance" },
-  { href: "/social-insurance", label: "التأمينات الاجتماعية", icon: Landmark, resource: "social-insurance" },
+  { href: "/insurance", label: "التأمينات", icon: Umbrella, resource: ["insurance", "social-insurance"] },
   { href: "/attendance", label: "الحضور والورديات", icon: Clock, resource: ["attendance", "shifts"] },
   { href: "/payroll", label: "مسير الرواتب والبدلات", icon: DollarSign, resource: ["payroll", "allowances", "deductions"] },
   { href: "/assets", label: "الأصول والعهد", icon: Package, resource: "assets" },
@@ -196,22 +195,13 @@ export function AppShell({ children, dictionary }: AppShellProps) {
                         {pendingApprovalsCount > 99 ? "99+" : pendingApprovalsCount}
                       </span>
                     ) : null}
-                    {item.href === "/insurance" && expiringInsuranceCount ? (
+                    {item.href === "/insurance" && (expiringInsuranceCount || socialInsuranceAlertsCount) ? (
                       <span
                         key={expiringInsuranceCount}
                         className="absolute -top-1.5 -end-2 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 px-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white dark:ring-slate-950 shadow-sm"
-                        aria-label={`${expiringInsuranceCount} وثيقة تأمين على وشك الانتهاء`}
+                        aria-label={`${Number(expiringInsuranceCount || 0) + Number(socialInsuranceAlertsCount || 0)} تنبيهات تأمين`}
                       >
-                        {expiringInsuranceCount > 99 ? "99+" : expiringInsuranceCount}
-                      </span>
-                    ) : null}
-                    {item.href === "/social-insurance" && socialInsuranceAlertsCount ? (
-                      <span
-                        key={socialInsuranceAlertsCount}
-                        className="absolute -top-1.5 -end-2 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 px-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white dark:ring-slate-950 shadow-sm"
-                        aria-label={`${socialInsuranceAlertsCount} موظف بدون تسجيل تأمينات اجتماعية`}
-                      >
-                        {socialInsuranceAlertsCount > 99 ? "99+" : socialInsuranceAlertsCount}
+                        {Number(expiringInsuranceCount || 0) + Number(socialInsuranceAlertsCount || 0) > 99 ? "99+" : Number(expiringInsuranceCount || 0) + Number(socialInsuranceAlertsCount || 0)}
                       </span>
                     ) : null}
                   </span>
@@ -433,9 +423,12 @@ function ProfileOverlay({
           </div>
         ) : (
           <div className="border-t border-slate-100 dark:border-slate-800 p-4">
-            <div className="flex items-start gap-2.5 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 p-3 text-amber-800 dark:text-amber-300">
-              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-              <p className="text-xs font-bold leading-relaxed">لا يوجد ملف موظف مرتبط بهذا الحساب حالياً</p>
+            <div className="flex items-start gap-2.5 rounded-2xl border bg-slate-50 p-3 text-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
+              <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5 text-primary" />
+              <div>
+                <p className="text-xs font-bold leading-relaxed">حساب إداري</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">هذا الحساب مخصص لإدارة النظام ولا يحتاج إلى ملف موظف.</p>
+              </div>
             </div>
           </div>
         )}
