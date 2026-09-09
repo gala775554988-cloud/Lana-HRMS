@@ -111,7 +111,7 @@ function PayslipContent() {
           <p className="text-2xl font-black">{item.netPay.toLocaleString("ar-SA")} {item.currency}</p>
         </div>
 
-        <p className="mt-6 text-center text-xs text-slate-400">تم إصدار هذا الكشف إلكترونياً من نظام Lana HRMS بتاريخ {new Date().toLocaleDateString("ar-SA")}</p>
+        <p className="mt-6 text-center text-xs text-slate-400">تم إصدار هذا الكشف إلكترونياً من نظام HRMS بتاريخ {new Date().toLocaleDateString("ar-SA")}</p>
       </div>
     </div>
   );

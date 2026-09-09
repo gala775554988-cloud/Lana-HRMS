@@ -142,9 +142,9 @@ export default function PasswordManagementClient({ totalEmployees }: { totalEmpl
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><KeyRound className="h-5 w-5" />إدارة كلمات المرور</CardTitle>
           <CardDescription>
-            إعادة تعيين كلمة المرور إلى آخر 4 أرقام من رقم الهوية. سيُجبر الموظف على تغييرها عند أول دخول.
+            إنشاء كلمة مرور مؤقتة عشوائية وآمنة. سيُجبر الموظف على تغييرها عند أول دخول.
             <br />
-            <span className="text-red-600 font-bold">تحذير: هذه العملية ستعيد كلمة المرور إلى الافتراضية (آخر 4 أرقام) وستجبر الموظف على تغييرها.</span>
+            <span className="text-amber-700 font-bold">تظهر كلمة المرور المؤقتة مرة واحدة بعد العملية؛ انقلها للموظف عبر قناة آمنة.</span>
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -167,6 +167,11 @@ export default function PasswordManagementClient({ totalEmployees }: { totalEmpl
             <div className={`p-4 rounded-lg mb-4 ${result.success ? "bg-green-50 border border-green-200 text-green-800" : "bg-red-50 border border-red-200 text-red-800"}`}>
               <div className="font-bold">{result.message}</div>
               <div className="text-sm mt-1">تم: {result.resetCount} | تم تخطيه: {result.skippedCount} | إجمالي: {result.total}</div>
+              {result.results?.length > 0 && (
+                <div className="mt-3 space-y-1 rounded-lg border border-emerald-200 bg-white p-3 text-xs">
+                  {result.results.map((item: any) => <div key={item.id}><strong>{item.name}:</strong> <code dir="ltr">{item.temporaryPassword}</code></div>)}
+                </div>
+              )}
               {result.errors && result.errors.length > 0 && (
                 <div className="mt-2 text-xs">
                   <strong>أخطاء:</strong>
@@ -236,13 +241,13 @@ export default function PasswordManagementClient({ totalEmployees }: { totalEmpl
             </CardHeader>
             <CardContent className="space-y-4">
               {showConfirm === "single" && confirmEmployee && (
-                <p>هل أنت متأكد من إعادة تعيين كلمة مرور الموظف <strong>{confirmEmployee.firstName} {confirmEmployee.lastName}</strong> ({confirmEmployee.nationalId}) إلى آخر 4 أرقام <strong>{confirmEmployee.nationalId.slice(-4)}</strong>؟</p>
+                <p>هل تريد إنشاء كلمة مرور مؤقتة آمنة للموظف <strong>{confirmEmployee.firstName} {confirmEmployee.lastName}</strong>؟</p>
               )}
               {showConfirm === "multiple" && (
-                <p>هل أنت متأكد من إعادة تعيين كلمات مرور <strong>{selected.size}</strong> موظف إلى آخر 4 أرقام من هوياتهم؟</p>
+                <p>هل تريد إنشاء كلمات مرور مؤقتة آمنة لعدد <strong>{selected.size}</strong> من الموظفين؟</p>
               )}
               {showConfirm === "all" && (
-                <p className="text-red-700 font-bold">هل أنت متأكد من إعادة تعيين كلمات مرور <strong>جميع الموظفين ({totalEmployees})</strong> إلى آخر 4 أرقام؟ هذه العملية ستجبر الجميع على تغيير كلمة المرور عند أول دخول!</p>
+                <p className="text-red-700 font-bold">هل تريد إنشاء كلمات مرور مؤقتة جديدة لجميع الموظفين ({totalEmployees})؟ سيؤدي ذلك إلى إنهاء صلاحية كلمات المرور الحالية وإجبار الجميع على تغييرها.</p>
               )}
               <div className="bg-amber-50 border border-amber-200 rounded p-3 text-xs text-amber-800">
                 سيتم تسجيل هذه العملية في Audit Log مع اسم من قام بها ومتى ولأي موظف.

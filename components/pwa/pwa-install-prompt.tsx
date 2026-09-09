@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { BrandLogo } from "@/components/brand/brand-logo";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -85,9 +86,7 @@ export function PWAInstallPrompt() {
     return (
       <div className="fixed inset-x-3 bottom-3 z-[60] mx-auto max-w-md rounded-2xl border border-primary/30 bg-white/95 p-4 text-slate-900 shadow-2xl backdrop-blur dark:border-primary/40 dark:bg-slate-950/95 dark:text-slate-50">
         <div className="flex items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg shadow-primary/15">
-            <img src="/brand/lana-logo.png" alt="شعار Lana HRMS" className="h-full w-full object-contain p-1" />
-          </div>
+          <BrandLogo href={null} size="sm" showText={false} />
           <div className="min-w-0 flex-1">
             <p className="font-semibold">تحديث جديد متاح</p>
             <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
@@ -120,11 +119,9 @@ export function PWAInstallPrompt() {
   return (
     <div className="fixed inset-x-3 bottom-3 z-[60] mx-auto max-w-md rounded-2xl border border-slate-200 bg-white/95 p-4 text-slate-900 shadow-2xl backdrop-blur dark:border-slate-700 dark:bg-slate-950/95 dark:text-slate-50">
       <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg shadow-primary/15">
-          <img src="/brand/lana-logo.png" alt="شعار Lana HRMS" className="h-full w-full object-contain p-1" />
-        </div>
+        <BrandLogo href={null} size="sm" showText={false} />
         <div className="min-w-0 flex-1">
-          <p className="font-semibold">ثبّت Lana HRMS كتطبيق</p>
+          <p className="font-semibold">ثبّت HRMS كتطبيق</p>
           <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
             {showIOSHelp
               ? "على الآيفون/الآيباد: اضغط زر المشاركة ثم اختر \"إضافة إلى الشاشة الرئيسية\"."

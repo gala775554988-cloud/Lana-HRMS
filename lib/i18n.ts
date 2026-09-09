@@ -195,7 +195,7 @@ export const dictionaries = {
       payroll: "Payroll & Compensation",
       permissions: "Permissions",
       "ai-assistant": "Lana AI Assistant",
-      "lana-ai": "AI System Manager",
+      "lana-ai": "مراقبة جودة النظام",
       "departments-branches": "Departments & Branches",
       insurance: "Insurance"
     },

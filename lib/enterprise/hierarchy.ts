@@ -79,7 +79,7 @@ export async function getAccessProfile(userId: string, roles: string[] = []): Pr
     select: { id: true, userId: true, departmentId: true, branchId: true, hospitalId: true, projectId: true, position: { select: { title: true } } }
   });
   const effectiveRoles = Array.from(new Set([...roles, ...inferEnterpriseRolesFromPosition(employee?.position?.title)]));
-  const effectivePermissions = await getCachedEffectivePermissions(userId, effectiveRoles).catch(() => []);
+  const effectivePermissions: string[] = await getCachedEffectivePermissions(userId, effectiveRoles).catch(() => [] as string[]);
   const canViewAllEmployees = effectivePermissions.includes("read:employees") || effectivePermissions.includes("manage:employees");
 
   return {

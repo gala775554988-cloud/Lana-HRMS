@@ -350,7 +350,7 @@ export function LanaAiFullPageClient() {
               <Sparkles className="h-6 w-6 text-amber-300" />
             </div>
             <div>
-              <h2 className="font-black text-lg text-slate-900 dark:text-slate-100">مساعد Lana</h2>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">المساعد الذكي</h2>
               <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                 متصل بالنظام ومستعد لتنفيذ العمليات والإجابة الفورية
@@ -429,7 +429,7 @@ export function LanaAiFullPageClient() {
                           <span className="h-2 w-2 rounded-full bg-secondary dark:bg-secondary/50 animate-bounce [animation-delay:0.2s]" />
                           <span className="h-2 w-2 rounded-full bg-secondary dark:bg-secondary/50 animate-bounce [animation-delay:0.4s]" />
                         </span>
-                        <span className="text-xs font-semibold">Lana يكتب الآن...</span>
+                        <span className="text-xs font-semibold">جاري إعداد الإجابة...</span>
                       </div>
                     )
                   ) : (
@@ -521,7 +521,7 @@ export function LanaAiFullPageClient() {
                   send();
                 }
               }}
-              placeholder="تحدث مع Lana بشكل طبيعي أو اطلب تنفيذ عملية في النظام..."
+              placeholder="اكتب سؤالك أو اطلب تنفيذ عملية في النظام..."
               rows={1}
               className="max-h-36 min-h-[40px] w-full resize-none border-0 bg-transparent py-2.5 text-sm focus:outline-none focus:ring-0 placeholder:text-muted-foreground"
             />

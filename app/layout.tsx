@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { IBM_Plex_Sans_Arabic } from "next/font/google";
 import "@/lib/error-interceptor";
 import { cookies, headers } from "next/headers";
 import { siteConfig } from "@/config/site";
@@ -9,11 +10,17 @@ import { auth } from "@/auth";
 import { ThemeProvider } from "@/components/hrms/theme-provider";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { I18nRuntime } from "@/components/i18n/i18n-runtime";
-import { LazyLanaAiAssistant } from "@/components/enterprise/lazy-lana-ai-assistant";
 import { PWAInstallPrompt } from "@/components/pwa/pwa-install-prompt";
 import { PWARegister } from "@/components/pwa/pwa-register";
 
 export const dynamic = "force-dynamic";
+
+const interfaceFont = IBM_Plex_Sans_Arabic({
+  subsets: ["arabic", "latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  variable: "--font-ibm-plex-arabic"
+});
 
 function getSafeMetadataBase() {
   const url = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
@@ -26,31 +33,20 @@ function getSafeMetadataBase() {
 
 export const metadata: Metadata = {
   metadataBase: getSafeMetadataBase(),
-  title: { default: siteConfig.name, template: "%s | Lana HRMS" },
+  title: { default: siteConfig.name, template: "%s | HRMS" },
   description: siteConfig.description,
   applicationName: siteConfig.name,
-  authors: [{ name: "Lana HRMS" }],
+  authors: [{ name: "HRMS" }],
   keywords: ["HRMS", "Human Resources", "Payroll", "Attendance", "Recruitment", "Employee Management"],
   openGraph: { title: siteConfig.name, description: siteConfig.description, type: "website", locale: "ar_SA" },
   robots: { index: false, follow: false },
   manifest: "/manifest.webmanifest",
   icons: {
-    icon: [
-      { url: "/favicon.ico", sizes: "16x16 32x32", type: "image/x-icon" },
-      { url: "/favicon.png", sizes: "32x32", type: "image/png" },
-      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
-      { url: "/icons/icon-512x512.png", sizes: "512x512", type: "image/png" }
-    ],
-    apple: [
-      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
-      { url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }
-    ]
+    icon: [{ url: "/favicon.svg", sizes: "any", type: "image/svg+xml" }]
   },
   appleWebApp: {
     capable: true,
-    title: "Lana HRMS",
+    title: "HRMS",
     statusBarStyle: "default"
   },
   formatDetection: {
@@ -59,13 +55,13 @@ export const metadata: Metadata = {
   other: {
     "mobile-web-app-capable": "yes",
     "apple-mobile-web-app-capable": "yes",
-    "apple-mobile-web-app-title": "Lana HRMS"
+    "apple-mobile-web-app-title": "HRMS"
   }
 };
 
 export const viewport: Viewport = {
   width: "device-width", initialScale: 1, maximumScale: 1,
-  themeColor: "#ffffff"
+  themeColor: "#18365f"
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -81,7 +77,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const locale = normalizeLocale(headerLocale ?? cookieLocale);
 
   return (
-    <html lang={locale} dir={getDirection(locale)} className="light" style={{ colorScheme: "light" }} suppressHydrationWarning>
+    <html lang={locale} dir={getDirection(locale)} className={`${interfaceFont.variable} light`} style={{ colorScheme: "light" }} suppressHydrationWarning>
       <body>
         <SessionProvider session={session} refetchOnWindowFocus={false} refetchWhenOffline={false}>
           <QueryProvider>
@@ -89,7 +85,6 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               <PWARegister />
               <I18nRuntime initialLocale={locale} />
               {children}
-              <LazyLanaAiAssistant />
               <PWAInstallPrompt />
             </ThemeProvider>
           </QueryProvider>

@@ -1,7 +1,8 @@
 import Link from "next/link";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
-export const BRAND_LOGO_SRC = "/brand/lana-logo.png";
+export const BRAND_LOGO_SRC = "";
 
 type BrandLogoSize = "xs" | "sm" | "md" | "lg" | "xl" | "hero";
 
@@ -50,7 +51,7 @@ interface BrandLogoProps {
 export function BrandLogo({
   href = "/",
   showText = true,
-  title = "Lana HRMS",
+  title = "HRMS",
   subtitle = "نظام إدارة الموارد البشرية",
   src,
   size = "md",
@@ -66,16 +67,16 @@ export function BrandLogo({
     <>
       <span
         className={cn(
-          "inline-flex shrink-0 items-center justify-center overflow-hidden border border-slate-200 bg-white shadow-sm shadow-slate-950/10 ring-1 ring-white/50",
+          "inline-flex shrink-0 items-center justify-center overflow-hidden border border-white/15 bg-primary text-primary-foreground shadow-sm",
           logoSizes[size],
           logoClassName
         )}
       >
-        <img
-          src={logoSrc}
-          alt="شعار Lana HRMS"
-          className={cn("h-full w-full object-contain p-1", imageClassName)}
-        />
+        {logoSrc ? (
+          <Image src={logoSrc} alt="شعار HRMS" width={176} height={176} unoptimized className={cn("h-full w-full object-contain p-1", imageClassName)} />
+        ) : (
+          <span className="text-[0.58em] font-black tracking-[-0.06em]" aria-hidden="true">HR</span>
+        )}
       </span>
       {showText ? (
         <span className={cn("min-w-0 leading-tight", textClassName)}>
@@ -95,7 +96,7 @@ export function BrandLogo({
   }
 
   return (
-    <Link href={href} className={cn(classes, "transition-transform hover:scale-[1.01]")} aria-label="Lana HRMS home">
+    <Link href={href} className={classes} aria-label="الصفحة الرئيسية لنظام HRMS">
       {content}
     </Link>
   );

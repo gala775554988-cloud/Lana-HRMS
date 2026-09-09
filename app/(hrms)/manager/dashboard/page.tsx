@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "لوحة تحكم المدير | Lana HRMS",
+  title: "لوحة تحكم المدير | HRMS",
   description: "نظرة سريعة على فريقك، الاعتمادات المعلقة، والحضور."
 };
 

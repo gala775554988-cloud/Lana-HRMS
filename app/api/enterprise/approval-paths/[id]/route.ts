@@ -17,15 +17,21 @@ type StageInput = { order: number; name?: string | null; approverEmployeeId: str
 
 function validateStages(stages: unknown): StageInput[] {
   if (!Array.isArray(stages) || !stages.length) throw new Error("يجب إضافة مرحلة واحدة على الأقل");
+  const seenApprovers = new Set<string>();
   return stages.map((raw, index) => {
     const stage = raw as Record<string, unknown>;
     if (!stage.approverEmployeeId || typeof stage.approverEmployeeId !== "string") {
       throw new Error(`المرحلة رقم ${index + 1}: يجب اختيار الموظف المسؤول عن الموافقة`);
     }
+    const approverEmployeeId = stage.approverEmployeeId.trim();
+    if (seenApprovers.has(approverEmployeeId)) {
+      throw new Error(`المرحلة رقم ${index + 1}: لا يمكن تكرار المعتمد نفسه في المسار`);
+    }
+    seenApprovers.add(approverEmployeeId);
     return {
       order: index + 1,
       name: typeof stage.name === "string" ? stage.name.trim() || null : null,
-      approverEmployeeId: stage.approverEmployeeId,
+      approverEmployeeId,
       isMandatory: stage.isMandatory !== false
     };
   });

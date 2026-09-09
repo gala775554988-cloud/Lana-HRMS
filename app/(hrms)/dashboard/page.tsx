@@ -1,226 +1,187 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import type { LucideIcon } from "lucide-react";
+import {
+  ArrowLeft,
+  Building2,
+  CalendarCheck2,
+  Clock3,
+  Hospital,
+  Landmark,
+  Plus,
+  Syringe,
+  Users,
+  WalletCards,
+  Wrench
+} from "lucide-react";
 import { auth } from "@/auth";
 import { getRequestDictionary } from "@/lib/i18n-server";
 import { CompanyOverview, OverviewSkeleton } from "@/app/(hrms)/analytics/page";
 import { getExecutiveHubOrgGroups, type OrgGroupCard } from "@/lib/enterprise/dashboard-org-groups";
-import {
-  Users, ArrowUpRight, Activity, Hospital, Wrench, Syringe, Landmark, CalendarClock, AlertTriangle
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
 
-// Brand gradient (navy -> mid-blue -> grey), pixel-matched to the real Lana
-// logo -- kept as hardcoded hex literals (not the shared --primary token)
-// so this page's look never depends on what --primary resolves to
-// elsewhere in the app. Kept as a literal gradient string since Tailwind
-// has no single utility for a precise 3-stop percentage gradient.
-const BRAND_GRADIENT = "linear-gradient(90deg, #1E3A64 0%, #2E4E7E 55%, #707070 100%)";
-
 export const metadata = {
-  title: "لوحة التحكم المركزية — Pro Max Executive Hub | Lana HRMS",
-  description: "المستشعر الذكي وإدارة الموارد البشرية التنفيذية لمنصات لانا الطبية والتشغيلية."
+  title: "لوحة التحكم",
+  description: "نظرة شاملة على الموارد البشرية والعمليات اليومية."
 };
 
-function DiagnosticConfessionBox({ err, location }: { err: any; location: string }) {
-  const errMsg = err?.message || String(err || "Unknown error");
-  const stack = err?.stack || "";
-  return (
-    <div className="rounded-3xl border border-rose-300 bg-rose-50/95 p-6 shadow-xl dark:border-rose-800 dark:bg-rose-950/80 text-rose-900 dark:text-rose-100" dir="rtl">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="grid h-12 w-12 place-items-center rounded-2xl bg-rose-600 text-white shadow-md shrink-0">
-          <AlertTriangle className="h-6 w-6" />
-        </div>
-        <div>
-          <h2 className="text-lg font-black">اعتراف النظام بالخطأ التقني المباشر (`{location}`)</h2>
-          <p className="text-xs text-rose-700 dark:text-rose-300 font-bold">تم التقاط الاستثناء برمجياً قبل إخفائه من خادم الإنتاج لبيان السبب بدقة</p>
-        </div>
-      </div>
-      <div className="rounded-2xl bg-white/90 dark:bg-slate-900/90 p-4 border border-rose-200 dark:border-rose-900/60 font-mono text-xs text-rose-800 dark:text-rose-200 overflow-x-auto space-y-2">
-        <p className="font-bold text-sm text-rose-600 dark:text-rose-400">الرسالة التقنية (Error Message):</p>
-        <p className="p-2 bg-rose-50 dark:bg-rose-950/50 rounded-lg">{errMsg}</p>
-        {stack ? (
-          <>
-            <p className="font-bold text-sm text-rose-600 dark:text-rose-400 pt-2">مسار التنفيذ والسطر (Stack Trace):</p>
-            <pre className="p-2 bg-slate-100 dark:bg-slate-950 rounded-lg text-[11px] leading-relaxed max-h-64 overflow-y-auto">{stack}</pre>
-          </>
-        ) : null}
-      </div>
-    </div>
-  );
-}
+type OrganizationCard = {
+  key: string;
+  title: string;
+  description: string;
+  icon: LucideIcon;
+  data: OrgGroupCard;
+};
+
+const quickActions = [
+  { href: "/employees?action=create", label: "إضافة موظف", icon: Plus },
+  { href: "/request-center", label: "مراجعة الطلبات", icon: CalendarCheck2 },
+  { href: "/attendance", label: "متابعة الحضور", icon: Clock3 },
+  { href: "/payroll", label: "مسير الرواتب", icon: WalletCards }
+];
 
 export default async function CentralDashboardPage() {
-  try {
-    const session = await auth().catch((e: any) => { console.error("Dashboard auth error:", e); return null; });
-    const { locale, dictionary } = await getRequestDictionary().catch(() => ({ locale: "ar" as const, dictionary: {} as any }));
-    const orgGroups = await getExecutiveHubOrgGroups().catch(() => null);
+  const [session, requestData, orgGroups] = await Promise.all([
+    auth().catch(() => null),
+    getRequestDictionary().catch(() => ({ locale: "ar" as const, dictionary: {} as never })),
+    getExecutiveHubOrgGroups().catch(() => null)
+  ]);
 
-    const orgCards: Array<{
-      key: string; title: string; description: string; icon: LucideIcon; badge: string; color: string;
-      bgLight: string; data: OrgGroupCard;
-    }> = [
-      {
-        key: "hospitals",
-        title: "المستشفيات",
-        description: "توزيع الكوادر الطبية على مواقع المستشفيات الفعلية.",
-        icon: Hospital,
-        badge: "القطاع الطبي",
-        color: "#1E3A64",
-        bgLight: "bg-white border-slate-200 hover:border-[#1E3A64]/40 dark:bg-slate-900 dark:border-slate-800",
-        data: orgGroups?.hospitals ?? { total: 0, items: [], href: "/hospitals" }
-      },
-      {
-        key: "operations",
-        title: "التشغيل",
-        description: "المشاريع والخدمات اللوجستية ومحطات المعالجة والبيئة ومكافحة العدوى.",
-        icon: Wrench,
-        badge: "العمليات التشغيلية",
-        color: "#707070",
-        bgLight: "bg-white border-slate-200 hover:border-[#707070]/40 dark:bg-slate-900 dark:border-slate-800",
-        data: orgGroups?.operations ?? { total: 0, items: [], href: "/branches?tab=departments" }
-      },
-      {
-        key: "medical-supplies",
-        title: "المستلزمات الطبية",
-        description: "الأجهزة والمستلزمات الطبية، الصيانة، والمشتريات الطبية.",
-        icon: Syringe,
-        badge: "الإمداد الطبي",
-        color: "#3D5A80",
-        bgLight: "bg-white border-slate-200 hover:border-[#3D5A80]/40 dark:bg-slate-900 dark:border-slate-800",
-        data: orgGroups?.medicalSupplies ?? { total: 0, items: [], href: "/branches?tab=departments" }
-      },
-      {
-        key: "main-administration",
-        title: "الإدارة الرئيسية",
-        description: "الإدارة والمالية وإدارة التوريد وتقنية المعلومات والمراجع.",
-        icon: Landmark,
-        badge: "الإدارة المركزية",
-        color: "#4A4E52",
-        bgLight: "bg-white border-slate-200 hover:border-[#4A4E52]/40 dark:bg-slate-900 dark:border-slate-800",
-        data: orgGroups?.mainAdministration ?? { total: 0, items: [], href: "/branches?tab=departments" }
-      }
-    ];
+  const orgCards: OrganizationCard[] = [
+    {
+      key: "hospitals",
+      title: "المستشفيات",
+      description: "توزيع الموظفين على المستشفيات والمواقع الطبية.",
+      icon: Hospital,
+      data: orgGroups?.hospitals ?? { total: 0, items: [], href: "/hospitals" }
+    },
+    {
+      key: "operations",
+      title: "التشغيل",
+      description: "المشاريع والخدمات التشغيلية واللوجستية.",
+      icon: Wrench,
+      data: orgGroups?.operations ?? { total: 0, items: [], href: "/branches?tab=departments" }
+    },
+    {
+      key: "medical-supplies",
+      title: "المستلزمات الطبية",
+      description: "الأجهزة والصيانة والمشتريات الطبية.",
+      icon: Syringe,
+      data: orgGroups?.medicalSupplies ?? { total: 0, items: [], href: "/branches?tab=departments" }
+    },
+    {
+      key: "main-administration",
+      title: "الإدارة الرئيسية",
+      description: "الإدارات المركزية والمالية والتقنية.",
+      icon: Landmark,
+      data: orgGroups?.mainAdministration ?? { total: 0, items: [], href: "/branches?tab=departments" }
+    }
+  ];
 
-    return (
-      <div className="space-y-8 pb-10">
-        {/* Pro Max Executive Header Card */}
-        <div className="relative overflow-hidden rounded-3xl p-6 sm:p-8 shadow-xl" style={{ background: BRAND_GRADIENT }}>
-          <div className="relative flex flex-col justify-between gap-6 md:flex-row md:items-center">
-            <div className="space-y-2.5">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <span className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-white" style={{ backgroundColor: "rgba(255,255,255,0.18)" }}>
-                  <span className="h-2 w-2 rounded-full bg-emerald-300 animate-ping" />
-                  <span>المزامنة والتشغيل الفوري متصل بأعلى كفاءة</span>
+  return (
+    <div className="mx-auto w-full max-w-[1600px] space-y-6 pb-8">
+      <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
+        <div className="h-1 bg-primary" />
+        <div className="flex flex-col gap-6 p-5 sm:p-7 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="mb-2 text-xs font-medium text-muted-foreground">لوحة العمل اليومية</p>
+            <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
+              مرحبًا، {session?.user?.name || "مرحبًا بك"}
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+              هنا ملخص القوى العاملة والطلبات والحضور. ابدأ من إجراء سريع أو استعرض التفاصيل أدناه.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:flex">
+            <Link href="/employees?action=create" className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90">
+              <Plus className="h-4 w-4" />
+              إضافة موظف
+            </Link>
+            <Link href="/employees" className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-semibold text-foreground transition-colors hover:bg-muted">
+              <Users className="h-4 w-4 text-primary" />
+              دليل الموظفين
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="quick-actions-title">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 id="quick-actions-title" className="text-base font-bold">إجراءات سريعة</h2>
+          <span className="text-xs text-muted-foreground">العمليات الأكثر استخدامًا</span>
+        </div>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {quickActions.map((action) => {
+            const Icon = action.icon;
+            return (
+              <Link key={action.href} href={action.href} className="group flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)] transition-colors hover:border-primary/30">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                  <Icon className="h-5 w-5" />
                 </span>
-                <Badge className="bg-white px-3 py-1 text-xs font-black shadow-sm hover:bg-white" style={{ color: "#1E3A64" }}>
-                  👑 لوحة التحكم المركزية Pro Max
-                </Badge>
-              </div>
-              <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white">
-                أهلاً بك، <span>{session?.user?.name || "الإدارة التنفيذية"}</span>
-              </h1>
-              <p className="text-sm font-semibold text-white/90 max-w-2xl leading-relaxed">
-                مركز التحكم التنفيذي Pro Max لمنصة لانا الطبية؛ رصد لحظي لحركة الكوادر، الاعتمادات، الرواتب، وتكامل بيانات Odoo لحظياً.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3 shrink-0">
-              <Link
-                href="/employees?action=create"
-                className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black shadow-lg transition-all hover:scale-105 hover:bg-slate-50 hover:shadow-xl active:scale-95"
-                style={{ color: "#1E3A64" }}
-              >
-                <Users className="h-4.5 w-4.5" />
-                <span>إضافة موظف جديد</span>
+                <span className="text-sm font-semibold">{action.label}</span>
+                <ArrowLeft className="ms-auto h-4 w-4 text-muted-foreground transition-transform group-hover:-translate-x-0.5 rtl:rotate-0 ltr:rotate-180" />
               </Link>
-              <Link
-                href="/attendance"
-                className="inline-flex items-center gap-2 rounded-2xl border border-white px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-white/20"
-              >
-                <CalendarClock className="h-4.5 w-4.5" />
-                <span>مراقبة الحضور</span>
-              </Link>
-            </div>
-          </div>
+            );
+          })}
         </div>
+      </section>
 
-        {/* Organizational Units Grid (real Hospital/Department data) */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between px-1">
-            <h2 className="text-base font-extrabold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-              <Activity className="h-4.5 w-4.5" style={{ color: "#1E3A64" }} />
-              <span>الوحدات التنظيمية الرئيسية</span>
-            </h2>
-            <span className="text-xs font-bold text-slate-400 dark:text-slate-500">أعداد حية من قاعدة البيانات</span>
+      <section aria-labelledby="organization-title">
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <h2 id="organization-title" className="text-base font-bold">الوحدات التنظيمية</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">بيانات مباشرة من سجلات الموظفين</p>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {orgCards.map((card, index) => {
-              const Icon = card.icon;
-              return (
-                <div
-                  key={card.key}
-                  className={`group relative overflow-hidden rounded-3xl border p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${card.bgLight}`}
-                  style={{ animationDelay: `${index * 50}ms` }}
-                >
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div
-                      className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-white shadow-md transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6"
-                      style={{ backgroundColor: card.color }}
-                    >
-                      <Icon className="h-6 w-6" />
+          <Link href="/branches" className="text-xs font-semibold text-primary hover:underline">إدارة الهيكل التنظيمي</Link>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {orgCards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <Card key={card.key} className="overflow-hidden border-border shadow-[var(--shadow-card)] transition-colors hover:border-primary/30">
+                <CardHeader className="flex-row items-start justify-between space-y-0 p-5 pb-3">
+                  <div className="flex items-center gap-3">
+                    <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><Icon className="h-5 w-5" /></span>
+                    <div>
+                      <CardTitle className="text-sm font-bold">{card.title}</CardTitle>
+                      <Badge variant="secondary" className="mt-1 border-0 px-2 py-0 text-[10px] font-medium">{card.data.total.toLocaleString("ar-SA")} موظف</Badge>
                     </div>
-                    <Badge variant="outline" className="text-[10px] font-extrabold border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900">
-                      {card.badge}
-                    </Badge>
                   </div>
-                  <h3 className="text-base font-black text-slate-900 dark:text-slate-100">{card.title}</h3>
-                  <p className="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-400 leading-relaxed">
-                    {card.description}
-                  </p>
-                  <div className="mt-3 flex items-baseline gap-1.5">
-                    <span className="text-2xl font-black tracking-tight text-slate-900 dark:text-slate-100">{card.data.total.toLocaleString("ar-SA")}</span>
-                    <span className="text-xs font-bold text-slate-400 dark:text-slate-500">موظف</span>
+                </CardHeader>
+                <CardContent className="px-5 pb-5">
+                  <p className="min-h-10 text-xs leading-5 text-muted-foreground">{card.description}</p>
+                  <div className="mt-3 space-y-1 border-t border-border pt-3">
+                    {card.data.items.slice(0, 3).map((item) => (
+                      <Link key={item.id} href={item.href} className="flex items-center justify-between rounded-lg px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground">
+                        <span className="truncate">{item.name}</span>
+                        <span className="font-semibold text-foreground">{item.count.toLocaleString("ar-SA")}</span>
+                      </Link>
+                    ))}
+                    {card.data.items.length === 0 ? <p className="py-2 text-xs text-muted-foreground">لا توجد بيانات مسجلة</p> : null}
                   </div>
-                  <div className="mt-3 max-h-36 space-y-0.5 overflow-y-auto rounded-xl bg-white p-1.5 dark:bg-slate-950">
-                    {card.data.items.length === 0 ? (
-                      <p className="px-2 py-2 text-[11px] font-semibold text-slate-400 dark:text-slate-500">لا توجد بيانات مطابقة بعد</p>
-                    ) : (
-                      card.data.items.map((item) => (
-                        <Link
-                          key={item.id}
-                          href={item.href}
-                          className="flex items-center justify-between rounded-lg px-2 py-1.5 text-[11px] font-semibold text-slate-600 transition-colors hover:bg-white dark:text-slate-400 dark:hover:bg-slate-900"
-                        >
-                          <span className="truncate">{item.name}</span>
-                          <span className="shrink-0 font-black text-slate-800 dark:text-slate-200">{item.count.toLocaleString("ar-SA")}</span>
-                        </Link>
-                      ))
-                    )}
-                  </div>
-                  <Link
-                    href={card.data.href}
-                    className="mt-3 flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-black text-white shadow-sm transition-transform group-hover:scale-[1.02]"
-                    style={{ backgroundColor: card.color }}
-                  >
-                    <span>فتح القسم</span>
-                    <ArrowUpRight className="h-3.5 w-3.5" />
+                  <Link href={card.data.href} className="mt-3 flex items-center justify-between rounded-lg text-xs font-semibold text-primary hover:underline">
+                    عرض التفاصيل
+                    <ArrowLeft className="h-3.5 w-3.5" />
                   </Link>
-                </div>
-              );
-            })}
-          </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
+      </section>
 
-        {/* Company Overview (KPIs, Live Metrics) */}
+      <section aria-labelledby="overview-title">
+        <div className="mb-3 flex items-center gap-2">
+          <Building2 className="h-4 w-4 text-primary" />
+          <h2 id="overview-title" className="text-base font-bold">نظرة عامة</h2>
+        </div>
         <Suspense fallback={<OverviewSkeleton />}>
-          <CompanyOverview locale={locale || "ar"} dictionary={dictionary || {}} showCharts={false} showAiSummary={false} />
+          <CompanyOverview locale={requestData.locale} dictionary={requestData.dictionary} showCharts={false} showAiSummary={false} />
         </Suspense>
-      </div>
-    );
-  } catch (err: any) {
-    return <DiagnosticConfessionBox err={err} location="CentralDashboardPage (/dashboard)" />;
-  }
+      </section>
+    </div>
+  );
 }

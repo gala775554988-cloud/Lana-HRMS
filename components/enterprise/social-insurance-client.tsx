@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Landmark, Users, UserCheck, UserX, ShieldCheck, ShieldOff, ShieldAlert,
@@ -254,7 +254,7 @@ function ListTab() {
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<ListRow | null>(null);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     const params = new URLSearchParams();
     if (status) params.set("status", status);
@@ -264,9 +264,9 @@ function ListTab() {
       .then((r) => r.json())
       .then((d) => { if (d.success) { setRows(d.records); setTotal(d.total); } })
       .finally(() => setLoading(false));
-  };
+  }, [page, search, status]);
 
-  useEffect(() => { load(); }, [status, page]);
+  useEffect(() => { load(); }, [load]);
 
   const pageCount = Math.max(1, Math.ceil(total / 25));
 

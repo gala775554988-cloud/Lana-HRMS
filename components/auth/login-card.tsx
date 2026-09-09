@@ -1,7 +1,6 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { BrandLogo } from "@/components/brand/brand-logo";
 import { LoginForm } from "@/app/login/login-form";
 import { cn } from "@/lib/utils";
 import type { Dictionary } from "@/lib/i18n";
@@ -23,30 +22,14 @@ export function LoginCard({ dictionary }: { dictionary: Dictionary }) {
 
   return (
     <div className="w-full max-w-md">
-      <div
-        className={cn(
-          "lana-slide-up mb-7 flex flex-col items-center text-center transition-all duration-500 ease-premium lg:items-start lg:text-start",
-          exiting ? "translate-x-16 opacity-0 rtl:-translate-x-16" : "translate-x-0 opacity-100"
-        )}
-      >
-        <div className="flex items-center gap-3">
-          <BrandLogo
-            href="/"
-            size="hero"
-            showText={false}
-            logoClassName="border-slate-300 shadow-2xl shadow-[#1E3A64]/10 ring-4 ring-white/80 dark:border-slate-700 dark:ring-slate-800"
-            imageClassName="p-2"
-          />
-          <h1 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 sm:text-3xl">
-            Lana <span className="font-medium text-[#1E3A64]">HRMS</span>
-          </h1>
-        </div>
-        <p className="mt-3 text-sm font-medium text-slate-400 dark:text-slate-500">البوابة الموحدة لدخول الموظفين والمسؤولين</p>
+      <div className={cn("mb-7 transition-opacity duration-300", exiting ? "opacity-0" : "opacity-100")}>
+        <p className="mb-2 text-sm font-semibold text-primary">مرحبًا بعودتك</p>
+        <h1 className="text-2xl font-bold text-foreground sm:text-3xl">تسجيل الدخول</h1>
+        <p className="mt-2 text-sm text-muted-foreground">أدخل بيانات حسابك للوصول إلى لوحة التحكم.</p>
       </div>
       <div
-        style={{ animationDelay: "90ms" }}
         className={cn(
-          "lana-slide-up relative rounded-3xl border border-slate-200/80 bg-white p-8 shadow-glass transition-all duration-500 ease-premium before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:shadow-[inset_0_1px_0_0_rgb(255_255_255_/_0.6)] dark:border-slate-800 dark:bg-slate-900/70",
+          "relative rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] transition-opacity duration-300 sm:p-8",
           exiting ? "scale-95 opacity-0" : "scale-100 opacity-100"
         )}
       >

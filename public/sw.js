@@ -1,23 +1,16 @@
-/* Lana HRMS PWA service worker
+/* HRMS PWA service worker
  * Strategy:
  * - Cache static app assets and PWA icons.
  * - Never cache API responses or authenticated HTML pages by default.
  * - Show a safe offline page when navigation fails.
  */
-const CACHE_VERSION = "v5";
-const STATIC_CACHE = `lana-hrms-static-${CACHE_VERSION}`;
+const CACHE_VERSION = "v6";
+const STATIC_CACHE = `hrms-static-${CACHE_VERSION}`;
 const OFFLINE_URL = "/offline.html";
 
 const PRECACHE_ASSETS = [
   OFFLINE_URL,
-  "/favicon.png",
-  "/favicon.ico",
-  "/brand/lana-logo.png",
-  "/icons/icon-192x192.png",
-  "/icons/icon-512x512.png",
-  "/icons/maskable-192x192.png",
-  "/icons/maskable-512x512.png",
-  "/icons/apple-touch-icon.png"
+  "/favicon.svg"
 ];
 
 self.addEventListener("install", (event) => {
@@ -34,7 +27,7 @@ self.addEventListener("activate", (event) => {
     caches
       .keys()
       .then((cacheNames) =>
-        Promise.all(cacheNames.filter((name) => name.startsWith("lana-hrms-") && name !== STATIC_CACHE).map((name) => caches.delete(name)))
+        Promise.all(cacheNames.filter((name) => (name.startsWith("lana-hrms-") || name.startsWith("hrms-")) && name !== STATIC_CACHE).map((name) => caches.delete(name)))
       )
       .then(() => self.clients.claim())
   );
@@ -51,8 +44,7 @@ function isApiOrAuthRequest(url) {
 function isStaticAsset(url) {
   return (
     url.pathname.startsWith("/icons/") ||
-    url.pathname === "/favicon.png" ||
-    url.pathname === "/favicon.ico" ||
+    url.pathname === "/favicon.svg" ||
     url.pathname === "/manifest.webmanifest" ||
     /\.(?:css|js|mjs|png|jpg|jpeg|gif|webp|svg|ico|woff2?)$/i.test(url.pathname)
   );

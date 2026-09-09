@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -69,7 +69,7 @@ export function HospitalsClient() {
     return params.toString();
   }, [branchId, departmentId, isActive, search]);
 
-  const load = () => {
+  const load = useCallback(() => {
     fetch(`/api/enterprise/hospitals?${query}`, { cache: "no-store" })
       .then(async (response) => {
         const data = await response.json().catch(() => ({ success: false, message: "فشل قراءة رد المستشفيات" }));
@@ -82,12 +82,12 @@ export function HospitalsClient() {
         setBranches(data.branches ?? []);
       })
       .catch((error) => setMessage(error.message));
-  };
+  }, [query]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(load, 300);
     return () => clearTimeout(delayDebounceFn);
-  }, [query]);
+  }, [load]);
 
   function startEdit(hospital?: Hospital) {
     setEditing(hospital ?? null);

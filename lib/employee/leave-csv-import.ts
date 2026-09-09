@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 
-type CsvRow = Record<string, string> & { rowIndex: number };
+type CsvRow = { rowIndex: number; [key: string]: string | number };
+const cell = (row: CsvRow, key: string) => String(row[key] ?? "");
 
 type PlannedLeaveImport = {
   employee: { id: string; employeeNumber: string; odooId: number | null; odooRawData: unknown; leaveBalance: { accrued: unknown; used: unknown } | null };
@@ -140,8 +141,8 @@ export async function planLeaveCsvImport(csv: string) {
         } else { 
           skipped.push({
             row: row.rowIndex,
-            id: row.ID,
-            name: row.name,
+            id: cell(row, "ID"),
+            name: cell(row, "name"),
             reason: `ambiguous employee name; candidates: ${matches.map((candidate) => `${candidate.employeeNumber} (Odoo ${candidate.odooId ?? "-"}, ${candidate.hireDate.toISOString().slice(0, 10)}, ${candidate.department?.name ?? "-"}, ${candidate.position?.title ?? "-"})`).join(", ")}`,
           });
           continue;
@@ -149,18 +150,18 @@ export async function planLeaveCsvImport(csv: string) {
       }
     }
     if (!employee) {
-      skipped.push({ row: row.rowIndex, id: row.ID, name: row.name, reason: "employee not found" });
+      skipped.push({ row: row.rowIndex, id: cell(row, "ID"), name: cell(row, "name"), reason: "employee not found" });
       continue;
     }
     if ([accrued, used, remaining, monthsAccrued].some((value) => value === null)) {
-      skipped.push({ row: row.rowIndex, id: row.ID, name: row.name, reason: "invalid leave numeric value" });
+      skipped.push({ row: row.rowIndex, id: cell(row, "ID"), name: cell(row, "name"), reason: "invalid leave numeric value" });
       continue;
     }
     if (Math.abs((accrued! - used!) - remaining!) > 0.01) {
-      skipped.push({ row: row.rowIndex, id: row.ID, name: row.name, reason: "accrued - used does not equal remaining" });
+      skipped.push({ row: row.rowIndex, id: cell(row, "ID"), name: cell(row, "name"), reason: "accrued - used does not equal remaining" });
       continue;
     }
-    planned.push({ employee, accrued: accrued!, used: used!, remaining: remaining!, monthsAccrued: monthsAccrued!, sourceId: row.ID });
+    planned.push({ employee, accrued: accrued!, used: used!, remaining: remaining!, monthsAccrued: monthsAccrued!, sourceId: cell(row, "ID") });
   }
   return { totalRows: records.length, planned, skipped };
 }

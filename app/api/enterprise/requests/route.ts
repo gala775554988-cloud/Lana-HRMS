@@ -2,17 +2,13 @@ import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { applyScopedWhere, getAccessProfile } from "@/lib/enterprise/hierarchy";
+import { parseWorkflowStepMetadata } from "@/lib/enterprise/workflow-step-metadata";
 
 const DEFAULT_TYPES = ["LEAVE", "RESUMPTION", "LOAN", "RESIDENCY", "DELEGATION", "CUSTODY", "DOCUMENT", "EXPENSE", "LETTER", "OVERTIME"];
 
 function parseDeferredUntil(comments: string | null) {
-  if (!comments) return null;
-  try {
-    const value = JSON.parse(comments) as { deferredUntil?: string };
-    return value.deferredUntil ? new Date(value.deferredUntil) : null;
-  } catch {
-    return null;
-  }
+  const value = parseWorkflowStepMetadata(comments).deferredUntil;
+  return value ? new Date(value) : null;
 }
 
 async function reactivateDueDeferredSteps() {
@@ -26,12 +22,7 @@ async function reactivateDueDeferredSteps() {
 
 function priorityOf(workflow: any) {
   const current = workflow.steps?.find((step: any) => step.step === workflow.currentStep);
-  if (!current?.comments) return "Normal";
-  try {
-    return JSON.parse(current.comments)?.priority ?? "Normal";
-  } catch {
-    return "Normal";
-  }
+  return parseWorkflowStepMetadata(current?.comments).priority ?? "Normal";
 }
 
 function currentApprover(workflow: any, userMap: Map<string, { name: string | null; email: string | null }>) {
@@ -144,6 +135,7 @@ export async function GET(request: NextRequest) {
   const approverUsers = approverIds.length ? await prisma.user.findMany({ where: { id: { in: approverIds } }, select: { id: true, name: true, email: true } }) : [];
   const approverUserMap = new Map(approverUsers.map((user) => [user.id, { name: user.name, email: user.email }]));
   const total = searched.length;
+  const elevated = profile.roles.includes("SUPER_ADMIN") || profile.roles.includes("HR_MANAGER");
   const requests = searched.slice((page - 1) * pageSize, page * pageSize).map((workflow) => ({
     id: workflow.id,
     type: workflow.type,
@@ -152,10 +144,21 @@ export async function GET(request: NextRequest) {
     currentStep: workflow.currentStep,
     createdAt: workflow.createdAt,
     updatedAt: workflow.updatedAt,
-    employee: workflow.employee,
+    employee: workflow.employee ? {
+      id: workflow.employee.id,
+      employeeNumber: workflow.employee.employeeNumber,
+      firstName: workflow.employee.firstName,
+      lastName: workflow.employee.lastName,
+      department: workflow.employee.department,
+      branch: workflow.employee.branch,
+      position: workflow.employee.position
+    } : null,
     steps: workflow.steps,
     priority: priorityOf(workflow),
-    currentApprover: currentApprover(workflow, approverUserMap)
+    currentApprover: currentApprover(workflow, approverUserMap),
+    canAct: workflow.status === "PENDING" && workflow.steps.some((step: any) =>
+      step.step === workflow.currentStep && step.status === "PENDING" && (step.approverUserId === session.user.id || elevated)
+    )
   }));
 
   const types = Array.from(new Set([...DEFAULT_TYPES, ...allScoped.map((workflow) => workflow.type)])).sort();

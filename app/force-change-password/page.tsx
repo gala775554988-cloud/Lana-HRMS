@@ -12,7 +12,7 @@ export default async function ForceChangePasswordPage() {
           <div className="text-center mb-6">
             <h1 className="text-2xl font-bold">تغيير كلمة المرور إجباري</h1>
             <p className="text-sm text-muted-foreground mt-2">
-              كلمة المرور الحالية هي الافتراضية (آخر 4 أرقام من رقم الهوية). يجب تغييرها قبل استخدام النظام.
+              تستخدم حالياً كلمة مرور مؤقتة. يجب تغييرها قبل استخدام النظام.
             </p>
           </div>
           <Suspense fallback={<div>جاري التحميل...</div>}>

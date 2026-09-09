@@ -145,7 +145,7 @@ export function QuickSearchModal({ isOpen, onClose }: QuickSearchModalProps) {
     },
     {
       id: "lana-ai",
-      title: "المساعد الذكي Lana AI Assistant",
+      title: "المساعد الذكي",
       description: "تحليل كفاءة الموظفين والتنبؤ بمعدلات الدوران الوظيفي بالذكاء الاصطناعي",
       category: "الذكاء الاصطناعي والتقارير",
       href: "/lana-ai",
@@ -258,7 +258,7 @@ export function QuickSearchModal({ isOpen, onClose }: QuickSearchModalProps) {
             <div className="py-12 text-center">
               <Sparkles className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600 mb-3" />
               <p className="text-base font-bold text-slate-700 dark:text-slate-300">لم يتم العثور على نتائج</p>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">جرب البحث بكلمات مفتاحية أخرى مثل: الموظفون، الرواتب، أو لانا</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">جرب البحث بكلمات مفتاحية أخرى مثل: الموظفون، الرواتب، أو التقارير</p>
             </div>
           ) : (
             ["الموظفون", "الوحدات والنظم", "إجراءات سريعة", "الذكاء الاصطناعي والتقارير"].map((cat) => {
@@ -342,7 +342,7 @@ export function QuickSearchModal({ isOpen, onClose }: QuickSearchModalProps) {
           </div>
           <div className="flex items-center gap-1.5 text-primary font-bold dark:text-primary/50">
             <Sparkles className="h-3.5 w-3.5" />
-            <span>Lana Search Engine v2.0</span>
+            <span>HRMS Search</span>
           </div>
         </div>
       </div>

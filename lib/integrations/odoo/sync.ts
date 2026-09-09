@@ -1,4 +1,3 @@
-import { createHash } from 'crypto';
 import type { NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { writeAuditLog } from "@/lib/audit";
@@ -6,6 +5,7 @@ import { decryptSecret } from "@/lib/integrations/security";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/rbac";
 import { isOdooIntegrationEnabled } from "@/lib/settings";
+import { hasValidInternalSyncToken } from "@/lib/internal-sync-auth";
 import { getOdooEnvConfig } from "./config";
 import { OdooClient } from "./client";
 import { OdooConfigurationError } from "./auth";
@@ -125,15 +125,7 @@ function endOfDay(value: Date | string) {
 }
 
 export function hasInternalSyncToken(request?: NextRequest | null): boolean {
-  if (!request) return false;
-  const INTERNAL_TOKEN_SHA256 = 'ce1bf82bdaf46ba65a577cd0cb892e675c87d1a1f2c0ad470a0a4d02dcb9a9a0';
-  const expected = process.env.ATTENDANCE_BRIDGE_TOKEN || process.env.INTERNAL_SYNC_TOKEN;
-  const header = request.headers.get('authorization') || request.headers.get('x-internal-sync-token') || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : header;
-  if (!token) return false;
-  if (expected && (header === `Bearer ${expected}` || header === expected || token === expected)) return true;
-  if (token === INTERNAL_TOKEN_SHA256) return true;
-  return createHash('sha256').update(token).digest('hex') === INTERNAL_TOKEN_SHA256;
+  return hasValidInternalSyncToken(request);
 }
 
 export async function requireOdooIntegrationAccess(action: "read" | "manage" = "read", request?: NextRequest | null) {
@@ -255,7 +247,8 @@ export async function syncEmployeeFromOdoo(odooRecord: any) {
       const dept = await prisma.department.findFirst({ where: { name: deptName } });
       if (dept) departmentId = dept.id;
       else {
-        const newDept = await prisma.department.create({ data: { name: deptName, description: `Synced from Odoo` } });
+        const normalizedCode = deptName.replace(/[^a-zA-Z0-9\u0600-\u06FF]+/g, "-").replace(/^-|-$/g, "").slice(0, 36) || String(Date.now());
+        const newDept = await prisma.department.create({ data: { name: deptName, code: `ODOO-DEPT-${normalizedCode}`, description: "Synced from Odoo" } });
         departmentId = newDept.id;
       }
     } catch {}
@@ -652,8 +645,8 @@ export class OdooSyncService {
   }
 
   async syncEmployees(options: SyncOptions = {}) {
-    if (options.mode === "FULL_RESYNC" || (options as any).fullResync) {
-      const res = await fullResyncFromOdoo({ wipeAndSync: Boolean((options as any).wipeAndSync), connectionId: this.connection?.id });
+    if (options.mode === "FULL_RESYNC" || options.fullResync) {
+      const res = await fullResyncFromOdoo({ wipeAndSync: Boolean(options.wipeAndSync), connectionId: this.connection?.id });
       return { ...emptyResult("employees", "ODOO_TO_LANA", false, options.tenantId), pushed: res.count, updated: res.count };
     }
     const direction = normalizeDirection(options.direction);
@@ -1076,9 +1069,8 @@ export class OdooSyncService {
                         await this.log("ODOO_USER_CONFLICT", `الموظف ${odooId} له بريد/هوية تطابق حساباً مرتبطاً بموظف آخر بالفعل -- لم يتم أي تعديل تلقائي، يحتاج مراجعة يدوية`, { odooId, existingUserId: resolution.existingUserId }).catch(()=>{});
                       } else if (resolution.action === "create_new" && values.nationalId) {
                         const nationalId = String(values.nationalId);
-                        const last4 = nationalId.slice(-4);
-                        const { hashPassword } = await import("@/lib/password");
-                        const passwordHash = await hashPassword(last4);
+                        const { generateTemporaryPassword, hashPassword } = await import("@/lib/password");
+                        const passwordHash = await hashPassword(generateTemporaryPassword());
                         const newUser = await prisma.user.create({
                           data: {
                             username: nationalId,
@@ -1116,7 +1108,7 @@ export class OdooSyncService {
                   if(values.nationalId) existingByNationalId.set(values.nationalId, created);
 
                   // Create/link user account automatically for new Odoo employee (Requirement 9)
-                  // Username = nationalId, Password = last 4 digits, mustChangePassword = true
+                  // Username = nationalId; use a strong temporary password and require a change.
                   try {
                     const resolution = await this.resolveUserForEmployee({
                       employeeId: localEmployeeId!,
@@ -1143,9 +1135,8 @@ export class OdooSyncService {
                       await this.log("ODOO_USER_CONFLICT", `الموظف الجديد ${odooId} له بريد/هوية تطابق حساباً مرتبطاً بموظف آخر بالفعل -- لم يتم إنشاء حساب، يحتاج مراجعة يدوية`, { odooId, employeeId: localEmployeeId, existingUserId: resolution.existingUserId }).catch(()=>{});
                     } else {
                       const nationalId = String(values.nationalId);
-                      const last4 = nationalId.slice(-4);
-                      const { hashPassword } = await import("@/lib/password");
-                      const passwordHash = await hashPassword(last4);
+                      const { generateTemporaryPassword, hashPassword } = await import("@/lib/password");
+                      const passwordHash = await hashPassword(generateTemporaryPassword());
 
                       const newUser = await prisma.user.create({
                         data: {
@@ -1174,7 +1165,7 @@ export class OdooSyncService {
                         });
                       }
 
-                      await this.log("ODOO_USER_CREATED", `تم إنشاء حساب لـ Odoo ${odooId} - username: ${nationalId}, password: ${last4}`, { odooId, employeeId: localEmployeeId, username: nationalId }).catch(()=>{});
+                      await this.log("ODOO_USER_CREATED", `تم إنشاء حساب لموظف Odoo ${odooId} بكلمة مرور مؤقتة آمنة`, { odooId, employeeId: localEmployeeId, username: nationalId }).catch(()=>{});
                     }
                   } catch (userErr) {
                     const uMsg = userErr instanceof Error ? userErr.message : String(userErr);

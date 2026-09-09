@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import { prisma } from "@/lib/prisma";
-import { hashPassword } from "@/lib/password";
+import { generateTemporaryPassword, hashPassword } from "@/lib/password";
 import { extractSalaryProfile } from "@/lib/employee/salary-profile";
 import { saveEmployeeSalaryProfile } from "@/lib/employee/salary-profile-store";
 import { requirePasswordChange } from "@/lib/auth/password-change-policy";
@@ -392,8 +392,7 @@ async function ensureReferences(rows: ParsedEmployeeRow[], autoCreate: boolean) 
 async function getPasswordHashes(rows: ParsedEmployeeRow[]) {
   const cache = new Map<string, string>();
   for (const row of rows) {
-    const password = row.nationalId.slice(-4).padStart(4, "0");
-    if (!cache.has(password)) cache.set(password, await hashPassword(password));
+    if (!cache.has(row.nationalId)) cache.set(row.nationalId, await hashPassword(generateTemporaryPassword()));
   }
   return cache;
 }
@@ -443,7 +442,7 @@ export async function importEmployees(rows: ParsedEmployeeRow[], options: BulkIm
         name: row.fullName,
         email: userEmails[index],
         emailVerified: new Date(),
-        passwordHash: passwordHashes.get(row.nationalId.slice(-4).padStart(4, "0"))!,
+        passwordHash: passwordHashes.get(row.nationalId)!,
         isActive: true
       })),
       skipDuplicates: true

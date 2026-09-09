@@ -1,14 +1,25 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { buildEmployeeScopeWhere, getAccessProfile } from "@/lib/enterprise/hierarchy";
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const instance = await prisma.workflowInstance.findUnique({
-    where: { id },
+  const roles = (session.user.roles as string[]) ?? [];
+  const profile = await getAccessProfile(session.user.id, roles);
+  const employeeScope = await buildEmployeeScopeWhere(profile);
+  const instance = await prisma.workflowInstance.findFirst({
+    where: {
+      id,
+      OR: [
+        { employee: employeeScope },
+        { employee: { userId: session.user.id } },
+        { steps: { some: { approverUserId: session.user.id } } }
+      ]
+    },
     include: {
       steps: { orderBy: { step: "asc" } },
       employee: { select: { firstName: true, lastName: true, employeeNumber: true } }

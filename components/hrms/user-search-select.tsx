@@ -36,8 +36,8 @@ export function UserSearchSelect({
   useEffect(() => {
     if (value && initialLabel) {
       setSelectedLabel(initialLabel);
-    } else if (initialLabel && !selectedLabel) {
-      setSelectedLabel(initialLabel);
+    } else if (initialLabel) {
+      setSelectedLabel((current) => current || initialLabel);
     } else if (!value && !initialLabel) {
       setSelectedLabel("");
     }

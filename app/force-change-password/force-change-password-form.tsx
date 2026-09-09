@@ -63,7 +63,7 @@ export function ForceChangePasswordForm({ dictionary }: { dictionary: any }) {
     <form onSubmit={onSubmit} className="space-y-5">
       {message && <Alert variant="destructive"><AlertDescription>{message}</AlertDescription></Alert>}
       <div className="space-y-2">
-        <Label htmlFor="currentPassword">كلمة المرور الحالية (آخر 4 أرقام من الهوية)</Label>
+        <Label htmlFor="currentPassword">كلمة المرور المؤقتة الحالية</Label>
         <div className="relative">
           <Input id="currentPassword" type={showCurrent ? "text" : "password"} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="h-11 px-9" placeholder="مثال: 9068" required />
           <button type="button" onClick={() => setShowCurrent(!showCurrent)} className="absolute right-3 top-3">{showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>

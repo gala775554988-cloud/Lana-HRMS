@@ -17,7 +17,7 @@ export default async function VerifyEmailPage({
     : { success: false, message: "رمز التحقق غير موجود." };
 
   return (
-    <AuthCard title="تأكيد الحساب" description="تأكيد الوصول إلى حساب نظام لانا للموارد البشرية." locale={locale} dictionary={dictionary}>
+    <AuthCard title="تأكيد الحساب" description="تأكيد الوصول إلى حساب نظام HRMS للموارد البشرية." locale={locale} dictionary={dictionary}>
       <Alert variant={result.success ? "default" : "destructive"}>
         <AlertDescription>{result.message}</AlertDescription>
       </Alert>

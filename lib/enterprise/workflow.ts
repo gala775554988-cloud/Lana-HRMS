@@ -107,7 +107,9 @@ export async function decideWorkflowStep({
   // A rejection reason is mandatory for transparency -- enforced here (not
   // just in the client UI) so the requirement can't be bypassed by calling
   // the API directly.
-  if (decision === "REJECT" && !comments?.trim()) throw new Error("سبب الرفض مطلوب");
+  if ((decision === "REJECT" || decision === "RETURN") && !comments?.trim()) {
+    throw new Error(decision === "REJECT" ? "سبب الرفض مطلوب" : "سبب الإرجاع مطلوب");
+  }
 
   const nextStatus = decision === "APPROVE" ? "APPROVED" : decision === "REJECT" ? "REJECTED" : "RETURNED";
   await prisma.workflowStep.update({

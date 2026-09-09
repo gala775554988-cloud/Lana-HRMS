@@ -110,7 +110,7 @@ export async function registerDevicePushToken({
     if (!empId || !deviceId || !fcmToken) return false;
 
     await prisma.employeeMobileDevice.upsert({
-      where: { employeeId: empId },
+      where: { employeeId_deviceId: { employeeId: empId, deviceId: deviceId.trim() } },
       update: {
         deviceId: deviceId.trim(),
         fcmToken: fcmToken.trim(),

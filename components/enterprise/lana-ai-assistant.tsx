@@ -282,14 +282,14 @@ export function LanaAiAssistant() {
           } ${isDragging ? "ring-2 ring-secondary bg-secondary/50 dark:bg-secondary/20" : ""}`}
         >
           {/* Header */}
-          <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-gradient-to-r from-secondary via-secondary to-purple-700 px-4 py-3.5 text-white dark:border-slate-800">
+          <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-[#102a56] px-4 py-3.5 text-white dark:border-slate-800">
             <div className="flex items-center gap-3">
               <div className="grid h-9 w-9 place-items-center rounded-2xl bg-white/10 backdrop-blur-md shadow-inner">
                 <Sparkles className="h-5 w-5 text-amber-300" />
               </div>
               <div>
-                <h3 className="font-bold text-sm leading-tight">Lana</h3>
-                <p className="text-[11px] text-secondary/90 flex items-center gap-1.5 mt-0.5">
+                <h3 className="font-bold text-sm leading-tight">HRMS AI</h3>
+                <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-blue-100">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   المساعد الذكي الفوري
                 </p>
@@ -335,7 +335,7 @@ export function LanaAiAssistant() {
                 <div className="grid h-14 w-14 place-items-center rounded-3xl bg-secondary/8 text-secondary dark:bg-secondary/50 dark:text-secondary/50 mb-4 shadow-sm">
                   <Sparkles className="h-7 w-7" />
                 </div>
-                <h4 className="font-bold text-base mb-1.5">تحدث مع Lana</h4>
+                <h4 className="font-bold text-base mb-1.5">تحدث مع المساعد الذكي</h4>
                 <p className="text-xs text-muted-foreground max-w-xs mb-6 leading-relaxed">
                   مساعدك الذكي لإدارة شؤون الموظفين، استعلام الإجازات والرواتب، تسجيل الحضور، وتحليل الملفات (PDF / Excel / Word).
                 </p>
@@ -392,7 +392,7 @@ export function LanaAiAssistant() {
                             <span className="h-1.5 w-1.5 rounded-full bg-secondary dark:bg-secondary/50 animate-bounce [animation-delay:0.2s]" />
                             <span className="h-1.5 w-1.5 rounded-full bg-secondary dark:bg-secondary/50 animate-bounce [animation-delay:0.4s]" />
                           </span>
-                          <span className="text-xs font-semibold">Lana يكتب الآن...</span>
+                          <span className="text-xs font-semibold">جاري إعداد الإجابة...</span>
                         </div>
                       )
                     ) : (
@@ -492,7 +492,7 @@ export function LanaAiAssistant() {
                     send();
                   }
                 }}
-                placeholder="اسأل Lana أي شيء أو اطلب تنفيذ عملية في النظام..."
+                placeholder="اسأل عن بيانات الموظفين أو اطلب تنفيذ عملية..."
                 rows={1}
                 className="max-h-32 min-h-[36px] w-full resize-none border-0 bg-transparent py-2 text-sm focus:outline-none focus:ring-0 placeholder:text-muted-foreground"
               />
@@ -524,7 +524,7 @@ export function LanaAiAssistant() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          aria-label="مساعد Lana AI"
+          aria-label="المساعد الذكي"
           // Brand gradient hardcoded (not --secondary/--primary) so this
           // floating button's identity is fixed regardless of the shared
           // tokens elsewhere in the app.
@@ -535,7 +535,7 @@ export function LanaAiAssistant() {
             <Sparkles className="h-4 w-4 text-amber-300" />
             <span className="absolute -top-1 -end-1 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-[#1E3A64] animate-pulse" />
           </div>
-          <span className="font-bold text-sm tracking-wide">Lana</span>
+          <span className="text-sm font-semibold">المساعد الذكي</span>
         </button>
       )}
     </div>

@@ -157,11 +157,11 @@ export function PayrollDashboard() {
               <p className="text-xl font-bold mt-1">{latestRun.totals.employeeCount}</p>
             </div>
             <div className="p-4 rounded-xl border">
-              <p className="text-xs text-muted-foreground">إجمالي الرواتب (Gross)</p>
+              <p className="text-xs text-muted-foreground">إجمالي الرواتب قبل الاستقطاعات</p>
               <p className="text-xl font-bold mt-1">{currency(latestRun.totals.gross)}</p>
             </div>
             <div className="p-4 rounded-xl border">
-              <p className="text-xs text-muted-foreground">صافي الرواتب (Net)</p>
+              <p className="text-xs text-muted-foreground">صافي الرواتب المستحقة</p>
               <p className="text-xl font-bold mt-1 text-emerald-600">{currency(latestRun.totals.net)}</p>
             </div>
           </CardContent>

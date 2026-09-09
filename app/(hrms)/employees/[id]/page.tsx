@@ -21,7 +21,7 @@ export default async function EmployeeProfilePage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { id } = await params;
-  const query = searchParams ? await searchParams.catch(() => ({})) : {};
+  const query: Record<string, string | string[] | undefined> = searchParams ? await searchParams : {};
   const backHref = typeof query?.from === "string" ? query.from : undefined;
   const { dictionary, locale } = await getRequestDictionary();
   const session = await auth();

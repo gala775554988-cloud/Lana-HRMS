@@ -334,6 +334,9 @@ export function ApprovalWorkflowsClient() {
 
   const entityFilterOptions = useMemo(() => entityOptions(org, filterEntityType), [org, filterEntityType]);
   const entityEditorOptions = useMemo(() => entityOptions(org, entityType), [org, entityType]);
+  const activePathCount = paths.filter((path) => path.isActive).length;
+  const coveredRequestTypes = new Set(paths.map((path) => path.requestType)).size;
+  const totalStages = paths.reduce((sum, path) => sum + path.stages.length, 0);
 
   return (
     <div className="space-y-5" dir="rtl">
@@ -344,10 +347,16 @@ export function ApprovalWorkflowsClient() {
         </div>
       ) : null}
 
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">المسارات النشطة</p><p className="mt-1 text-2xl font-semibold">{activePathCount}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">أنواع الطلبات المغطاة</p><p className="mt-1 text-2xl font-semibold">{coveredRequestTypes}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">إجمالي مراحل الاعتماد</p><p className="mt-1 text-2xl font-semibold">{totalStages}</p></CardContent></Card>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle>مسارات الموافقات</CardTitle>
-          <CardDescription>الشركة ← نوع الجهة ← اسم الجهة ← نوع الطلب ← مراحل الاعتماد -- عدد غير محدود من المسارات.</CardDescription>
+          <CardDescription>حدّد نطاق المسار ونوع الطلب، ثم رتّب المعتمدين بالترتيب الذي يمر به الطلب.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
@@ -383,7 +392,7 @@ export function ApprovalWorkflowsClient() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {paths.map((path) => (
-            <Card key={path.id} className="glass-card-premium">
+            <Card key={path.id} className="rounded-xl border-border/80 shadow-sm">
               <CardContent className="p-5 space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -394,7 +403,7 @@ export function ApprovalWorkflowsClient() {
                 </div>
                 <Badge variant="outline" className="font-bold">{path.requestType}</Badge>
                 {path.name ? <p className="text-xs text-muted-foreground">{path.name}</p> : null}
-                <div className="rounded-2xl bg-slate-50/80 p-3 dark:bg-slate-800/40">
+                <div className="rounded-lg bg-muted/60 p-3">
                   <p className="text-xs font-bold mb-1.5">{path.stages.length} مرحلة</p>
                   <ol className="space-y-1 text-xs text-muted-foreground">
                     {path.stages.map((s) => (

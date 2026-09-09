@@ -30,11 +30,11 @@ export async function GET(request: NextRequest) {
 
     const result = await fullResyncFromOdoo({ wipeAndSync, connectionId });
     return NextResponse.json({
+      ...result,
       success: true,
       message: wipeAndSync
         ? `تمت إعادة الضبط وسحب (${result.count}) موظف بنجاح بالتنسيق الموحد`
         : `تمت المزامنة الذكية الشاملة لـ (${result.count}) موظف بنجاح دون مسح السجلات السابقة`,
-      ...result
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -53,11 +53,11 @@ export async function POST(request: NextRequest) {
 
     const result = await fullResyncFromOdoo({ wipeAndSync, connectionId });
     return NextResponse.json({
+      ...result,
       success: true,
       message: wipeAndSync
         ? `تمت إعادة الضبط وسحب (${result.count}) موظف بنجاح بالتنسيق الموحد`
         : `تمت المزامنة الذكية الشاملة لـ (${result.count}) موظف بنجاح دون مسح السجلات السابقة`,
-      ...result
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Crown, Pencil, Trash2, Check, X, ShieldCheck, ChevronDown, CheckSquare } from "lucide-react";
+import { Bot, Pencil, Trash2, Check, X, ShieldCheck, ChevronDown, CheckSquare } from "lucide-react";
 import { UserSearchSelect } from "@/components/hrms/user-search-select";
 import { getPermissionHint } from "@/lib/enterprise/permission-hints";
 import { RESOURCE_LABELS_AR, ACTION_LABELS_AR, CATEGORY_LABELS_AR } from "@/lib/enterprise/permission-labels";
@@ -198,7 +198,7 @@ export function PermissionManagementDashboard() {
         body: JSON.stringify({ userIds: nextDelegateIds })
       });
       const data = await response.json();
-      if (!data.success) { setMessage(data.message || "فشل تحديث صلاحية لانا"); updateEntry(entry.userId, { isDelegate: entry.isDelegate }); return; }
+      if (!data.success) { setMessage(data.message || "فشل تحديث صلاحية المساعد الذكي"); updateEntry(entry.userId, { isDelegate: entry.isDelegate }); return; }
     } finally {
       updateEntry(entry.userId, { saving: false });
     }
@@ -260,7 +260,7 @@ export function PermissionManagementDashboard() {
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-slate-900 dark:text-slate-100">{entry.firstName} {entry.lastName}</span>
                     <span className="text-xs text-muted-foreground">({entry.employeeNumber})</span>
-                    {entry.isDelegate ? <Crown className="h-3.5 w-3.5 text-amber-500" /> : null}
+                    {entry.isDelegate ? <Bot className="h-3.5 w-3.5 text-primary" /> : null}
                   </div>
                   <p className="mt-0.5 text-xs text-muted-foreground">{entry.department?.name ?? "بدون قسم / No department"}</p>
                 </div>
@@ -295,10 +295,10 @@ export function PermissionManagementDashboard() {
               </div>
 
               <div className="flex flex-wrap gap-2 border-t border-slate-100 bg-slate-50/60 px-5 py-4 dark:border-slate-800 dark:bg-slate-950/40">
-                <label className={`flex cursor-pointer items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-semibold transition ${entry.isDelegate ? "border-amber-400 bg-amber-50 text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300" : "border-slate-200 bg-white text-slate-600 hover:border-amber-300 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"}`}>
-                  <input type="checkbox" checked={entry.isDelegate} onChange={() => toggleLana(entry)} disabled={entry.saving} className="h-4 w-4 accent-amber-500" />
-                  <Crown className="h-3.5 w-3.5" />
-                  <span>تفعيل لانا / Enable Lana Access</span>
+                <label className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition ${entry.isDelegate ? "border-primary/40 bg-primary/5 text-primary" : "border-slate-200 bg-white text-slate-600 hover:border-primary/30 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"}`}>
+                  <input type="checkbox" checked={entry.isDelegate} onChange={() => toggleLana(entry)} disabled={entry.saving} className="h-4 w-4 accent-primary" />
+                  <Bot className="h-3.5 w-3.5" />
+                  <span>السماح بأوامر الأتمتة</span>
                 </label>
                 {categories.map((category) => {
                   const checked = category.permissions.every((p) => entry.grants.has(p));

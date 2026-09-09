@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ArrowUpRight, BadgeCheck, BriefcaseBusiness, CalendarClock, Fingerprint, ShieldCheck, UsersRound } from "lucide-react";
+import { ArrowUpRight, BadgeCheck, Fingerprint, ShieldCheck } from "lucide-react";
 import { AuthPreferences } from "@/components/auth/auth-preferences";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { Badge } from "@/components/ui/badge";
@@ -22,12 +22,6 @@ export function AuthCard({
   children: ReactNode;
   footer?: ReactNode;
 }) {
-  const snapshotItems = [
-    [UsersRound, dictionary.dashboard.employees, "428", "text-blue-200"],
-    [CalendarClock, dictionary.dashboard.pendingLeave, "12", "text-amber-200"],
-    [BriefcaseBusiness, dictionary.dashboard.openJobs, "18", "text-emerald-200"]
-  ] as const;
-
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#06111f] text-white">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_20%,rgba(59,130,246,0.36),transparent_28rem),radial-gradient(circle_at_85%_12%,rgba(16,185,129,0.28),transparent_28rem),linear-gradient(135deg,#020617,#0f172a_48%,#042f2e)]" />
@@ -54,7 +48,7 @@ export function AuthCard({
                 <p className="max-w-2xl text-base leading-7 text-white/70 md:text-lg">{dictionary.auth.heroDescription}</p>
               </div>
               <div className="grid max-w-2xl gap-3 sm:grid-cols-3">
-                {[["99.9%", "availability-ready"], ["RBAC", "permission-first"], ["RTL", "Arabic-ready"]].map(([value, label]) => (
+                {[["RBAC", "permission-first"], ["RTL", "Arabic-ready"], ["Audit", "activity-recorded"]].map(([value, label]) => (
                   <div key={label} className="rounded-2xl border border-white/10 bg-white/10 p-4 shadow-2xl shadow-slate-950/20 backdrop-blur">
                     <p className="text-2xl font-semibold">{value}</p>
                     <p className="mt-1 text-xs text-white/60">{label}</p>
@@ -73,13 +67,10 @@ export function AuthCard({
                   <BadgeCheck className="h-5 w-5 text-emerald-300" />
                 </div>
                 <div className="grid gap-3">
-                  {snapshotItems.map(([Icon, label, value, tone]) => (
-                    <div key={label} className="flex items-center justify-between rounded-2xl bg-slate-950/35 p-4">
-                      <div className="flex items-center gap-3">
-                        <span className="rounded-xl bg-white/10 p-2"><Icon className={`h-5 w-5 ${tone}`} /></span>
-                        <span className="text-sm text-white/72">{label}</span>
-                      </div>
-                      <span className="text-2xl font-semibold">{value}</span>
+                  {[dictionary.dashboard.employees, dictionary.dashboard.pendingLeave, dictionary.dashboard.openJobs].map((label) => (
+                    <div key={label} className="flex items-center gap-3 rounded-2xl bg-slate-950/35 p-4">
+                      <span className="rounded-xl bg-white/10 p-2"><BadgeCheck className="h-5 w-5 text-blue-200" /></span>
+                      <span className="text-sm text-white/72">{label}</span>
                     </div>
                   ))}
                 </div>

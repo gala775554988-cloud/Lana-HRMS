@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { hashPassword } from "@/lib/password";
+import { generateTemporaryPassword, hashPassword } from "@/lib/password";
 import { writeAuditLog } from "@/lib/audit";
 import { hasPermission } from "@/lib/rbac";
 
@@ -71,8 +71,8 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        const last4 = employee.nationalId.slice(-4);
-        const newHash = await hashPassword(last4);
+        const temporaryPassword = generateTemporaryPassword();
+        const newHash = await hashPassword(temporaryPassword);
 
         let userId = employee.userId;
 
@@ -132,13 +132,13 @@ export async function POST(request: NextRequest) {
             employeeId: employee.id,
             employeeName: `${employee.firstName} ${employee.lastName}`,
             nationalId: employee.nationalId,
-            resetTo: "last4",
+            resetTo: "random-temporary-password",
             timestamp: new Date().toISOString(),
           },
         }).catch(() => {});
 
         resetCount++;
-        results.push({ id: employee.id, name: `${employee.firstName} ${employee.lastName}`, nationalId: employee.nationalId, newPassword: last4 });
+        results.push({ id: employee.id, name: `${employee.firstName} ${employee.lastName}`, temporaryPassword });
       } catch (e: any) {
         skippedCount++;
         errors.push({ id, error: e.message });

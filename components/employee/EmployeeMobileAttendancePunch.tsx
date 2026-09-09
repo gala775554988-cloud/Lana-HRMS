@@ -25,7 +25,7 @@ export function EmployeeMobileAttendancePunch() {
       await navigator.credentials.create({
         publicKey: {
           challenge,
-          rp: { name: 'Lana HRMS' },
+          rp: { name: 'HRMS' },
           user: { id: crypto.getRandomValues(new Uint8Array(16)), name: 'employee', displayName: 'Employee' },
           pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
           authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
