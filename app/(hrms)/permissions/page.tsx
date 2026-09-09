@@ -33,15 +33,13 @@ export default async function PermissionsPage({ searchParams }: { searchParams: 
 
   let scopesContent: React.ReactNode = null;
   if (activeTab === "scopes") {
-    const [allRoles, branches, departments, hospitals] = await Promise.all([
-      prisma.role.findMany({ orderBy: { name: "asc" } }),
+    const [branches, departments, hospitals] = await Promise.all([
       prisma.branch.findMany({ select: { id: true, name: true }, where: { isActive: true }, orderBy: { name: "asc" } }),
       prisma.department.findMany({ select: { id: true, name: true }, where: { isActive: true }, orderBy: { name: "asc" } }),
       prisma.hospital.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
     ]);
     scopesContent = (
       <PermissionsAdmin
-        allRoles={JSON.parse(JSON.stringify(allRoles))}
         branches={JSON.parse(JSON.stringify(branches))}
         departments={JSON.parse(JSON.stringify(departments))}
         hospitals={JSON.parse(JSON.stringify(hospitals))}
@@ -91,7 +89,7 @@ export default async function PermissionsPage({ searchParams }: { searchParams: 
       items={[
         {
           value: "roles",
-          label: "الأدوار",
+          label: "الأدوار والصلاحيات",
           icon: <ShieldCheck className="h-4 w-4" />,
           content: activeTab === "roles" ? (
             <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">Loading roles...</div>}>
@@ -101,7 +99,7 @@ export default async function PermissionsPage({ searchParams }: { searchParams: 
         },
         {
           value: "management",
-          label: "صلاحيات إضافية لمستخدم",
+          label: "صلاحيات المستخدمين",
           icon: <Shield className="h-4 w-4" />,
           content: activeTab === "management" ? (
             <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">Loading permissions...</div>}>
@@ -111,13 +109,13 @@ export default async function PermissionsPage({ searchParams }: { searchParams: 
         },
         {
           value: "scopes",
-          label: "نطاقات الصلاحيات",
+          label: "نطاق الوصول",
           icon: <KeyRound className="h-4 w-4" />,
           content: scopesContent
         },
         {
           value: "approval-workflows",
-          label: "مسارات الموافقات",
+          label: "سلسلة الموافقات",
           icon: <Workflow className="h-4 w-4" />,
           content: activeTab === "approval-workflows" ? (
             <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">Loading...</div>}>

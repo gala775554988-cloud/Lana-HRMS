@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 
 type PermissionMap = Record<string, string[]>;
-type ScopeMap = Record<string, { scope: string; branchId?: string | null; departmentId?: string | null }>;
+type ScopeMap = Record<string, { scope: string; branchId?: string | null; departmentId?: string | null; hospitalId?: string | null }>;
 
 const permissionCache = new Map<string, { roles: string[]; permissions: PermissionMap; scope: ScopeMap; ts: number }>();
 const CACHE_TTL = 60_000;
@@ -30,7 +30,7 @@ export async function getPermissionProfile(userId: string) {
   if (roles.includes("SUPER_ADMIN")) perms["*"] = ["*:*"];
 
   const scope: ScopeMap = {};
-  for (const s of scopes) scope[s.module] = { scope: s.scope, branchId: s.branchId, departmentId: s.departmentId };
+  for (const s of scopes) scope[s.module] = { scope: s.scope, branchId: s.branchId, departmentId: s.departmentId, hospitalId: s.hospitalId };
 
   const result = { roles, permissions: perms, scope, ts: Date.now() };
   permissionCache.set(userId, result);
@@ -51,13 +51,20 @@ export async function getEmployeeScopeWhere(userId: string): Promise<Record<stri
   const profile = await getPermissionProfile(userId);
   if (profile.roles.includes("SUPER_ADMIN")) return {};
   const empScope = profile.scope["employees"];
-  if (!empScope || empScope.scope === "ALL") return {};
+  if (empScope?.scope === "ALL") return {};
+  // Least privilege is the default: absence of a custom scope must never
+  // expand an ordinary account to every employee in the company.
+  if (!empScope) {
+    const self = await prisma.employee.findFirst({ where: { userId }, select: { id: true } });
+    return self ? { id: self.id } : { id: "__NO_ACCESS__" };
+  }
   if (empScope.scope === "SELF") {
     const self = await prisma.employee.findFirst({ where: { userId }, select: { id: true } });
     return self ? { id: self.id } : { id: "__NO_ACCESS__" };
   }
-  if (empScope.scope === "BRANCH") return empScope.branchId ? { branchId: empScope.branchId } : {};
-  if (empScope.scope === "DEPARTMENT") return empScope.departmentId ? { departmentId: empScope.departmentId } : {};
+  if (empScope.scope === "BRANCH") return empScope.branchId ? { branchId: empScope.branchId } : { id: "__NO_ACCESS__" };
+  if (empScope.scope === "DEPARTMENT") return empScope.departmentId ? { departmentId: empScope.departmentId } : { id: "__NO_ACCESS__" };
+  if (empScope.scope === "HOSPITAL") return empScope.hospitalId ? { hospitalId: empScope.hospitalId } : { id: "__NO_ACCESS__" };
   if (empScope.scope === "TEAM") {
     const self = await prisma.employee.findFirst({ where: { userId }, select: { id: true } });
     return self ? { managerId: self.id } : { id: "__NO_ACCESS__" };
@@ -70,7 +77,7 @@ export async function getEmployeeScopeWhere(userId: string): Promise<Record<stri
 // lib/enterprise/approval-engine.ts (ApprovalPath/ApprovalStage) and
 // app/api/enterprise/approval-paths/ for the replacement.
 
-export const MODULES = ["employees","attendance","payroll","leaves","loans","overtime","documents","contracts","reports","settings","permissions","audit-logs","integrations"] as const;
+export const MODULES = ["employees","hospitals","requests","attendance","payroll","leaves","insurance","social-insurance","loans","overtime","documents","contracts","assets","reports","settings","permissions","audit-logs","integrations"] as const;
 export const SCOPES = ["ALL","BRANCH","DEPARTMENT","HOSPITAL","TEAM","SELF"] as const;
 export const APPROVER_ROLES = ["DIRECT_MANAGER","DEPARTMENT_MANAGER","BRANCH_MANAGER","HR_MANAGER","SUPER_ADMIN"] as const;
 

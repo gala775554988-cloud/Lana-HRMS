@@ -37,6 +37,46 @@ async function getAuthorization(userId: string) {
   return { roles, hasGrantedAdminAccess };
 }
 
+/**
+ * Repairs legacy Odoo accounts that can authenticate by national ID but were
+ * never connected to their Employee row. The match is deliberately limited to
+ * the authenticated username and never reassigns an employee owned by another
+ * user.
+ */
+async function ensureAuthenticatedEmployeeLink(user: { id: string; username: string | null; email: string | null }) {
+  const linked = await prisma.employee.findFirst({ where: { userId: user.id }, select: { id: true } });
+  if (linked) return linked.id;
+
+  const identifier = user.username?.trim();
+  const email = user.email?.trim().toLowerCase();
+  if (!identifier && !email) return null;
+
+  const employee = await prisma.employee.findFirst({
+    where: {
+      userId: null,
+      OR: [
+        ...(identifier ? [{ nationalId: identifier }, { employeeNumber: identifier }] : []),
+        ...(email ? [{ email: { equals: email, mode: "insensitive" as const } }] : []),
+      ],
+    },
+    select: { id: true },
+  });
+  if (!employee) return null;
+
+  await prisma.employee.update({ where: { id: employee.id }, data: { userId: user.id } });
+  const employeeRole = await prisma.role.upsert({
+    where: { name: "EMPLOYEE" },
+    update: {},
+    create: { name: "EMPLOYEE", description: "Employee", isSystem: true },
+  });
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: user.id, roleId: employeeRole.id } },
+    update: {},
+    create: { userId: user.id, roleId: employeeRole.id },
+  });
+  return employee.id;
+}
+
 async function findUserByUsernameOrEmail(value: string, lower: string) {
   // Two independent reads, run in parallel — cheap enough to always pay for,
   // unlike adding a third concurrent query on every login (see below).
@@ -157,6 +197,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           if (!user?.passwordHash || !user.isActive) return null;
           const ok = await verifyPassword(parsed.data.password, user.passwordHash);
           if (!ok) return null;
+
+          await ensureAuthenticatedEmployeeLink(user).catch((linkError) => {
+            console.error("[Auth][EMPLOYEE_LINK_REPAIR_ERROR]", linkError);
+          });
 
           const deviceId = parsed.data.deviceId;
           if (deviceId && deviceId !== "unknown" && deviceId !== "server-side" && deviceId !== "mobile-session-fallback") {

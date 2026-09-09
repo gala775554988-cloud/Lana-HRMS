@@ -70,9 +70,17 @@ export function RolesManagementClient() {
     fetch("/api/permissions/roles", { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
-        setRoles(data.roles ?? []);
-        setTree(data.tree ?? []);
+        const loadedRoles: RoleRow[] = data.roles ?? [];
+        const loadedTree: PermissionTreeCategory[] = data.tree ?? [];
+        setRoles(loadedRoles);
+        setTree(loadedTree);
         setTemplateKeys(data.templateKeys ?? []);
+        setSelectedRoleId((current) => current && loadedRoles.some((role) => role.id === current)
+          ? current
+          : loadedRoles[0]?.id ?? null);
+        setExpandedCategories((current) => current.size
+          ? current
+          : new Set(loadedTree.map((category) => category.key)));
       })
       .catch((error) => setMessage(error.message))
       .finally(() => setLoading(false));
@@ -265,7 +273,7 @@ export function RolesManagementClient() {
                 <div key={role.id}>
                   <button
                     type="button"
-                    onClick={() => setSelectedRoleId(role.id === selectedRoleId ? null : role.id)}
+                    onClick={() => setSelectedRoleId(role.id)}
                     className={`flex w-full items-center justify-between gap-2 rounded-2xl border px-3 py-2.5 text-start transition ${
                       selectedRoleId === role.id ? "border-primary bg-primary/8" : "border-slate-200 hover:bg-muted/50 dark:border-slate-800"
                     }`}
@@ -352,7 +360,6 @@ export function RolesManagementClient() {
                           <button type="button" onClick={() => toggleCategoryExpanded(category.key)} className="flex flex-1 items-center gap-2 text-start">
                             <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform ${isOpen ? "rotate-0" : "-rotate-90"}`} />
                             <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{CATEGORY_LABELS_AR[category.key] ?? category.key}</span>
-                            <span className="text-[11px] text-muted-foreground">{category.title}</span>
                           </button>
                           <label className={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-semibold ${allGranted ? "bg-primary/12 text-primary dark:bg-primary/50 dark:text-primary/30" : someGranted ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" : "text-slate-500"}`}>
                             <input

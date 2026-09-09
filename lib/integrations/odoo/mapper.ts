@@ -220,6 +220,11 @@ export function mapOdooEmployeeToLana(record: OdooRecord): Record<string, unknow
   const dateOfBirth = asDate(record.birthday);
   const terminationDate = asDate(record.departure_date);
   const emergencyContact = [textValue(record.emergency_contact), textValue(record.emergency_phone)].filter(Boolean).join(" - ") || undefined;
+  const employeeEnglishName = [record.employee_english_name, record.english_name, record.name_en, record.x_employee_english_name, record.x_studio_employee_english_name].map(textValue).find(Boolean);
+  const iqamahJobName = [record.iqamah_job_name, record.iqama_job_name, record.profession, record.profession_id, record.x_iqamah_job_name, record.x_studio_iqamah_job_name]
+    .map((value) => many2oneName(value) || textValue(value)).find(Boolean);
+  const privateAddress = [record.private_street, record.private_street2, record.private_city, many2oneName(record.private_state_id), many2oneName(record.private_country_id), record.private_zip]
+    .map(textValue).filter(Boolean).join("، ") || many2oneName(record.address_home_id) || undefined;
 
   // Extract many2one IDs for later resolution in sync service
   const departmentOdooId = many2oneId(record.department_id);
@@ -259,14 +264,14 @@ export function mapOdooEmployeeToLana(record: OdooRecord): Record<string, unknow
     terminationDate,
     emergencyContact,
     profilePhotoUrl,
-    address: undefined,
+    address: privateAddress,
     // Real Odoo field names confirmed by the client: sponsor, sponsor_name,
     // sponsor_id can each independently hold the sponsor display value
     // depending on how their instance is configured -- prefer the most
     // specific/readable one available.
     sponsor: textValue(record.sponsor_name) || textValue(record.sponsor) || many2oneName(record.sponsor_id) || textValue(record.sponsor_id),
-    employeeEnglishName: textValue(record.employee_english_name),
-    iqamahJobName: textValue(record.iqamah_job_name),
+    employeeEnglishName,
+    iqamahJobName,
     workPhone: textValue(record.work_phone),
     mobilePhone: textValue(record.mobile_phone),
     maritalStatus: textValue(record.marital),

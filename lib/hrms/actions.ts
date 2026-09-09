@@ -361,7 +361,7 @@ export async function listModuleRecords(input: QueryInput) {
             where,
             skip: (page - 1) * pageSize,
             take: pageSize,
-            orderBy: { createdAt: "desc" },
+            orderBy: [{ status: "asc" }, { employeeNumber: "asc" }, { firstName: "asc" }],
             select: {
               id: true,
               employeeNumber: true,
@@ -392,7 +392,7 @@ export async function listModuleRecords(input: QueryInput) {
           where,
           skip: (page - 1) * pageSize,
           take: pageSize,
-          orderBy: { createdAt: "desc" },
+          orderBy: [{ status: "asc" }, { employeeNumber: "asc" }, { firstName: "asc" }],
           select: {
             id: true,
             employeeNumber: true,
