@@ -1,103 +1,54 @@
+import { ShieldCheck } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 
-type ScopeItem = {
-  id: string;
-  module: string;
-  scope: string;
-  name: string;
+const MODULE_LABELS: Record<string, string> = {
+  employees: "الموظفون", hospitals: "المستشفيات والمواقع", requests: "الطلبات والموافقات",
+  attendance: "الحضور والورديات", payroll: "الرواتب", leaves: "الإجازات", insurance: "التأمين",
+  "social-insurance": "التأمينات الاجتماعية", loans: "السلف", overtime: "العمل الإضافي",
+  documents: "المستندات", contracts: "العقود", assets: "العهد والأصول", reports: "التقارير",
+  settings: "الإعدادات", permissions: "الصلاحيات", integrations: "التكاملات",
 };
 
-async function fetchEmployeeScopes(employeeId: string): Promise<ScopeItem[]> {
-  if (!employeeId) return [];
+const SCOPE_LABELS: Record<string, string> = {
+  ALL: "كل المنشأة", BRANCH: "فرع محدد", DEPARTMENT: "إدارة محددة",
+  HOSPITAL: "مستشفى أو موقع", TEAM: "الفريق المباشر", SELF: "ملف الموظف فقط",
+};
 
-  const employee = await prisma.employee.findUnique({
-    where: { id: employeeId },
-    select: { userId: true }
-  });
-  if (!employee?.userId) return [];
+const ROLE_LABELS: Record<string, string> = {
+  SUPER_ADMIN: "مدير النظام", HR_MANAGER: "مدير الموارد البشرية", EMPLOYEE: "موظف",
+  PAYROLL_MANAGER: "مدير الرواتب", RECRUITER: "مسؤول التوظيف", SUPERVISOR: "مشرف",
+};
 
-  const rawScopes = await prisma.hrPermissionScope.findMany({
-    where: { userId: employee.userId },
-    orderBy: { createdAt: "desc" }
-  });
-  if (!rawScopes.length) return [];
-
-  const branchIds = Array.from(new Set(rawScopes.map((s) => s.branchId).filter(Boolean) as string[]));
-  const deptIds = Array.from(new Set(rawScopes.map((s) => s.departmentId).filter(Boolean) as string[]));
-  const hospitalIds = Array.from(new Set(rawScopes.map((s) => (s as any).hospitalId).filter(Boolean) as string[]));
-
-  const [branches, depts, hospitals] = await Promise.all([
-    branchIds.length > 0 ? prisma.branch.findMany({ where: { id: { in: branchIds } }, select: { id: true, name: true } }) : [],
-    deptIds.length > 0 ? prisma.department.findMany({ where: { id: { in: deptIds } }, select: { id: true, name: true } }) : [],
-    hospitalIds.length > 0 ? prisma.hospital.findMany({ where: { id: { in: hospitalIds } }, select: { id: true, name: true } }) : []
-  ]);
-
-  const branchMap = new Map(branches.map((b) => [b.id, b.name]));
-  const deptMap = new Map(depts.map((d) => [d.id, d.name]));
-  const hospitalMap = new Map(hospitals.map((h) => [h.id, h.name]));
-
-  const scopeNames: Record<string, string> = {
-    ALL: "كل الشركة",
-    BRANCH: "فرع محدد",
-    DEPARTMENT: "قسم محدد",
-    HOSPITAL: "مستشفى / موقع",
-    TEAM: "فريق مباشر",
-    SELF: "ذاتي فقط"
-  };
-
-  return rawScopes.map((s) => {
-    const scopeLabel = scopeNames[s.scope] || s.scope;
-    const targetDetails = s.branchId
-      ? ` (${branchMap.get(s.branchId) || s.branchId})`
-      : s.departmentId
-      ? ` (${deptMap.get(s.departmentId) || s.departmentId})`
-      : (s as any).hospitalId
-      ? ` (${hospitalMap.get((s as any).hospitalId) || (s as any).hospitalId})`
-      : "";
-
-    return {
-      id: s.id,
-      module: s.module,
-      scope: s.scope,
-      name: `${s.module}: ${scopeLabel}${targetDetails}`
-    };
-  });
-}
-
-// قم باستبدال الكود الحالي بهذا المنطق
 export default async function PermissionsScope({ employeeId }: { employeeId: string }) {
   try {
-    // 1. جلب البيانات مع حماية من الأخطاء
-    const scopes = await fetchEmployeeScopes(employeeId); // استبدلها بدالة الجلب لديك
+    const employee = await prisma.employee.findUnique({
+      where: { id: employeeId },
+      select: {
+        userId: true,
+        user: { select: { roles: { select: { role: { select: { name: true, permissions: { select: { permissionId: true } } } } } } } },
+      },
+    });
+    if (!employee?.userId) return <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">لا يوجد حساب مستخدم مرتبط بهذا الموظف.</div>;
 
-    if (!scopes || scopes.length === 0) {
-      return (
-        <div className="p-4 text-sm text-gray-500 bg-gray-50 rounded-md" dir="rtl">
-          لا توجد نطاقات صلاحيات محددة لهذا الموظف.
-        </div>
-      );
-    }
+    const scopes = await prisma.hrPermissionScope.findMany({ where: { userId: employee.userId }, orderBy: [{ module: "asc" }] });
+    const [branches, departments, hospitals] = await Promise.all([
+      prisma.branch.findMany({ where: { id: { in: scopes.flatMap((scope) => scope.branchId ? [scope.branchId] : []) } }, select: { id: true, name: true } }),
+      prisma.department.findMany({ where: { id: { in: scopes.flatMap((scope) => scope.departmentId ? [scope.departmentId] : []) } }, select: { id: true, name: true } }),
+      prisma.hospital.findMany({ where: { id: { in: scopes.flatMap((scope) => scope.hospitalId ? [scope.hospitalId] : []) } }, select: { id: true, name: true } }),
+    ]);
+    const targetNames = new Map([...branches, ...departments, ...hospitals].map((row) => [row.id, row.name]));
+    const roles = employee.user?.roles.map(({ role }) => ({ name: role.name, permissions: role.permissions.length })) ?? [];
 
-    return (
-      <div className="scope-container space-y-2" dir="rtl">
-        {scopes.map((scope) => (
-          <div key={scope.id} className="scope-item flex items-center justify-between p-3 rounded-xl border bg-card text-sm font-medium shadow-sm">
-            <span>{scope.name}</span>
-            <span className="text-xs px-2.5 py-1 rounded-full bg-primary/8 text-primary dark:bg-primary/60 dark:text-primary/30">
-              {scope.scope}
-            </span>
-          </div>
-        ))}
-      </div>
-    );
+    return <div className="space-y-5" dir="rtl">
+      <section className="rounded-2xl border bg-card p-5"><div className="mb-4 flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /><h3 className="font-black">الأدوار المعيّنة</h3></div><div className="flex flex-wrap gap-2">{roles.map((role) => <span key={role.name} className="rounded-xl border bg-muted/40 px-3 py-2 text-sm font-bold">{ROLE_LABELS[role.name] ?? role.name}<small className="ms-2 font-normal text-muted-foreground">{role.permissions} صلاحية</small></span>)}</div></section>
+      <section className="rounded-2xl border bg-card p-5"><h3 className="mb-4 font-black">نطاقات الوصول</h3>{!scopes.length ? <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">النطاق الافتراضي: يرى الموظف ملفه فقط.</div> : <div className="grid gap-2 md:grid-cols-2">{scopes.map((scope) => {
+        const targetId = scope.branchId || scope.departmentId || scope.hospitalId;
+        return <div key={scope.id} className="flex items-center justify-between gap-3 rounded-xl border p-3"><span className="font-semibold">{MODULE_LABELS[scope.module] ?? scope.module}</span><span className="rounded-lg bg-primary/10 px-2 py-1 text-xs font-bold text-primary">{SCOPE_LABELS[scope.scope] ?? scope.scope}{targetId ? ` · ${targetNames.get(targetId) ?? targetId}` : ""}</span></div>;
+      })}</div>}</section>
+    </div>;
   } catch (error) {
-    // 2. إدارة الخطأ محلياً بدلاً من انهيار الصفحة كاملة
-    console.error("Error loading scopes:", error);
-    return (
-      <div className="p-4 border border-red-200 rounded-md text-red-600 text-sm" dir="rtl">
-        عذراً، تعذر تحميل النطاقات. يرجى المحاولة لاحقاً.
-      </div>
-    );
+    console.error("[PermissionsScope]", error);
+    return <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">تعذر تحميل الصلاحيات حالياً.</div>;
   }
 }
 

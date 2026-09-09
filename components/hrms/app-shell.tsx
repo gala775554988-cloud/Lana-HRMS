@@ -11,7 +11,7 @@ import {
   DollarSign, Package, Megaphone, BarChart3, Settings,
   Shield, GitPullRequest, Menu, X, PlugZap, Search,
   CalendarClock, Fingerprint,
-  Umbrella, User, Mail, ShieldCheck, Briefcase
+  Umbrella
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/brand/brand-logo";
@@ -35,13 +35,9 @@ interface AppShellProps {
   dictionary: Dictionary;
 }
 
-// Flat, explicitly ordered sidebar -- the 16 navigable items requested,
-// in the exact order specified (grouping/categories removed). "ملفي" is
-// intentionally not in this list: it's rendered as a separate pinned
-// overlay trigger at the very end of the sidebar (see ProfileOverlay),
-// not a route. The smart assistant additionally gets its own explicit
-// authenticated-state guard where it renders, beyond the outer session
-// check this whole shell already requires.
+// Flat, explicitly ordered sidebar. A personal employee file is deliberately
+// not a global navigation module: only a user linked to an Employee record can
+// open their own file, from the identity control in the header below.
 const navItems: Array<{ href: string; label: string; icon: typeof LayoutDashboard; resource: string | string[] }> = [
   { href: "/dashboard", label: "الرئيسية", icon: LayoutDashboard, resource: "dashboard" },
   { href: "/employees", label: "الموظفون", icon: Users, resource: "employees" },
@@ -68,7 +64,6 @@ export function AppShell({ children, dictionary }: AppShellProps) {
   const sidebarCollapsed = _hasHydrated ? storedSidebarCollapsed : false;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [showProfileOverlay, setShowProfileOverlay] = useState(false);
 
   const prefetchRoute = useCallback((href: string) => {
     router.prefetch(href);
@@ -106,6 +101,12 @@ export function AppShell({ children, dictionary }: AppShellProps) {
   // HR/Super Admin each have a distinct one) rather than the hardcoded
   // Central Executive Dashboard every non-super-admin used to land on.
   const homeHref = useMemo(() => resolveRoleDashboard(userRoles), [userRoles]);
+  const ownEmployeeProfile = session?.user?.employeeProfile ?? null;
+  const ownProfileHref = ownEmployeeProfile?.id
+    ? userRoles.includes("EMPLOYEE")
+      ? "/employee/profile"
+      : `/employees/${ownEmployeeProfile.id}`
+    : null;
   const visibleNavItems = useMemo(
     () => navItems.filter(isNavItemAllowed).map((item) => (item.resource === "dashboard" ? { ...item, href: homeHref } : item)),
     [isNavItemAllowed, homeHref]
@@ -215,36 +216,7 @@ export function AppShell({ children, dictionary }: AppShellProps) {
           </div>
         </div>
 
-        {/* #17 ملفي -- pinned last, opens the Profile Overlay in place
-            instead of navigating; the admin work area stays mounted and
-            visible behind it. */}
-        <div className="border-t border-white/10 p-3">
-          <button
-            type="button"
-            onClick={() => setShowProfileOverlay(true)}
-            className={cn(
-              "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-blue-100/75 transition-colors hover:bg-white/10 hover:text-white",
-              sidebarCollapsed ? "lg:justify-center lg:px-2.5" : ""
-            )}
-            title={sidebarCollapsed ? "ملفي" : undefined}
-          >
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/10 text-xs font-bold text-white">
-              {session.user?.name?.charAt(0) || <User className="h-4 w-4" />}
-            </span>
-            {(!sidebarCollapsed || mobileMenuOpen) && <span className="truncate">ملفي</span>}
-          </button>
-        </div>
       </aside>
-
-      <ProfileOverlay
-        open={showProfileOverlay}
-        onClose={() => setShowProfileOverlay(false)}
-        userName={session.user?.name}
-        userEmail={session.user?.email}
-        userRoles={userRoles}
-        employeeProfile={session.user?.employeeProfile ?? null}
-        onLogout={handleLogout}
-      />
 
       <div className="flex min-w-0 flex-1 flex-col h-screen">
       {/* Shared application header */}
@@ -278,7 +250,7 @@ export function AppShell({ children, dictionary }: AppShellProps) {
             <ClientLanguageToggle variant="ghost" className="hidden sm:inline-flex rounded-xl hover:bg-primary/10 dark:hover:bg-slate-900" />
             <ThemeToggle />
             <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-slate-800" />
-            <div className="hidden sm:flex items-center gap-3 pl-1">
+            {ownProfileHref ? <Link href={ownProfileHref} className="hidden items-center gap-3 rounded-xl px-2 py-1 transition-colors hover:bg-muted sm:flex" title="فتح ملفي الوظيفي">
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
                 {session.user?.name?.charAt(0) || "م"}
               </div>
@@ -294,7 +266,15 @@ export function AppShell({ children, dictionary }: AppShellProps) {
                   ))}
                 </div>
               </div>
-            </div>
+            </Link> : <div className="hidden items-center gap-3 px-2 py-1 sm:flex">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                {session.user?.name?.charAt(0) || "م"}
+              </div>
+              <div className="min-w-0">
+                <p className="max-w-[150px] truncate text-sm font-black leading-tight text-slate-900 dark:text-slate-100">{session.user?.name}</p>
+                <p className="mt-1 text-[9px] font-medium text-muted-foreground">{userRoles.includes("SUPER_ADMIN") ? "مدير النظام" : userRoles[0]}</p>
+              </div>
+            </div>}
             <Button
               onClick={handleLogout}
               variant="ghost"
@@ -315,143 +295,6 @@ export function AppShell({ children, dictionary }: AppShellProps) {
       </div>
 
       <QuickSearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
-    </div>
-  );
-}
-
-/**
- * "ملفي" Profile Overlay: a modal floated on top of the admin dashboard --
- * the dashboard/work area stays mounted and dimly visible behind the
- * backdrop (never unmounted, never navigated away from), matching the
- * "keep the admin work context open in the background" requirement.
- */
-function ProfileOverlay({
-  open,
-  onClose,
-  userName,
-  userEmail,
-  userRoles,
-  employeeProfile,
-  onLogout
-}: {
-  open: boolean;
-  onClose: () => void;
-  userName?: string | null;
-  userEmail?: string | null;
-  userRoles: string[];
-  employeeProfile?: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    employeeNumber: string;
-    profilePhotoUrl: string | null;
-    positionTitle: string | null;
-    departmentName: string | null;
-  } | null;
-  onLogout: () => void;
-}) {
-  if (!open) return null;
-  const initials = userName?.charAt(0) || "?";
-
-  return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-sm animate-in fade-in duration-200"
-      role="dialog"
-      aria-modal="true"
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl shadow-black/30 animate-in zoom-in-95 duration-200"
-      >
-        {/* البطاقة البنفسجية: the purple/violet gradient profile card. */}
-        <div className="relative bg-gradient-to-br from-secondary via-secondary to-primary p-6 text-white">
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="إغلاق"
-            className="absolute top-4 end-4 grid h-8 w-8 place-items-center rounded-xl bg-white/15 hover:bg-white/25 transition-colors"
-          >
-            <X className="h-4 w-4" />
-          </button>
-          <div className="flex items-center gap-4">
-            <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-white/20 text-2xl font-black backdrop-blur-sm ring-2 ring-white/30">
-              {initials}
-            </div>
-            <div className="min-w-0">
-              <p className="text-lg font-black truncate">{userName || "المستخدم"}</p>
-              <div className="flex items-center gap-1.5 mt-1 text-white/80 text-xs font-semibold truncate">
-                <Mail className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{userEmail || "—"}</span>
-              </div>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-1.5 mt-4">
-            {userRoles.slice(0, 3).map((role) => (
-              <span key={role} className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-black">
-                <ShieldCheck className="h-3 w-3" />
-                {role === "SUPER_ADMIN" ? "مدير النظام" : role}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* الملف الوظيفي: real Employee data when this account is linked to
-            one, or an honest "not linked" notice -- never fabricated data. */}
-        {employeeProfile ? (
-          <div className="border-t border-slate-100 dark:border-slate-800 p-4">
-            <div className="flex items-center gap-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 p-3">
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-                <Briefcase className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-black text-slate-800 dark:text-slate-100 truncate">
-                  {employeeProfile.positionTitle || "بدون مسمى وظيفي"}
-                </p>
-                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">
-                  {employeeProfile.departmentName || "بدون قسم"} · رقم الموظف {employeeProfile.employeeNumber}
-                </p>
-              </div>
-            </div>
-            <Link
-              href={`/employees/${employeeProfile.id}`}
-              onClick={onClose}
-              className="mt-2 flex items-center justify-center gap-2 rounded-2xl px-3.5 py-2 text-xs font-bold text-primary hover:bg-primary/8 transition-colors"
-            >
-              <span>عرض ملفي الوظيفي الكامل</span>
-            </Link>
-          </div>
-        ) : (
-          <div className="border-t border-slate-100 dark:border-slate-800 p-4">
-            <div className="flex items-start gap-2.5 rounded-2xl border bg-slate-50 p-3 text-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
-              <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5 text-primary" />
-              <div>
-                <p className="text-xs font-bold leading-relaxed">حساب إداري</p>
-                <p className="mt-1 text-[11px] text-muted-foreground">هذا الحساب مخصص لإدارة النظام ولا يحتاج إلى ملف موظف.</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="bg-white dark:bg-slate-900 p-4 space-y-1.5">
-          <Link
-            href="/settings"
-            onClick={onClose}
-            className="flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-sm font-bold text-slate-700 hover:bg-primary/8 hover:text-primary transition-colors dark:text-slate-300 dark:hover:bg-primary/10"
-          >
-            <Settings className="h-4.5 w-4.5" />
-            <span>الإعدادات</span>
-          </Link>
-          <button
-            type="button"
-            onClick={() => { onClose(); onLogout(); }}
-            className="flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-sm font-bold text-rose-600 hover:bg-rose-50 transition-colors dark:text-rose-400 dark:hover:bg-rose-950/40"
-          >
-            <LogOut className="h-4.5 w-4.5" />
-            <span>تسجيل الخروج</span>
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

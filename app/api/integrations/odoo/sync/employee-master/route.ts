@@ -60,9 +60,12 @@ const HOSPITAL_FIELD_CANDIDATES = [
 ];
 
 const EXTENDED_PROFILE_FIELD_CANDIDATES = [
-  "employee_english_name", "iqamah_job_name", "birthday", "gender", "marital",
-  "join_date", "first_contract_date", "work_location_name", "employee_working_status",
-  "hr_presence_state", "is_absent", "tz", "category_ids", "branch_id"
+  "employee_english_name", "english_name", "name_en", "x_employee_english_name", "x_studio_employee_english_name",
+  "iqamah_job_name", "iqama_job_name", "profession", "profession_id", "x_iqamah_job_name", "x_studio_iqamah_job_name",
+  "birthday", "gender", "marital", "join_date", "joining_date", "date_joining", "first_contract_date",
+  "work_location_name", "employee_working_status", "working_status", "hr_presence_state", "is_absent", "tz", "category_ids", "branch_id",
+  "emergency_contact", "emergency_phone", "private_street", "private_street2", "private_city", "private_state_id", "private_country_id", "private_zip",
+  "address_home_id", "country_id", "place_of_birth"
 ];
 
 const ANALYTIC_FIELD_CANDIDATES = [
@@ -118,6 +121,29 @@ function emailFrom(row: MasterRow) {
 
 function phoneFrom(row: MasterRow) {
   return clean(row.work_phone) || clean(row.mobile_phone) || clean(row.private_phone) || null;
+}
+
+function firstText(row: Record<string, unknown>, fields: string[]) {
+  for (const field of fields) {
+    const value = many2oneName(row[field]) || clean(row[field]);
+    if (value) return value;
+  }
+  return "";
+}
+
+function firstDate(row: Record<string, unknown>, fields: string[]) {
+  for (const field of fields) {
+    const value = dateValue(row[field]);
+    if (value) return value;
+  }
+  return undefined;
+}
+
+function addressFrom(row: Record<string, unknown>) {
+  const parts = ["private_street", "private_street2", "private_city", "private_state_id", "private_country_id", "private_zip"]
+    .map((field) => many2oneName(row[field]) || clean(row[field]))
+    .filter(Boolean);
+  return parts.join("، ") || many2oneName(row.address_home_id) || clean(row.address_home_id) || undefined;
 }
 
 async function ensureEmployeeUser(employeeId: string, values: { nationalId: string; email?: string | null; firstName: string; lastName: string }) {
@@ -194,7 +220,7 @@ export async function POST(request: NextRequest) {
     const hospitalFields = HOSPITAL_FIELD_CANDIDATES.filter((field) => fieldsMeta[field]);
     const analyticFields = ANALYTIC_FIELD_CANDIDATES.filter((field) => fieldsMeta[field]);
     const extendedProfileFields = EXTENDED_PROFILE_FIELD_CANDIDATES.filter((field) => fieldsMeta[field]);
-    const fields = [
+    const requestedFields = [
       "id",
       "name",
       "barcode",
@@ -218,6 +244,9 @@ export async function POST(request: NextRequest) {
       ...analyticFields,
       ...extendedProfileFields,
     ];
+    const fields = requestedFields.filter((field, index) =>
+      (field === "id" || Boolean(fieldsMeta[field])) && requestedFields.indexOf(field) === index
+    );
 
     const rows: MasterRow[] = [];
     let lastOdooId = Math.max(Number(body.afterId ?? 0), 0);
@@ -318,20 +347,24 @@ export async function POST(request: NextRequest) {
           phone: phoneFrom(row),
           profilePhotoUrl: (row as any).image_1920 ? (String((row as any).image_1920).startsWith("data:") ? String((row as any).image_1920) : `data:image/jpeg;base64,${(row as any).image_1920}`) : undefined,
           sponsor: sponsorValue(row as Record<string, unknown>, sponsorFields),
-          employeeEnglishName: clean((row as any).employee_english_name) || undefined,
-          iqamahJobName: clean((row as any).iqamah_job_name) || undefined,
+          employeeEnglishName: firstText(row, ["employee_english_name", "english_name", "name_en", "x_employee_english_name", "x_studio_employee_english_name"]) || undefined,
+          iqamahJobName: firstText(row, ["iqamah_job_name", "iqama_job_name", "profession", "profession_id", "x_iqamah_job_name", "x_studio_iqamah_job_name"]) || undefined,
           workPhone: clean((row as any).work_phone) || undefined,
           mobilePhone: clean((row as any).mobile_phone) || undefined,
+          gender: clean((row as any).gender) || undefined,
+          dateOfBirth: dateValue((row as any).birthday),
+          address: addressFrom(row),
+          emergencyContact: [firstText(row, ["emergency_contact"]), firstText(row, ["emergency_phone"])].filter(Boolean).join(" - ") || undefined,
           maritalStatus: clean((row as any).marital) || undefined,
-          firstContractDate: dateValue((row as any).first_contract_date),
-          workingStatus: many2oneName((row as any).employee_working_status) || clean((row as any).employee_working_status) || undefined,
+          firstContractDate: firstDate(row, ["first_contract_date", "join_date", "joining_date", "date_joining"]),
+          workingStatus: firstText(row, ["employee_working_status", "working_status"]) || undefined,
           hrPresenceState: clean((row as any).hr_presence_state) || undefined,
           isAbsent: Boolean((row as any).is_absent),
           odooTimezone: clean((row as any).tz) || "Asia/Riyadh",
           odooTags: Array.isArray((row as any).category_ids) ? (row as any).category_ids : undefined,
           workLocationName: clean((row as any).work_location_name) || many2oneName((row as any).work_location_id) || undefined,
           costCenter: costCenterVal || undefined,
-          hireDate: dateValue((row as any).join_date) || dateValue(row.first_contract_date) || dateValue(row.create_date) || new Date(),
+          hireDate: firstDate(row, ["join_date", "joining_date", "date_joining", "first_contract_date", "create_date"]) || new Date(),
           status: row.active === false ? "INACTIVE" : "ACTIVE",
           odooWriteDate: dateValue(row.write_date),
           odooCreateDate: dateValue(row.create_date),

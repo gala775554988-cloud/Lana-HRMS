@@ -423,7 +423,6 @@ export function EmployeeProfileDashboard({
             <TabsTrigger value="assets" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Laptop className="h-4 w-4 ml-1" />الأصول</TabsTrigger>
             <TabsTrigger value="permissions" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Shield className="h-4 w-4 ml-1" />الصلاحيات</TabsTrigger>
             <TabsTrigger value="activity" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Activity className="h-4 w-4 ml-1" />النشاط</TabsTrigger>
-            <TabsTrigger value="ai" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Brain className="h-4 w-4 ml-1" />الذكاء الاصطناعي</TabsTrigger>
           </TabsList>
         </div>
 

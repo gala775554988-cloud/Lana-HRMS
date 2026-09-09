@@ -87,15 +87,15 @@ export default async function EmployeeProfilePage({
         ]);
         const refreshed = await prisma.employee.findUnique({
           where: { id },
-          select: { profilePhotoUrl: true, sponsor: true, dateOfBirth: true, odooRawDataSyncedAt: true, firstName: true, lastName: true }
+          select: {
+            profilePhotoUrl: true, sponsor: true, dateOfBirth: true, gender: true, address: true, emergencyContact: true,
+            employeeEnglishName: true, iqamahJobName: true, workPhone: true, mobilePhone: true, maritalStatus: true,
+            firstContractDate: true, workingStatus: true, hrPresenceState: true, workLocationName: true, costCenter: true,
+            odooRawDataSyncedAt: true, firstName: true, lastName: true,
+          }
         });
         if (refreshed) {
-          employee.profilePhotoUrl = refreshed.profilePhotoUrl;
-          employee.sponsor = refreshed.sponsor;
-          employee.dateOfBirth = refreshed.dateOfBirth;
-          employee.odooRawDataSyncedAt = refreshed.odooRawDataSyncedAt;
-          employee.firstName = refreshed.firstName;
-          employee.lastName = refreshed.lastName;
+          Object.assign(employee, refreshed);
         }
       } catch (err) {
         console.log(`[EmployeeProfilePage] Lazy detail load notice for odooId ${employee.odooId}:`, err instanceof Error ? err.message : String(err));
