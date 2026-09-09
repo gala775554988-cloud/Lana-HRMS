@@ -4,7 +4,7 @@
  * - Never cache API responses or authenticated HTML pages by default.
  * - Show a safe offline page when navigation fails.
  */
-const CACHE_VERSION = "v6";
+const CACHE_VERSION = "v7";
 const STATIC_CACHE = `hrms-static-${CACHE_VERSION}`;
 const OFFLINE_URL = "/offline.html";
 
@@ -45,8 +45,7 @@ function isStaticAsset(url) {
   return (
     url.pathname.startsWith("/icons/") ||
     url.pathname === "/favicon.svg" ||
-    url.pathname === "/manifest.webmanifest" ||
-    /\.(?:css|js|mjs|png|jpg|jpeg|gif|webp|svg|ico|woff2?)$/i.test(url.pathname)
+    url.pathname === "/manifest.webmanifest"
   );
 }
 
@@ -64,7 +63,7 @@ async function cacheFirst(request) {
 
 async function networkOnlyNavigation(request) {
   try {
-    return await fetch(request);
+    return await fetch(request, { cache: "no-store" });
   } catch (_error) {
     const cachedOffline = await caches.match(OFFLINE_URL);
     return cachedOffline || Response.error();
@@ -77,6 +76,10 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
   if (!isSameOrigin(url) || isApiOrAuthRequest(url)) return;
+
+  // Next.js chunks and RSC payloads are deployment-specific. Let the browser
+  // fetch them directly so an open PWA cannot retain stale Server Action IDs.
+  if (url.pathname.startsWith("/_next/")) return;
 
   if (request.mode === "navigate") {
     event.respondWith(networkOnlyNavigation(request));

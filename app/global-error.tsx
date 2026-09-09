@@ -15,8 +15,8 @@ import { parseClientError } from "@/lib/errors";
 // with sessionStorage so a genuinely broken deploy doesn't reload forever.
 const RELOAD_GUARD_KEY = "lana-global-error-reload-attempted";
 
-function isChunkLoadError(error: Error) {
-  return /ChunkLoadError|Loading chunk|failed to fetch dynamically imported module/i.test(error.message ?? "");
+function isStaleDeploymentError(error: Error) {
+  return /Server Action .* was not found|failed-to-find-server-action|ChunkLoadError|Loading chunk|failed to fetch dynamically imported module/i.test(error.message ?? "");
 }
 
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
@@ -24,15 +24,23 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
 
   useEffect(() => {
     console.error("[GlobalError]", error);
-    if (isChunkLoadError(error) && typeof window !== "undefined" && !window.sessionStorage.getItem(RELOAD_GUARD_KEY)) {
+    if (isStaleDeploymentError(error) && typeof window !== "undefined" && !window.sessionStorage.getItem(RELOAD_GUARD_KEY)) {
       window.sessionStorage.setItem(RELOAD_GUARD_KEY, "1");
       setReloaded(true);
-      window.location.reload();
+      void (async () => {
+        if ("caches" in window) {
+          const names = await caches.keys();
+          await Promise.all(names.filter((name) => name.startsWith("hrms-") || name.startsWith("lana-hrms-")).map((name) => caches.delete(name)));
+        }
+        const freshUrl = new URL(window.location.href);
+        freshUrl.searchParams.set("_hrms_refresh", String(Date.now()));
+        window.location.replace(freshUrl.toString());
+      })().catch(() => window.location.reload());
     }
   }, [error]);
 
   const structured = parseClientError(error, "app/global-error");
-  const chunkError = isChunkLoadError(error);
+  const chunkError = isStaleDeploymentError(error);
 
   return (
     <html lang="ar" dir="rtl">

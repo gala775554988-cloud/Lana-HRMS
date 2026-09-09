@@ -6,7 +6,6 @@ import { PERMISSION_TEMPLATES } from "@/lib/enterprise/permissions";
 import { AppShell } from "@/components/hrms/app-shell";
 import { TopLoader } from "@/components/ui/top-loader";
 import { getRequestDictionary } from "@/lib/i18n-server";
-import "@/lib/error-interceptor";
 
 export const dynamic = "force-dynamic";
 
