@@ -2,16 +2,14 @@ import dynamicImport from "next/dynamic";
 import { Suspense } from "react";
 import { MergedModuleTabs } from "@/components/hrms/merged-module-tabs";
 import { Inbox, Send, GitPullRequest } from "lucide-react";
+import { WorkspaceHeader } from "@/components/hrms/workspace-ui";
 
 const RequestWorkbenchClient = dynamicImport(() => import("@/components/enterprise/request-workbench-client").then((mod) => mod.RequestWorkbenchClient));
 
 export default function ApprovalsPage() {
   return (
     <div className="space-y-5" dir="rtl">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">مركز الطلبات والموافقات</h1>
-        <p className="mt-1 text-sm text-muted-foreground">متابعة الطلبات الواردة والصادرة، تنفيذ القرارات، ومراجعة سلسلة الاعتماد من مكان واحد.</p>
-      </div>
+      <WorkspaceHeader title="الطلبات والموافقات" description="متابعة الطلبات واتخاذ القرار من مكان واحد." />
       <MergedModuleTabs
         defaultValue="center"
         items={[

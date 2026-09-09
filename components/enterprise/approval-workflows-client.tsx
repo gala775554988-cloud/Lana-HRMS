@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { UserSearchSelect } from "@/components/hrms/user-search-select";
+import { MetricStrip } from "@/components/hrms/workspace-ui";
 
 const ENTITY_TYPE_LABELS: Record<string, string> = { HOSPITAL: "مستشفى", DEPARTMENT: "إدارة", BRANCH: "فرع", PROJECT: "مشروع" };
 const ENTITY_TYPES = ["HOSPITAL", "DEPARTMENT", "BRANCH", "PROJECT"] as const;
@@ -347,11 +348,7 @@ export function ApprovalWorkflowsClient() {
         </div>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">المسارات النشطة</p><p className="mt-1 text-2xl font-semibold">{activePathCount}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">أنواع الطلبات المغطاة</p><p className="mt-1 text-2xl font-semibold">{coveredRequestTypes}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">إجمالي مراحل الاعتماد</p><p className="mt-1 text-2xl font-semibold">{totalStages}</p></CardContent></Card>
-      </div>
+      <MetricStrip className="xl:grid-cols-3" items={[{ label: "المسارات النشطة", value: activePathCount }, { label: "أنواع الطلبات", value: coveredRequestTypes }, { label: "مراحل الاعتماد", value: totalStages }]} />
 
       <Card>
         <CardHeader>

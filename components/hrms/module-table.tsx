@@ -16,11 +16,23 @@ import { cn } from "@/lib/utils";
 
 type Row = Record<string, unknown> & { id: string };
 
-function display(value: unknown, yesLabel: string, noLabel: string) {
+const VALUE_LABELS: Record<string, string> = {
+  ACTIVE: "نشط", INACTIVE: "غير نشط", PENDING: "قيد الانتظار", APPROVED: "معتمد",
+  REJECTED: "مرفوض", CANCELLED: "ملغي", DRAFT: "مسودة", COMPLETED: "مكتمل"
+};
+
+function display(value: unknown, yesLabel: string, noLabel: string, locale: Locale) {
   if (value === null || value === undefined || value === "") return "-";
   if (typeof value === "boolean") return value ? yesLabel : noLabel;
-  if (typeof value === "object") return JSON.stringify(value);
-  return String(value);
+  if (value instanceof Date) return value.toLocaleDateString(locale === "ar" ? "ar-SA" : "en-US");
+  if (typeof value === "object") return "—";
+  const text = String(value);
+  if (VALUE_LABELS[text]) return VALUE_LABELS[text];
+  if (/^\d{4}-\d{2}-\d{2}T/.test(text)) {
+    const date = new Date(text);
+    if (!Number.isNaN(date.getTime())) return date.toLocaleString(locale === "ar" ? "ar-SA" : "en-US", { dateStyle: "medium", timeStyle: "short" });
+  }
+  return text;
 }
 
 function formatHeader(field: string, fieldsDict: Record<string, string>) {
@@ -93,7 +105,7 @@ export function ModuleTable({ resource, records, dictionary, locale = "en", from
       header: formatHeader(field, fieldsDict),
       cell: (info) => resource.key === "insurance" && field === "endDate"
         ? <InsuranceExpiryBar endDate={info.getValue()} />
-        : display(info.getValue(), yesLabel, noLabel)
+        : display(info.getValue(), yesLabel, noLabel, locale)
     })),
     helper.display({ id: "actions", header: dictionary.table.actions, cell: ({ row }) => {
       const workflowId = typeof row.original._workflowId === "string" ? row.original._workflowId : "";
@@ -130,7 +142,7 @@ export function ModuleTable({ resource, records, dictionary, locale = "en", from
         </div>
       );
     }})
-  ], [dictionary, fieldsDict, fromHref, helper, isPending, noLabel, resource, yesLabel, handleDelete, handleDecision]);
+  ], [dictionary, fieldsDict, fromHref, helper, isPending, locale, noLabel, resource, yesLabel, handleDelete, handleDecision]);
 
   const table = useReactTable({ data: records, columns, getCoreRowModel: getCoreRowModel() });
 

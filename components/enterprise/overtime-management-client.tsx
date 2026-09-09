@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { CheckCircle2, Clock3, Coins, Download, Eye, Plus, ShieldCheck, XCircle } from "lucide-react";
+import { Download, Eye, Plus } from "lucide-react";
 import { ApprovalTimeline } from "@/components/enterprise/approval-timeline";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { MetricStrip } from "@/components/hrms/workspace-ui";
 
 type EmployeeOption = { id: string; employeeNumber: string; firstName: string; lastName: string; departmentId?: string | null; branchId?: string | null; department?: { name: string } | null; branch?: { name: string } | null };
 type RefOption = { id: string; name: string };
@@ -69,9 +70,12 @@ export function OvertimeManagementClient() {
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <Metric label="إجمالي الطلبات" value={stats.total} icon={Clock3} /><Metric label="بانتظار الاعتماد" value={stats.pending} icon={ShieldCheck} /><Metric label="الطلبات المعتمدة" value={stats.approved} icon={CheckCircle2} /><Metric label="المرفوضة" value={stats.rejected} icon={XCircle} /><Metric label="الساعات المعتمدة" value={stats.approvedHours.toLocaleString("ar-SA")} icon={Clock3} /><Metric label="القيمة المعتمدة" value={`${stats.approvedAmount.toLocaleString("ar-SA")} ر.س`} icon={Coins} />
-      </div>
+      <MetricStrip items={[
+        { label: "الإجمالي", value: stats.total }, { label: "بانتظار الاعتماد", value: stats.pending },
+        { label: "المعتمدة", value: stats.approved }, { label: "المرفوضة", value: stats.rejected },
+        { label: "الساعات المعتمدة", value: stats.approvedHours.toLocaleString("ar-SA") },
+        { label: "القيمة المعتمدة", value: `${stats.approvedAmount.toLocaleString("ar-SA")} ر.س` }
+      ]} />
 
       <Card>
         <CardHeader className="flex-row items-center justify-between gap-4"><div><CardTitle>طلبات العمل الإضافي</CardTitle><CardDescription>يمر كل طلب بمسار الاعتماد المحدد للموظف، ثم يصبح جاهزًا للمسير أو رصيد الإجازة التعويضية.</CardDescription></div><Button type="button" onClick={() => setShowForm((value) => !value)}><Plus className="me-2 h-4 w-4" />طلب جديد</Button></CardHeader>
@@ -102,8 +106,4 @@ export function OvertimeManagementClient() {
       <ApprovalTimeline workflowId={workflowId} onClose={() => setWorkflowId(null)} />
     </div>
   );
-}
-
-function Metric({ label, value, icon: Icon }: { label: string; value: string | number; icon: typeof Clock3 }) {
-  return <Card><CardContent className="flex items-center justify-between p-4"><div><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-xl font-bold">{value}</p></div><span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary"><Icon className="h-4 w-4" /></span></CardContent></Card>;
 }

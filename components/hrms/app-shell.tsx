@@ -145,12 +145,12 @@ export function AppShell({ children, dictionary }: AppShellProps) {
       <aside
         className={cn(
           "fixed inset-y-0 start-0 z-50 flex h-screen flex-col border-e border-white/10 bg-[hsl(var(--sidebar-bg))] text-[hsl(var(--sidebar-foreground))] shadow-xl transition-[width,transform] duration-200 lg:sticky lg:top-0 lg:z-auto lg:!translate-x-0",
-          sidebarCollapsed ? "lg:w-[76px]" : "lg:w-[272px]",
-          "w-[272px]",
+          sidebarCollapsed ? "lg:w-[72px]" : "lg:w-[248px]",
+          "w-[248px]",
           mobileMenuOpen ? "translate-x-0" : "rtl:translate-x-full ltr:-translate-x-full"
         )}
       >
-        <div className="flex h-[72px] items-center justify-between border-b border-white/10 px-4">
+        <div className="flex h-16 items-center justify-between border-b border-white/10 px-4">
           <BrandLogo href="/" size="sm" showText={!sidebarCollapsed || mobileMenuOpen} textClassName="text-white" subtitleClassName="text-blue-100/60" logoClassName="bg-white text-primary border-white" />
           <button
             onClick={() => setMobileMenuOpen(false)}
@@ -160,7 +160,7 @@ export function AppShell({ children, dictionary }: AppShellProps) {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-3">
           <div className="space-y-1">
             {visibleNavItems.map((item) => {
               const Icon = item.icon;
@@ -174,7 +174,7 @@ export function AppShell({ children, dictionary }: AppShellProps) {
                   onFocus={() => prefetchRoute(item.href)}
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
-                    "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors duration-150",
+                    "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors duration-150",
                     sidebarCollapsed ? "lg:justify-center lg:px-2.5" : "",
                     active
                       ? "bg-white font-semibold text-primary shadow-sm"
@@ -259,7 +259,7 @@ export function AppShell({ children, dictionary }: AppShellProps) {
       <div className="flex min-w-0 flex-1 flex-col h-screen">
       {/* Shared application header */}
       <header className="sticky top-0 z-30 shrink-0 border-b border-border bg-card/95 backdrop-blur-sm">
-        <div className="flex h-[72px] items-center justify-between gap-4 px-4 lg:px-7">
+        <div className="flex h-16 items-center justify-between gap-4 px-4 lg:px-6">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileMenuOpen(prev => !prev)}
@@ -319,7 +319,7 @@ export function AppShell({ children, dictionary }: AppShellProps) {
         </div>
       </header>
 
-      <main className="relative min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-background p-4 lg:p-7">
+      <main className="hrms-workspace relative min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-background p-4 lg:p-6">
         {children}
       </main>
       </div>

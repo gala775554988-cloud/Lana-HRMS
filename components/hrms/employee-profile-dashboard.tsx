@@ -350,33 +350,29 @@ export function EmployeeProfileDashboard({
           </Button>
         </div>
       )}
-      {/* Header - Glassmorphism, Rounded XL */}
-      <Card className="overflow-hidden border-0 shadow-2xl bg-white/80 backdrop-blur-xl dark:bg-slate-900/80">
-        <div className="h-32 bg-gradient-to-r from-primary via-violet-600 to-blue-600 relative">
-          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.1)_1px,transparent_1px)] bg-[size:20px_20px] opacity-30" />
-        </div>
+      <Card className="overflow-hidden">
         <CardContent className="p-0">
-          <div className="px-6 pb-6">
-            <div className="flex flex-col lg:flex-row gap-6 -mt-16">
-              <Avatar className="h-32 w-32 rounded-3xl border-4 border-white shadow-2xl ring-4 ring-white/50">
+          <div className="p-5">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
+              <Avatar className="h-20 w-20 rounded-xl border">
                 {employee.profilePhotoUrl ? (
                   <AvatarImage src={employee.profilePhotoUrl} alt={fullName} className="object-cover" />
                 ) : (
-                  <AvatarFallback className="text-3xl font-black bg-gradient-to-br from-primary to-violet-500 text-white">{initials}</AvatarFallback>
+                  <AvatarFallback className="text-xl font-bold bg-primary/10 text-primary">{initials}</AvatarFallback>
                 )}
               </Avatar>
-              <div className="flex-1 min-w-0 pt-4 lg:pt-16">
+              <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <h1 className="text-3xl font-black tracking-tight">{fullName}</h1>
+                      <h1 className="text-2xl font-bold tracking-tight">{fullName}</h1>
                     </div>
                     <p className="text-muted-foreground mt-1 flex flex-wrap gap-2 text-sm">
                       <span className="font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full text-xs">{employee.employeeNumber}</span>
                       <span className="font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full text-xs">{employee.nationalId}</span>
                       <Badge variant={employee.status === "ACTIVE" ? "default" : "secondary"}>{employee.status}</Badge>
                     </p>
-                    <div className="mt-3 grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                    <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
                       <div className="flex items-center gap-2"><Briefcase className="h-4 w-4 text-muted-foreground" /><span>{employee.position?.title || "-"}</span></div>
                       <div className="flex items-center gap-2"><Building2 className="h-4 w-4 text-muted-foreground" /><span>{employee.department?.name || "-"}</span></div>
                       <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-muted-foreground" /><span>{employee.branch?.name || "-"}</span></div>
@@ -390,7 +386,6 @@ export function EmployeeProfileDashboard({
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="outline" onClick={() => router.push(`/employees/${employee.id}/edit`)}><Edit className="h-4 w-4 ml-1" />تعديل</Button>
                     <Button size="sm" variant="outline" onClick={() => window.print()}><Printer className="h-4 w-4 ml-1" />طباعة</Button>
-                    <Button size="sm" variant="outline" onClick={() => window.open(`/api/hr/employees/export?format=pdf&search=${employee.employeeNumber}`, "_blank")}><Download className="h-4 w-4 ml-1" />PDF</Button>
                     <Button size="sm" variant={employee.status === "INACTIVE" ? "outline" : "destructive"} onClick={handleArchive} className="gap-1">
                       {employee.status === "INACTIVE" ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
                       {employee.status === "INACTIVE" ? "إلغاء الأرشفة" : "أرشفة"}
@@ -408,10 +403,9 @@ export function EmployeeProfileDashboard({
         </CardContent>
       </Card>
 
-      {/* Tabs - Modern, not long page */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border rounded-2xl p-2 shadow-premium-sm">
-          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 xl:grid-cols-13 gap-1 h-auto bg-transparent">
+        <div className="sticky top-0 z-10 overflow-x-auto border-b bg-background py-2">
+          <TabsList className="inline-flex h-10 min-w-max gap-1 bg-transparent">
             <TabsTrigger value="personal" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><User className="h-4 w-4 ml-1" />الشخصية</TabsTrigger>
             <TabsTrigger value="job" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Briefcase className="h-4 w-4 ml-1" />الوظيفة</TabsTrigger>
             <TabsTrigger value="career" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Award className="h-4 w-4 ml-1" />المؤهلات والخبرات</TabsTrigger>
@@ -431,7 +425,7 @@ export function EmployeeProfileDashboard({
 
         {/* 1- Personal */}
         <TabsContent value="personal" className="space-y-4 mt-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <Card><CardContent className="grid gap-x-8 gap-y-0 p-5 md:grid-cols-2">
             {[
               { label: "الاسم عربي", value: `${employee.firstName} ${employee.lastName}` },
               { label: "الاسم انجليزي", value: `${employee.firstName} ${employee.lastName}` },
@@ -450,14 +444,14 @@ export function EmployeeProfileDashboard({
               { label: "المنطقة", value: "-" },
               { label: "الدولة", value: employee.branch?.country || (employee as any).nationality?.name || "-" },
             ].map((item, i) => (
-              <Card key={i} className="rounded-2xl"><CardContent className="p-4"><p className="text-xs text-muted-foreground">{item.label}</p><p className="font-medium mt-1">{item.value}</p></CardContent></Card>
+              <div key={i} className="grid grid-cols-[130px_1fr] gap-3 border-b py-3 text-sm last:border-b-0"><p className="text-muted-foreground">{item.label}</p><p className="font-medium">{item.value}</p></div>
             ))}
-          </div>
+          </CardContent></Card>
         </TabsContent>
 
         {/* 2- Job */}
         <TabsContent value="job" className="space-y-4 mt-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <Card><CardContent className="grid gap-x-8 gap-y-0 p-5 md:grid-cols-2">
             {[
               { label: "الرقم الوظيفي", value: employee.employeeNumber },
               { label: "القسم", value: employee.department?.name || "-" },
@@ -477,9 +471,9 @@ export function EmployeeProfileDashboard({
               { label: "رقم الموظف في Odoo", value: (employee as any).odooId || employee.employeeNumber },
               { label: "آخر مزامنة", value: lastSync ? new Date(lastSync).toLocaleString() : "-" },
             ].map((item, i) => (
-              <Card key={i} className="rounded-2xl"><CardContent className="p-4"><p className="text-xs text-muted-foreground">{item.label}</p><p className="font-medium mt-1">{item.value}</p></CardContent></Card>
+              <div key={i} className="grid grid-cols-[130px_1fr] gap-3 border-b py-3 text-sm last:border-b-0"><p className="text-muted-foreground">{item.label}</p><p className="font-medium">{item.value}</p></div>
             ))}
-          </div>
+          </CardContent></Card>
         </TabsContent>
 
         {/* 3- Salaries */}

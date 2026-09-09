@@ -145,6 +145,44 @@
     @apply relative rounded-2xl border border-border bg-card;
     box-shadow: var(--shadow-card);
   }
+
+  /* Calm enterprise workspace: one visual hierarchy across every HR module. */
+  .hrms-workspace {
+    --radius: 0.625rem;
+  }
+  .hrms-workspace section,
+  .hrms-workspace > div {
+    max-width: 1600px;
+    margin-inline: auto;
+  }
+  .hrms-workspace .shadow-sm,
+  .hrms-workspace .shadow-md,
+  .hrms-workspace .shadow-lg,
+  .hrms-workspace .shadow-xl,
+  .hrms-workspace .shadow-2xl,
+  .hrms-workspace .shadow-premium-sm,
+  .hrms-workspace .shadow-premium-md,
+  .hrms-workspace .shadow-premium-lg {
+    box-shadow: none !important;
+  }
+  .hrms-workspace .rounded-3xl,
+  .hrms-workspace .rounded-2xl {
+    border-radius: 0.75rem !important;
+  }
+  .hrms-workspace table thead {
+    background: hsl(var(--muted) / 0.7);
+  }
+  .hrms-workspace table th {
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .hrms-workspace table tbody tr:hover {
+    background: hsl(var(--muted) / 0.35);
+  }
+  .hrms-workspace [class*="bg-gradient-to-"] {
+    background-image: none !important;
+  }
 }
 
 @keyframes lanaFadeIn {

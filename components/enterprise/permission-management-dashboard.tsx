@@ -221,9 +221,9 @@ export function PermissionManagementDashboard() {
         });
       }
       setEntries((current) => current.filter((e) => e.userId !== entry.userId));
-      setMessage(`تمت إزالة (${entry.firstName} ${entry.lastName}) وسحب جميع صلاحياته / Removed and revoked all access`);
+      setMessage(`تمت إزالة (${entry.firstName} ${entry.lastName}) وسحب جميع صلاحياته`);
     } catch {
-      setMessage("فشل حذف الموظف / Failed to remove employee");
+      setMessage("تعذرت إزالة الموظف، حاول مرة أخرى");
       updateEntry(entry.userId, { saving: false, confirmingDelete: false });
     }
   }
@@ -235,7 +235,7 @@ export function PermissionManagementDashboard() {
   return (
     <div className="space-y-5" dir="rtl">
       <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">لوحة إدارة الصلاحيات / Permission Management Dashboard</h2>
+        <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">صلاحيات إضافية للمستخدمين</h2>
         <p className="mt-1 text-sm text-muted-foreground">ابحث بالاسم أو رقم الهوية أو الرقم الوظيفي لإضافة موظف إلى القائمة أدناه.</p>
         <div className="mt-3 max-w-md">
           <UserSearchSelect value="" onChange={(_userId, _label, employee) => addEmployee(employee)} placeholder="ابحث بالاسم أو رقم الهوية أو الكود الوظيفي..." />

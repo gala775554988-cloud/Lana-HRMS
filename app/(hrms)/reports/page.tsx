@@ -1,33 +1,25 @@
 import Link from "next/link";
-import { Suspense } from "react";
-import { auth } from "@/auth";
 import { hrmsModules } from "@/config/hrms";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CompanyOverview, OverviewSkeleton } from "@/app/(hrms)/analytics/page";
-import { getRequestDictionary } from "@/lib/i18n-server";
+import { ArrowLeft, BarChart3 } from "lucide-react";
+import { WorkspaceHeader } from "@/components/hrms/workspace-ui";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReportsPage() {
-  const session = await auth();
-  const roles = (session?.user?.roles as string[]) || [];
-  const isAdmin = roles.some((role) =>
-    ["SUPER_ADMIN", "HR_MANAGER", "PAYROLL_MANAGER", "RECRUITER", "MANAGER", "HR", "DEPARTMENT_MANAGER", "BRANCH_MANAGER", "SUPERVISOR", "PROJECT_MANAGER"].includes(role)
-  );
-  const { locale, dictionary } = await getRequestDictionary();
-
   return (
-    <section className="space-y-6">
-      <div><p className="text-sm font-medium text-muted-foreground">التحليلات</p><h1 className="text-3xl font-semibold">التقارير</h1><p className="text-muted-foreground">نقاط الدخول للتقارير التشغيلية لكل وحدة من وحدات النظام.</p></div>
-
-      {isAdmin ? (
-        <Suspense fallback={<OverviewSkeleton showCharts={false} />}>
-          <CompanyOverview locale={locale} dictionary={dictionary} showCharts={false} />
-        </Suspense>
-      ) : null}
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {hrmsModules.filter((entity) => entity.key !== "audit-logs" && entity.key !== "reports").map((entity) => <Link key={entity.key} href={"/" + entity.key}><Card className="h-full transition-colors hover:bg-accent"><CardHeader><CardTitle>{entity.title}</CardTitle><CardDescription>{entity.description}</CardDescription></CardHeader><CardContent><p className="text-sm text-muted-foreground">عرض الجدول المباشر والفلاتر والبيانات الجاهزة للتصدير.</p></CardContent></Card></Link>)}
+    <section className="space-y-5" dir="rtl">
+      <WorkspaceHeader title="التقارير" description="اختر التقرير المطلوب، ثم حدّد الفترة والفلاتر من داخله." />
+      <div className="overflow-hidden rounded-xl border bg-card">
+        {hrmsModules.filter((entity) => entity.key !== "audit-logs" && entity.key !== "reports").map((entity) => (
+          <Link key={entity.key} href={"/" + entity.key} className="group flex items-center gap-4 border-b px-4 py-3.5 last:border-b-0 hover:bg-muted/40">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><BarChart3 className="h-4 w-4" /></span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold">{entity.title}</span>
+              <span className="block truncate text-sm text-muted-foreground">{entity.description}</span>
+            </span>
+            <span className="flex items-center gap-1 text-xs font-medium text-primary">فتح التقرير <ArrowLeft className="h-4 w-4" /></span>
+          </Link>
+        ))}
       </div>
     </section>
   );
