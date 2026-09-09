@@ -35,6 +35,7 @@ interface Props {
   lastSync: any;
   attendanceStats: any[];
   attendanceCount: number;
+  attendanceRecords: any[];
   leaveBalance: any[];
   leaveRequests: any[];
   contracts: any[];
@@ -64,6 +65,7 @@ export function EmployeeProfileDashboard({
   lastSync,
   attendanceStats,
   attendanceCount,
+  attendanceRecords,
   leaveBalance,
   leaveRequests,
   contracts,
@@ -412,6 +414,7 @@ export function EmployeeProfileDashboard({
           <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 xl:grid-cols-13 gap-1 h-auto bg-transparent">
             <TabsTrigger value="personal" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><User className="h-4 w-4 ml-1" />الشخصية</TabsTrigger>
             <TabsTrigger value="job" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Briefcase className="h-4 w-4 ml-1" />الوظيفة</TabsTrigger>
+            <TabsTrigger value="career" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Award className="h-4 w-4 ml-1" />المؤهلات والخبرات</TabsTrigger>
             <TabsTrigger value="salary" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Wallet className="h-4 w-4 ml-1" />الرواتب</TabsTrigger>
             <TabsTrigger value="attendance" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Clock className="h-4 w-4 ml-1" />الحضور</TabsTrigger>
             <TabsTrigger value="leaves" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Calendar className="h-4 w-4 ml-1" />الإجازات</TabsTrigger>
@@ -626,6 +629,18 @@ export function EmployeeProfileDashboard({
           })()}
         </TabsContent>
 
+        <TabsContent value="career" className="space-y-4 mt-6">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card className="rounded-2xl"><CardHeader><CardTitle>المؤهلات العلمية</CardTitle><CardDescription>الشهادات والجهات التعليمية والمرفقات</CardDescription></CardHeader><CardContent className="space-y-2">{employee.qualifications?.map((item: any) => <div key={item.id} className="rounded-xl border p-3"><div className="flex items-start justify-between gap-3"><div><p className="font-bold">{item.title}</p><p className="text-xs text-muted-foreground">{item.field || "التخصص غير محدد"} · {item.organization || "الجهة غير محددة"}</p></div>{item.attachmentUrl ? <Button size="sm" variant="outline" onClick={() => handleViewDocument({ ...item, fileUrl: item.attachmentUrl, name: item.title, type: "QUALIFICATION" })}>عرض المرفق</Button> : null}</div></div>)}{!employee.qualifications?.length ? <p className="py-8 text-center text-sm text-muted-foreground">لا توجد مؤهلات مسجلة</p> : null}</CardContent></Card>
+            <Card className="rounded-2xl"><CardHeader><CardTitle>الخبرات السابقة</CardTitle><CardDescription>التسلسل المهني قبل الالتحاق بالمنشأة</CardDescription></CardHeader><CardContent className="space-y-2">{employee.experiences?.map((item: any) => <div key={item.id} className="rounded-xl border p-3"><p className="font-bold">{item.title}</p><p className="text-xs text-muted-foreground">{item.organization || "الجهة غير محددة"}</p><p className="mt-1 text-xs text-muted-foreground">{item.fromDate ? new Date(item.fromDate).toLocaleDateString("ar-SA") : "—"} — {item.toDate ? new Date(item.toDate).toLocaleDateString("ar-SA") : "حتى الآن"}</p></div>)}{!employee.experiences?.length ? <p className="py-8 text-center text-sm text-muted-foreground">لا توجد خبرات مسجلة</p> : null}</CardContent></Card>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card className="rounded-2xl"><CardHeader><CardTitle>المهارات</CardTitle></CardHeader><CardContent className="flex flex-wrap gap-2">{employee.skills?.map((item: any) => <Badge key={item.id} variant="outline">{item.name} · {item.level}/5</Badge>)}{!employee.skills?.length ? <p className="text-sm text-muted-foreground">لا توجد مهارات مسجلة</p> : null}</CardContent></Card>
+            <Card className="rounded-2xl"><CardHeader><CardTitle>اللغات</CardTitle></CardHeader><CardContent className="flex flex-wrap gap-2">{employee.languages?.map((item: any) => <Badge key={item.id} variant="outline">{item.name} · {item.level}</Badge>)}{!employee.languages?.length ? <p className="text-sm text-muted-foreground">لا توجد لغات مسجلة</p> : null}</CardContent></Card>
+          </div>
+          <Card className="rounded-2xl"><CardHeader><CardTitle>أفراد العائلة وجهات الطوارئ</CardTitle></CardHeader><CardContent className="grid gap-2 md:grid-cols-2">{employee.familyMembers?.map((item: any) => <div key={item.id} className="flex items-center justify-between rounded-xl border p-3"><div><p className="font-bold">{item.name}</p><p className="text-xs text-muted-foreground">{item.relation} · {item.phone || "بدون رقم"}</p></div>{item.isEmergencyContact ? <Badge>جهة طوارئ</Badge> : null}</div>)}{!employee.familyMembers?.length ? <p className="col-span-full py-6 text-center text-sm text-muted-foreground">لا توجد بيانات عائلة مسجلة</p> : null}</CardContent></Card>
+        </TabsContent>
+
         {/* 4- Attendance */}
         <TabsContent value="attendance" className="space-y-4 mt-6">
           <div className="grid gap-4 md:grid-cols-4">
@@ -634,7 +649,7 @@ export function EmployeeProfileDashboard({
             <Card className="rounded-2xl"><CardContent className="p-4"><p className="text-xs">التأخير</p><p className="text-2xl font-bold mt-1 text-amber-600">{attendanceStats.find((s:any)=>s.status==="LATE")?._count || 0}</p></CardContent></Card>
             <Card className="rounded-2xl"><CardContent className="p-4"><p className="text-xs">ساعات العمل</p><p className="text-2xl font-bold mt-1">{attendanceCount * 8}h</p></CardContent></Card>
           </div>
-          <Card className="rounded-2xl"><CardHeader><CardTitle>تقويم الحضور</CardTitle></CardHeader><CardContent><div className="h-64 grid place-items-center text-muted-foreground border rounded-xl border-dashed">تقويم كامل - سيتم ربطه ببيانات الحضور والبصمة (وقت الدخول/الخروج، اسم الجهاز، الموقع)</div></CardContent></Card>
+          <Card className="rounded-2xl"><CardHeader><CardTitle>سجل الحضور لآخر 30 حركة</CardTitle><CardDescription>الوقت الفعلي للدخول والخروج والحالة المسجلة</CardDescription></CardHeader><CardContent><div className="overflow-x-auto"><table className="w-full min-w-[650px] text-sm"><thead><tr className="border-b text-xs text-muted-foreground"><th className="p-2 text-start">التاريخ</th><th className="p-2 text-start">الدخول</th><th className="p-2 text-start">الخروج</th><th className="p-2 text-start">الساعات</th><th className="p-2 text-start">الحالة</th><th className="p-2 text-start">الملاحظات</th></tr></thead><tbody>{attendanceRecords.map((record: any) => { const hours = record.checkIn && record.checkOut ? Math.max((new Date(record.checkOut).getTime() - new Date(record.checkIn).getTime()) / 3600000, 0).toFixed(2) : "—"; return <tr key={record.id} className="border-b last:border-0"><td className="p-2">{new Date(record.workDate).toLocaleDateString("ar-SA")}</td><td className="p-2">{record.checkIn ? new Date(record.checkIn).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" }) : "—"}</td><td className="p-2">{record.checkOut ? new Date(record.checkOut).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" }) : "—"}</td><td className="p-2">{hours}</td><td className="p-2"><Badge variant="outline">{record.status}</Badge></td><td className="p-2 text-muted-foreground">{record.notes || "—"}</td></tr>; })}{attendanceRecords.length === 0 ? <tr><td colSpan={6} className="p-10 text-center text-muted-foreground">لا توجد حركات حضور مسجلة</td></tr> : null}</tbody></table></div></CardContent></Card>
         </TabsContent>
 
         {/* 5- Leaves */}

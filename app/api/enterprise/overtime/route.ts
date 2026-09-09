@@ -6,7 +6,6 @@ import { hasPermission } from "@/lib/rbac";
 import { applyScopedWhere, canAccessEmployeeId, getAccessProfile } from "@/lib/enterprise/hierarchy";
 import { createEnterpriseWorkflow } from "@/lib/enterprise/workflow";
 import { getEmployeeExtraSettings } from "@/lib/enterprise/hospitals";
-import { calculateNetSalary } from "@/lib/employee/salary-profile";
 import { getEmployeeSalaryProfile } from "@/lib/employee/salary-profile-store";
 import { writeAuditLog } from "@/lib/audit";
 
@@ -41,18 +40,19 @@ function calculateHours(startTime: string, endTime: string, fallback?: number) {
   return Number((minutes / 60).toFixed(2));
 }
 
-function overtimeMultiplier(type: string) {
-  const normalized = type.toLowerCase();
-  if (normalized.includes("holiday") || normalized.includes("عطلة") || normalized.includes("weekend")) return 2;
-  if (normalized.includes("night") || normalized.includes("ليل")) return 1.75;
-  return 1.5;
-}
-
-async function calculateOvertimeAmount(employeeId: string, hours: number, type: string) {
+async function calculateOvertimeAmount(employeeId: string, hours: number, compensationMode: string) {
+  if (compensationMode === "TIME_OFF") return 0;
   const salary = await getEmployeeSalaryProfile(employeeId);
-  const monthlySalary = calculateNetSalary(salary);
-  const hourlyRate = monthlySalary > 0 ? monthlySalary / 240 : 0;
-  return Number((hourlyRate * hours * overtimeMultiplier(type)).toFixed(2));
+  const base = Number(salary.salaryBase ?? 0);
+  const actual = base
+    + Number(salary.salaryHousingAllowance ?? 0)
+    + Number(salary.salaryTransportAllowance ?? 0)
+    + Number(salary.salaryFoodAllowance ?? 0)
+    + Number(salary.salaryCommunicationAllowance ?? 0)
+    + Number(salary.salaryOtherAllowances ?? 0);
+  // Saudi overtime formula: actual hourly wage + 50% of the basic hourly wage.
+  const hourlyCompensation = actual / 240 + (base / 240) * 0.5;
+  return Number((hourlyCompensation * hours).toFixed(2));
 }
 
 async function getEmployeeScope(userId: string, roles: string[]) {
@@ -130,14 +130,34 @@ async function listData(session: any, request: NextRequest) {
   const extras = await prisma.appSetting.findMany({ where: { key: { in: overtime.flatMap((item) => [`overtime.extra.${item.id}`, `employee.extra.${item.employeeId}`, `employee.salary.${item.employeeId}`]) } } });
   const settingMap = new Map(extras.map((setting) => [setting.key, setting.value]));
 
+  const workflowRows = overtime.length ? await prisma.workflowInstance.findMany({
+    where: { type: "OVERTIME", entityId: { in: overtime.map((item) => item.id) } },
+    select: { id: true, entityId: true, currentStep: true, status: true },
+    orderBy: { createdAt: "desc" }
+  }) : [];
+  const workflowByEntity = new Map(workflowRows.map((workflow) => [workflow.entityId, workflow]));
+
   const rows = overtime.map((item) => ({
     ...item,
+    amount: Number(item.amount ?? 0),
+    hours: Number(item.hours),
+    rate: Number(item.rate),
     extra: settingMap.get(`overtime.extra.${item.id}`) ?? {},
     employeeExtra: settingMap.get(`employee.extra.${item.employeeId}`) ?? {},
-    salary: settingMap.get(`employee.salary.${item.employeeId}`) ?? {}
+    salary: settingMap.get(`employee.salary.${item.employeeId}`) ?? {},
+    workflow: workflowByEntity.get(item.id) ?? null
   }));
 
-  return { rows };
+  const stats = {
+    total: rows.length,
+    pending: rows.filter((row) => row.status === "PENDING").length,
+    approved: rows.filter((row) => row.status === "APPROVED").length,
+    rejected: rows.filter((row) => row.status === "REJECTED").length,
+    approvedHours: rows.filter((row) => row.status === "APPROVED").reduce((sum, row) => sum + Number(row.hours), 0),
+    approvedAmount: rows.filter((row) => row.status === "APPROVED").reduce((sum, row) => sum + Number(row.amount ?? 0), 0)
+  };
+
+  return { rows, stats };
 }
 
 function exportWorkbook(rows: any[]) {
@@ -175,7 +195,7 @@ export async function GET(request: NextRequest) {
   if (!session?.user?.id) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   if (!canManageOvertime(session)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
 
-  const { rows } = await listData(session, request);
+  const { rows, stats } = await listData(session, request);
   if (request.nextUrl.searchParams.get("export") === "excel") {
     const buffer = exportWorkbook(rows.filter((row) => row.status === "APPROVED"));
     return new NextResponse(new Uint8Array(buffer), {
@@ -197,7 +217,7 @@ export async function GET(request: NextRequest) {
     prisma.branch.findMany({ where: { isActive: true }, select: { id: true, name: true } })
   ]);
 
-  return NextResponse.json({ success: true, overtime: rows, employees, departments, branches });
+  return NextResponse.json({ success: true, overtime: rows, stats, employees, departments, branches });
 }
 
 export async function POST(request: NextRequest) {
@@ -212,6 +232,7 @@ export async function POST(request: NextRequest) {
     endTime: string;
     hours?: number;
     overtimeType: string;
+    compensationMode?: "PAY" | "TIME_OFF";
     notes?: string;
     project?: string;
     hospital?: string;
@@ -223,16 +244,34 @@ export async function POST(request: NextRequest) {
   const profile = await getAccessProfile(session.user.id, roles);
   if (!(await canAccessEmployeeId(body.employeeId, profile))) return NextResponse.json({ success: false, message: "Forbidden employee scope" }, { status: 403 });
 
+  const workDate = new Date(body.workDate);
+  if (Number.isNaN(workDate.getTime())) return NextResponse.json({ success: false, message: "تاريخ العمل الإضافي غير صالح" }, { status: 400 });
   const hours = calculateHours(body.startTime, body.endTime, body.hours);
-  const amount = await calculateOvertimeAmount(body.employeeId, hours, body.overtimeType || "regular");
-  const rate = overtimeMultiplier(body.overtimeType || "regular");
+  if (!Number.isFinite(hours) || hours <= 0 || hours > 24) return NextResponse.json({ success: false, message: "يجب أن تكون الساعات أكبر من صفر ولا تتجاوز 24 ساعة" }, { status: 400 });
+  if (!body.notes?.trim()) return NextResponse.json({ success: false, message: "سبب العمل الإضافي مطلوب" }, { status: 400 });
+
+  const dayStart = new Date(workDate); dayStart.setUTCHours(0, 0, 0, 0);
+  const dayEnd = new Date(dayStart); dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+  const yearStart = new Date(Date.UTC(workDate.getUTCFullYear(), 0, 1));
+  const yearEnd = new Date(Date.UTC(workDate.getUTCFullYear() + 1, 0, 1));
+  const [sameDay, yearly] = await Promise.all([
+    prisma.overtimeRequest.findFirst({ where: { employeeId: body.employeeId, workDate: { gte: dayStart, lt: dayEnd }, status: { not: "CANCELLED" } }, select: { id: true } }),
+    prisma.overtimeRequest.aggregate({ where: { employeeId: body.employeeId, workDate: { gte: yearStart, lt: yearEnd }, status: { in: ["PENDING", "APPROVED"] } }, _sum: { hours: true } })
+  ]);
+  if (sameDay) return NextResponse.json({ success: false, message: "يوجد طلب عمل إضافي لهذا الموظف في التاريخ نفسه" }, { status: 409 });
+  if (Number(yearly._sum.hours ?? 0) + hours > 720) return NextResponse.json({ success: false, message: "يتجاوز الطلب الحد السنوي للعمل الإضافي (720 ساعة)" }, { status: 400 });
+
+  const compensationMode = body.compensationMode === "TIME_OFF" ? "TIME_OFF" : "PAY";
+  const amount = await calculateOvertimeAmount(body.employeeId, hours, compensationMode);
+  const rate = 1.5;
 
   const overtime = await prisma.overtimeRequest.create({
     data: {
       employeeId: body.employeeId,
-      workDate: new Date(body.workDate),
+      workDate,
       hours,
       rate,
+      amount,
       reason: body.notes ?? "",
       status: "PENDING"
     }
@@ -240,8 +279,8 @@ export async function POST(request: NextRequest) {
 
   await prisma.appSetting.upsert({
     where: { key: `overtime.extra.${overtime.id}` },
-    update: { value: { ...body, amount, rate } as any },
-    create: { key: `overtime.extra.${overtime.id}`, value: { ...body, amount, rate } as any, description: "Overtime extra details" }
+    update: { value: { ...body, compensationMode, timeOffHours: compensationMode === "TIME_OFF" ? Number((hours * 1.5).toFixed(2)) : 0, amount, rate } as any },
+    create: { key: `overtime.extra.${overtime.id}`, value: { ...body, compensationMode, timeOffHours: compensationMode === "TIME_OFF" ? Number((hours * 1.5).toFixed(2)) : 0, amount, rate } as any, description: "Overtime extra details" }
   });
   await createOvertimeWorkflow(body.employeeId, overtime.id, session.user.id);
   await writeAuditLog({ actorUserId: session.user.id, action: "overtime:create", entity: "overtimeRequest", entityId: overtime.id, metadata: { amount, hours, rate } }).catch(() => null);

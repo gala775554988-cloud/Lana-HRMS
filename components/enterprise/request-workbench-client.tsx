@@ -444,7 +444,7 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
               </div>
 
               <div className="flex flex-wrap gap-1.5 pt-1 border-t border-slate-200/60 dark:border-slate-800">
-                <Button type="button" size="sm" variant="outline" onClick={() => setTimelineWorkflowId(request.id)} disabled={isRowPending(request.id)}><History className="h-3.5 w-3.5" />السجل</Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => setTimelineWorkflowId(request.id)} disabled={isRowPending(request.id)}><History className="h-3.5 w-3.5" />تفاصيل الطلب والمسار</Button>
                 {/* Decision actions only make sense on a request that's actually
                     awaiting a decision right now -- the "all"/"decided" scopes
                     legitimately include already-APPROVED/REJECTED/RETURNED rows,

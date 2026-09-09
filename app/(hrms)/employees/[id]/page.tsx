@@ -52,6 +52,11 @@ export default async function EmployeeProfilePage({
       },
       manager: { select: { id: true, firstName: true, lastName: true, employeeNumber: true } },
       managedEmployees: { select: { id: true, firstName: true, lastName: true } },
+      familyMembers: { orderBy: { createdAt: "desc" } },
+      qualifications: { orderBy: { createdAt: "desc" } },
+      experiences: { orderBy: { fromDate: "desc" } },
+      skills: { orderBy: { name: "asc" } },
+      languages: { orderBy: { name: "asc" } },
     },
   }));
 
@@ -119,6 +124,7 @@ export default async function EmployeeProfilePage({
     salaryProfile,
     attendanceStats,
     attendanceCount,
+    attendanceRecords,
     leaveBalance,
     leaveRequests,
     contracts,
@@ -141,6 +147,7 @@ export default async function EmployeeProfilePage({
       _count: true,
     }).catch(() => []),
     prisma.attendanceRecord.count({ where: { employeeId: id } }).catch(() => 0),
+    prisma.attendanceRecord.findMany({ where: { employeeId: id }, orderBy: { workDate: "desc" }, take: 30 }).catch(() => []),
     prisma.leaveType.findMany({ select: { id: true, name: true, annualLimit: true } }).catch(() => []),
     prisma.leaveRequest.findMany({
       where: { employeeId: id },
@@ -151,12 +158,12 @@ export default async function EmployeeProfilePage({
     prisma.employeeContract.findMany({
       where: { employeeId: id },
       orderBy: { startDate: 'desc' },
-      take: 10,
+      take: 100,
     }).catch(() => []),
     prisma.employeeDocument.findMany({
       where: { employeeId: id },
       orderBy: { uploadedAt: 'desc' },
-      take: 10,
+      take: 100,
     }).catch(() => []),
     prisma.asset.findMany({
       where: { assignedEmployeeId: id },
@@ -235,6 +242,7 @@ export default async function EmployeeProfilePage({
       lastSync={lastSync}
       attendanceStats={attendanceStats as any}
       attendanceCount={attendanceCount}
+      attendanceRecords={attendanceRecords as any}
       leaveBalance={modifiedLeaveBalance as any}
       leaveRequests={leaveRequests as any}
       contracts={contracts as any}
