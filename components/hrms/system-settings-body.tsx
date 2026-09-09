@@ -4,7 +4,6 @@ import { Input } from "@/components/ui/input";
 import { getAppSetting, setAppSetting } from "@/lib/settings";
 import { LogoUploadField } from "@/components/hrms/logo-upload-field";
 import { SettingsFormClient } from "@/components/hrms/settings-form-client";
-import { SidebarColorSliderClient } from "@/components/hrms/sidebar-color-slider";
 import { ThemeModeCard } from "@/components/hrms/theme-mode-card";
 import type { ToastState } from "@/components/ui/toast-message";
 
@@ -79,12 +78,11 @@ export async function SystemSettingsBody() {
   return (
     <div className="space-y-6">
       <ThemeModeCard />
-      <SidebarColorSliderClient />
       <SettingsFormClient action={saveSystemSettings}>
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>بيانات الشركة</CardTitle>
-            <CardDescription>تُقرأ هذه القيم من جدول AppSetting وتُحفظ مباشرة في قاعدة البيانات.</CardDescription>
+            <CardDescription>المعلومات الأساسية التي تظهر في النظام والمستندات.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
             <label className="space-y-2 text-sm">
@@ -108,7 +106,7 @@ export async function SystemSettingsBody() {
               <Input name="theme" defaultValue={scalarSetting(theme, "corporate")} />
             </label>
             <label className="space-y-2 text-sm">
-              <span className="font-medium">السجل التجاري (CR)</span>
+              <span className="font-medium">السجل التجاري</span>
               <Input name="crNumber" defaultValue={scalarSetting(crNumber)} />
             </label>
             <label className="space-y-2 text-sm">
@@ -123,7 +121,9 @@ export async function SystemSettingsBody() {
         </Card>
 
         <div className="space-y-6">
-        <Card>
+        <details className="rounded-xl border bg-card">
+          <summary className="cursor-pointer px-5 py-4 font-semibold">إعدادات التكامل المتقدمة</summary>
+        <Card className="border-0">
           <CardHeader>
             <CardTitle>تفعيل الميزات</CardTitle>
             <CardDescription>تحكم بتشغيل أو إيقاف عمليات المزامنة والإرسال الخارجية.</CardDescription>
@@ -156,7 +156,7 @@ export async function SystemSettingsBody() {
         <Card>
           <CardHeader>
             <CardTitle>قنوات الإرسال والتكامل</CardTitle>
-            <CardDescription>احفظ إعدادات المزودين بصيغة نصية أو JSON حسب المزود المستخدم.</CardDescription>
+            <CardDescription>هذه الإعدادات مخصصة لمسؤول التقنية فقط.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <label className="space-y-2 text-sm block">
@@ -177,6 +177,7 @@ export async function SystemSettingsBody() {
             </label>
           </CardContent>
         </Card>
+        </details>
         </div>
       </SettingsFormClient>
     </div>

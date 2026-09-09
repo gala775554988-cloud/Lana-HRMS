@@ -32,7 +32,7 @@ export function HospitalsClient() {
   const [departmentId, setDepartmentId] = useState("");
   const [branchId, setBranchId] = useState("");
   const [isActive, setIsActive] = useState("");
-  const [viewMode, setViewMode] = useState<"card" | "table">("card");
+  const [viewMode, setViewMode] = useState<"card" | "table">("table");
   const [editing, setEditing] = useState<Hospital | null>(null);
   const [form, setForm] = useState({ name: "", code: "", departmentId: "", branchId: "", isActive: true });
   const [message, setMessage] = useState("");
@@ -165,11 +165,12 @@ export function HospitalsClient() {
               type="button"
               onClick={handleReconcile}
               disabled={reconciling}
-              className="rounded-xl gap-1.5 h-10 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold shadow-sm"
+              variant="outline"
+              className="rounded-lg gap-1.5 h-10"
               title="مزامنة وربط كافة الموظفين بالمستشفيات وفروعهم بدقة عالية 100%"
             >
               <RefreshCw className={`h-4 w-4 ${reconciling ? "animate-spin" : ""}`} />
-              <span>{reconciling ? "جاري المزامنة والربط..." : "⚡ مزامنة وربط الموظفين (100%)"}</span>
+              <span>{reconciling ? "جارٍ تحديث البيانات..." : "تحديث بيانات الموظفين"}</span>
             </Button>
             <Button type="button" onClick={() => startEdit()} className="rounded-xl gap-1.5 h-10">
               <Plus className="h-4 w-4" />

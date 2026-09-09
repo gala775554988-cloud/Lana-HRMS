@@ -21,6 +21,7 @@ import { AlertTriangle, Search, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { ModuleTabs } from "@/components/hrms/module-tabs";
 import { ModuleToolbarMenu } from "@/components/hrms/module-toolbar-menu";
+import { WorkspaceHeader } from "@/components/hrms/workspace-ui";
 
 async function getBranchOptions(query: Record<string, string | string[] | undefined>) {
   const search = typeof query.search === "string" ? query.search : "";
@@ -135,7 +136,6 @@ export async function ModulePageBody({
       : Promise.resolve([])
   ]);
 
-  const polishedResource = resourceKey === "departments" || resourceKey === "branches";
   const t = dictionary.module;
   const f = dictionary.fields as Record<string, string>;
   const getFieldLabel = (fieldName: string) => f[fieldName] ?? fieldName;
@@ -199,20 +199,15 @@ export async function ModulePageBody({
   return (
     <section className="space-y-5" dir={locale === "ar" ? "rtl" : "ltr"}>
       {showModuleTabs ? <ModuleTabs module={resourceKey} /> : null}
-      <div className={polishedResource ? "flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white/95 p-6 shadow-sm shadow-slate-200/60 lg:flex-row lg:items-start lg:justify-between dark:border-slate-800 dark:bg-slate-900/85 dark:shadow-slate-950/30" : "flex flex-col gap-4 rounded-2xl border bg-card p-6 shadow-sm lg:flex-row lg:items-start lg:justify-between"}>
-        <div className="space-y-2">
-          <Badge variant="outline">{t.moduleTag}</Badge>
-          <h1 className="text-3xl font-semibold tracking-tight">{resourceTitle}</h1>
-          <p className="max-w-2xl text-muted-foreground">{resourceDescription}</p>
-        </div>
-        {resource.key !== "audit-logs" ? (
-          <div className="shrink-0">
+      <WorkspaceHeader
+        title={resourceTitle}
+        description={resourceDescription}
+        actions={resource.key !== "audit-logs" ? (
             <ModuleFormDialog triggerLabel={`${t.create} ${resourceTitle}`} title={`${t.create} ${resourceTitle}`} description={t.createDescription}>
               {resource.key === "loans" ? <LoanForm dictionary={dictionary} locale={locale} /> : <ModuleForm resource={resource} dictionary={dictionary} locale={locale} />}
             </ModuleFormDialog>
-          </div>
         ) : null}
-      </div>
+      />
 
       {/* Compact single-row toolbar: search + filters on one side, import/export/reports tucked into a menu */}
       <div className="flex flex-col gap-3 rounded-2xl border bg-card px-4 py-3 shadow-premium-sm sm:flex-row sm:items-center sm:justify-between">

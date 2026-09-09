@@ -240,7 +240,7 @@ export function RolesManagementClient() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5" /> الأدوار</CardTitle>
-            <CardDescription>كل دور يحمل عدداً غير محدود من الصلاحيات المستقلة.</CardDescription>
+            <CardDescription>أنشئ دوراً وحدد الصلاحيات التي يحتاجها فقط.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {creating ? (
@@ -279,7 +279,6 @@ export function RolesManagementClient() {
                         <span className="flex items-center gap-1"><Users className="h-3 w-3" />{role.userCount}</span>
                         <span>{role.permissionKeys.length} صلاحية</span>
                       </span>
-                      {ROLE_LABELS[role.name] ? <span className="mt-0.5 block text-[10px] text-muted-foreground" dir="ltr">{role.name}</span> : null}
                     </span>
                     <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${selectedRoleId === role.id ? "rotate-180" : ""}`} />
                   </button>
@@ -293,7 +292,7 @@ export function RolesManagementClient() {
         <Card>
           <CardHeader>
             <CardTitle>تفاصيل الدور وصلاحياته</CardTitle>
-            <CardDescription>اربط أو أزل أي صلاحية من هذا الدور -- يتم الحفظ فوراً ويطبق على جميع مستخدمي الدور.</CardDescription>
+            <CardDescription>تُحفظ التغييرات مباشرة وتُطبّق على مستخدمي الدور.</CardDescription>
           </CardHeader>
           <CardContent>
             {!selectedRole ? (
@@ -310,7 +309,6 @@ export function RolesManagementClient() {
                   ) : (
                     <div className="flex items-center gap-2">
                       <span className="text-base font-black">{ROLE_LABELS[selectedRole.name] ?? selectedRole.name}</span>
-                      {ROLE_LABELS[selectedRole.name] ? <Badge variant="outline" dir="ltr">{selectedRole.name}</Badge> : null}
                       {selectedRole.description ? <span className="text-xs text-muted-foreground">{selectedRole.description}</span> : null}
                     </div>
                   )}

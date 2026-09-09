@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { ApprovalTimeline } from "@/components/enterprise/approval-timeline";
 import { PENDING_APPROVALS_QUERY_KEY } from "@/lib/hooks/use-pending-approvals-count";
 import { cn } from "@/lib/utils";
+import { MetricStrip } from "@/components/hrms/workspace-ui";
 
 const typeLabels: Record<string, string> = {
   ALL: "كل الأنواع",
@@ -321,16 +322,13 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <Stat label="إجمالي الطلبات" value={stats.total} />
-        <Stat label="بانتظار موافقتي" value={stats.waiting} />
-        <Stat label="عالية الأولوية" value={stats.highPriority} />
-        <Stat label="المؤجلة" value={stats.deferred} />
-        <Stat label="المكتملة" value={stats.completed} />
-        <Stat label="المرفوضة" value={stats.rejected} />
-      </div>
+      <MetricStrip items={[
+        { label: "الإجمالي", value: stats.total }, { label: "بانتظار موافقتي", value: stats.waiting },
+        { label: "عالية الأولوية", value: stats.highPriority }, { label: "المؤجلة", value: stats.deferred },
+        { label: "المكتملة", value: stats.completed }, { label: "المرفوضة", value: stats.rejected }
+      ]} />
 
-      <div className="rounded-xl border bg-card p-4 shadow-sm">
+      <div className="rounded-xl border bg-card p-3">
         <div className="flex flex-wrap gap-2">
           {types.map((item) => (
             <Button key={item} type="button" variant={type === item ? "default" : "outline"} onClick={() => setType(item)}>
@@ -353,7 +351,7 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
         </div>
       </div>
 
-      <div className="rounded-xl border bg-card p-4 shadow-sm">
+      {selectedIds.length > 0 ? <div className="rounded-xl border bg-card p-3">
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" size="sm" disabled={!selectedIds.length || isPending} onClick={() => bulk("APPROVE")}>اعتماد المحدد</Button>
           {bulkRejecting ? (
@@ -384,7 +382,7 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
           </select>
           <Button type="button" size="sm" variant="outline" disabled={!selectedIds.length || isPending} onClick={() => bulk("DEFER")}>تأجيل المحدد</Button>
         </div>
-      </div>
+      </div> : null}
 
       {message ? (
         <div className={`rounded-xl border p-3 text-sm ${messageTone === "error" ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-400" : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-400"}`}>
@@ -531,8 +529,4 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
       <ApprovalTimeline workflowId={timelineWorkflowId} onClose={() => setTimelineWorkflowId(null)} />
     </div>
   );
-}
-
-function Stat({ label, value }: { label: string; value: number }) {
-  return <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 text-2xl font-semibold">{value}</p></CardContent></Card>;
 }
