@@ -6,7 +6,7 @@ import { getModuleRecord } from "@/lib/hrms/actions";
 import { getEmployeeSalaryProfile } from "@/lib/employee/salary-profile-store";
 import { getEmployeeFieldAccess, redactHiddenFields } from "@/lib/enterprise/employee-field-access";
 import { memoryCache } from "@/lib/cache/memory-cache";
-import { getEffectiveLeaveBalance } from "@/lib/employee/leave-balance";
+import { getAllLeaveTypeBalances } from "@/lib/enterprise/leave-engine";
 import { EmployeeProfileDashboard } from "@/components/hrms/employee-profile-dashboard";
 import { PermissionsScope } from "@/components/hrms/permissions-scope";
 import { hasAnyRole } from "@/lib/rbac";
@@ -37,6 +37,9 @@ export default async function EmployeeProfilePage({
       branch: { select: { id: true, name: true, code: true, city: true } },
       employmentType: { select: { name: true } },
       nationality: { select: { name: true } },
+      hospital: { select: { name: true } },
+      company: { select: { name: true } },
+      project: { select: { name: true } },
       user: { 
         select: { 
           id: true, 
@@ -148,7 +151,7 @@ export default async function EmployeeProfilePage({
     }).catch(() => []),
     prisma.attendanceRecord.count({ where: { employeeId: id } }).catch(() => 0),
     prisma.attendanceRecord.findMany({ where: { employeeId: id }, orderBy: { workDate: "desc" }, take: 30 }).catch(() => []),
-    prisma.leaveType.findMany({ select: { id: true, name: true, annualLimit: true } }).catch(() => []),
+    getAllLeaveTypeBalances(id).catch(() => []),
     prisma.leaveRequest.findMany({
       where: { employeeId: id },
       take: 5,
@@ -220,19 +223,17 @@ export default async function EmployeeProfilePage({
   // component, which would still leak the real value over the network.
   const visibleEmployee = redactHiddenFields(employee as unknown as Record<string, unknown>, viewerFieldAccess);
 
-  const raw = (employee.odooRawData as any) || {};
-  const csv = raw._csvLeaveData || {};
-  const effectiveBalance = await getEffectiveLeaveBalance(id).catch(() => null);
-  const modifiedLeaveBalance = effectiveBalance ? [
-    {
-      id: "annual",
-      name: "إجازة سنوية (حسب رصيد الموارد البشرية المعتمد)",
-      annualLimit: effectiveBalance.accrued,
-      remaining: effectiveBalance.remaining,
-      used: effectiveBalance.used,
-      monthsAccrued: Number(csv.monthsAccrued ?? raw.leaveMonthsAccrued ?? 0)
-    }
-  ] : leaveBalance;
+  const modifiedLeaveBalance = leaveBalance.map((balance) => ({
+    id: balance.leaveTypeId,
+    code: balance.leaveTypeCode,
+    name: balance.leaveTypeName,
+    annualLimit: Number(balance.accrued) + Number(balance.carriedOver),
+    accrued: balance.accrued,
+    carriedOver: balance.carriedOver,
+    used: balance.used,
+    remaining: balance.remaining,
+    automatic: true,
+  }));
 
   return (
     <EmployeeProfileDashboard

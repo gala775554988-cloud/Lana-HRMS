@@ -49,7 +49,7 @@ export function UserSearchSelect({
     const timer = setTimeout(() => {
       fetch(`/api/employees/search?q=${encodeURIComponent(query.trim())}`, { signal: controller.signal })
         .then((r) => r.json())
-        .then((d) => setResults((d.employees ?? []).filter((e: EmployeeSearchResult) => e.userId)))
+        .then((d) => setResults(d.employees ?? []))
         .catch(() => {});
     }, 250);
     return () => { clearTimeout(timer); controller.abort(); };

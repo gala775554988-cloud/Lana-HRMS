@@ -22,6 +22,7 @@ type RunDetail = {
   history: HistoryEntry[];
 };
 type SavedFilter = { name: string; search: string; status: string; sortBy: string };
+type OrgOption = { id: string; name: string };
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "مسودة",
@@ -69,6 +70,8 @@ export function PayrollRunManager() {
   const [endDate, setEndDate] = useState("");
   const [branchId, setBranchId] = useState("");
   const [departmentId, setDepartmentId] = useState("");
+  const [branches, setBranches] = useState<OrgOption[]>([]);
+  const [departments, setDepartments] = useState<OrgOption[]>([]);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -102,6 +105,13 @@ export function PayrollRunManager() {
   useEffect(() => {
     loadRuns();
     loadPeriods();
+    fetch("/api/enterprise/org-entities", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((data) => {
+        setBranches(data.branches ?? []);
+        setDepartments(data.departments ?? []);
+      })
+      .catch(() => {});
   }, [loadRuns, loadPeriods]);
 
   async function openRun(id: string) {
@@ -297,12 +307,18 @@ export function PayrollRunManager() {
             <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label>الفرع (اختياري، ID)</Label>
-            <Input value={branchId} onChange={(e) => setBranchId(e.target.value)} placeholder="اتركه فارغاً لكل الفروع" />
+            <Label>الفرع</Label>
+            <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm">
+              <option value="">كل الفروع</option>
+              {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+            </select>
           </div>
           <div className="space-y-1.5 md:col-span-2">
-            <Label>القسم (اختياري، ID)</Label>
-            <Input value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} placeholder="اتركه فارغاً لكل الأقسام" />
+            <Label>القسم</Label>
+            <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm">
+              <option value="">كل الأقسام</option>
+              {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
+            </select>
           </div>
           <div className="md:col-span-2 flex items-end">
             <Button onClick={createRun} disabled={actionLoading} className="gap-2 w-full">

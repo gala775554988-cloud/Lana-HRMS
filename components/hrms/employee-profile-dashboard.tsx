@@ -64,7 +64,6 @@ export function EmployeeProfileDashboard({
   yearsOfService,
   lastSync,
   attendanceStats,
-  attendanceCount,
   attendanceRecords,
   leaveBalance,
   leaveRequests,
@@ -140,6 +139,11 @@ export function EmployeeProfileDashboard({
 
   const fullName = `${employee.firstName} ${employee.lastName}`.trim();
   const initials = `${employee.firstName?.[0] || ""}${employee.lastName?.[0] || ""}`.toUpperCase();
+  const statusLabels: Record<string, string> = { ACTIVE: "على رأس العمل", ON_LEAVE: "في إجازة", TERMINATED: "منتهية خدمته", INACTIVE: "غير نشط", PRESENT: "حاضر", ABSENT: "غائب", LATE: "متأخر", HALF_DAY: "نصف يوم", REMOTE: "عن بُعد", HOLIDAY: "إجازة", PENDING: "قيد الانتظار", APPROVED: "معتمد", REJECTED: "مرفوض", CANCELLED: "ملغي" };
+  const totalWorkedHours = attendanceRecords.reduce((sum: number, record: any) => {
+    if (!record.checkIn || !record.checkOut) return sum;
+    return sum + Math.max((new Date(record.checkOut).getTime() - new Date(record.checkIn).getTime()) / 3_600_000, 0);
+  }, 0);
 
 
   const handleArchive = async () => {
@@ -428,16 +432,16 @@ export function EmployeeProfileDashboard({
           <Card><CardContent className="grid gap-x-8 gap-y-0 p-5 md:grid-cols-2">
             {[
               { label: "الاسم عربي", value: `${employee.firstName} ${employee.lastName}` },
-              { label: "الاسم انجليزي", value: `${employee.firstName} ${employee.lastName}` },
+              { label: "الاسم بالإنجليزية", value: (employee as any).employeeEnglishName || "-" },
               { label: "رقم الهوية", value: employee.nationalId },
               { label: "الجنسية", value: (employee as any).nationality?.name || "-" },
               { label: "الكفيل", value: (employee as any).sponsor || "-" },
               { label: "الجنس", value: employee.gender || "-" },
-              { label: "الحالة الاجتماعية", value: "-" },
+              { label: "الحالة الاجتماعية", value: (employee as any).maritalStatus ? ({ SINGLE: "أعزب", MARRIED: "متزوج", DIVORCED: "مطلق", WIDOWED: "أرمل" } as Record<string, string>)[(employee as any).maritalStatus] || (employee as any).maritalStatus : "-" },
               { label: "تاريخ الميلاد", value: employee.dateOfBirth ? new Date(employee.dateOfBirth).toLocaleDateString() : "-" },
-              { label: "الجوال", value: employee.phone || "-" },
-              { label: "جوال آخر", value: "-" },
-              { label: "البريد الشخصي", value: "-" },
+              { label: "الجوال", value: (employee as any).mobilePhone || employee.phone || "-" },
+              { label: "هاتف العمل", value: (employee as any).workPhone || "-" },
+              { label: "جهة اتصال الطوارئ", value: (employee as any).emergencyContact || "-" },
               { label: "البريد الوظيفي", value: employee.email || "-" },
               { label: "العنوان", value: employee.address || "-" },
               { label: "المدينة", value: employee.branch?.city || "-" },
@@ -457,17 +461,17 @@ export function EmployeeProfileDashboard({
               { label: "القسم", value: employee.department?.name || "-" },
               { label: "الفرع", value: employee.branch?.name || "-" },
               { label: "المنصب", value: employee.position?.title || "-" },
-              { label: "المستشفى", value: "-" },
-              { label: "المركز", value: "-" },
+              { label: "المستشفى", value: (employee as any).hospital?.name || "-" },
+              { label: "مركز التكلفة", value: (employee as any).costCenter || "-" },
               { label: "نوع العقد", value: employee.employmentType?.name || "-" },
-              { label: "الحالة", value: employee.status },
-              { label: "الدرجة", value: "-" },
+              { label: "الحالة", value: statusLabels[employee.status] || employee.status },
+              { label: "المهنة في الإقامة", value: (employee as any).iqamahJobName || "-" },
               { label: "المدير", value: (employee as any).manager ? `${(employee as any).manager.firstName} ${(employee as any).manager.lastName}` : "-" },
               { label: "تاريخ التوظيف", value: employee.hireDate ? new Date(employee.hireDate).toLocaleDateString() : "-" },
-              { label: "تاريخ المباشرة", value: "-" },
+              { label: "تاريخ المباشرة", value: (employee as any).firstContractDate ? new Date((employee as any).firstContractDate).toLocaleDateString("ar-SA") : employee.hireDate ? new Date(employee.hireDate).toLocaleDateString("ar-SA") : "-" },
               { label: "تاريخ انتهاء العقد", value: employee.terminationDate ? new Date(employee.terminationDate).toLocaleDateString() : "-" },
-              { label: "نوع الدوام", value: "-" },
-              { label: "نظام الورديات", value: "-" },
+              { label: "حالة العمل", value: (employee as any).workingStatus || "-" },
+              { label: "المشروع", value: (employee as any).project?.name || "-" },
               { label: "رقم الموظف في Odoo", value: (employee as any).odooId || employee.employeeNumber },
               { label: "آخر مزامنة", value: lastSync ? new Date(lastSync).toLocaleString() : "-" },
             ].map((item, i) => (
@@ -641,9 +645,9 @@ export function EmployeeProfileDashboard({
             <Card className="rounded-2xl"><CardContent className="p-4"><p className="text-xs">أيام الحضور</p><p className="text-2xl font-bold mt-1">{attendanceStats.find((s:any)=>s.status==="PRESENT")?._count || 0}</p></CardContent></Card>
             <Card className="rounded-2xl"><CardContent className="p-4"><p className="text-xs">الغياب</p><p className="text-2xl font-bold mt-1 text-red-600">{attendanceStats.find((s:any)=>s.status==="ABSENT")?._count || 0}</p></CardContent></Card>
             <Card className="rounded-2xl"><CardContent className="p-4"><p className="text-xs">التأخير</p><p className="text-2xl font-bold mt-1 text-amber-600">{attendanceStats.find((s:any)=>s.status==="LATE")?._count || 0}</p></CardContent></Card>
-            <Card className="rounded-2xl"><CardContent className="p-4"><p className="text-xs">ساعات العمل</p><p className="text-2xl font-bold mt-1">{attendanceCount * 8}h</p></CardContent></Card>
+            <Card className="rounded-2xl"><CardContent className="p-4"><p className="text-xs">ساعات العمل الفعلية</p><p className="text-2xl font-bold mt-1">{totalWorkedHours.toFixed(1)} ساعة</p></CardContent></Card>
           </div>
-          <Card className="rounded-2xl"><CardHeader><CardTitle>سجل الحضور لآخر 30 حركة</CardTitle><CardDescription>الوقت الفعلي للدخول والخروج والحالة المسجلة</CardDescription></CardHeader><CardContent><div className="overflow-x-auto"><table className="w-full min-w-[650px] text-sm"><thead><tr className="border-b text-xs text-muted-foreground"><th className="p-2 text-start">التاريخ</th><th className="p-2 text-start">الدخول</th><th className="p-2 text-start">الخروج</th><th className="p-2 text-start">الساعات</th><th className="p-2 text-start">الحالة</th><th className="p-2 text-start">الملاحظات</th></tr></thead><tbody>{attendanceRecords.map((record: any) => { const hours = record.checkIn && record.checkOut ? Math.max((new Date(record.checkOut).getTime() - new Date(record.checkIn).getTime()) / 3600000, 0).toFixed(2) : "—"; return <tr key={record.id} className="border-b last:border-0"><td className="p-2">{new Date(record.workDate).toLocaleDateString("ar-SA")}</td><td className="p-2">{record.checkIn ? new Date(record.checkIn).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" }) : "—"}</td><td className="p-2">{record.checkOut ? new Date(record.checkOut).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" }) : "—"}</td><td className="p-2">{hours}</td><td className="p-2"><Badge variant="outline">{record.status}</Badge></td><td className="p-2 text-muted-foreground">{record.notes || "—"}</td></tr>; })}{attendanceRecords.length === 0 ? <tr><td colSpan={6} className="p-10 text-center text-muted-foreground">لا توجد حركات حضور مسجلة</td></tr> : null}</tbody></table></div></CardContent></Card>
+          <Card className="rounded-2xl"><CardHeader><CardTitle>سجل الحضور لآخر 30 حركة</CardTitle><CardDescription>الوقت الفعلي للدخول والخروج والحالة المسجلة</CardDescription></CardHeader><CardContent><div className="overflow-x-auto"><table className="w-full min-w-[650px] text-sm"><thead><tr className="border-b text-xs text-muted-foreground"><th className="p-2 text-start">التاريخ</th><th className="p-2 text-start">الدخول</th><th className="p-2 text-start">الخروج</th><th className="p-2 text-start">الساعات</th><th className="p-2 text-start">الحالة</th><th className="p-2 text-start">الملاحظات</th></tr></thead><tbody>{attendanceRecords.map((record: any) => { const hours = record.checkIn && record.checkOut ? Math.max((new Date(record.checkOut).getTime() - new Date(record.checkIn).getTime()) / 3600000, 0).toFixed(2) : "—"; return <tr key={record.id} className="border-b last:border-0"><td className="p-2">{new Date(record.workDate).toLocaleDateString("ar-SA")}</td><td className="p-2">{record.checkIn ? new Date(record.checkIn).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" }) : "—"}</td><td className="p-2">{record.checkOut ? new Date(record.checkOut).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" }) : "—"}</td><td className="p-2">{hours}</td><td className="p-2"><Badge variant="outline">{statusLabels[record.status] || record.status}</Badge></td><td className="p-2 text-muted-foreground">{record.notes || "—"}</td></tr>; })}{attendanceRecords.length === 0 ? <tr><td colSpan={6} className="p-10 text-center text-muted-foreground">لا توجد حركات حضور مسجلة</td></tr> : null}</tbody></table></div></CardContent></Card>
         </TabsContent>
 
         {/* 5- Leaves */}
@@ -658,6 +662,7 @@ export function EmployeeProfileDashboard({
                     <div className="flex items-center justify-between">
                       <p className="text-base font-extrabold text-slate-900 dark:text-slate-100">{lt.name}</p>
                       <div className="flex items-center gap-2">
+                        {lt.automatic ? <Badge variant="outline" className="text-[10px]">محسوب آلياً من العقد</Badge> : null}
                         {lt.monthsAccrued > 0 ? (
                           <Badge className="bg-teal-600 text-white font-bold text-[10px]">عن {lt.monthsAccrued} أشهر</Badge>
                         ) : null}
@@ -731,7 +736,7 @@ export function EmployeeProfileDashboard({
               );
             })}
           </div>
-          <Card className="rounded-2xl"><CardHeader><CardTitle>طلبات الإجازة</CardTitle></CardHeader><CardContent><div className="space-y-2">{leaveRequests.map((lr: any) => (<div key={lr.id} className="flex justify-between border rounded-xl p-3"><span>{lr.leaveType?.name} - {lr.days?.toString()} يوم</span><Badge variant="outline">{lr.status}</Badge></div>))}{leaveRequests.length===0 && <p className="text-center text-muted-foreground py-8">لا يوجد إجازات</p>}</div></CardContent></Card>
+          <Card className="rounded-2xl"><CardHeader><CardTitle>طلبات الإجازة</CardTitle><CardDescription>يُخصم الرصيد تلقائياً بعد اعتماد الطلب.</CardDescription></CardHeader><CardContent><div className="space-y-2">{leaveRequests.map((lr: any) => (<div key={lr.id} className="flex justify-between border rounded-xl p-3"><span>{lr.leaveType?.name} - {lr.days?.toString()} يوم</span><Badge variant="outline">{statusLabels[lr.status] || lr.status}</Badge></div>))}{leaveRequests.length===0 && <p className="text-center text-muted-foreground py-8">لا توجد طلبات إجازة</p>}</div></CardContent></Card>
         </TabsContent>
 
         {/* 6- Documents */}

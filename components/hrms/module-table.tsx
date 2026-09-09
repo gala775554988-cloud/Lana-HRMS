@@ -18,7 +18,16 @@ type Row = Record<string, unknown> & { id: string };
 
 const VALUE_LABELS: Record<string, string> = {
   ACTIVE: "نشط", INACTIVE: "غير نشط", PENDING: "قيد الانتظار", APPROVED: "معتمد",
-  REJECTED: "مرفوض", CANCELLED: "ملغي", DRAFT: "مسودة", COMPLETED: "مكتمل"
+  REJECTED: "مرفوض", CANCELLED: "ملغي", DRAFT: "مسودة", COMPLETED: "مكتمل",
+  PRESENT: "حاضر", ABSENT: "غائب", LATE: "متأخر", HALF_DAY: "نصف يوم", REMOTE: "عن بُعد", HOLIDAY: "إجازة",
+  ON_LEAVE: "في إجازة", TERMINATED: "منتهية خدمته", EXPIRED: "منتهي", PROCESSING: "قيد المعالجة", PAID: "تم الصرف"
+};
+
+const FIELD_LABELS: Record<string, string> = {
+  employeeName: "الموظف", employeeNumber: "الرقم الوظيفي", workDate: "تاريخ الدوام",
+  scheduledShift: "الوردية", checkIn: "الحضور", checkOut: "الانصراف",
+  workedHours: "ساعات العمل", lateMinutes: "دقائق التأخير", status: "الحالة",
+  leaveTypeName: "نوع الإجازة", days: "عدد الأيام"
 };
 
 function display(value: unknown, yesLabel: string, noLabel: string, locale: Locale) {
@@ -36,6 +45,7 @@ function display(value: unknown, yesLabel: string, noLabel: string, locale: Loca
 }
 
 function formatHeader(field: string, fieldsDict: Record<string, string>) {
+  if (FIELD_LABELS[field]) return FIELD_LABELS[field];
   if (fieldsDict[field]) return fieldsDict[field];
   return field.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
 }
@@ -105,7 +115,11 @@ export function ModuleTable({ resource, records, dictionary, locale = "en", from
       header: formatHeader(field, fieldsDict),
       cell: (info) => resource.key === "insurance" && field === "endDate"
         ? <InsuranceExpiryBar endDate={info.getValue()} />
-        : display(info.getValue(), yesLabel, noLabel, locale)
+        : field === "workedHours" && typeof info.getValue() === "number"
+          ? `${info.getValue()} ساعة`
+          : field === "lateMinutes" && typeof info.getValue() === "number"
+            ? `${info.getValue()} دقيقة`
+            : display(info.getValue(), yesLabel, noLabel, locale)
     })),
     helper.display({ id: "actions", header: dictionary.table.actions, cell: ({ row }) => {
       const workflowId = typeof row.original._workflowId === "string" ? row.original._workflowId : "";

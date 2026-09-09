@@ -68,6 +68,16 @@ function setCachedCount(key: string, count: number) {
   }
 }
 
+function timeToMinutes(value?: string | null) {
+  const [hours, minutes] = String(value || "09:00").split(":").map(Number);
+  return (Number.isFinite(hours) ? hours : 9) * 60 + (Number.isFinite(minutes) ? minutes : 0);
+}
+
+function riyadhMinutes(value: Date) {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Riyadh", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(value);
+  return Number(parts.find((part) => part.type === "hour")?.value || 0) * 60 + Number(parts.find((part) => part.type === "minute")?.value || 0);
+}
+
 function delegateFor(modelName: string) {
   return (prisma as unknown as Record<string, CrudDelegate>)[modelName];
 }
@@ -453,15 +463,72 @@ export async function listModuleRecords(input: QueryInput) {
         employee: { select: { firstName: true, lastName: true, employeeNumber: true } },
         leaveType: { select: { name: true } }
       };
+    } else if (resource.key === "attendance") {
+      findManyArgs.include = {
+        employee: {
+          select: {
+            firstName: true,
+            lastName: true,
+            employeeNumber: true,
+            shiftAssignments: {
+              where: { isActive: true },
+              orderBy: { effectiveFrom: "desc" },
+              take: 5,
+              include: { shift: { select: { name: true, startTime: true, endTime: true } } }
+            }
+          }
+        }
+      };
+    } else if (resource.key === "insurance") {
+      findManyArgs.include = { employee: { select: { firstName: true, lastName: true, employeeNumber: true } } };
     } else {
       const select = buildGenericModuleSelect(resource);
       if (select) findManyArgs.select = select;
     }
 
-    const [records, total] = await Promise.all([
+    const [rawRecords, total] = await Promise.all([
       delegate.findMany(findManyArgs),
       delegate.count({ where })
     ]);
+    let records = rawRecords;
+    if (resource.key === "attendance") {
+      records = rawRecords.map((record: any) => {
+          const workDate = new Date(record.workDate);
+          const assignment = record.employee?.shiftAssignments?.find((item: any) => {
+            const from = new Date(item.effectiveFrom);
+            const to = item.effectiveTo ? new Date(item.effectiveTo) : null;
+            return from <= workDate && (!to || to >= workDate);
+          });
+          const checkIn = record.checkIn ? new Date(record.checkIn) : null;
+          const checkOut = record.checkOut ? new Date(record.checkOut) : null;
+          const workedHours = checkIn && checkOut ? Math.max(0, Math.round(((checkOut.getTime() - checkIn.getTime()) / 3_600_000) * 100) / 100) : null;
+          const shiftStart = assignment?.shift?.startTime || "09:00";
+          const lateMinutes = checkIn ? Math.max(0, riyadhMinutes(checkIn) - timeToMinutes(shiftStart)) : 0;
+          return {
+            ...record,
+            employeeName: `${record.employee?.firstName || ""} ${record.employee?.lastName || ""}`.trim() || "موظف غير معروف",
+            employeeNumber: record.employee?.employeeNumber || "—",
+            scheduledShift: assignment?.shift ? `${assignment.shift.name} (${assignment.shift.startTime} - ${assignment.shift.endTime})` : "الدوام الافتراضي (09:00)",
+            workedHours,
+            lateMinutes,
+            employee: undefined
+          };
+        });
+    } else if (resource.key === "leave-requests") {
+      records = rawRecords.map((record: any) => ({
+        ...record,
+        employeeName: `${record.employee?.firstName || ""} ${record.employee?.lastName || ""}`.trim() || "موظف غير معروف",
+        leaveTypeName: record.leaveType?.name || "—",
+        employee: undefined,
+        leaveType: undefined
+      }));
+    } else if (resource.key === "insurance") {
+      records = rawRecords.map((record: any) => ({
+        ...record,
+        employeeName: `${record.employee?.firstName || ""} ${record.employee?.lastName || ""}`.trim() || "موظف غير معروف",
+        employee: undefined
+      }));
+    }
 
     const requestModules = new Set(["leave-requests", "overtime", "loans", "expenses", "letter-requests"]);
     if (requestModules.has(resource.key) && records.length > 0) {
