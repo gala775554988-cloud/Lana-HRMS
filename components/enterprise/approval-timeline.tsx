@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Clock, Loader2, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { parseWorkflowStepMetadata } from "@/lib/enterprise/workflow-step-metadata";
 
 const POLL_INTERVAL_MS = 12_000;
 
@@ -129,6 +130,7 @@ export function ApprovalTimeline({ workflowId, onClose, locale = "ar" }: { workf
               <ol className="space-y-4">
                 {workflow.steps.map((step, index) => {
                   const meta = statusMeta[step.status] ?? statusMeta.WAITING;
+                  const details = parseWorkflowStepMetadata(step.comments);
                   const Icon = meta.icon;
                   const isCurrent = step.step === workflow.currentStep && step.status === "PENDING";
                   return (
@@ -144,7 +146,10 @@ export function ApprovalTimeline({ workflowId, onClose, locale = "ar" }: { workf
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">{step.approver?.name ?? step.approver?.email ?? "لم يُحدد معتمد"}</p>
                         {step.approvedAt ? <p className="mt-1 text-xs text-muted-foreground">بتاريخ: {formatDate(step.approvedAt, locale)}</p> : null}
-                        {step.comments ? <p className="mt-2 rounded-lg bg-muted/60 p-2 text-xs text-foreground">{step.comments}</p> : null}
+                        {details.priority ? <p className="mt-1 text-xs text-muted-foreground">الأولوية: {details.priority === "High" ? "عالية" : details.priority === "Low" ? "منخفضة" : "عادية"}</p> : null}
+                        {details.deferredUntil ? <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">مؤجل حتى: {formatDate(details.deferredUntil, locale)}</p> : null}
+                        {details.transferred ? <p className="mt-1 text-xs text-sky-700 dark:text-sky-400">تم تحويل هذه المرحلة إلى معتمد آخر</p> : null}
+                        {details.note ? <p className="mt-2 rounded-lg bg-muted/60 p-2 text-xs text-foreground">{details.note}</p> : null}
                       </div>
                     </li>
                   );

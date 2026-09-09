@@ -110,8 +110,8 @@ async function executeAiFirstSemanticOrchestrator(
       executedTools.push({ tool: "getDepartments", result: deptsRes });
       const totalEmp = (deptsRes.departments || []).reduce((acc: number, d: any) => acc + (d.employeeCount || 0), 0);
       replyText = isAr
-        ? `يبلغ إجمالي عدد الموظفين النشطين في المؤسسة حالياً ${totalEmp || "1205"} موظفاً موزعين على ${deptsRes.count} إدارات وأقسام رسمية.\n\n💡 مبادرة لانا: هل ترغب في الاطلاع على الإدارات الأكثر كثافة أو تقرير توزيع الموظفين حسب الفروع والمستشفيات؟`
-        : `The organization currently has ${totalEmp || "1205"} active employees across ${deptsRes.count} departments.\n\n💡 Proactive Suggestion: Would you like a breakdown by branch or hospital allocation?`;
+        ? `يبلغ إجمالي عدد الموظفين النشطين في المؤسسة حالياً ${totalEmp} موظفاً موزعين على ${deptsRes.count} إدارات وأقسام رسمية.\n\n💡 اقتراح: هل ترغب في الاطلاع على الإدارات الأكثر كثافة أو تقرير توزيع الموظفين حسب الفروع والمستشفيات؟`
+        : `The organization currently has ${totalEmp} active employees across ${deptsRes.count} departments.\n\n💡 Proactive Suggestion: Would you like a breakdown by branch or hospital allocation?`;
     }
     // 1b. Direct single-fact lookup
     else if (nationalIdMatch || employeeNumberMatch) {
@@ -144,7 +144,7 @@ async function executeAiFirstSemanticOrchestrator(
         
         const grantRes = await tools.grantEmployeePermission.execute({ employeeIdentifier: grantTarget, permissionOrRole: perm, scope: "ALL" });
         executedTools.push({ tool: "grantEmployeePermission", result: grantRes });
-        replyText = (grantRes.error || grantRes.message) + (isAr ? "\n\n💡 مبادرة لانا: هل نود مراجعة سجل صلاحيات الموظف بالكامل للتأكد من خلوه من التعارضات؟" : "\n\n💡 Proactive Suggestion: Shall we review their full effective permissions list now?");
+        replyText = (grantRes.error || grantRes.message) + (isAr ? "\n\n💡 اقتراح: هل نود مراجعة سجل صلاحيات الموظف بالكامل للتأكد من خلوه من التعارضات؟" : "\n\n💡 Proactive Suggestion: Shall we review their full effective permissions list now?");
       }
     }
     // 3. Leave balance ("كم رصيد إجازاته؟", "رصيد إجازاته", "رصيدي")
@@ -157,10 +157,10 @@ async function executeAiFirstSemanticOrchestrator(
       } else {
         replyText = context.isExecutive
           ? (isAr
-            ? `الرصيد السنوي المستحق: ${bal.annualEntitlement} يوم | المستهلك: ${bal.usedDays} يوم | المتبقي المتاح: ${bal.remainingDays} يوم (${bal.source})\n\n💡 مبادرة لانا: هل نود إصدار أمر اعتماد طلب إجازة لهذا الموظف فوراً؟`
+            ? `الرصيد السنوي المستحق: ${bal.annualEntitlement} يوم | المستهلك: ${bal.usedDays} يوم | المتبقي المتاح: ${bal.remainingDays} يوم (${bal.source})\n\n💡 اقتراح: هل نود إصدار أمر اعتماد طلب إجازة لهذا الموظف فوراً؟`
             : `Entitlement: ${bal.annualEntitlement}d | Used: ${bal.usedDays}d | Remaining: ${bal.remainingDays}d (${bal.source})\n\n💡 Proactive Option: Would you like me to process a leave request immediately?`)
           : (isAr
-            ? `رصيد الإجازات السنوي المستحق للموظف (${bal.employeeName || "لك"}) هو ${bal.annualEntitlement} يوماً، المستهلك منها ${bal.usedDays} أيام، والرصيد المتبقي المتاح حالياً هو ${bal.remainingDays} يوماً (${bal.source}).\n\n💡 مبادرة لانا: هل تود مني تجهيز ومراجعة طلب إجازة سنوية من هذا الرصيد؟`
+            ? `رصيد الإجازات السنوي المستحق للموظف (${bal.employeeName || "لك"}) هو ${bal.annualEntitlement} يوماً، المستهلك منها ${bal.usedDays} أيام، والرصيد المتبقي المتاح حالياً هو ${bal.remainingDays} يوماً (${bal.source}).\n\n💡 اقتراح: هل تود مني تجهيز ومراجعة طلب إجازة سنوية من هذا الرصيد؟`
             : `Annual leave balance for (${bal.employeeName || "you"}): Entitlement ${bal.annualEntitlement} days, Used ${bal.usedDays} days, Remaining ${bal.remainingDays} days (${bal.source}).\n\n💡 Proactive Suggestion: Would you like me to prepare an official leave request?`);
       }
     }
@@ -174,33 +174,33 @@ async function executeAiFirstSemanticOrchestrator(
           executedTools.push({ tool: "searchEmployees", result: searchRes });
           const first = searchRes.employees[0];
           replyText = isAr
-            ? `بيانات الموظف (${first.name} - رقم ${first.employeeNumber}):\n• القسم: ${first.department}\n• المسمى الوظيفي: ${first.position}\n• الحالة: ${first.status === "ACTIVE" ? "على رأس العمل" : "غير نشط"}\n\n💡 مبادرة لانا: هل ترغب في عرض رصيد إجازاته، أو مراجعة سلسلة موافقات مستشفى (${first.branch || "الرئيسي"}) التابع له؟`
+            ? `بيانات الموظف (${first.name} - رقم ${first.employeeNumber}):\n• القسم: ${first.department}\n• المسمى الوظيفي: ${first.position}\n• الحالة: ${first.status === "ACTIVE" ? "على رأس العمل" : "غير نشط"}\n\n💡 اقتراح: هل ترغب في عرض رصيد إجازاته، أو مراجعة سلسلة موافقات مستشفى (${first.branch || "الرئيسي"}) التابع له؟`
             : `Employee (${first.name} - #${first.employeeNumber}):\n• Dept: ${first.department}\n• Position: ${first.position}\n• Status: ${first.status}\n\n💡 Proactive Suggestion: Would you like to view their leave balance or check their direct approval chain?`;
         } else {
           replyText = prof.error;
         }
       } else {
         replyText = isAr
-          ? `بطاقة معلومات الموظف (${prof.name}):\n• الرقم الوظيفي الموحد: ${prof.employeeNumber}\n• رقم الهوية/الإقامة: ${prof.nationalId}\n• الإدارة والقسم: ${prof.department}\n• المسمى الوظيفي: ${prof.position}\n• المستشفى/الفرع: ${prof.branch}\n• المدير المباشر المعتمد: ${prof.manager}\n• الحالة الوظيفية: ${prof.status === "ACTIVE" ? "نشط وعلى رأس العمل" : prof.status}\n\n💡 مبادرة لانا: لقد تم حفظ هذا الموظف في ذاكرة حوارنا؛ يمكنك الآن سؤالي مباشرة عن راتبه، رصيد إجازاته، أو سجل تدقيقه الأمني دون إعادة كتابة اسمه.`
+          ? `بطاقة معلومات الموظف (${prof.name}):\n• الرقم الوظيفي الموحد: ${prof.employeeNumber}\n• رقم الهوية/الإقامة: ${prof.nationalId}\n• الإدارة والقسم: ${prof.department}\n• المسمى الوظيفي: ${prof.position}\n• المستشفى/الفرع: ${prof.branch}\n• المدير المباشر المعتمد: ${prof.manager}\n• الحالة الوظيفية: ${prof.status === "ACTIVE" ? "نشط وعلى رأس العمل" : prof.status}\n\n💡 تم حفظ هذا الموظف في سياق المحادثة؛ يمكنك الآن السؤال مباشرة عن راتبه، رصيد إجازاته، أو سجل تدقيقه الأمني دون إعادة كتابة اسمه.`
           : `Employee Profile (${prof.name}):\n• ID (#${prof.employeeNumber}) | National ID: ${prof.nationalId}\n• Department: ${prof.department} | Position: ${prof.position}\n• Branch/Hospital: ${prof.branch} | Direct Manager: ${prof.manager}\n• Status: ${prof.status}\n\n💡 Proactive Memory: I have linked (${prof.name}) to our conversation context. You may now ask for their leave balance, payslips, or security log directly.`;
       }
     }
     // 5. Attendance punch
     else if (/checkin|check in|حضور|سجل دخول|تسجيل دخول/i.test(text)) {
-      const check = await tools.checkIn.execute({ notes: "Recorded via Lana AI Assistant" });
+      const check = await tools.checkIn.execute({ notes: "Recorded via HRMS AI Assistant" });
       executedTools.push({ tool: "checkIn", result: check });
-      replyText = (check.message || check.error || (isAr ? "تم تسجيل الدخول بنجاح." : "Checked in successfully.")) + (isAr ? "\n\n💡 مبادرة لانا: تم توثيق موقع بصمتك والأوفر تايم المحتمل لليوم." : "\n\n💡 Proactive Note: Your location punch and potential overtime buffer have been logged.");
+      replyText = (check.message || check.error || (isAr ? "تم تسجيل الدخول بنجاح." : "Checked in successfully.")) + (isAr ? "\n\n💡 تم توثيق موقع بصمتك والعمل الإضافي المحتمل لليوم." : "\n\n💡 Proactive Note: Your location punch and potential overtime buffer have been logged.");
     }
     else if (/checkout|check out|انصراف|تسجيل خروج/i.test(text)) {
-      const check = await tools.checkOut.execute({ notes: "Recorded via Lana AI Assistant" });
+      const check = await tools.checkOut.execute({ notes: "Recorded via HRMS AI Assistant" });
       executedTools.push({ tool: "checkOut", result: check });
-      replyText = (check.message || check.error || (isAr ? "تم تسجيل الانصراف بنجاح." : "Checked out successfully.")) + (isAr ? "\n\n💡 مبادرة لانا: أتمنى لك قضاء وقت ممتع؛ تم احتساب إجمالي ساعات عملك لليوم." : "\n\n💡 Proactive Note: Have a great evening! Your daily work hours have been calculated.");
+      replyText = (check.message || check.error || (isAr ? "تم تسجيل الانصراف بنجاح." : "Checked out successfully.")) + (isAr ? "\n\n💡 تم احتساب إجمالي ساعات عملك لليوم." : "\n\n💡 Proactive Note: Have a great evening! Your daily work hours have been calculated.");
     }
     // 6. Direct natural response (No intent classifier fallbacks!)
     else {
       replyText = context.isExecutive
         ? (isAr ? `تم تلقي الأمر التنفيذي: "${text}".\nبصفتي المساعد التنفيذي، يمكنني فوراً أتمتة الصلاحيات، اعتماد الاستثناءات، أو الاستعلام عن أي موظف أو مستشفى في قاعدة البيانات. ما هو الإجراء المستهدف؟` : `Executive Command received: "${text}".\nI am ready to automate permissions, approve workflows, or inspect any record immediately. What target shall we process?`)
-        : (isAr ? `أهلاً بك؛ أنا لانا، مساعدتك الذكية لإدارة شؤون الموظفين والموارد البشرية.\nيمكنني مساعدتك في الاستعلام عن الأرصدة، تقديم الطلبات، معرفة سياسات الشركة، أو مراجعة الهيكل الإداري والمستشفيات بمبادرة وسرعة فائقة. كيف يسعدني دعمك اليوم؟` : `Welcome! I am Lana, your intelligent HR and Executive Assistant.\nI can help you check balances, submit requests, explain policies, or navigate hospitals and hierarchy with proactive ease. How can I assist you today?`);
+        : (isAr ? `أهلاً بك؛ أنا المساعد الذكي لنظام HRMS.\nيمكنني مساعدتك في الاستعلام عن الأرصدة، تقديم الطلبات، معرفة سياسات الشركة، أو مراجعة الهيكل الإداري والفروع. كيف يمكنني دعمك اليوم؟` : `Welcome! I am the HRMS intelligent assistant.\nI can help you check balances, submit requests, explain policies, or navigate branches and hierarchy. How can I assist you today?`);
     }
   } catch (err: any) {
     const rawMsg = String(err?.message || "");
@@ -302,7 +302,7 @@ export async function POST(request: NextRequest) {
       const conv = await prisma.aIAssistantConversation.create({
         data: {
           userId,
-          title: lastMessage.slice(0, 70) || "Lana AI Conversation",
+          title: lastMessage.slice(0, 70) || "HRMS AI Conversation",
           status: "ACTIVE"
         }
       });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { Download, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,7 +47,7 @@ export function OvertimeManagementClient() {
     return params.toString();
   }, [filters]);
 
-  const load = () => {
+  const load = useCallback(() => {
     fetch(`/api/enterprise/overtime?${query}`, { cache: "no-store" })
       .then((response) => response.json())
       .then((data) => {
@@ -58,12 +58,12 @@ export function OvertimeManagementClient() {
         setBranches(data.branches ?? []);
       })
       .catch((error) => setMessage(error.message));
-  };
+  }, [query]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(load, 300);
     return () => clearTimeout(delayDebounceFn);
-  }, [query]);
+  }, [load]);
   useEffect(() => {
     if (selectedEmployee) setForm((current) => ({ ...current, departmentId: selectedEmployee.departmentId ?? "", branchId: selectedEmployee.branchId ?? "" }));
   }, [selectedEmployee]);

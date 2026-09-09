@@ -139,10 +139,6 @@ export function EmployeeProfileDashboard({
   const fullName = `${employee.firstName} ${employee.lastName}`.trim();
   const initials = `${employee.firstName?.[0] || ""}${employee.lastName?.[0] || ""}`.toUpperCase();
 
-  const AdminBadge = ({ isDelegate }: { isDelegate?: boolean }) => {
-    if (!isDelegate) return null;
-    return <span className="text-yellow-500 text-lg ml-2 inline-block" title="مفوض تنفيذي">👑</span>;
-  };
 
   const handleArchive = async () => {
     const isArchived = employee.status === "INACTIVE" || employee.status === "TERMINATED";
@@ -165,7 +161,7 @@ export function EmployeeProfileDashboard({
   };
 
   const handleResetPassword = async () => {
-    if (!confirm(isAr ? `إعادة تعيين كلمة مرور ${fullName} إلى آخر 4 أرقام من الهوية؟` : `Reset password for ${fullName}?`)) return;
+    if (!confirm(isAr ? `إنشاء كلمة مرور مؤقتة جديدة للموظف ${fullName}؟` : `Generate a temporary password for ${fullName}?`)) return;
     try {
       const res = await fetch("/api/employees/reset-password", {
         method: "POST",
@@ -173,7 +169,8 @@ export function EmployeeProfileDashboard({
         body: JSON.stringify({ employeeId: employee.id }),
       });
       const json = await res.json();
-      alert(json.message || "تمت إعادة التعيين");
+      const temporaryPassword = json.results?.[0]?.temporaryPassword;
+      alert(temporaryPassword ? `${json.message}\nكلمة المرور المؤقتة: ${temporaryPassword}` : (json.message || "تمت إعادة التعيين"));
     } catch (e) {
       alert("خطأ");
     }
@@ -186,7 +183,7 @@ export function EmployeeProfileDashboard({
   const handleDownloadDocument = (doc: any) => {
     const url = doc.fileUrl || doc.attachmentUrl;
     if (!url) {
-      featureDone("تحميل المستند");
+      alert(isAr ? "لا يوجد ملف مرفق لهذا السجل" : "No file is attached to this record");
       return;
     }
     if (url.startsWith("data:")) {
@@ -229,7 +226,7 @@ export function EmployeeProfileDashboard({
   const handleViewDocument = (doc: any) => {
     const url = doc.fileUrl || doc.attachmentUrl;
     if (!url) {
-      featureDone("عرض المستند");
+      alert(isAr ? "لا يوجد ملف مرفق لهذا السجل" : "No file is attached to this record");
       return;
     }
     setActivePreviewDoc(doc);
@@ -329,8 +326,6 @@ export function EmployeeProfileDashboard({
     }
   };
 
-  const featureDone = (label: string) => alert(`${label}: تم تفعيل الزر وسيتم ربط الإجراء المتقدم حسب سياسة المنشأة.`);
-
   const filteredDocs = useMemo(() => {
     if (!searchDocs) return docs;
     const q = searchDocs.toLowerCase();
@@ -373,7 +368,6 @@ export function EmployeeProfileDashboard({
                   <div>
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <h1 className="text-3xl font-black tracking-tight">{fullName}</h1>
-                      <AdminBadge isDelegate={Boolean(employee.isDelegate || employee.user?.roles?.some((r: any) => ["SUPER_ADMIN", "HR_MANAGER"].includes(typeof r === "string" ? r : r.role?.name || r.name)))} />
                     </div>
                     <p className="text-muted-foreground mt-1 flex flex-wrap gap-2 text-sm">
                       <span className="font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full text-xs">{employee.employeeNumber}</span>
@@ -795,8 +789,8 @@ export function EmployeeProfileDashboard({
 
         {/* 7- Contracts */}
         <TabsContent value="contracts" className="space-y-4 mt-6">
-          <Card className="rounded-2xl"><CardHeader><CardTitle>العقود</CardTitle><CardDescription>العقد الحالي والسابقة - تحميل PDF، تجديد، إنهاء</CardDescription></CardHeader><CardContent>
-            <div className="space-y-3">{contracts.map((c: any) => (<div key={c.id} className="border rounded-xl p-4 flex justify-between items-center"><div><p className="font-bold">{c.contractNumber} - {c.title}</p><p className="text-xs text-muted-foreground">{c.startDate ? new Date(c.startDate).toLocaleDateString() : ""} - {c.endDate ? new Date(c.endDate).toLocaleDateString() : "حتى الآن"} | {c.status} | {c.salaryAmount?.toString()} {c.currency}</p></div><div className="flex gap-1"><Button size="sm" variant="outline" onClick={() => c.attachmentUrl ? handleViewDocument(c) : featureDone("PDF العقد")}>PDF</Button><Button size="sm" variant="outline" onClick={() => featureDone("تجديد العقد")}>تجديد</Button><Button size="sm" variant="destructive" onClick={() => featureDone("إنهاء العقد")}>إنهاء</Button></div></div>))}{contracts.length===0 && <p className="text-center text-muted-foreground py-8">لا يوجد عقود</p>}</div>
+          <Card className="rounded-2xl"><CardHeader><CardTitle>العقود</CardTitle><CardDescription>العقد الحالي والعقود السابقة والمرفقات المتاحة</CardDescription></CardHeader><CardContent>
+            <div className="space-y-3">{contracts.map((c: any) => (<div key={c.id} className="border rounded-xl p-4 flex justify-between items-center"><div><p className="font-bold">{c.contractNumber} - {c.title}</p><p className="text-xs text-muted-foreground">{c.startDate ? new Date(c.startDate).toLocaleDateString() : ""} - {c.endDate ? new Date(c.endDate).toLocaleDateString() : "حتى الآن"} | {c.status} | {c.salaryAmount?.toString()} {c.currency}</p></div>{c.attachmentUrl ? <Button size="sm" variant="outline" onClick={() => handleViewDocument(c)}>عرض العقد</Button> : <span className="text-xs text-muted-foreground">لا يوجد مرفق</span>}</div>))}{contracts.length===0 && <p className="text-center text-muted-foreground py-8">لا توجد عقود مسجلة</p>}</div>
           </CardContent></Card>
         </TabsContent>
 
@@ -1003,42 +997,6 @@ export function EmployeeProfileDashboard({
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl"><CardHeader><CardTitle>الصلاحيات - عرض شجري</CardTitle><CardDescription>إعطاء أي صلاحية لأي موظف بدون تعديل الدور بالكامل - موروثة، مخصصة، فعلية</CardDescription></CardHeader><CardContent>
-            <div className="space-y-4">
-              {[
-                { key: "Employee", label: "الموظفون" },
-                { key: "Attendance", label: "الحضور" },
-                { key: "Payroll", label: "الرواتب" },
-                { key: "Contracts", label: "العقود" },
-                { key: "Settings", label: "الإعدادات" }
-              ].map((mod) => (
-                <div key={mod.key} className="border rounded-xl p-4">
-                  <p className="font-bold mb-3">{mod.label}</p>
-                  <div className="grid gap-3 md:grid-cols-4">
-                    {[
-                      { key: "View", label: "عرض" },
-                      { key: "Create", label: "إنشاء" },
-                      { key: "Update", label: "تحديث" },
-                      { key: "Delete", label: "حذف" },
-                      { key: "Approve", label: "اعتماد" },
-                      { key: "Export", label: "تصدير" },
-                      { key: "Edit", label: "تعديل" }
-                    ].slice(0, mod.key==="Employee"?4:3).map((perm) => (
-                      <label key={perm.key} className="flex items-center justify-between border rounded-lg p-3 hover:bg-muted/30 cursor-pointer">
-                        <span className="text-sm">{perm.label}</span>
-                        <input type="checkbox" defaultChecked={Math.random()>0.5} onChange={() => featureDone("تحديث الصلاحية")} className="h-4 w-4" />
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              ))}
-              <div className="grid gap-4 md:grid-cols-3 mt-6">
-                <Card><CardContent className="p-4"><p className="text-xs">الصلاحيات الموروثة</p><p className="text-sm mt-1">من الدور: HR_MANAGER (12)</p></CardContent></Card>
-                <Card><CardContent className="p-4"><p className="text-xs">الصلاحيات المخصصة</p><p className="text-sm mt-1">3 صلاحيات مخصصة</p></CardContent></Card>
-                <Card><CardContent className="p-4"><p className="text-xs">الصلاحيات الفعلية</p><p className="text-sm mt-1">15 صلاحية فعالة</p></CardContent></Card>
-              </div>
-            </div>
-          </CardContent></Card>
         </TabsContent>
 
         {/* 11- Activity */}
@@ -1050,7 +1008,7 @@ export function EmployeeProfileDashboard({
                   <div className="h-8 w-8 rounded-full bg-primary text-white grid place-items-center text-xs font-bold relative z-10">{i+1}</div>
                   <div className="flex-1 border rounded-xl p-4 bg-white dark:bg-slate-900">
                     <p className="font-bold text-sm">{log.action} - {log.entity}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{log.createdAt ? new Date(log.createdAt).toLocaleString() : ""} - IP: {(log.metadata as any)?.ip || "192.168.1.1"} - جهاز: {(log.metadata as any)?.device || "Chrome Windows"}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{log.createdAt ? new Date(log.createdAt).toLocaleString() : ""} - IP: {(log.metadata as any)?.ip || "غير متوفر"} - جهاز: {(log.metadata as any)?.device || "غير متوفر"}</p>
                     <pre className="text-xs mt-2 bg-slate-50 dark:bg-slate-800 p-2 rounded overflow-x-auto">{JSON.stringify(log.metadata || {}, null, 2).slice(0,200)}</pre>
                   </div>
                 </div>
@@ -1062,13 +1020,8 @@ export function EmployeeProfileDashboard({
 
         {/* 12- AI */}
         <TabsContent value="ai" className="space-y-4 mt-6">
-          <Card className="rounded-2xl bg-gradient-to-br from-primary/8 to-violet-50 dark:from-primary/20 dark:to-violet-950/20 border-0 shadow-xl"><CardHeader><CardTitle className="flex items-center gap-2"><Brain className="h-6 w-6 text-primary" />تحليل الموظف بالذكاء الاصطناعي - Lana</CardTitle></CardHeader><CardContent className="grid gap-4 md:grid-cols-3">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border"><p className="text-xs">أداء الموظف</p><p className="text-3xl font-black mt-2 text-green-600">87%</p><p className="text-xs mt-1">ممتاز - فوق المتوسط</p></div>
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border"><p className="text-xs">تحليل الغياب</p><p className="text-3xl font-black mt-2 text-amber-600">3 أيام</p><p className="text-xs mt-1">أقل من المتوسط (5)</p></div>
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border"><p className="text-xs">نسبة الاستقرار</p><p className="text-3xl font-black mt-2 text-blue-600">92%</p><p className="text-xs mt-1">مستقر جداً</p></div>
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border"><p className="text-xs">احتمال الاستقالة</p><p className="text-3xl font-black mt-2 text-green-600">5%</p><p className="text-xs mt-1">منخفض جداً</p></div>
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border md:col-span-2"><p className="text-xs">التوصيات</p><ul className="text-sm mt-2 list-disc pr-5 space-y-1"><li>ترقية مقترحة خلال 6 أشهر</li><li>إشراك في مشروع قيادي</li><li>مكافأة أداء 10%</li></ul></div>
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border"><p className="text-xs">المخاطر</p><p className="text-sm mt-2 font-bold text-green-600">لا يوجد مخاطر - موظف مستقر</p></div>
+          <Card className="rounded-2xl border border-slate-200"><CardHeader><CardTitle className="flex items-center gap-2"><Brain className="h-6 w-6 text-primary" />تحليل الموظف بالذكاء الاصطناعي</CardTitle></CardHeader><CardContent>
+            <div className="rounded-xl bg-slate-50 p-6 text-sm leading-7 text-slate-600">لا تُعرض تنبؤات أو نسب افتراضية. ستظهر التحليلات هنا فقط عند اكتمال بيانات الأداء والحضور الفعلية وتوفر صلاحية الوصول إليها.</div>
           </CardContent></Card>
         </TabsContent>
       </Tabs>

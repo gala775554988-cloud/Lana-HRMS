@@ -28,7 +28,7 @@ type WorkflowRequest = {
 };
 
 export function EnterpriseAccessManager({
-  currentHospitalName = "مستشفى لانا الطبي",
+  currentHospitalName = "المنشأة الرئيسية",
   currentHospitalId = null
 }: {
   currentHospitalName?: string;
@@ -133,7 +133,7 @@ export function EnterpriseAccessManager({
 
         if (!response.ok) throw new Error("فشل تحديث بطاقة الصلاحيات في خادم Neon");
 
-        await sendNotification(employee.name, employee.id, `تم تحديث وإقرار صلاحياتك الإدارية في نظام لانا الموحد (${activePermKeys.length} صلاحية فعالة).`);
+        await sendNotification(employee.name, employee.id, `تم تحديث وإقرار صلاحياتك الإدارية في نظام HRMS (${activePermKeys.length} صلاحية فعالة).`);
         setMessage(`تم حفظ الصلاحيات للموظف (${employee.name}) وإرسال إشعار لحظي للتطبيق بنجاح.`);
       } catch (err: any) {
         setMessage(err.message || "حدث خطأ أثناء تحديث الصلاحيات");

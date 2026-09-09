@@ -49,21 +49,22 @@ export const queryCompanyFiles = async (userQuery: string, authContext?: ToolAut
       prisma.fileCenterDocument.findMany({
         where: {
           OR: [
-            { title: { contains: queryClean, mode: "insensitive" } },
-            { description: { contains: queryClean, mode: "insensitive" } },
-            ...searchTerms.map((term) => ({ title: { contains: term, mode: "insensitive" as const } }))
+            { name: { contains: queryClean, mode: "insensitive" } },
+            { ocrText: { contains: queryClean, mode: "insensitive" } },
+            ...searchTerms.map((term) => ({ name: { contains: term, mode: "insensitive" as const } }))
           ]
         },
         take: 6,
-        orderBy: { updatedAt: "desc" }
+        orderBy: { updatedAt: "desc" },
+        include: { versions: { orderBy: { version: "desc" }, take: 1 } }
       }).catch(() => []),
 
       prisma.globalSearchDocument.findMany({
         where: {
           OR: [
             { title: { contains: queryClean, mode: "insensitive" } },
-            { contentSummary: { contains: queryClean, mode: "insensitive" } },
-            ...searchTerms.map((term) => ({ contentSummary: { contains: term, mode: "insensitive" as const } }))
+            { content: { contains: queryClean, mode: "insensitive" } },
+            ...searchTerms.map((term) => ({ content: { contains: term, mode: "insensitive" as const } }))
           ]
         },
         take: 5
@@ -83,9 +84,9 @@ export const queryCompanyFiles = async (userQuery: string, authContext?: ToolAut
     for (const doc of fileCenterDocs) {
       matchedExcerpts.push({
         source: `مرکز ملفات الشركة (File Center - ${doc.category || "General"})`,
-        title: doc.title,
-        excerpt: doc.description || `وثيقة مؤسسية مسجلة برقم إصدار (${doc.version || "1.0"}) وتصنيف (${doc.category}).`,
-        fileUrl: doc.fileUrl || undefined,
+        title: doc.name,
+        excerpt: doc.ocrText || `وثيقة مؤسسية مسجلة برقم إصدار (${doc.versions[0]?.version || 1}) وتصنيف (${doc.category}).`,
+        fileUrl: doc.currentUrl || doc.versions[0]?.fileUrl || undefined,
         date: doc.updatedAt ? new Date(doc.updatedAt).toLocaleDateString("ar-SA") : undefined
       });
     }
@@ -94,7 +95,7 @@ export const queryCompanyFiles = async (userQuery: string, authContext?: ToolAut
       matchedExcerpts.push({
         source: `الأرشيف الشامل (Global Search)`,
         title: doc.title,
-        excerpt: doc.contentSummary || doc.title,
+        excerpt: doc.content || doc.title,
         fileUrl: doc.url || undefined
       });
     }
@@ -145,7 +146,7 @@ export const queryCompanyFiles = async (userQuery: string, authContext?: ToolAut
       query: userQuery,
       matchedCount: matchedExcerpts.length,
       excerpts: matchedExcerpts,
-      instructionToAi: "أنت المساعد الذكي Lana AI Pro Max؛ استخدم هذه الفقرات والبيانات المستخرجة من ملفات ووثائق ولوائح شركة لانا الطبية لتقديم إجابة دقيقة وشاملة وموثوقة للمستخدم بالكامل."
+      instructionToAi: "أنت مساعد الموارد البشرية في HRMS؛ استخدم هذه الفقرات والبيانات المستخرجة من ملفات ووثائق ولوائح المنشأة لتقديم إجابة دقيقة وموثوقة ضمن صلاحيات المستخدم."
     };
 
     return contextFromFiles;
@@ -1096,7 +1097,7 @@ export function createScopedHrTools(context: ToolAuthContext) {
           data: {
             approverUserId: targetManagerId,
             status: "PENDING",
-            comments: `[تمت إعادة التوجيه برمجياً عبر Lana AI Pro Max Delegate]: ${reason || "تجاوز المدة الزمنية المسموحة"}`
+            comments: `[تمت إعادة التوجيه آلياً]: ${reason || "تجاوز المدة الزمنية المسموحة"}`
           }
         });
 

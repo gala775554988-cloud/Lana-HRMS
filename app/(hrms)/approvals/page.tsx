@@ -7,9 +7,14 @@ const RequestWorkbenchClient = dynamicImport(() => import("@/components/enterpri
 
 export default function ApprovalsPage() {
   return (
-    <MergedModuleTabs
-      defaultValue="center"
-      items={[
+    <div className="space-y-5" dir="rtl">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">مركز الطلبات والموافقات</h1>
+        <p className="mt-1 text-sm text-muted-foreground">متابعة الطلبات الواردة والصادرة، تنفيذ القرارات، ومراجعة سلسلة الاعتماد من مكان واحد.</p>
+      </div>
+      <MergedModuleTabs
+        defaultValue="center"
+        items={[
         {
           value: "center",
           label: "استقبال الطلبات",
@@ -28,7 +33,8 @@ export default function ApprovalsPage() {
           icon: <Send className="h-4 w-4" />,
           content: <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">Loading outbox...</div>}><RequestWorkbenchClient mode="outbox" /></Suspense>
         }
-      ]}
-    />
+        ]}
+      />
+    </div>
   );
 }

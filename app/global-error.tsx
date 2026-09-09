@@ -50,7 +50,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
                 ? "تم إصدار تحديث جديد للتطبيق -- جارٍ إعادة تحميل الصفحة..."
                 : chunkError
                   ? structured.cause || "تعذر تحميل جزء من التطبيق بعد تحديث جديد. يرجى إعادة تحميل الصفحة بالكامل."
-                  : structured.message || "حدث خطأ غير متوقع في تطبيق Lana HRMS. يرجى تحديث الصفحة أو المحاولة مرة أخرى."}
+                  : structured.message || "حدث خطأ غير متوقع في نظام HRMS. يرجى تحديث الصفحة أو المحاولة مرة أخرى."}
             </p>
             {error.digest && (
               <p style={{ fontSize: "0.75rem", color: "#94a3b8", marginBottom: "1rem", fontFamily: "monospace" }}>

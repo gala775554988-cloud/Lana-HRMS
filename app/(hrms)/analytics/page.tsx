@@ -99,18 +99,6 @@ function lastNMonthRanges(n: number) {
   return ranges;
 }
 
-function DiagnosticConfessionBox({ err, location }: { err: any; location: string }) {
-  const errMsg = err?.message || String(err || "Unknown error");
-  const stack = err?.stack || "";
-  return (
-    <div className="rounded-3xl border border-rose-300 bg-rose-50/95 p-6 shadow-xl dark:border-rose-800 dark:bg-rose-950/80 text-rose-900 dark:text-rose-100" dir="rtl">
-      <h2 className="text-lg font-black">اعتراف النظام بالخطأ التقني المباشر (`{location}`)</h2>
-      <p className="font-mono text-xs p-3 bg-white dark:bg-slate-900 rounded-xl mt-2 text-rose-600">{errMsg}</p>
-      {stack ? <pre className="font-mono text-[11px] p-3 bg-slate-100 dark:bg-slate-950 rounded-xl mt-2 overflow-auto max-h-64">{stack}</pre> : null}
-    </div>
-  );
-}
-
 export default async function AnalyticsPage() {
   try {
     const session = await auth().catch(() => null);
@@ -140,7 +128,8 @@ export default async function AnalyticsPage() {
       </section>
     );
   } catch (err: any) {
-    return <DiagnosticConfessionBox err={err} location="AnalyticsPage (/analytics)" />;
+    console.error("[AnalyticsPage] render failed", err);
+    throw err;
   }
 }
 
@@ -186,7 +175,8 @@ async function BranchHospitalBreakdown() {
       </div>
     );
   } catch (err: any) {
-    return <DiagnosticConfessionBox err={err} location="BranchHospitalBreakdown (/analytics)" />;
+    console.error("[BranchHospitalBreakdown] render failed", err);
+    throw err;
   }
 }
 
@@ -223,11 +213,11 @@ export async function CompanyOverview({ locale, dictionary, showCharts = true, s
       payrollSum,
       overtimePending
     ] = await Promise.all([
-      prisma.employee.count({ where: { status: "ACTIVE" } }).catch(() => 1203),
-      prisma.department.count({ where: { isActive: true } }).catch(() => 8),
-      prisma.branch.count({ where: { isActive: true } }).catch(() => 4),
-      listHospitals().then(r => r.hospitals.length).catch(() => 72),
-      prisma.employeeContract.count({ where: { status: "ACTIVE" } }).catch(() => 1203),
+      prisma.employee.count({ where: { status: "ACTIVE" } }).catch(() => 0),
+      prisma.department.count({ where: { isActive: true } }).catch(() => 0),
+      prisma.branch.count({ where: { isActive: true } }).catch(() => 0),
+      listHospitals().then(r => r.hospitals.length).catch(() => 0),
+      prisma.employeeContract.count({ where: { status: "ACTIVE" } }).catch(() => 0),
       prisma.workflowInstance.count({ where: { createdAt: { gte: todayStart } } }).catch(() => 0),
       prisma.workflowInstance.count({ where: { status: "PENDING" } }).catch(() => 0),
       prisma.leaveRequest.count({ where: { status: "PENDING" } }).catch(() => 0),
@@ -238,11 +228,11 @@ export async function CompanyOverview({ locale, dictionary, showCharts = true, s
     ]);
   } catch (err: any) {
     console.warn("[CompanyOverview] Metric query fallback:", err?.message || err);
-    employees = 1203;
-    departments = 8;
-    branches = 4;
-    hospitals = 72;
-    contracts = 1203;
+    employees = 0;
+    departments = 0;
+    branches = 0;
+    hospitals = 0;
+    contracts = 0;
   }
 
   const metrics = {
@@ -295,24 +285,20 @@ export async function CompanyOverview({ locale, dictionary, showCharts = true, s
     </div>
   );
   } catch (err: any) {
-    return <DiagnosticConfessionBox err={err} location="CompanyOverview (/analytics)" />;
+    console.error("[CompanyOverview] render failed", err);
+    throw err;
   }
 }
 
-// Navy/grey brand identity, pixel-matched to the real Lana logo, hardcoded
-// as literals (not the shared --primary token) so this KPI grid's look
-// never depends on what --primary resolves to elsewhere in the app.
-const KPI_BRAND_GRADIENT = "linear-gradient(135deg, #1E3A64 0%, #2E4E7E 55%, #707070 100%)";
-
 function KpiCard({
-  title, value, icon: Icon, hint, tone, badgeText, index, variant
+  title, value, icon: Icon, hint, badgeText, index, variant
 }: {
   title: string; value: number | string; icon: LucideIcon; hint: string; tone: string; badgeText?: string; index: number; variant?: "solid";
 }) {
   if (variant === "solid") {
     return (
-      <Card className="group relative overflow-hidden rounded-2xl border-0 p-0 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-xl" style={{ animationDelay: `${index * 35}ms`, background: KPI_BRAND_GRADIENT }}>
-        <CardContent className="relative p-6 lana-slide-up">
+      <Card className="relative overflow-hidden border-primary bg-primary p-0 text-primary-foreground" style={{ animationDelay: `${index * 35}ms` }}>
+        <CardContent className="relative p-6">
           <div className="relative flex items-start justify-between gap-4">
             <div className="space-y-2 flex-1 min-w-0">
               <div className="flex items-center gap-2">
@@ -326,7 +312,7 @@ function KpiCard({
               <div className="text-2xl sm:text-3xl font-black tracking-tight text-white truncate">{value}</div>
               <p className="text-xs font-semibold text-white/75 truncate">{hint}</p>
             </div>
-            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/20 text-white transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white/15 text-white">
               <Icon className="h-5 w-5" />
             </div>
           </div>
@@ -336,23 +322,22 @@ function KpiCard({
   }
 
   return (
-    <Card className="glass-card-premium group relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:border-[#1E3A64]/40 hover:shadow-xl" style={{ animationDelay: `${index * 35}ms` }}>
-      <CardContent className="relative p-6 lana-slide-up">
-        <div className={`absolute -left-10 -top-10 h-32 w-32 rounded-full bg-gradient-to-br ${tone} opacity-10 blur-2xl transition-opacity duration-300 group-hover:opacity-25 pointer-events-none`} />
+    <Card className="relative overflow-hidden transition-colors hover:border-primary/30" style={{ animationDelay: `${index * 35}ms` }}>
+      <CardContent className="relative p-5">
         <div className="relative flex items-start justify-between gap-4">
           <div className="space-y-2 flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <p className="text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wide truncate">{title}</p>
               {badgeText && (
-                <span className="rounded-full bg-[#F2F3F4] px-2 py-0.5 text-[10px] font-bold text-[#1E3A64] dark:bg-[#1A2A40] dark:text-[#9DB4D4]">
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
                   {badgeText}
                 </span>
               )}
             </div>
-            <div className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-slate-100 truncate">{value}</div>
-            <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 truncate">{hint}</p>
+            <div className="truncate text-2xl font-bold tracking-tight text-foreground sm:text-3xl">{value}</div>
+            <p className="truncate text-xs text-muted-foreground">{hint}</p>
           </div>
-          <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br ${tone} text-white shadow-lg shadow-[#1E3A64]/15 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3`}>
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
             <Icon className="h-5 w-5" />
           </div>
         </div>
@@ -366,10 +351,10 @@ export function OverviewSkeleton({ showCharts = true }: { showCharts?: boolean }
     <div className="space-y-8 animate-pulse">
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 12 }).map((_, i) => (
-          <div key={i} className="h-36 rounded-3xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-900" />
+          <div key={i} className="h-32 rounded-2xl border border-border bg-muted" />
         ))}
       </div>
-      {showCharts ? <div className="h-96 rounded-3xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-900" /> : null}
+      {showCharts ? <div className="h-96 rounded-2xl border border-border bg-muted" /> : null}
     </div>
   );
 }

@@ -164,7 +164,7 @@ async function main() {
   });
   await client.reportDefinition.upsert({ where: { code: "HEADCOUNT" }, update: { name: "Headcount", module: "employees" }, create: { name: "Headcount", code: "HEADCOUNT", module: "employees", description: "Employee headcount by status and organization" } });
   await client.appSetting.upsert({ where: { key: "company.name" }, update: { value: "Lana HRMS" }, create: { key: "company.name", value: "Lana HRMS", description: "Company display name" } });
-  await client.appSetting.upsert({ where: { key: "company.logo" }, update: { value: { url: "/brand/lana-logo.png" } }, create: { key: "company.logo", value: { url: "/brand/lana-logo.png" }, description: "Company logo URL" } });
+  await client.appSetting.upsert({ where: { key: "company.logo" }, update: { value: { url: "/favicon.svg" } }, create: { key: "company.logo", value: { url: "/favicon.svg" }, description: "Company logo URL" } });
   await client.announcement.upsert({ where: { id: "seed-announcement-welcome" }, update: { title: "Welcome to HRMS", body: "The HRMS platform is ready for your team.", isPublished: true, publishedAt: new Date() }, create: { id: "seed-announcement-welcome", title: "Welcome to HRMS", body: "The HRMS platform is ready for your team.", isPublished: true, publishedAt: new Date() } });
   console.info("Seeded Lana HRMS data. Admin username: admin. Employee national ID: " + employeeNationalId);
 }

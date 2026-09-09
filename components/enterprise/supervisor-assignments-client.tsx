@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, X, Check, UserCog } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -52,8 +52,8 @@ export function SupervisorAssignmentsClient() {
   const [saving, setSaving] = useState(false);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
-  const loadOrg = () => fetch("/api/enterprise/org-entities").then((r) => r.json()).then((d) => { if (d.success) setOrg(d); });
-  const loadAssignments = () => {
+  const loadOrg = useCallback(() => fetch("/api/enterprise/org-entities").then((r) => r.json()).then((d) => { if (d.success) setOrg(d); }), []);
+  const loadAssignments = useCallback(() => {
     setLoading(true);
     const params = new URLSearchParams();
     if (filterEntityType) params.set("entityType", filterEntityType);
@@ -62,10 +62,10 @@ export function SupervisorAssignmentsClient() {
       .then((r) => r.json())
       .then((d) => { if (d.success) setAssignments(d.assignments); else setMessage(d.message || "فشل تحميل التكليفات"); })
       .finally(() => setLoading(false));
-  };
+  }, [filterActive, filterEntityType]);
 
-  useEffect(() => { loadOrg(); }, []);
-  useEffect(() => { loadAssignments(); }, [filterEntityType, filterActive]);
+  useEffect(() => { loadOrg(); }, [loadOrg]);
+  useEffect(() => { loadAssignments(); }, [loadAssignments]);
 
   function openCreate() {
     setEmployeeId(""); setEmployeeLabel(""); setEntityType("HOSPITAL"); setEntityId("");

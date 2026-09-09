@@ -1,174 +1,69 @@
 "use client";
 
-import React, { useState } from "react";
-import { Suspense } from "react";
+import { BriefcaseBusiness, CalendarCheck2, ChartNoAxesCombined, ShieldCheck, Users, WalletCards } from "lucide-react";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { ClientLanguageToggle } from "@/components/i18n/client-language-toggle";
 import { LoginCard } from "@/components/auth/login-card";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, Monitor, Video, LayoutGrid, Users, ShieldCheck, Activity, CalendarCheck2, FileText, Hospital, WalletCards } from "lucide-react";
 import type { Dictionary } from "@/lib/i18n";
 
-const PHONE_VIDEO_POSTER = `data:image/svg+xml,${encodeURIComponent(
-  `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="220" viewBox="0 0 400 220">
-    <defs>
-      <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stop-color="#2ED3C6"/>
-        <stop offset="100%" stop-color="#19BFAF"/>
-      </linearGradient>
-    </defs>
-    <rect width="400" height="220" fill="url(#g)"/>
-    <circle cx="200" cy="100" r="28" fill="rgba(255,255,255,0.2)"/>
-    <circle cx="200" cy="100" r="19" fill="#ffffff"/>
-    <path d="M193 89 L213 100 L193 111 Z" fill="#19BFAF"/>
-    <text x="200" y="155" font-family="Cairo, sans-serif" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">لانا الطبية</text>
-  </svg>`
-)}`;
-
-const stats = [
-  { label: "عدد الموظفين", value: "4580", icon: Users },
-  { label: "عدد المستشفيات", value: "72", icon: Hospital },
-  { label: "الطلبات الجديدة", value: "15", icon: FileText },
-  { label: "الرواتب", value: "98%", icon: WalletCards },
-  { label: "الأوفر تايم", value: "124h", icon: Activity },
-  { label: "الإجازات", value: "32", icon: CalendarCheck2 }
+const modules = [
+  { label: "إدارة الموظفين", icon: Users },
+  { label: "الحضور والإجازات", icon: CalendarCheck2 },
+  { label: "الرواتب والمزايا", icon: WalletCards },
+  { label: "التقارير والتحليلات", icon: ChartNoAxesCombined }
 ];
 
 export function LoginHeroContainer({ dictionary, isAr }: { dictionary: Dictionary; isAr: boolean }) {
-  const [activeSection, setActiveSection] = useState<"hero" | "login">("login"); // Defaulting or switching smoothly
-  const [heroOpacity, setHeroOpacity] = useState(1);
-  const [loginOpacity, setLoginOpacity] = useState(1);
-
-  const switchToLogin = () => {
-    setHeroOpacity(0);
-    setTimeout(() => {
-      setActiveSection("login");
-      setLoginOpacity(1);
-    }, 500);
-  };
-
-  const switchToHero = () => {
-    setLoginOpacity(0);
-    setTimeout(() => {
-      setActiveSection("hero");
-      setHeroOpacity(1);
-    }, 500);
-  };
-
   return (
-    <div className="relative min-h-screen w-full bg-slate-50 dark:bg-slate-950 overflow-hidden" dir={isAr ? "rtl" : "ltr"}>
-      {/* 1. الحاوية الأولى (Hero Section) */}
-      <div
-        id="heroSection"
-        style={{
-          transition: "opacity 0.5s ease-in-out",
-          opacity: activeSection === "hero" ? heroOpacity : 0,
-          pointerEvents: activeSection === "hero" ? "auto" : "none",
-          display: activeSection === "hero" ? "block" : "none"
-        }}
-        className="w-full min-h-screen bg-[#030C1B] text-white p-6 sm:p-12"
-      >
-        <div className="max-w-6xl mx-auto space-y-12">
-          <div className="flex items-center justify-between">
-            <BrandLogo href="/" size="md" subtitle="منصة إدارة الموارد البشرية للمؤسسات" textClassName="text-white" subtitleClassName="text-white/65" />
-            <div className="flex items-center gap-4">
-              <ClientLanguageToggle variant="outline" />
-              <Button
-                id="loginBtn"
-                onClick={switchToLogin}
-                className="rounded-2xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white font-black px-6 py-3.5 shadow-lg shadow-teal-500/25 flex items-center gap-2"
-              >
-                <span>تسجيل الدخول للنظام</span>
-                <ArrowLeft className="h-4 w-4 rtl:rotate-180" />
-              </Button>
-            </div>
-          </div>
+    <main className="grid min-h-screen bg-background lg:grid-cols-[minmax(0,1.08fr)_minmax(440px,.92fr)]" dir={isAr ? "rtl" : "ltr"}>
+      <section className="relative hidden overflow-hidden bg-[hsl(var(--sidebar-bg))] p-10 text-white lg:flex lg:flex-col">
+        <div className="pointer-events-none absolute inset-0 opacity-40 [background-image:radial-gradient(circle_at_15%_20%,rgba(96,165,250,.24),transparent_34%),radial-gradient(circle_at_85%_78%,rgba(255,255,255,.1),transparent_28%)]" />
+        <div className="relative flex items-center justify-between">
+          <BrandLogo href="/login" size="md" title="HRMS" subtitle="إدارة الموارد البشرية" textClassName="text-white" subtitleClassName="text-blue-100/60" logoClassName="border-white bg-white text-primary" />
+          <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-blue-100/75">منصة مؤسسية آمنة</span>
+        </div>
 
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="space-y-6">
-              <span className="rounded-full border border-teal-500/40 bg-teal-950/50 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-teal-300">
-                منصة الموارد البشرية الاحترافية Pro Max
-              </span>
-              <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-[1.25]">
-                إدارة الموارد البشرية
-                <span className="block bg-gradient-to-l from-teal-400 to-emerald-300 bg-clip-text text-transparent">بطريقة ذكية ومنصة واحدة.</span>
-              </h1>
-              <p className="text-base text-slate-400 leading-relaxed max-w-lg">
-                نظام متكامل لإدارة الموظفين، الحضور، الإجازات، الرواتب، الأوفر تايم، العهد، والاعتمادات التنفيذية مع تكامل Odoo المباشر.
-              </p>
-              <Button
-                onClick={switchToLogin}
-                size="lg"
-                className="rounded-2xl bg-white text-slate-900 font-black hover:bg-slate-100 shadow-xl px-8 h-14"
-              >
-                البدء الآن وتسجيل الدخول
-              </Button>
-            </div>
+        <div className="relative my-auto max-w-2xl">
+          <span className="mb-5 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-blue-100">
+            <ShieldCheck className="h-4 w-4" />
+            إدارة موحّدة وقرارات أوضح
+          </span>
+          <h1 className="max-w-xl text-4xl font-bold leading-[1.35] xl:text-5xl">كل أعمال الموارد البشرية في مكان واحد</h1>
+          <p className="mt-4 max-w-xl text-base leading-8 text-blue-100/70">
+            نظّم بيانات الموظفين والحضور والإجازات والرواتب والطلبات من خلال تجربة سهلة وواضحة تساعد فريقك على إنجاز العمل بسرعة.
+          </p>
 
-            <div className="relative min-h-[520px] flex justify-center">
-              <div className="absolute inset-x-0 top-12 h-[28rem] rounded-[4rem] bg-teal-500/10 blur-3xl pointer-events-none" />
-              <div className="relative z-20 w-[280px] rounded-[3rem] border border-white/10 bg-[#030C1B] p-3 shadow-2xl shadow-black/40">
-                <div className="h-full rounded-[2.35rem] bg-[#F7F9FC] p-3.5 text-[#111827] space-y-3 text-start">
-                  <div className="mx-auto mb-2 h-5 w-28 rounded-b-2xl bg-[#030C1B]" />
-                  <div className="flex items-center justify-between border-b pb-2">
-                    <span className="text-[11px] font-black text-[#0B192B]">منصة لانا للموارد البشرية</span>
-                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold text-emerald-700">للمؤسسات</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-1.5 text-center">
-                    <div className="rounded-xl bg-teal-600 p-2 text-white"><p className="text-[9px]">المنصة</p><p className="text-sm font-black">360°</p></div>
-                    <div className="rounded-xl border bg-white p-2"><p className="text-[9px] text-slate-500">الإجازات</p><p className="text-sm font-black text-teal-600">24</p></div>
-                    <div className="rounded-xl border bg-white p-2"><p className="text-[9px] text-slate-500">الحضور</p><p className="text-sm font-black text-emerald-600">16</p></div>
-                  </div>
-                  <div className="overflow-hidden rounded-2xl border bg-slate-900 shadow-md">
-                    <video className="h-28 w-full object-cover" controls playsInline preload="none" poster={PHONE_VIDEO_POSTER}>
-                      <source src="/lana-intro.mp4" type="video/mp4" />
-                    </video>
-                  </div>
+          <div className="mt-9 grid max-w-xl grid-cols-2 gap-3">
+            {modules.map((module) => {
+              const Icon = module.icon;
+              return (
+                <div key={module.label} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.06] p-3.5">
+                  <span className="grid h-9 w-9 place-items-center rounded-lg bg-white/10 text-blue-100"><Icon className="h-4.5 w-4.5" /></span>
+                  <span className="text-sm font-medium text-white/90">{module.label}</span>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6 pt-8 border-t border-white/10">
-            {stats.map((st) => (
-              <div key={st.label}>
-                <span className="block text-2xl font-black text-teal-400">{st.value}</span>
-                <span className="block text-xs text-slate-400 mt-1">{st.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* 2. الحاوية الثانية (Login Section) */}
-      <div
-        id="loginSection"
-        style={{
-          transition: "opacity 0.5s ease-in-out",
-          opacity: activeSection === "login" ? loginOpacity : 0,
-          pointerEvents: activeSection === "login" ? "auto" : "none",
-          display: activeSection === "login" ? "block" : "none"
-        }}
-        className="w-full min-h-screen bg-white dark:bg-slate-950 p-6 flex flex-col justify-between"
-      >
-        <div className="flex justify-between items-center max-w-6xl mx-auto w-full pt-4">
-          <BrandLogo href="/" size="sm" showText={true} />
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={switchToHero} className="text-xs font-bold text-slate-600 hover:bg-slate-100 dark:text-slate-400">
-              استعراض مميزات المنصة (الصفحة الترويجية)
-            </Button>
-            <ClientLanguageToggle variant="outline" />
+              );
+            })}
           </div>
         </div>
 
-        <div className="flex-1 flex items-center justify-center py-12">
+        <div className="relative flex items-center gap-2 border-t border-white/10 pt-5 text-xs text-blue-100/55">
+          <BriefcaseBusiness className="h-4 w-4" />
+          <span>نظام HRMS لإدارة دورة حياة الموظف بكفاءة</span>
+        </div>
+      </section>
+
+      <section className="relative flex min-h-screen items-center justify-center bg-card px-5 py-10 sm:px-10">
+        <div className="absolute start-5 top-5 flex items-center gap-3 lg:start-auto lg:end-7 lg:top-7">
+          <ClientLanguageToggle variant="ghost" />
+        </div>
+        <div className="w-full max-w-md">
+          <div className="mb-8 lg:hidden">
+            <BrandLogo href="/login" size="md" title="HRMS" subtitle="إدارة الموارد البشرية" />
+          </div>
           <LoginCard dictionary={dictionary} />
+          <p className="mt-6 text-center text-xs text-muted-foreground">الدخول مخصص للمستخدمين المصرح لهم فقط</p>
         </div>
-
-        <div className="text-center py-4 text-xs font-semibold text-slate-400 dark:text-slate-600 border-t border-slate-100 dark:border-slate-900">
-          © {new Date().getFullYear()} شركة لانا الطبية — نظام الموارد البشرية الفائق (Lana HRMS Pro Max)
-        </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }

@@ -87,7 +87,7 @@ export async function GET() {
     branches,
     departments,
     positions,
-    company: { name: "Lana HRMS" }
+    company: { name: "HRMS" }
   });
 }
 

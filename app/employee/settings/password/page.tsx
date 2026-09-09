@@ -99,11 +99,11 @@ export default async function PasswordPage({ searchParams }: { searchParams: Pro
       <CardHeader>
         <CardTitle>تغيير كلمة المرور</CardTitle>
         <CardDescription>
-          {required ? "يجب تغيير كلمة المرور الافتراضية (آخر 4 أرقام من الهوية) قبل استخدام النظام." : "يمكنك تغيير كلمة المرور في أي وقت بعد إدخال الحالية."}
+          {required ? "يجب تغيير كلمة المرور المؤقتة قبل استخدام النظام." : "يمكنك تغيير كلمة المرور في أي وقت بعد إدخال الحالية."}
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {required ? <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">يجب تغيير كلمة المرور الافتراضية قبل استخدام النظام. كلمة المرور الحالية هي آخر 4 أرقام من رقم الهوية.</p> : null}
+        {required ? <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">يجب تغيير كلمة المرور المؤقتة قبل استخدام النظام.</p> : null}
         {errorText ? <p className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{errorText}</p> : null}
         <form action={changePasswordAction} className="max-w-md space-y-4">
           <div className="space-y-2">

@@ -21,18 +21,18 @@ export async function GET(request: NextRequest) {
     todayStart.setHours(0, 0, 0, 0);
 
     const [totalEmployees, activeHospitals, pendingApprovals, todayAttendance, pendingLeaves] = await Promise.all([
-      prisma.employee.count({ where: { status: "ACTIVE" } }).catch(() => 1205),
-      prisma.hospital.count({ where: { isActive: true } }).catch(() => 72),
-      prisma.workflowInstance.count({ where: { status: "PENDING" } }).catch(() => 15),
-      prisma.attendanceRecord.count({ where: { workDate: { gte: todayStart } } }).catch(() => 340),
-      prisma.leaveRequest.count({ where: { status: "PENDING" } }).catch(() => 8)
+      prisma.employee.count({ where: { status: "ACTIVE" } }),
+      prisma.hospital.count({ where: { isActive: true } }),
+      prisma.workflowInstance.count({ where: { status: "PENDING" } }),
+      prisma.attendanceRecord.count({ where: { workDate: { gte: todayStart } } }),
+      prisma.leaveRequest.count({ where: { status: "PENDING" } })
     ]);
 
     let summary = "";
     if (pendingApprovals > 0 || pendingLeaves > 0) {
-      summary = `يبلغ إجمالي القوى العاملة النشطة حالياً ${totalEmployees} موظفاً موزعين على ${activeHospitals} مستشفى وموقع طبي، مع تسجيل ${todayAttendance} حركة حضور وانصراف لليوم. 💡 تنبيه لانا التنفيذي: يوجد (${pendingApprovals + pendingLeaves}) طلب معلق بانتظار الاعتماد المباشر في مسارات الإجازات وموافقات المستشفيات؛ يُوصى بمعالجتها لضمان انسيابية العمل.`;
+      summary = `يبلغ إجمالي القوى العاملة النشطة حالياً ${totalEmployees} موظفاً موزعين على ${activeHospitals} مستشفى وموقع طبي، مع تسجيل ${todayAttendance} حركة حضور وانصراف لليوم. 💡 تنبيه تنفيذي: يوجد (${pendingApprovals + pendingLeaves}) طلب معلق بانتظار الاعتماد المباشر في مسارات الإجازات وموافقات المستشفيات؛ يُوصى بمعالجتها لضمان انسيابية العمل.`;
     } else {
-      summary = `تتمتع المنصة بنسبة استقرار إداري فائقة اليوم؛ إجمالي القوى العاملة ${totalEmployees} موظفاً على رأس العمل عبر ${activeHospitals} مستشفى وموقع طبي، وقد تم إنجاز واعتماد كافة الطلبات المعلقة في صندوق موافقات المستشفيات والتسلسل الإداري بنسبة 100%.`;
+      summary = `إجمالي القوى العاملة النشطة ${totalEmployees} موظفاً عبر ${activeHospitals} مستشفى وموقع طبي، ولا توجد طلبات معلقة حالياً في مسارات الإجازات والموافقات.`;
     }
 
     return NextResponse.json({

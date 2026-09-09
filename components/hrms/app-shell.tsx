@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
@@ -9,7 +9,7 @@ import {
   LayoutDashboard, LogOut, ChevronLeft, ChevronRight,
   Users, Building2, Clock,
   DollarSign, Package, Megaphone, BarChart3, Settings,
-  Shield, GitPullRequest, Sparkles, Menu, X, PlugZap,
+  Shield, GitPullRequest, Menu, X, PlugZap, Search,
   CalendarClock, Fingerprint,
   Umbrella, User, Mail, ShieldCheck, Landmark, Briefcase, AlertTriangle
 } from "lucide-react";
@@ -31,7 +31,6 @@ import type { Dictionary, Locale } from "@/lib/i18n";
 
 interface AppShellProps {
   children: ReactNode;
-  companyLogo?: string | null;
   locale: Locale;
   dictionary: Dictionary;
 }
@@ -40,7 +39,7 @@ interface AppShellProps {
 // in the exact order specified (grouping/categories removed). "ملفي" is
 // intentionally not in this list: it's rendered as a separate pinned
 // overlay trigger at the very end of the sidebar (see ProfileOverlay),
-// not a route. "Lana AI Pro Max" (#16) additionally gets its own explicit
+// not a route. The smart assistant additionally gets its own explicit
 // authenticated-state guard where it renders, beyond the outer session
 // check this whole shell already requires.
 const navItems: Array<{ href: string; label: string; icon: typeof LayoutDashboard; resource: string | string[] }> = [
@@ -61,9 +60,8 @@ const navItems: Array<{ href: string; label: string; icon: typeof LayoutDashboar
   { href: "/announcements", label: "الإعلانات", icon: Megaphone, resource: ["announcements", "notifications"] },
   { href: "/settings", label: "الإعدادات", icon: Settings, resource: "settings" },
 ];
-const LANA_AI_ITEM = { href: "/lana-ai", label: "Lana AI Pro Max", icon: Sparkles, resource: "reports" };
 
-export function AppShell({ children, companyLogo, locale, dictionary }: AppShellProps) {
+export function AppShell({ children, dictionary }: AppShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { data: session, status } = useSession();
@@ -79,31 +77,6 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
 
   const userRoles = useMemo(() => (session?.user?.roles as string[]) || [], [session?.user?.roles]);
   const userPermissions = useMemo(() => (session?.user?.permissions as string[]) || [], [session?.user?.permissions]);
-  // Apply the user's saved sidebar/system color hue (set via /settings) on
-  // load, so the retint set from Range Slider (Prisma User.sidebarHue)
-  // persists across the whole app, not just the settings page itself.
-  useEffect(() => {
-    if (status !== "authenticated") return;
-    fetch("/api/user/preferences")
-      .then((res) => res.json())
-      .then((data) => {
-        if (!data.success || typeof data.sidebarHue !== "number") return;
-        const isDark = document.documentElement.classList.contains("dark");
-        const hue = data.sidebarHue;
-        const secondaryHue = (hue + 73) % 360;
-        const root = document.documentElement.style;
-        const primaryL = isDark ? 50 : 42;
-        const secondaryL = isDark ? 72 : 66;
-        root.setProperty("--primary", `${hue} 70% ${primaryL}%`);
-        root.setProperty("--accent", `${hue} 70% ${primaryL}%`);
-        root.setProperty("--ring", `${hue} 70% ${primaryL}%`);
-        root.setProperty("--info", `${hue} 70% ${primaryL}%`);
-        root.setProperty("--sidebar-accent", `${hue} 70% ${primaryL}%`);
-        root.setProperty("--secondary", `${secondaryHue} 85% ${secondaryL}%`);
-      })
-      .catch(() => {});
-  }, [status]);
-
   const { data: pendingApprovalsCount } = usePendingApprovalsCount(status === "authenticated");
   const canViewInsurance = userRoles.includes("SUPER_ADMIN") || userRoles.includes("HR_MANAGER") || userPermissions.includes("read:insurance") || userPermissions.includes("manage:insurance");
   const { data: expiringInsuranceCount } = useExpiringInsuranceCount(status === "authenticated" && canViewInsurance);
@@ -138,16 +111,11 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
     () => navItems.filter(isNavItemAllowed).map((item) => (item.resource === "dashboard" ? { ...item, href: homeHref } : item)),
     [isNavItemAllowed, homeHref]
   );
-  // Defense-in-depth Auth Guard for Lana AI Pro Max: this whole shell already
-  // returns null with no session (below), but this item additionally checks
-  // the live authenticated status explicitly, per requirement, so it can
-  // never render mid-transition (e.g. session revoked/expiring client-side).
-  const showLanaAI = status === "authenticated" && Boolean(session?.user) && isNavItemAllowed(LANA_AI_ITEM);
 
   if (status === "loading") {
     return (
       <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
-        <div className="hidden h-screen w-[284px] shrink-0 border-e border-primary/10 bg-white lg:block dark:border-slate-800/80 dark:bg-slate-950" />
+        <div className="hidden h-screen w-[272px] shrink-0 bg-[hsl(var(--sidebar-bg))] lg:block" />
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="h-16 shrink-0 border-b border-border/80 bg-white dark:bg-slate-950" />
           <main className="min-w-0 flex-1 overflow-y-auto p-4 lg:p-8">{children}</main>
@@ -161,7 +129,7 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
   }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-slate-50/50 text-foreground transition-colors duration-200 dark:bg-slate-950">
+    <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
       {mobileMenuOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs lg:hidden animate-in fade-in duration-200"
@@ -176,24 +144,24 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
           the two surfaces read as deliberately different materials. */}
       <aside
         className={cn(
-          "fixed inset-y-0 start-0 z-50 flex h-screen flex-col border-e border-slate-200/80 bg-white shadow-[0_0_24px_-6px_rgb(15_23_42_/_0.15)] transition-all duration-300 ease-premium lg:sticky lg:top-0 lg:z-auto lg:!translate-x-0 dark:border-slate-800/80 dark:bg-slate-950 dark:shadow-[0_0_24px_-6px_rgb(0_0_0_/_0.4)]",
-          sidebarCollapsed ? "lg:w-[78px]" : "lg:w-[284px]",
-          "w-[284px]",
+          "fixed inset-y-0 start-0 z-50 flex h-screen flex-col border-e border-white/10 bg-[hsl(var(--sidebar-bg))] text-[hsl(var(--sidebar-foreground))] shadow-xl transition-[width,transform] duration-200 lg:sticky lg:top-0 lg:z-auto lg:!translate-x-0",
+          sidebarCollapsed ? "lg:w-[76px]" : "lg:w-[272px]",
+          "w-[272px]",
           mobileMenuOpen ? "translate-x-0" : "rtl:translate-x-full ltr:-translate-x-full"
         )}
       >
-        <div className="flex h-16 items-center justify-between border-b border-primary/10 px-4 lg:hidden dark:border-slate-800/80">
-          <BrandLogo href="/" size="sm" showText={true} />
+        <div className="flex h-[72px] items-center justify-between border-b border-white/10 px-4">
+          <BrandLogo href="/" size="sm" showText={!sidebarCollapsed || mobileMenuOpen} textClassName="text-white" subtitleClassName="text-blue-100/60" logoClassName="bg-white text-primary border-white" />
           <button
             onClick={() => setMobileMenuOpen(false)}
-            className="rounded-xl p-2 text-slate-500 hover:bg-primary/10 dark:hover:bg-slate-800 transition-colors"
+            className="rounded-lg p-2 text-white/70 hover:bg-white/10 hover:text-white transition-colors lg:hidden"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="flex-1 py-5 px-3 overflow-y-auto overflow-x-hidden">
-          <div className="space-y-1.5">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4">
+          <div className="space-y-1">
             {visibleNavItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
@@ -206,18 +174,18 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
                   onFocus={() => prefetchRoute(item.href)}
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
-                    "group relative flex items-center gap-3.5 rounded-2xl px-3.5 py-3 text-sm font-bold transition-all duration-300 ease-premium border",
-                    sidebarCollapsed ? "lg:justify-center lg:px-2.5 lg:py-3" : "",
+                    "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors duration-150",
+                    sidebarCollapsed ? "lg:justify-center lg:px-2.5" : "",
                     active
-                      ? "bg-gradient-to-l from-primary to-secondary text-white font-black shadow-premium-md border-primary/40 dark:text-slate-950"
-                      : "border-transparent text-slate-600 hover:translate-x-0.5 rtl:hover:-translate-x-0.5 hover:bg-primary/8 hover:text-primary hover:border-primary/15 hover:shadow-premium-sm dark:text-slate-400 dark:hover:bg-primary/10 dark:hover:text-primary dark:hover:border-primary/20"
+                      ? "bg-white font-semibold text-primary shadow-sm"
+                      : "text-blue-100/70 hover:bg-white/10 hover:text-white"
                   )}
                   title={sidebarCollapsed ? item.label : undefined}
                 >
                   <span className="relative inline-flex shrink-0">
                     <Icon className={cn(
-                      "h-5 w-5 shrink-0 transition-transform duration-300 ease-premium group-hover:scale-110",
-                      active ? "text-white dark:text-slate-950 drop-shadow-xs" : "text-slate-400 group-hover:text-primary dark:text-slate-500 dark:group-hover:text-primary"
+                      "h-[18px] w-[18px] shrink-0",
+                      active ? "text-primary" : "text-blue-100/65 group-hover:text-white"
                     )} />
                     {item.href === "/request-center" && pendingApprovalsCount ? (
                       <span
@@ -254,45 +222,23 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
               );
             })}
 
-            {/* #16 Lana AI Pro Max -- Auth Guard: only ever mounted once
-                showLanaAI (live authenticated status, not just this shell's
-                outer session check) is true. */}
-            {showLanaAI ? (
-              <Link
-                href={LANA_AI_ITEM.href}
-                prefetch={false}
-                onMouseEnter={() => prefetchRoute(LANA_AI_ITEM.href)}
-                onClick={() => setMobileMenuOpen(false)}
-                className={cn(
-                  "group relative flex items-center gap-3.5 rounded-2xl px-3.5 py-3 text-sm font-bold transition-all duration-300 ease-premium border mt-2",
-                  sidebarCollapsed ? "lg:justify-center lg:px-2.5 lg:py-3" : "",
-                  isActive(LANA_AI_ITEM.href)
-                    ? "bg-gradient-to-l from-primary to-secondary text-white font-black shadow-premium-md border-primary/40 dark:text-slate-950"
-                    : "border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 dark:border-primary/25 dark:bg-primary/10"
-                )}
-                title={sidebarCollapsed ? LANA_AI_ITEM.label : undefined}
-              >
-                <Sparkles className="h-5 w-5 shrink-0 animate-pulse" />
-                {(!sidebarCollapsed || mobileMenuOpen) && <span className="truncate">{LANA_AI_ITEM.label}</span>}
-              </Link>
-            ) : null}
           </div>
         </div>
 
         {/* #17 ملفي -- pinned last, opens the Profile Overlay in place
             instead of navigating; the admin work area stays mounted and
             visible behind it. */}
-        <div className="p-3 border-t border-slate-100 dark:border-slate-800/80">
+        <div className="border-t border-white/10 p-3">
           <button
             type="button"
             onClick={() => setShowProfileOverlay(true)}
             className={cn(
-              "flex w-full items-center gap-3.5 rounded-2xl px-3.5 py-3 text-sm font-bold transition-all duration-300 ease-premium border border-transparent text-slate-600 hover:bg-primary/8 hover:text-primary hover:border-primary/15 dark:text-slate-400 dark:hover:bg-primary/10 dark:hover:text-primary",
+              "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-blue-100/75 transition-colors hover:bg-white/10 hover:text-white",
               sidebarCollapsed ? "lg:justify-center lg:px-2.5" : ""
             )}
             title={sidebarCollapsed ? "ملفي" : undefined}
           >
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-primary to-secondary text-white text-xs font-black">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/10 text-xs font-bold text-white">
               {session.user?.name?.charAt(0) || <User className="h-4 w-4" />}
             </span>
             {(!sidebarCollapsed || mobileMenuOpen) && <span className="truncate">ملفي</span>}
@@ -311,9 +257,9 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
       />
 
       <div className="flex min-w-0 flex-1 flex-col h-screen">
-      {/* Cleaned Pro Max Header (Smart Search removed per requirement #2) */}
-      <header className="sticky top-0 z-30 shrink-0 border-b border-primary/10 bg-white shadow-2xs shadow-primary/5 dark:border-slate-800/80 dark:bg-slate-950 dark:shadow-slate-950/40">
-        <div className="flex h-16 items-center justify-between gap-4 px-4 lg:px-6">
+      {/* Shared application header */}
+      <header className="sticky top-0 z-30 shrink-0 border-b border-border bg-card/95 backdrop-blur-sm">
+        <div className="flex h-[72px] items-center justify-between gap-4 px-4 lg:px-7">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileMenuOpen(prev => !prev)}
@@ -324,21 +270,16 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
             </button>
             <button
               onClick={toggleSidebar}
-              className="hidden lg:flex h-9 w-9 items-center justify-center rounded-xl hover:bg-primary/10 text-slate-600 hover:text-primary transition-all duration-300 ease-premium dark:text-slate-400 dark:hover:bg-primary/10 dark:hover:text-primary border border-transparent hover:border-primary/20"
+              className="hidden h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:flex"
               aria-label={sidebarCollapsed ? "توسيع القائمة الجانبية" : "طي القائمة الجانبية"}
             >
               {sidebarCollapsed ? <ChevronLeft className="h-4.5 w-4.5" /> : <ChevronRight className="h-4.5 w-4.5" />}
             </button>
-            <BrandLogo
-              href="/"
-              src={companyLogo}
-              size="sm"
-              showText={!sidebarCollapsed}
-              subtitle=""
-              className="font-semibold"
-              logoClassName="h-11 w-11"
-              titleClassName="text-base"
-            />
+            <button type="button" onClick={() => setSearchOpen(true)} className="hidden h-10 min-w-[260px] items-center gap-2 rounded-xl border border-border bg-muted/45 px-3 text-sm text-muted-foreground transition-colors hover:border-primary/30 hover:bg-card lg:flex">
+              <Search className="h-4 w-4" />
+              <span>البحث في النظام</span>
+              <kbd className="ms-auto rounded-md border bg-card px-1.5 py-0.5 text-[10px]">⌘ K</kbd>
+            </button>
           </div>
 
           {/* Right section: Notification Bell, Language, Theme, User Badge, Logout */}
@@ -348,17 +289,17 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
             <ThemeToggle />
             <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-slate-800" />
             <div className="hidden sm:flex items-center gap-3 pl-1">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-secondary text-white text-sm font-black shadow-premium-sm">
-                {session.user?.name?.charAt(0) || "👑"}
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                {session.user?.name?.charAt(0) || "م"}
               </div>
               <div className="flex flex-col min-w-0">
                 <p className="text-sm font-black truncate max-w-[150px] text-slate-900 dark:text-slate-100 leading-tight">
                   {session.user?.name}
                 </p>
                 <div className="flex gap-1 mt-1">
-                  {userRoles.slice(0, 2).map((role: string) => (
-                    <Badge key={role} variant="secondary" className="text-[9px] font-black px-2 py-0.5 bg-primary/10 text-primary border-primary/20 dark:bg-primary/15 dark:text-primary dark:border-primary/25">
-                      {role === "SUPER_ADMIN" ? "👑 SUPER_ADMIN" : role}
+                  {userRoles.slice(0, 1).map((role: string) => (
+                    <Badge key={role} variant="secondary" className="border-0 bg-muted px-2 py-0 text-[9px] font-medium text-muted-foreground">
+                      {role === "SUPER_ADMIN" ? "مدير النظام" : role}
                     </Badge>
                   ))}
                 </div>
@@ -378,13 +319,7 @@ export function AppShell({ children, companyLogo, locale, dictionary }: AppShell
         </div>
       </header>
 
-      <main className="relative flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-4 lg:p-8 bg-gradient-to-br from-primary/[0.06] via-transparent to-secondary/[0.08] dark:from-primary/[0.08] dark:to-secondary/[0.1]">
-        {/* Soft color-mesh backdrop so the Glassmorphism cards inside have
-            something to actually blur against, per the Hybrid Design brief. */}
-        <div className="pointer-events-none fixed -z-10 inset-0 overflow-hidden">
-          <div className="absolute -top-24 end-1/4 h-96 w-96 rounded-full bg-primary/10 blur-[120px] dark:bg-primary/15" />
-          <div className="absolute top-1/3 start-0 h-80 w-80 rounded-full bg-secondary/10 blur-[120px] dark:bg-secondary/15" />
-        </div>
+      <main className="relative min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-background p-4 lg:p-7">
         {children}
       </main>
       </div>
@@ -465,7 +400,7 @@ function ProfileOverlay({
             {userRoles.slice(0, 3).map((role) => (
               <span key={role} className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-black">
                 <ShieldCheck className="h-3 w-3" />
-                {role === "SUPER_ADMIN" ? "👑 SUPER_ADMIN" : role}
+                {role === "SUPER_ADMIN" ? "مدير النظام" : role}
               </span>
             ))}
           </div>

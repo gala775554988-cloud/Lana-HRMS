@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { hashPassword } from "@/lib/password";
+import { generateTemporaryPassword, hashPassword } from "@/lib/password";
 export const maxDuration = 60;
 
 export async function POST() {
@@ -23,6 +23,7 @@ export async function POST() {
   let created = 0;
   let errors = 0;
   const errs: string[] = [];
+  const temporaryCredentials: Array<{ employeeNumber: string; username: string; temporaryPassword: string }> = [];
 
   const employeeRole = await prisma.role.upsert({
     where: { name: "EMPLOYEE" },
@@ -33,8 +34,8 @@ export async function POST() {
   for (const emp of employees) {
     try {
       const nationalId = emp.nationalId || `EMP-${emp.employeeNumber}`;
-      const last4 = nationalId.slice(-4).padStart(4, "0");
-      const pwHash = await hashPassword(last4);
+      const temporaryPassword = generateTemporaryPassword();
+      const pwHash = await hashPassword(temporaryPassword);
       const fullName = `${emp.firstName} ${emp.lastName}`.trim();
       const email = emp.email || `emp.${emp.employeeNumber}@lana.local`;
 
@@ -49,6 +50,7 @@ export async function POST() {
       await prisma.employee.update({ where: { id: emp.id }, data: { userId: user.id } });
       await prisma.userRole.upsert({ where: { userId_roleId: { userId: user.id, roleId: employeeRole.id } }, update: {}, create: { userId: user.id, roleId: employeeRole.id } });
       created++;
+      temporaryCredentials.push({ employeeNumber: emp.employeeNumber, username: nationalId, temporaryPassword });
     } catch (e: any) {
       errors++;
       if (errs.length < 3) errs.push(`${emp.employeeNumber}: ${e.message}`);
@@ -61,6 +63,7 @@ export async function POST() {
     created,
     errors,
     sampleErrors: errs,
+    temporaryCredentials,
     note: "Run again for next batch if needed",
   });
 }

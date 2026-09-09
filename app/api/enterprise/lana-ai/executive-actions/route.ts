@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
         }
       });
 
-      if (targetHospitalName && targetHospitalName !== "لانا") {
+      if (targetHospitalName) {
         pendingInstances = pendingInstances.filter((inst) =>
           inst.employee?.hospital?.name?.toLowerCase().includes(targetHospitalName.toLowerCase())
         );
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
             workflowInstanceId: inst.id,
             actorUserId: userId,
             decision: "APPROVE",
-            comments: `Approved via Lana Executive Agent by user ${session.user.name || userId}`
+            comments: `Approved via HRMS Executive Agent by user ${session.user.name || userId}`
           });
           approvedCount++;
         } catch {
@@ -91,13 +91,13 @@ export async function POST(request: NextRequest) {
       }).catch(() => {});
 
       replyText = isAr
-        ? `👑 أتمتة القيادة التنفيذية: تم اعتماد (${approvedCount}) طلب إجازة وموافقة معلقة ${targetHospitalName ? `لمستشفى (${targetHospitalName})` : "لكافة المستشفيات والأفرع الطبية"} وتمريرها في التسلسل الإداري بنجاح تام.\n\n💡 مبادرة لانا التنفيذية: هل ترغب في إرسال إشعار لحظي للموظفين المعنيين بصدور قرار الاعتماد، أو تصدير تقرير بصيغة PDF؟`
+        ? `تم اعتماد (${approvedCount}) طلب إجازة وموافقة معلقة ${targetHospitalName ? `لمستشفى (${targetHospitalName})` : "لكافة المستشفيات والأفرع الطبية"} وتمريرها في التسلسل الإداري بنجاح.\n\n💡 هل ترغب في إرسال إشعار للموظفين المعنيين أو تصدير تقرير بصيغة PDF؟`
         : `👑 Executive Automation: Successfully approved (${approvedCount}) pending workflow requests ${targetHospitalName ? `for (${targetHospitalName})` : "across all medical sites"}.\n\n💡 Executive Proactive Suggestion: Would you like to push mobile notification confirmations or generate a PDF summary?`;
     }
     // 2. Trigger Odoo Sync ("تشغيل مزامنة أودو", "مزامنة الموظفين")
     else if (/مزامنة\s+أودو|مزامنة\s+odoo|sync\s+odoo|full\s+resync/i.test(prompt)) {
       replyText = isAr
-        ? `👑 تنفيذ الأمر: تم إطلاق دورة المزامنة الذكية الشاملة (Smart Upsert) لموظفي أودو والمرفقات في قاعدة بيانات Neon بالخلفية.\n\n💡 مبادرة لانا: يمكنك متابعة إحصائيات المزامنة لحظياً عبر شاشة (التكامل والمزامنة) في الإعدادات.`
+        ? `تم إطلاق دورة المزامنة الشاملة لموظفي أودو والمرفقات في الخلفية.\n\n💡 يمكنك متابعة إحصائيات المزامنة عبر شاشة (التكامل والمزامنة) في الإعدادات.`
         : `👑 Executive Execution: Triggered full Odoo Smart Upsert sync across employees and attachments in Neon PostgreSQL.\n\n💡 Proactive Note: You can monitor live progress directly in the Synchronization dashboard.`;
     }
     // 3. Delegate to chat endpoint orchestrator for all other natural lookups

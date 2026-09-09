@@ -32,24 +32,28 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 backdrop-blur-md p-4 animate-fade-in" onClick={() => onOpenChange(false)} role="dialog" aria-modal="true">
-      <div onClick={(e) => e.stopPropagation()} className="premium-pop-in relative w-full max-w-lg max-h-[90vh] overflow-auto rounded-3xl border border-border/70 bg-card shadow-premium-xl before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:shadow-[inset_0_1px_0_0_rgb(255_255_255_/_0.5)] dark:before:shadow-[inset_0_1px_0_0_rgb(255_255_255_/_0.06)]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 animate-fade-in" onClick={() => onOpenChange(false)} role="dialog" aria-modal="true">
+      <div onClick={(e) => e.stopPropagation()} className="relative max-h-[90vh] w-full max-w-lg overflow-auto rounded-2xl border border-border bg-card shadow-2xl">
         {children}
       </div>
     </div>
   );
 }
 
-export function DialogContent({ className, children }: { className?: string; children: React.ReactNode }) {
-  return <div className={cn("p-6", className)}>{children}</div>;
+export function DialogContent({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn("p-6", className)} {...props}>{children}</div>;
 }
 
-export function DialogHeader({ className, children }: { className?: string; children: React.ReactNode }) {
-  return <div className={cn("flex items-center justify-between mb-4", className)}>{children}</div>;
+export function DialogHeader({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn("mb-4 flex items-center justify-between", className)} {...props}>{children}</div>;
 }
 
-export function DialogTitle({ className, children }: { className?: string; children: React.ReactNode }) {
-  return <h2 className={cn("text-xl font-semibold", className)}>{children}</h2>;
+export function DialogTitle({ className, children, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
+  return <h2 className={cn("text-xl font-semibold", className)} {...props}>{children}</h2>;
+}
+
+export function DialogDescription({ className, children, ...props }: React.HTMLAttributes<HTMLParagraphElement>) {
+  return <p className={cn("text-sm text-muted-foreground", className)} {...props}>{children}</p>;
 }
 
 export function DialogClose({ onClick }: { onClick: () => void }) {

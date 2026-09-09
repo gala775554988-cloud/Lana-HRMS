@@ -57,7 +57,7 @@ export function LanaAnalytics() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-black text-lg text-white">خلاصة لانا الذكية اللحظية</h3>
+                <h3 className="font-bold text-lg text-white">الخلاصة الذكية اللحظية</h3>
                 <Badge className="bg-amber-400/20 text-amber-300 border-amber-400/30 px-2 py-0.5 text-[10px] font-mono">
                   Live AI Engine
                 </Badge>

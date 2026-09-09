@@ -1,37 +1,21 @@
-import { createHash } from 'crypto';
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { hashPassword } from "@/lib/password";
+import { generateTemporaryPassword, hashPassword } from "@/lib/password";
 import { OdooSyncService, requireOdooIntegrationAccess } from "@/lib/integrations/odoo/sync";
 import { bulkSyncAllOdooDocuments } from "@/lib/integrations/odoo/documents";
 import { many2oneId, many2oneName } from "@/lib/integrations/odoo/mapper";
 import { resolveOdooHospital } from "@/lib/integrations/odoo/hospital-resolver";
 import type { OdooRecord } from "@/lib/integrations/odoo/types";
 import { isOdooIntegrationEnabled } from "@/lib/settings";
+import { hasValidInternalSyncToken } from "@/lib/internal-sync-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const maxDuration = 300;
 
-const INTERNAL_TOKEN_SHA256 = 'ce1bf82bdaf46ba65a577cd0cb892e675c87d1a1f2c0ad470a0a4d02dcb9a9a0';
-
-function safeToken(value: string) {
-  return value.startsWith('Bearer ') ? value.slice(7) : value;
-}
-
-function tokenHash(value: string) {
-  return createHash('sha256').update(value).digest('hex');
-}
-
 function hasInternalSyncToken(request: NextRequest) {
-  const expected = process.env.ATTENDANCE_BRIDGE_TOKEN || process.env.INTERNAL_SYNC_TOKEN;
-  const header = request.headers.get('authorization') || request.headers.get('x-internal-sync-token') || '';
-  const token = safeToken(header);
-  if (!token) return false;
-  if (expected && (header === `Bearer ${expected}` || header === expected || token === expected)) return true;
-  if (token === INTERNAL_TOKEN_SHA256) return true;
-  return tokenHash(token) === INTERNAL_TOKEN_SHA256;
+  return hasValidInternalSyncToken(request);
 }
 
 type MasterRow = OdooRecord & {
@@ -164,7 +148,7 @@ async function ensureEmployeeUser(employeeId: string, values: { nationalId: stri
     return { created: false, reason: "linked-existing-user" };
   }
 
-  const passwordHash = await hashPassword(nationalId.slice(-4).padStart(4, "0"));
+  const passwordHash = await hashPassword(generateTemporaryPassword());
   const user = await prisma.user.create({
     data: {
       username: nationalId,
@@ -464,7 +448,7 @@ export async function POST(request: NextRequest) {
         if (item.contractData) {
           const cData = item.contractData;
           await prisma.employeeContract.upsert({
-            where: { employeeId_contractNumber: { employeeId, contractNumber: `ODOO-CONT-${cData.id}` } },
+            where: { contractNumber: `ODOO-CONT-${cData.id}` },
             update: {
               title: clean(cData.name) || "عقد العمل (Odoo)",
               salaryAmount: Number(cData.wage || 0) || undefined,

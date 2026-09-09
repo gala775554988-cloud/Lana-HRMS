@@ -22,7 +22,8 @@ const typeLabels: Record<string, string> = {
   DOCUMENT: "طلبات الوثائق",
   EXPENSE: "طلبات المصروفات",
   LETTER: "طلبات الخطابات",
-  OVERTIME: "طلبات الأوفر تايم"
+  OVERTIME: "طلبات الأوفر تايم",
+  RESUMPTION: "طلبات مباشرة العمل"
 };
 
 const scopeOptions = [
@@ -83,6 +84,7 @@ type RequestRecord = {
   updatedAt: string;
   priority: string;
   currentApprover: string;
+  canAct: boolean;
   steps?: Array<{ step: number; status: string }>;
   employee?: {
     employeeNumber: string;
@@ -120,7 +122,7 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("highlight");
   const [type, setType] = useState("ALL");
-  const [scope, setScope] = useState(highlightId ? "all" : mode === "inbox" ? "waiting" : "all");
+  const [scope, setScope] = useState(highlightId ? "all" : mode === "inbox" ? "waiting" : mode === "outbox" ? "mine" : "all");
   const [sort, setSort] = useState("newest");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -137,6 +139,8 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
   // the UX gate.
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [returningId, setReturningId] = useState<string | null>(null);
+  const [returnReason, setReturnReason] = useState("");
   const [bulkRejecting, setBulkRejecting] = useState(false);
   const [bulkRejectReason, setBulkRejectReason] = useState("");
 
@@ -280,6 +284,14 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
     setRejectReason("");
   }
 
+  function confirmReturn(id: string) {
+    const reason = returnReason.trim();
+    if (!reason) return;
+    decide(id, "RETURN", { comments: reason });
+    setReturningId(null);
+    setReturnReason("");
+  }
+
   function confirmBulkReject() {
     const reason = bulkRejectReason.trim();
     if (!reason || !selectedIds.length) return;
@@ -302,8 +314,10 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
   // Mirrors decideWorkflowStep's own precondition (instance.status === PENDING
   // AND the current step number is itself still PENDING, not DEFERRED) so the
   // buttons are only shown when the API call would actually succeed.
-  const isActionable = (request: RequestRecord) =>
+  const isActionable = (request: RequestRecord) => request.canAct &&
     request.status === "PENDING" && (request.steps ?? []).find((step) => step.step === request.currentStep)?.status === "PENDING";
+
+  const actionableRequests = requests.filter(isActionable);
 
   return (
     <div className="space-y-5">
@@ -327,7 +341,7 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
         <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_220px_160px]">
           <div className="relative">
             <Search className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") refetch(); }} placeholder="بحث سريع: الاسم، الرقم، الهوية، القسم، الفرع، المشروع، نوع الطلب" className="pr-9" />
+            <Input value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") refetch(); }} placeholder="بحث بالاسم، الرقم الوظيفي، القسم، الفرع أو نوع الطلب" className="pr-9" />
           </div>
           <select value={scope} onChange={(event) => setScope(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm">
             {scopeOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -380,19 +394,17 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
 
       {requests.length > 0 ? (
         <label className="flex w-fit items-center gap-2 rounded-xl border bg-card px-3 py-2 text-xs font-bold text-muted-foreground">
-          <input type="checkbox" checked={requests.length > 0 && selected.size === requests.length} onChange={(event) => setSelected(event.target.checked ? new Set(requests.map((request) => request.id)) : new Set())} />
-          <span>تحديد الكل ({requests.length})</span>
+          <input type="checkbox" checked={actionableRequests.length > 0 && selected.size === actionableRequests.length} onChange={(event) => setSelected(event.target.checked ? new Set(actionableRequests.map((request) => request.id)) : new Set())} />
+          <span>تحديد الطلبات القابلة للإجراء ({actionableRequests.length})</span>
         </label>
       ) : null}
 
-      {/* Card-style request grid -- elegant rounded-3xl cards matching the
-          profile-card aesthetic, replacing the old dense data table. */}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="space-y-3">
         {requests.map((request) => (
           <Card
             key={request.id}
             id={`request-${request.id}`}
-            className={cn("glass-card-premium relative overflow-hidden", request.id === highlightId && "ring-2 ring-primary ring-offset-2")}
+            className={cn("relative overflow-hidden rounded-xl border-border/80 shadow-sm", request.id === highlightId && "ring-2 ring-primary ring-offset-2")}
           >
             <div className={cn("absolute inset-y-0 start-0 w-1.5", PRIORITY_ACCENT[request.priority?.toLowerCase()] ?? "bg-slate-300")} />
             <CardContent className="p-5 pe-5 ps-6 space-y-4">
@@ -401,6 +413,7 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
                   <input
                     type="checkbox"
                     className="mt-1 shrink-0"
+                    disabled={!isActionable(request)}
                     checked={selected.has(request.id)}
                     onChange={(event) => setSelected((current) => { const next = new Set(current); if (event.target.checked) next.add(request.id); else next.delete(request.id); return next; })}
                   />
@@ -452,6 +465,20 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
                     </Button>
                     <Button type="button" size="sm" variant="outline" onClick={() => { setRejectingId(null); setRejectReason(""); }}>إلغاء</Button>
                   </div>
+                ) : isActionable(request) && returningId === request.id ? (
+                  <div className="flex flex-1 min-w-full items-center gap-1.5 mt-1.5">
+                    <Input
+                      autoFocus
+                      value={returnReason}
+                      onChange={(event) => setReturnReason(event.target.value)}
+                      placeholder="ما المطلوب تعديله قبل إعادة الإرسال؟"
+                      className="h-8 flex-1 text-xs"
+                    />
+                    <Button type="button" size="sm" disabled={!returnReason.trim() || isPending} onClick={() => confirmReturn(request.id)}>
+                      {isActionPending(request.id, "RETURN") ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "تأكيد الإرجاع"}
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => { setReturningId(null); setReturnReason(""); }}>إلغاء</Button>
+                  </div>
                 ) : isActionable(request) ? (
                   <>
                     <Button type="button" size="sm" onClick={() => decide(request.id, "APPROVE")} disabled={isPending}>
@@ -462,9 +489,9 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
                       <X className="h-3.5 w-3.5" />
                       رفض
                     </Button>
-                    <Button type="button" size="sm" variant="outline" onClick={() => decide(request.id, "RETURN")} disabled={isPending}>
-                      {isActionPending(request.id, "RETURN") ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
-                      {isActionPending(request.id, "RETURN") ? "جارٍ..." : "إرجاع"}
+                    <Button type="button" size="sm" variant="outline" onClick={() => { setReturningId(request.id); setReturnReason(""); }} disabled={isPending}>
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      إرجاع للتعديل
                     </Button>
                     <Button type="button" size="sm" variant="outline" onClick={() => targetUserId && decide(request.id, "TRANSFER", { targetUserId })} disabled={isPending || !targetUserId}>
                       {isActionPending(request.id, "TRANSFER") ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
@@ -479,7 +506,7 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
                   </>
                 ) : (
                   <span className="px-1 py-1.5 text-xs text-muted-foreground">
-                    {request.status !== "PENDING" ? "لا يوجد إجراء متاح (تم البت في الطلب)" : "لا يوجد إجراء متاح حالياً (الطلب مؤجل)"}
+                    {request.status !== "PENDING" ? "تم البت في الطلب" : request.canAct ? "الطلب مؤجل" : "الطلب لدى المعتمد الحالي"}
                   </span>
                 )}
               </div>
@@ -487,7 +514,7 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
           </Card>
         ))}
         {requests.length === 0 ? (
-          <div className="md:col-span-2 xl:col-span-3 rounded-3xl border border-dashed p-12 text-center text-muted-foreground">
+          <div className="rounded-xl border border-dashed p-12 text-center text-muted-foreground">
             {isFetching ? "جارِ التحميل..." : "لا توجد طلبات"}
           </div>
         ) : null}

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
 import { createEnterpriseNotification } from "@/lib/enterprise/notifications";
 import { decideWorkflowStep } from "@/lib/enterprise/workflow";
+import { mergeWorkflowStepMetadata } from "@/lib/enterprise/workflow-step-metadata";
 
 function getClientIp(request: NextRequest) {
   return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? request.headers.get("x-real-ip") ?? null;
@@ -61,9 +62,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     if (body.decision === "TRANSFER") {
       if (!body.targetUserId) return NextResponse.json({ success: false, message: "targetUserId is required" }, { status: 400 });
+      if (body.targetUserId === session.user.id) return NextResponse.json({ success: false, message: "لا يمكن تحويل الطلب إلى نفسك" }, { status: 400 });
+      const target = await prisma.user.findUnique({ where: { id: body.targetUserId }, select: { id: true, isActive: true } });
+      if (!target?.isActive) return NextResponse.json({ success: false, message: "المعتمد المحدد غير موجود أو غير نشط" }, { status: 400 });
       await prisma.workflowStep.update({
         where: { id: currentStep.id },
-        data: { approverUserId: body.targetUserId, status: "PENDING", comments: JSON.stringify({ transferred: true, by: session.user.id, note: body.comments ?? "" }) }
+        data: {
+          approverUserId: body.targetUserId,
+          status: "PENDING",
+          comments: mergeWorkflowStepMetadata(currentStep.comments, {
+            transferred: true,
+            transferredBy: session.user.id,
+            note: body.comments?.trim() || undefined
+          })
+        }
       });
       await createEnterpriseNotification({ userId: body.targetUserId, title: "تحويل طلب", body: `A ${instance.type} request has been transferred to you.`, type: "INFO", link: `/approvals?tab=inbox&highlight=${instance.id}` }).catch(() => null);
     }
@@ -72,21 +84,32 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const until = deferDate(body.deferPreset, body.deferUntil);
       await prisma.workflowStep.update({
         where: { id: currentStep.id },
-        data: { status: "DEFERRED", comments: JSON.stringify({ deferredUntil: until.toISOString(), note: body.comments ?? "" }) }
+        data: {
+          status: "DEFERRED",
+          comments: mergeWorkflowStepMetadata(currentStep.comments, {
+            deferredUntil: until.toISOString(),
+            note: body.comments?.trim() || undefined
+          })
+        }
       });
     }
 
     if (body.decision === "NOTE") {
       await prisma.workflowStep.update({
         where: { id: currentStep.id },
-        data: { comments: JSON.stringify({ note: body.comments ?? "" }) }
+        data: { comments: mergeWorkflowStepMetadata(currentStep.comments, { note: body.comments?.trim() || undefined }) }
       });
     }
 
     if (body.decision === "PRIORITY") {
       await prisma.workflowStep.update({
         where: { id: currentStep.id },
-        data: { comments: JSON.stringify({ priority: body.priority ?? "Normal", note: body.comments ?? "" }) }
+        data: {
+          comments: mergeWorkflowStepMetadata(currentStep.comments, {
+            priority: body.priority ?? "Normal",
+            note: body.comments?.trim() || undefined
+          })
+        }
       });
     }
 

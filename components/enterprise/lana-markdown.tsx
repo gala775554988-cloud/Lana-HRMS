@@ -103,7 +103,7 @@ function DoubleValidationPreview({ content, onConfirmAction }: { content: string
 /** Shared Lana AI reply renderer: real GitHub-flavored Markdown (headings,
  * bold/italic, ordered/unordered lists, tables, blockquotes, fenced code
  * with a copy button) instead of raw text with literal "**"/"#" markers.
- * Used by both the floating widget and the full-page Lana AI Pro Max chat
+ * Used by both the floating widget and the full-page AI assistant
  * so the two never drift into separately-maintained renderers again. */
 export function LanaMarkdown({ content, onConfirmAction }: { content: string; onConfirmAction?: (cmd: string) => void }) {
   if (

@@ -130,7 +130,7 @@ export function ModuleTable({ resource, records, dictionary, locale = "en", from
         </div>
       );
     }})
-  ], [dictionary, fieldsDict, helper, isPending, noLabel, resource, yesLabel, handleDelete, handleDecision]);
+  ], [dictionary, fieldsDict, fromHref, helper, isPending, noLabel, resource, yesLabel, handleDelete, handleDecision]);
 
   const table = useReactTable({ data: records, columns, getCoreRowModel: getCoreRowModel() });
 
@@ -139,14 +139,14 @@ export function ModuleTable({ resource, records, dictionary, locale = "en", from
   }
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-premium-md dark:border-slate-800/80 dark:bg-slate-900" dir={locale === "ar" ? "rtl" : "ltr"}>
+    <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]" dir={locale === "ar" ? "rtl" : "ltr"}>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-primary/8 text-foreground dark:bg-primary/10">
+          <thead className="bg-muted/60 text-foreground">
             {table.getHeaderGroups().map((group) => <tr key={group.id}>{group.headers.map((header) => <th key={header.id} className="px-4 py-3.5 text-start text-xs font-bold uppercase tracking-wide text-muted-foreground">{flexRender(header.column.columnDef.header, header.getContext())}</th>)}</tr>)}
           </thead>
           <tbody>
-            {table.getRowModel().rows.map((row) => <tr key={row.id} className="border-t border-slate-100 transition-colors duration-200 ease-premium hover:bg-primary/5 dark:border-slate-800 dark:hover:bg-primary/10">{row.getVisibleCells().map((cell) => <td key={cell.id} className="px-4 py-3.5 align-top">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}
+            {table.getRowModel().rows.map((row) => <tr key={row.id} className="border-t border-border transition-colors hover:bg-muted/35">{row.getVisibleCells().map((cell) => <td key={cell.id} className="px-4 py-3.5 align-top">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}
           </tbody>
         </table>
       </div>

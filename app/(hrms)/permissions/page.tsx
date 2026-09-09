@@ -117,7 +117,7 @@ export default async function PermissionsPage({ searchParams }: { searchParams: 
         },
         {
           value: "approval-workflows",
-          label: "Approval Workflows",
+          label: "مسارات الموافقات",
           icon: <Workflow className="h-4 w-4" />,
           content: activeTab === "approval-workflows" ? (
             <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">Loading...</div>}>

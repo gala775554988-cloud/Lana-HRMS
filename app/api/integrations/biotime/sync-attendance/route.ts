@@ -75,11 +75,12 @@ export async function POST(request: NextRequest) {
   try {
     const session = await requireOdooIntegrationAccess('manage');
     const body = await request.json().catch(() => ({}));
-    const baseUrl = clean(body.baseUrl || process.env.BIOTIME_URL || 'https://handbook-latino-trout-settle.trycloudflare.com');
+    const baseUrl = clean(body.baseUrl || process.env.BIOTIME_URL);
     if (!baseUrl) return NextResponse.json({ success: false, message: 'BioTime URL is required' }, { status: 400 });
 
-    const username = clean(body.username || process.env.BIOTIME_USERNAME || 'HR');
-    const password = clean(body.password || process.env.BIOTIME_PASSWORD || 'Lana@123');
+    const username = clean(body.username || process.env.BIOTIME_USERNAME);
+    const password = clean(body.password || process.env.BIOTIME_PASSWORD);
+    if (!username || !password) return NextResponse.json({ success: false, message: 'BioTime credentials are required' }, { status: 400 });
     const range = todayRange(clean(body.date));
     const startTime = clean(body.startTime) || range.startTime;
     const endTime = clean(body.endTime) || range.endTime;

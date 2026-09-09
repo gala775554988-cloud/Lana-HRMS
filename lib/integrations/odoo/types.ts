@@ -106,7 +106,9 @@ export type SyncOptions = {
   since?: Date | string;
   limit?: number;
   tenantId?: string;
-  mode?: "ID_FIRST" | "FULL" | "SINGLE_DETAIL";
+  mode?: "ID_FIRST" | "FULL" | "SINGLE_DETAIL" | "FULL_RESYNC";
+  fullResync?: boolean;
+  wipeAndSync?: boolean;
   queueDetails?: boolean;
   employeeIds?: number[];
 };

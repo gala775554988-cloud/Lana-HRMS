@@ -33,7 +33,7 @@ interface InstallButtonProps {
 
 export function InstallButton({
   className = "bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl shadow-lg gap-2",
-  label = 'تثبيت "لانا" الآن',
+  label = 'تثبيت HRMS الآن',
   variant = "default",
   size = "default"
 }: InstallButtonProps) {
@@ -112,7 +112,7 @@ export function InstallButton({
               </div>
               <div>
                 <DialogTitle className="text-lg font-bold text-slate-900 dark:text-slate-100">
-                  خطوات تثبيت تطبيق "لانا" على جهازك
+                  خطوات تثبيت تطبيق HRMS على جهازك
                 </DialogTitle>
                 <DialogDescription className="text-xs text-muted-foreground font-mono mt-0.5">
                   {iosDevice ? "دليل التثبيت عبر متصفح Safari" : "خطوات التثبيت اليدوي للتطبيق"}
@@ -157,7 +157,7 @@ export function InstallButton({
                   <div className="text-xs leading-relaxed">
                     <span className="font-bold text-slate-900 dark:text-slate-100">اضغط "إضافة (Add)":</span>
                     <p className="text-muted-foreground mt-0.5">
-                      في الزاوية العلوية اليمنى/اليسرى لتأكيد التثبيت. سيظهر لك أيقونة لانا الدائرية الموحدة على شاشة الآيفون مباشرة.
+                      في الزاوية العلوية اليمنى/اليسرى لتأكيد التثبيت. ستظهر أيقونة HRMS على شاشة الآيفون مباشرة.
                     </p>
                   </div>
                 </div>
@@ -166,7 +166,7 @@ export function InstallButton({
               <div className="rounded-2xl border border-slate-200 p-4 text-xs text-muted-foreground dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-2">
                 <p className="font-bold text-slate-900 dark:text-slate-100">لتثبيت التطبيق على متصفح Chrome أو Edge:</p>
                 <p>
-                  اضغط على خيارات المتصفح (النقاط الثلاث علوي الشاشة) ثم اختر <b>&quot;تثبيت Lana HRMS (Install App)&quot;</b> ليتم فتح النظام في نافذة تطبيق منفصلة وسريعة.
+                  اضغط على خيارات المتصفح (النقاط الثلاث أعلى الشاشة) ثم اختر <b>&quot;تثبيت HRMS&quot;</b> ليتم فتح النظام في نافذة تطبيق منفصلة.
                 </p>
               </div>
             )}

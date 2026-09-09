@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { Search, Sun, Moon, LogOut, User } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -76,16 +77,13 @@ export function EmployeeTopBar({ user, employee }: Props) {
             <div className="hidden sm:block text-right text-xs leading-tight">
               <div className="font-medium truncate max-w-[130px] flex items-center">
                 <span className="truncate">{user?.name || (employee as any)?.firstName || 'موظف'}</span>
-                {Boolean((employee as any)?.isDelegate || (user as any)?.roles?.some((r: any) => ["SUPER_ADMIN", "HR_MANAGER"].includes(typeof r === "string" ? r : r?.name))) && (
-                  <span className="text-yellow-500 text-sm ms-1 shrink-0" title="مفوض تنفيذي">👑</span>
-                )}
               </div>
               <div className="text-slate-500 text-[10px]">
                 {(employee as any)?.employeeNumber || '---'}
               </div>
             </div>
             {avatarUrl ? (
-              <img src={avatarUrl} alt="Avatar" className="h-8 w-8 rounded-full object-cover border border-slate-200 dark:border-slate-700" />
+              <Image src={avatarUrl} alt="الصورة الشخصية" width={32} height={32} unoptimized className="h-8 w-8 rounded-full border border-border object-cover" />
             ) : (
               <div className="h-8 w-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
                 <User className="h-4 w-4 text-slate-500" />

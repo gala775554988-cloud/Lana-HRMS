@@ -13,7 +13,7 @@ export default async function PasswordManagementPage() {
     <div className="space-y-6 p-6" dir="rtl">
       <div>
         <h1 className="text-3xl font-bold">إدارة كلمات المرور</h1>
-        <p className="text-muted-foreground mt-2">إعادة تعيين كلمات المرور للموظفين إلى آخر 4 أرقام من رقم الهوية - مسموح فقط لـ HR و Super Admin</p>
+        <p className="text-muted-foreground mt-2">إنشاء كلمات مرور مؤقتة آمنة مع إجبار الموظف على تغييرها عند أول دخول — متاح لإدارة الموارد البشرية ومدير النظام فقط.</p>
         <div className="mt-4 grid gap-4 md:grid-cols-3">
           <div className="rounded-lg border p-4">
             <div className="text-sm text-muted-foreground">إجمالي الموظفين</div>

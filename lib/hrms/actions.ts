@@ -8,7 +8,7 @@ import { hasPermission } from "@/lib/rbac";
 import { applyScopedWhere, canAccessEmployeeId, getAccessProfile, getHierarchyStore } from "@/lib/enterprise/hierarchy";
 import { writeAuditLog } from "@/lib/audit";
 import { buildModuleSchema } from "@/lib/validations/hrms";
-import { hashPassword } from "@/lib/password";
+import { generateTemporaryPassword, hashPassword } from "@/lib/password";
 import { notifyRole } from "@/lib/enterprise/notifications";
 import { extractSalaryProfile } from "@/lib/employee/salary-profile";
 import { saveEmployeeSalaryProfile } from "@/lib/employee/salary-profile-store";
@@ -122,10 +122,6 @@ function normalizeValues(resource: HrmsModule, values: Record<string, unknown>) 
       .map((field) => [field.name, normalizeValue(field, values[field.name])] as const)
       .filter(([, value]) => value !== undefined)
   );
-}
-
-function defaultEmployeePasswordFromNationalId(nationalId: string) {
-  return nationalId.slice(-4).padStart(4, "0");
 }
 
 function positionCodeFromTitle(title: string) {
@@ -571,7 +567,7 @@ export async function createModuleRecord(input: MutationInput) {
 
       const emailUser = await prisma.user.findUnique({ where: { email: userEmail } }).catch(() => null);
 
-      const defaultPassword = defaultEmployeePasswordFromNationalId(nationalId);
+      const defaultPassword = generateTemporaryPassword();
       const passwordHash = await hashPassword(defaultPassword);
       employeeData.positionId = await resolveEmployeePositionId(employeeData.positionId);
 
@@ -637,7 +633,7 @@ export async function createModuleRecord(input: MutationInput) {
 
       return {
         success: true,
-        message: `${resource.title} record created. Login: National ID ${nationalId} / Password: ${result.usedPassword}`,
+        message: `${resource.title} record created. Temporary password: ${result.usedPassword}`,
         id: String(result.employee.id)
       };
     } catch (error: any) {

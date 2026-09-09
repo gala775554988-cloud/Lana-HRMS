@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
     if (slowQueries.length > 0) score -= 5;
     score = Math.max(0, Math.min(100, score));
 
-    const rating = score >= 90 ? "ممتاز (World Class)" : score >= 80 ? "جيد جداً" : score >= 70 ? "جيد" : score >= 60 ? "متوسط" : "يحتاج تحسين";
+    const rating = score >= 90 ? "ممتاز" : score >= 80 ? "جيد جداً" : score >= 70 ? "جيد" : score >= 60 ? "متوسط" : "يحتاج تحسين";
 
     const report = {
       timestamp: new Date().toISOString(),

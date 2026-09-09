@@ -56,7 +56,7 @@ export default function AISystemManagerPage() {
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3 text-primary">
           <Bot className="h-8 w-8" />
-          AI System Manager
+          مراقبة جودة النظام
         </h1>
         <p className="text-muted-foreground max-w-3xl">
           وحدة ذكية تقوم بتحليل المشروع بالكامل، اكتشاف الأخطاء، الصفحات الفارغة، النواقص، اقتراح تحسينات، مراقبة الأداء، تحليل قاعدة البيانات والأمن، وإعطاء تقييم للنظام.

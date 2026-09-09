@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     success: true,
-    companyName: (companyName as string | null) ?? "Lana HRMS",
+    companyName: (companyName as string | null) ?? "HRMS",
     companyLogo: logo,
     qrDataUrl,
     item: {

@@ -94,7 +94,7 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
           </Label>
           <IdCard className="pointer-events-none absolute end-0 top-2.5 h-4 w-4 text-muted-foreground" />
         </div>
-        <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">للموظفين: استخدم رقم الهوية وكلمة المرور (آخر 4 أرقام من الهوية)</p>
+        <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">للموظفين: استخدم رقم الهوية وكلمة المرور المؤقتة الصادرة من إدارة الموارد البشرية.</p>
         {form.formState.errors.identifier ? <p className="text-xs text-destructive" role="alert">{form.formState.errors.identifier.message}</p> : null}
       </div>
       <div

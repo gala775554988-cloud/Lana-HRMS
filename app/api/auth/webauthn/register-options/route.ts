@@ -26,11 +26,11 @@ export async function POST(req: NextRequest) {
     const rpID = hostname === "localhost" || hostname === "127.0.0.1" ? hostname : hostname.replace(/^www\./, "");
 
     const options = await generateRegistrationOptions({
-      rpName: "Lana Medical HRMS",
+      rpName: "HRMS",
       rpID,
       userID: user.id,
       userName: user.email || user.username || user.name || "Employee",
-      userDisplayName: user.name || "Lana Employee",
+      userDisplayName: user.name || "HRMS Employee",
       attestationType: "none",
       excludeCredentials: user.biometricCredentials.map((cred) => ({
         id: Buffer.from(cred.credentialID, "base64url"),
