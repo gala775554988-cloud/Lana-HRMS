@@ -45,6 +45,7 @@ export function RolesManagementClient() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [templateKeys, setTemplateKeys] = useState<string[]>([]);
+  const [templates, setTemplates] = useState<Record<string, string[]>>({});
 
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -75,6 +76,7 @@ export function RolesManagementClient() {
         setRoles(loadedRoles);
         setTree(loadedTree);
         setTemplateKeys(data.templateKeys ?? []);
+        setTemplates(data.templates ?? {});
         setSelectedRoleId((current) => current && loadedRoles.some((role) => role.id === current)
           ? current
           : loadedRoles[0]?.id ?? null);
@@ -190,6 +192,18 @@ export function RolesManagementClient() {
     });
     const data = await response.json();
     if (!data.success) { setMessage(data.message || "فشل حفظ صلاحيات الدور"); load(); }
+  }
+
+  async function restoreSystemRole(role: RoleRow) {
+    const template = templates[role.name];
+    if (!role.isSystem || !template) return;
+    setSaving(true);
+    try {
+      await savePermissions(role.id, template);
+      setMessage(`تمت استعادة الصلاحيات الآمنة الافتراضية لدور "${ROLE_LABELS[role.name] ?? role.name}".`);
+    } finally {
+      setSaving(false);
+    }
   }
 
   function toggleCategoryExpanded(key: string) {
@@ -321,6 +335,11 @@ export function RolesManagementClient() {
                     </div>
                   )}
                   <div className="flex items-center gap-1.5">
+                    {selectedRole.isSystem && templates[selectedRole.name] ? (
+                      <Button type="button" size="sm" variant="outline" onClick={() => restoreSystemRole(selectedRole)} disabled={saving}>
+                        استعادة الصلاحيات الافتراضية
+                      </Button>
+                    ) : null}
                     {editingName !== selectedRole.id ? (
                       <Button type="button" size="sm" variant="outline" onClick={() => { setEditingName(selectedRole.id); setNameDraft(selectedRole.name); }} disabled={selectedRole.isSystem} title={selectedRole.isSystem ? "لا يمكن إعادة تسمية دور نظامي" : "تعديل الاسم"}>
                         <Pencil className="h-3.5 w-3.5" />
@@ -365,6 +384,7 @@ export function RolesManagementClient() {
                             <input
                               type="checkbox"
                               checked={allGranted}
+                              disabled={selectedRole.isSystem}
                               ref={(el) => { if (el) el.indeterminate = someGranted && !allGranted; }}
                               onChange={() => toggleRoleCategory(selectedRole, category)}
                               className="h-3.5 w-3.5 accent-primary"
@@ -380,13 +400,13 @@ export function RolesManagementClient() {
                               return (
                                 <div key={feature.resource} className="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl bg-slate-50/60 px-3 py-2 dark:bg-slate-950/30">
                                   <label className="flex min-w-[110px] cursor-pointer items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
-                                    <input type="checkbox" checked={featureAllGranted} onChange={() => toggleRoleFeature(selectedRole, feature)} className="h-3.5 w-3.5 accent-primary" />
+                                    <input type="checkbox" checked={featureAllGranted} disabled={selectedRole.isSystem} onChange={() => toggleRoleFeature(selectedRole, feature)} className="h-3.5 w-3.5 accent-primary" />
                                     <span>{RESOURCE_LABELS_AR[feature.resource] ?? feature.resource}</span>
                                   </label>
                                   <div className="flex flex-wrap items-center gap-3">
                                     {feature.actions.map((permissionAction) => (
                                       <label key={permissionAction.key} className="flex cursor-pointer items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
-                                        <input type="checkbox" checked={selectedRole.permissionKeys.includes(permissionAction.key)} onChange={() => toggleRolePermission(selectedRole, permissionAction.key)} className="h-3.5 w-3.5 accent-primary" />
+                                        <input type="checkbox" checked={selectedRole.permissionKeys.includes(permissionAction.key)} disabled={selectedRole.isSystem} onChange={() => toggleRolePermission(selectedRole, permissionAction.key)} className="h-3.5 w-3.5 accent-primary" />
                                         <span>{ACTION_LABELS_AR[permissionAction.action] ?? permissionAction.label}</span>
                                       </label>
                                     ))}

@@ -19,7 +19,8 @@ export async function GET() {
     roles,
     categories: PERMISSION_CATEGORIES,
     tree: buildPermissionTree(PERMISSION_CATEGORIES),
-    templateKeys: Object.keys(PERMISSION_TEMPLATES)
+    templateKeys: Object.keys(PERMISSION_TEMPLATES),
+    templates: PERMISSION_TEMPLATES,
   });
 }
 

@@ -140,6 +140,13 @@ export async function updateRolePermissions({
   if (!role) throw new Error("Role not found");
 
   const keys = normalizeKeys(permissionKeys);
+  if (role.isSystem) {
+    const template = PERMISSION_TEMPLATES[role.name as PermissionTemplateKey];
+    const expected = template ? normalizeKeys(template) : null;
+    if (!expected || expected.join("|") !== keys.join("|")) {
+      throw new Error("System roles are fixed. Restore the approved default template instead.");
+    }
+  }
   const before = await withQueryTiming("roles.rolePermission.findMany(before)", () =>
     prisma.rolePermission.findMany({
       where: { roleId },
