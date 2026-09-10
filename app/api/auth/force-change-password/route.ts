@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
     }).catch(() => {});
 
     const roles = saved.roles.map((item) => item.role.name);
-    const redirectTo = resolveRoleDashboard(roles);
+    const redirectTo = resolveRoleDashboard(roles, Boolean((session.user as any).hasGrantedAdminAccess));
 
     return NextResponse.json({
       success: true,

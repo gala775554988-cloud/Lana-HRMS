@@ -56,7 +56,7 @@ export default async function EmployeeLayout({ children }: { children: ReactNode
   const hasAdminRole = roles.some((r) => NON_EMPLOYEE_ROLES.includes(r));
 
   if (!isEmployee && hasAdminRole) {
-    const target = resolveRoleDashboard(roles);
+    const target = resolveRoleDashboard(roles, Boolean(session.user.hasGrantedAdminAccess));
     redirect(target);
   }
 

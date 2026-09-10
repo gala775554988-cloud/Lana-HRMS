@@ -34,7 +34,7 @@ export default async function HrmsLayout({ children }: { children: ReactNode }) 
   const permissions: string[] = (session.user as any).permissions ?? [];
   const baseEmployeePermissions = new Set(PERMISSION_TEMPLATES.EMPLOYEE);
   const hasAdminAccess =
-    resolveRoleDashboard(roles) !== DEFAULT_LOGIN_REDIRECT ||
+    resolveRoleDashboard(roles, Boolean(session.user.hasGrantedAdminAccess)) !== DEFAULT_LOGIN_REDIRECT ||
     permissions.some((permission) => !baseEmployeePermissions.has(permission as any));
   if (!hasAdminAccess) {
     redirect(DEFAULT_LOGIN_REDIRECT);

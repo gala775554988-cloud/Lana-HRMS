@@ -13,8 +13,9 @@ export async function redirectToRoleGatedDashboard(options?: { allowedRoles?: st
   if (!session?.user) redirect("/login");
 
   const roles = (session.user.roles as string[]) || [];
+  const dashboard = resolveRoleDashboard(roles, Boolean(session.user.hasGrantedAdminAccess));
   if (options?.allowedRoles && !roles.some((role) => options.allowedRoles!.includes(role))) {
-    redirect(resolveRoleDashboard(roles));
+    redirect(dashboard);
   }
-  redirect(options?.targetPath ?? resolveRoleDashboard(roles));
+  redirect(options?.targetPath ?? dashboard);
 }

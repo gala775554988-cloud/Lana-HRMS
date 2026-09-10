@@ -11,7 +11,7 @@ export default async function HomePage() {
 
   if (session?.user) {
     const roles = (session.user.roles as string[]) || [];
-    redirect(resolveRoleDashboard(roles));
+    redirect(resolveRoleDashboard(roles, Boolean(session.user.hasGrantedAdminAccess)));
   }
   const locale = await getRequestLocale();
   return <LandingPage locale={locale} />;
