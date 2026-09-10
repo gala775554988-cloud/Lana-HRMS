@@ -31,11 +31,11 @@ export async function GET(request: NextRequest) {
     const result = await fullResyncFromOdoo({ wipeAndSync, connectionId });
     return NextResponse.json({
       ...result,
-      success: true,
-      message: wipeAndSync
+      message: result.success ? (wipeAndSync
         ? `تمت إعادة الضبط وسحب (${result.count}) موظف بنجاح بالتنسيق الموحد`
-        : `تمت المزامنة الذكية الشاملة لـ (${result.count}) موظف بنجاح دون مسح السجلات السابقة`,
-    });
+        : `تمت المزامنة الذكية الشاملة لـ (${result.count}) موظف بنجاح دون مسح السجلات السابقة`)
+        : result.message,
+    }, { status: result.success ? 200 : 503 });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ success: false, message }, { status: message === "Forbidden" ? 403 : 500 });
@@ -54,11 +54,11 @@ export async function POST(request: NextRequest) {
     const result = await fullResyncFromOdoo({ wipeAndSync, connectionId });
     return NextResponse.json({
       ...result,
-      success: true,
-      message: wipeAndSync
+      message: result.success ? (wipeAndSync
         ? `تمت إعادة الضبط وسحب (${result.count}) موظف بنجاح بالتنسيق الموحد`
-        : `تمت المزامنة الذكية الشاملة لـ (${result.count}) موظف بنجاح دون مسح السجلات السابقة`,
-    });
+        : `تمت المزامنة الذكية الشاملة لـ (${result.count}) موظف بنجاح دون مسح السجلات السابقة`)
+        : result.message,
+    }, { status: result.success ? 200 : 503 });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ success: false, message }, { status: message === "Forbidden" ? 403 : 500 });

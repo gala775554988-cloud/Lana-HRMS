@@ -174,10 +174,8 @@ function parseOdooDate(val: unknown): Date | undefined {
 }
 
 export async function syncEmployeeFromOdoo(odooRecord: any) {
-  // 0. Logging تفصيلي لمراقبة كائن الموظف الخام القادم من أودو
-  console.log("Raw Odoo Data:", odooRecord);
-
-  // 1. تنقية البيانات: استبعاد الحقول البنكية حصراً
+  // Raw employee payloads can contain private identity/profile data. Never
+  // print them to server logs; keep only the sanitized database snapshot.
   const sanitizedData = Object.keys(odooRecord)
     .filter((key) => !SENSITIVE_FIELDS.includes(key) && !/(iban|swift|bank_account|sort_code)/i.test(key))
     .reduce((obj, key) => {
@@ -418,7 +416,7 @@ export async function fullResyncFromOdoo(options: { wipeAndSync?: boolean; conne
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes("configuration") || msg.includes("credentials") || msg.includes("ENOTFOUND") || msg.includes("ECONNREFUSED") || msg.includes("url")) {
       return {
-        success: true,
+        success: false,
         count: 0,
         message: "تم التحقق من جاهزية المحرك وصلاحيات INTERNAL_SYNC_TOKEN بنجاح. يرجى ضبط رابط ومفاتيح Odoo في لوحة إعدادات الربط للبدء بالسحب الفعلي.",
         odooConfigured: false,
@@ -892,15 +890,15 @@ export class OdooSyncService {
             if (resolved?.branchId) hospitalBranchMap.set(name, resolved.branchId);
           }
 
-          // Bulk managers - try ODOO-{id} first, then barcode lookup via Odoo read if needed (for performance, only ODOO-{id} in bulk)
+          // Bulk managers are linked by their stable Odoo relation id first.
+          // Employee numbers are business identifiers and must never be
+          // reconstructed from Odoo's internal sequential record id.
           let managerMap = new Map<number, string>();
           if(managerOdooIds.length>0) {
             try {
-              const managerCodes = managerOdooIds.map(id=> `ODOO-${id}`);
-              const managers = await delegate("employee").findMany({ where: { employeeNumber: { in: managerCodes } } }) as any[];
+              const managers = await delegate("employee").findMany({ where: { odooId: { in: managerOdooIds } } }) as any[];
               for(const m of managers) {
-                const match = (m.employeeNumber as string).match(/ODOO-(\d+)/);
-                if(match) managerMap.set(Number(match[1]), m.id);
+                if (m.odooId) managerMap.set(Number(m.odooId), m.id);
               }
               // Also try by barcode if we have manager barcodes from Odoo - fetch barcodes in bulk
               if(managerMap.size < managerOdooIds.length) {

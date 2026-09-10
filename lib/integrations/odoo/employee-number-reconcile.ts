@@ -455,7 +455,12 @@ export async function reconcileEmployeeNumbersAndIds(options: EmployeeNumberReco
   // a real run must prove zero drift.
   baseReport.verification.verified = dryRun ? true : (verifyMismatch.length === 0);
 
-  baseReport.success = errors.length === 0 || (baseReport.applied.updated + baseReport.applied.created) > 0;
+  // Never report a partial write as a successful reconciliation. Callers can
+  // still display applied counts, but success means the final verification
+  // actually passed and the serverless deadline did not truncate the run.
+  baseReport.success = errors.length === 0
+    && !baseReport.incomplete
+    && (dryRun || baseReport.verification.verified);
   baseReport.durationMs = Date.now() - started;
   baseReport.message =
     `فحص أودو: ${baseReport.odooEmployeesFetched} موظف | تطابق بواسطة odooId: ${baseReport.matches.byOdooId} + بالهوية: ${baseReport.matches.byNationalId} + بالاسم: ${baseReport.matches.byName} | ` +

@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Clock, RefreshCw } from "lucide-react";
+import { Clock, RefreshCw, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-const DEFAULT_BIOTIME_URL = "https://handbook-latino-trout-settle.trycloudflare.com";
-
 type Result = {
   success: boolean;
+  complete?: boolean;
   message?: string;
   fetched?: number;
   saved?: number;
@@ -17,29 +16,59 @@ type Result = {
   skippedUnknownState?: number;
   notFoundCount?: number;
   errorsCount?: number;
-  notFound?: Array<Record<string, unknown>>;
+  unmatchedEmployeeCodes?: Array<{ empCode: string; punches: number }>;
 };
 
 export function BioTimeAttendanceSyncButton() {
   const [pending, startTransition] = useTransition();
-  const [baseUrl, setBaseUrl] = useState(DEFAULT_BIOTIME_URL);
+  const [baseUrl, setBaseUrl] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [configured, setConfigured] = useState(false);
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [terminalAlias, setTerminalAlias] = useState("جهاز الحضور والأنصراف");
   const [result, setResult] = useState<Result | null>(null);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem("lana.biotime.url");
-    setBaseUrl(saved || DEFAULT_BIOTIME_URL);
+    let active = true;
+    fetch("/api/integrations/biotime/connection", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((json) => {
+        if (!active || !json?.success) return;
+        setConfigured(Boolean(json.configured));
+        setBaseUrl(json.connection?.baseUrl || "");
+        setUsername(json.connection?.username || "");
+      })
+      .catch(() => undefined);
+    return () => { active = false; };
   }, []);
+
+  function saveConnection() {
+    setResult(null);
+    startTransition(async () => {
+      const response = await fetch("/api/integrations/biotime/connection", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ baseUrl, username, password }),
+      });
+      const json = await response.json().catch(() => ({ success: false, message: "Invalid response" }));
+      if (json.success) {
+        setConfigured(true);
+        setPassword("");
+        setResult({ success: true, message: "تم حفظ اتصال BioTime بصورة مشفرة. نفّذ المزامنة لاختبار الاتصال وسحب الحركات." });
+      } else {
+        setResult(json);
+      }
+    });
+  }
 
   function syncNow() {
     setResult(null);
-    window.localStorage.setItem("lana.biotime.url", baseUrl);
     startTransition(async () => {
       const response = await fetch("/api/integrations/biotime/sync-attendance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ baseUrl, date, terminalAlias, pageSize: 100 }),
+        body: JSON.stringify({ date, terminalAlias, pageSize: 200 }),
       });
       const json = await response.json().catch(() => ({ success: false, message: "Invalid response" }));
       setResult(json);
@@ -54,21 +83,30 @@ export function BioTimeAttendanceSyncButton() {
           مزامنة BioTime الآن
         </div>
         <p className="text-sm text-muted-foreground">
-          اسحب حركات جهاز الحضور والانصراف من BioTime عبر رابط Cloudflare، واحفظها مباشرة في جدول الحضور.
+          اتصال ثابت ومشفّر بموقع ZKBio Time. تجمع المزامنة كل حركات اليوم وتحفظ أول دخول وآخر خروج لكل موظف.
         </p>
-        <div className="grid gap-2 md:grid-cols-[1.4fr_.6fr_.8fr_auto]">
-          <Input dir="ltr" placeholder="https://xxxxx.trycloudflare.com" value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} />
+        <div className="grid gap-2 md:grid-cols-3">
+          <Input dir="ltr" inputMode="url" placeholder="رابط موقع BioTime" value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} />
+          <Input dir="ltr" autoComplete="username" placeholder="اسم المستخدم" value={username} onChange={(event) => setUsername(event.target.value)} />
+          <Input dir="ltr" type="password" autoComplete="new-password" placeholder={configured ? "اتركها فارغة للإبقاء على كلمة المرور" : "كلمة المرور"} value={password} onChange={(event) => setPassword(event.target.value)} />
+        </div>
+        <div className="grid gap-2 md:grid-cols-[.6fr_.8fr_auto_auto]">
           <Input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
-          <Input value={terminalAlias} onChange={(event) => setTerminalAlias(event.target.value)} placeholder="terminal_alias" />
-          <Button onClick={syncNow} disabled={pending || !baseUrl} className="gap-2 bg-emerald-600 text-white hover:bg-emerald-700">
+          <Input value={terminalAlias} onChange={(event) => setTerminalAlias(event.target.value)} placeholder="اسم الجهاز (اختياري)" />
+          <Button variant="outline" onClick={saveConnection} disabled={pending || !baseUrl || !username || (!configured && !password)} className="gap-2">
+            <Save className="h-4 w-4" />
+            حفظ الربط
+          </Button>
+          <Button onClick={syncNow} disabled={pending || !configured} className="gap-2 bg-emerald-600 text-white hover:bg-emerald-700">
             <RefreshCw className={pending ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
             {pending ? "جاري المزامنة..." : "مزامنة فقط"}
           </Button>
         </div>
         {result ? (
-          <div className={`rounded-xl border p-3 text-sm ${result.success ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-red-200 bg-red-50 text-red-900"}`}>
+          <div className={`rounded-xl border p-3 text-sm ${result.success && result.complete !== false ? "border-emerald-200 bg-emerald-50 text-emerald-900" : result.success ? "border-amber-200 bg-amber-50 text-amber-950" : "border-red-200 bg-red-50 text-red-900"}`}>
             {result.success ? (
               <div className="space-y-2">
+                {result.message ? <p className="font-bold">{result.message}</p> : null}
                 <div className="grid gap-2 md:grid-cols-6">
                   <div>المجلوب: <strong>{result.fetched ?? 0}</strong></div>
                   <div>المحفوظ: <strong>{result.saved ?? 0}</strong></div>
@@ -77,7 +115,7 @@ export function BioTimeAttendanceSyncButton() {
                   <div>غير معروف: <strong>{result.skippedUnknownState ?? 0}</strong></div>
                   <div>غير موجود: <strong>{result.notFoundCount ?? 0}</strong></div>
                 </div>
-                {result.notFound?.length ? <p className="text-xs">أكواد غير موجودة: {result.notFound.map((item) => String(item.empCode)).slice(0, 20).join(", ")}</p> : null}
+                {result.unmatchedEmployeeCodes?.length ? <p className="text-xs">أكواد غير مرتبطة بموظف: {result.unmatchedEmployeeCodes.map((item) => item.empCode).slice(0, 20).join(", ")}</p> : null}
               </div>
             ) : <p className="font-bold">فشلت المزامنة: {result.message}</p>}
           </div>
