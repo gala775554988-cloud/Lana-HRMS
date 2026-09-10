@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { hasAnyRole } from "@/lib/rbac";
 import { setUserScope, getAllUserScopes } from "@/lib/permissions/engine";
 import { prisma } from "@/lib/prisma";
+import { canManagePermissionAdministration } from "@/lib/enterprise/permissions-admin";
+
+function canManage(session: any) {
+  return canManagePermissionAdministration(session?.user?.roles, session?.user?.permissions);
+}
 
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!hasAnyRole(session, ["SUPER_ADMIN", "HR_MANAGER"])) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!canManage(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const search = req.nextUrl.searchParams.get("search") || undefined;
   const page = parseInt(req.nextUrl.searchParams.get("page") || "1");
   const data = await getAllUserScopes(page, 30, search);
@@ -17,7 +21,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!hasAnyRole(session, ["SUPER_ADMIN", "HR_MANAGER"])) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!canManage(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { userId, module, scope, branchId, departmentId, hospitalId } = await req.json();
   if (!userId || !module || !scope) {
     return NextResponse.json({ error: "Missing required fields: userId, module, or scope" }, { status: 400 });
@@ -38,7 +42,7 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!hasAnyRole(session, ["SUPER_ADMIN", "HR_MANAGER"])) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!canManage(session)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const id = req.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Missing scope id" }, { status: 400 });
   await prisma.hrPermissionScope.delete({ where: { id } }).catch(() => {});

@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { assignRole, unassignRole } from "@/lib/enterprise/roles";
+import { canManagePermissionAdministration } from "@/lib/enterprise/permissions-admin";
 
-async function requireSuperAdmin() {
+async function requirePermissionAdmin() {
   const session = await auth();
   if (!session?.user?.id) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) } as const;
-  const roles = ((session.user as any).roles as string[] | undefined) ?? [];
-  if (!roles.includes("SUPER_ADMIN")) return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) } as const;
+  if (!canManagePermissionAdministration((session.user as any).roles, (session.user as any).permissions)) return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) } as const;
   return { session } as const;
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { session, error } = await requireSuperAdmin();
+  const { session, error } = await requirePermissionAdmin();
   if (error) return error;
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { session, error } = await requireSuperAdmin();
+  const { session, error } = await requirePermissionAdmin();
   if (error) return error;
   const { id } = await params;
   const body = await request.json().catch(() => ({}));

@@ -7,6 +7,8 @@ import { MergedModuleTabs } from "@/components/hrms/merged-module-tabs";
 import { PermissionsAdmin } from "@/app/(hrms)/permissions-system/admin-client";
 import { MultiDeviceAccessClient } from "@/components/enterprise/multi-device-access-client";
 import { KeyRound, Shield, ShieldCheck, Workflow, UserCog, Smartphone } from "lucide-react";
+import { canManagePermissionAdministration } from "@/lib/enterprise/permissions-admin";
+import { resolveRoleDashboard } from "@/config/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +31,10 @@ export default async function PermissionsPage({ searchParams }: { searchParams: 
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   const roles = (session.user as any).roles || [];
-  if (!roles.includes("SUPER_ADMIN")) redirect("/analytics");
+  const permissions = (session.user as any).permissions || [];
+  if (!canManagePermissionAdministration(roles, permissions)) {
+    redirect(resolveRoleDashboard(roles, Boolean((session.user as any).hasGrantedAdminAccess)));
+  }
 
   let scopesContent: React.ReactNode = null;
   if (activeTab === "scopes") {
