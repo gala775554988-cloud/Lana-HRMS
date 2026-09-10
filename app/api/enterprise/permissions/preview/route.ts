@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/rbac";
 import { PERMISSION_CATEGORIES, getEffectivePermissionsForRoles } from "@/lib/enterprise/permissions";
 import { hrmsModules } from "@/config/hrms";
+import { canManagePermissionAdministration } from "@/lib/enterprise/permissions-admin";
 
 /**
  * Read-only "View As" preview: computes exactly what a target user's role +
@@ -14,8 +15,7 @@ import { hrmsModules } from "@/config/hrms";
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
-  const callerRoles = (session.user.roles as string[]) ?? [];
-  if (!callerRoles.includes("SUPER_ADMIN")) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+  if (!canManagePermissionAdministration((session.user as any).roles, (session.user as any).permissions)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
 
   const targetUserId = request.nextUrl.searchParams.get("userId");
   if (!targetUserId) return NextResponse.json({ success: false, message: "userId is required" }, { status: 400 });

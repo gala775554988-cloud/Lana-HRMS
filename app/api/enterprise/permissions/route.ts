@@ -3,9 +3,10 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { ALL_ENTERPRISE_PERMISSIONS, PERMISSION_CATEGORIES, PERMISSION_TEMPLATES, buildPermissionTree, getPermissionStore, setUserPermissions, type PermissionKey } from "@/lib/enterprise/permissions";
 import { autoHealPendingWorkflowsForEmployee } from "@/lib/enterprise/workflow";
+import { canManagePermissionAdministration } from "@/lib/enterprise/permissions-admin";
 
-function isSuperAdmin(roles: string[] | undefined) {
-  return Boolean(roles?.includes("SUPER_ADMIN"));
+function canManage(session: any) {
+  return canManagePermissionAdministration(session?.user?.roles, session?.user?.permissions);
 }
 
 function getClientIp(request: NextRequest) {
@@ -15,7 +16,7 @@ function getClientIp(request: NextRequest) {
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
-  if (!isSuperAdmin(session.user.roles as string[] | undefined)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+  if (!canManage(session)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
 
   const store = await getPermissionStore();
 
@@ -33,7 +34,7 @@ export async function GET() {
 export async function PATCH(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
-  if (!isSuperAdmin(session.user.roles as string[] | undefined)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+  if (!canManage(session)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
 
   const body = await request.json() as {
     targetUserId?: string;
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user?.id) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
-    if (!isSuperAdmin(session.user.roles as string[] | undefined)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+    if (!canManage(session)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
 
     const body = await request.json().catch(() => ({})) as {
       employeeId?: string;
