@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     await writeAuditLog({ actorUserId: session.user.id, action: "PASSWORD_CHANGED", entity: "user", entityId: user.id, metadata: { self: true, firstLoginCompleted: true, mustChangePassword: false } }).catch(() => {});
 
     const roles = saved.roles.map((item) => item.role.name);
-    return NextResponse.json({ success: true, message: "تم تغيير كلمة المرور بنجاح", identifier: saved.username ?? saved.email, redirectTo: resolveRoleDashboard(roles), user: { id: saved.id, username: saved.username, email: saved.email, roles, mustChangePassword: saved.mustChangePassword, firstLoginCompleted: saved.passwordChanged, passwordChangedAt: saved.passwordChangedAt } });
+    return NextResponse.json({ success: true, message: "تم تغيير كلمة المرور بنجاح", identifier: saved.username ?? saved.email, redirectTo: resolveRoleDashboard(roles, Boolean((session.user as any).hasGrantedAdminAccess)), user: { id: saved.id, username: saved.username, email: saved.email, roles, mustChangePassword: saved.mustChangePassword, firstLoginCompleted: saved.passwordChanged, passwordChangedAt: saved.passwordChangedAt } });
   } catch (error) {
     console.error("[change-password] error:", error);
     return NextResponse.json({ success: false, message: error instanceof Error ? error.message : String(error) }, { status: 500 });

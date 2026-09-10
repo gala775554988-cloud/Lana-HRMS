@@ -12,7 +12,7 @@ import { resolveRoleDashboard } from "@/config/auth";
 export function Forbidden403() {
   const { data: session } = useSession();
   const roles = (session?.user?.roles as string[]) ?? [];
-  const homeHref = resolveRoleDashboard(roles);
+  const homeHref = resolveRoleDashboard(roles, Boolean(session?.user?.hasGrantedAdminAccess));
 
   return (
     <section className="flex min-h-[70vh] items-center justify-center p-4" dir="rtl">

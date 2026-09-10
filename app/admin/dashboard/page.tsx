@@ -12,5 +12,5 @@ export default async function AdminDashboardPage() {
   }
 
   const roles = (session.user.roles as string[]) || [];
-  redirect(resolveRoleDashboard(roles));
+  redirect(resolveRoleDashboard(roles, Boolean(session.user.hasGrantedAdminAccess)));
 }

@@ -18,6 +18,7 @@ declare module "next-auth" {
       id: string;
       roles: string[];
       permissions: string[];
+      hasGrantedAdminAccess: boolean;
       employeeProfile: EmployeeProfileSummary | null;
     } & DefaultSession["user"];
   }
@@ -25,6 +26,7 @@ declare module "next-auth" {
   interface User {
     roles?: string[];
     permissions?: string[];
+    hasGrantedAdminAccess?: boolean;
   }
 }
 
@@ -32,5 +34,6 @@ declare module "next-auth/jwt" {
   interface JWT {
     roles?: string[];
     permissions?: string[];
+    hasGrantedAdminAccess?: boolean;
   }
 }

@@ -100,7 +100,11 @@ export function AppShell({ children, dictionary }: AppShellProps) {
   // "الرئيسية" always points at the role's OWN dashboard (Employee/Manager/
   // HR/Super Admin each have a distinct one) rather than the hardcoded
   // Central Executive Dashboard every non-super-admin used to land on.
-  const homeHref = useMemo(() => resolveRoleDashboard(userRoles), [userRoles]);
+  const hasGrantedAdminAccess = Boolean(session?.user?.hasGrantedAdminAccess);
+  const homeHref = useMemo(
+    () => resolveRoleDashboard(userRoles, hasGrantedAdminAccess),
+    [userRoles, hasGrantedAdminAccess]
+  );
   const ownEmployeeProfile = session?.user?.employeeProfile ?? null;
   const ownProfileHref = ownEmployeeProfile?.id
     ? userRoles.includes("EMPLOYEE")

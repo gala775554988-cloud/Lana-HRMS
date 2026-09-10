@@ -9,6 +9,7 @@ import { signOut } from 'next-auth/react';
 import { BrandLogo } from '@/components/brand/brand-logo';
 import { ClientLanguageToggle } from '@/components/i18n/client-language-toggle';
 import { NotificationBell } from '@/components/enterprise/notification-bell';
+import { resolveRoleDashboard } from '@/config/auth';
 
 interface Props {
   user: any;
@@ -21,6 +22,7 @@ export function EmployeeTopBar({ user, employee }: Props) {
   const router = useRouter();
 
   const avatarUrl = user?.image || employee?.profilePhotoUrl || null;
+  const homeHref = resolveRoleDashboard(user?.roles, Boolean(user?.hasGrantedAdminAccess));
 
   const toggleTheme = () => {
     const newDark = !isDark;
@@ -40,7 +42,7 @@ export function EmployeeTopBar({ user, employee }: Props) {
       <div className="max-w-[1280px] mx-auto h-16 px-4 sm:px-6 flex items-center justify-between gap-4">
         {/* Logo */}
         <BrandLogo
-          href="/employee/dashboard"
+          href={homeHref}
           size="sm"
           subtitle="Employee Portal"
           className="gap-3"

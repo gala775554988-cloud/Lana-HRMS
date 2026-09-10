@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { GitPullRequest } from "lucide-react";
 import { EMPLOYEE_HOME_ITEM, EMPLOYEE_NAV_GROUPS, type EmployeeNavGroup } from "@/lib/employee/nav-items";
 import { usePendingApprovalsCount } from "@/lib/hooks/use-pending-approvals-count";
+import { resolveRoleDashboard } from "@/config/auth";
 
 // Roles that administer/approve on behalf of others -- membership in any of
 // these is enough on its own to show the entry, independent of whether they
@@ -32,7 +33,8 @@ const ADMIN_APPROVAL_ROLES = ["SUPER_ADMIN", "HR_MANAGER", "BRANCH_MANAGER", "DE
  */
 export function useEmployeeNavItems(): { home: typeof EMPLOYEE_HOME_ITEM; groups: EmployeeNavGroup[] } {
   const { data: session, status } = useSession();
-  const roles = (session?.user as { roles?: string[] } | undefined)?.roles ?? [];
+  const roles = useMemo(() => session?.user?.roles ?? [], [session?.user?.roles]);
+  const hasGrantedAdminAccess = Boolean(session?.user?.hasGrantedAdminAccess);
   const hasAdminApprovalRole = roles.some((role) => ADMIN_APPROVAL_ROLES.includes(role));
   const { data: pendingApprovalsCount } = usePendingApprovalsCount(status === "authenticated");
   const canSeeApprovals = hasAdminApprovalRole || (pendingApprovalsCount ?? 0) > 0;
@@ -46,5 +48,13 @@ export function useEmployeeNavItems(): { home: typeof EMPLOYEE_HOME_ITEM; groups
     );
   }, [canSeeApprovals, pendingApprovalsCount]);
 
-  return { home: EMPLOYEE_HOME_ITEM, groups };
+  const home = useMemo(
+    () => ({
+      ...EMPLOYEE_HOME_ITEM,
+      href: resolveRoleDashboard(roles, hasGrantedAdminAccess),
+    }),
+    [roles, hasGrantedAdminAccess]
+  );
+
+  return { home, groups };
 }
