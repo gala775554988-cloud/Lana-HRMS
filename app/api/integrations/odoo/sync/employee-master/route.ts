@@ -8,6 +8,16 @@ import { resolveOdooHospital } from "@/lib/integrations/odoo/hospital-resolver";
 import type { OdooRecord } from "@/lib/integrations/odoo/types";
 import { isOdooIntegrationEnabled } from "@/lib/settings";
 import { hasValidInternalSyncToken } from "@/lib/internal-sync-auth";
+import {
+  EMPLOYEE_NUMBER_CANDIDATE_FIELDS,
+  detectAuthoritativeEmployeeNumberField,
+  getConfiguredEmployeeNumberField,
+  resolveEmployeeNumberFromRecord,
+  setConfiguredEmployeeNumberField,
+} from "@/lib/integrations/odoo/employee-numbers";
+import { discoverContractFields, odooStructureName, salaryProfileFromOdooContract } from "@/lib/integrations/odoo/contract-salary";
+import { saveEmployeeSalaryProfile } from "@/lib/employee/salary-profile-store";
+import { syncSocialInsuranceFromPayroll } from "@/lib/enterprise/social-insurance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -107,8 +117,8 @@ function sponsorValue(row: Record<string, unknown>, sponsorFields: string[]) {
   return null;
 }
 
-function employeeNumberFrom(row: MasterRow) {
-  return clean(row.barcode) || String(row.id || "").trim() || `ODOO-${row.id}`;
+function employeeNumberFrom(row: MasterRow, authoritativeField?: string | null) {
+  return resolveEmployeeNumberFromRecord(row as Record<string, unknown>, authoritativeField)?.value || `ODOO-${row.id}`;
 }
 
 function nationalIdFrom(row: MasterRow) {
@@ -144,6 +154,12 @@ function addressFrom(row: Record<string, unknown>) {
     .map((field) => many2oneName(row[field]) || clean(row[field]))
     .filter(Boolean);
   return parts.join("، ") || many2oneName(row.address_home_id) || clean(row.address_home_id) || undefined;
+}
+
+const SENSITIVE_RAW_FIELD = /(bank|iban|swift|account_number|credit_card)/i;
+
+function safeEmployeeSnapshot(row: Record<string, unknown>) {
+  return Object.fromEntries(Object.entries(row).filter(([field]) => !SENSITIVE_RAW_FIELD.test(field) && field !== "image_1920"));
 }
 
 async function ensureEmployeeUser(employeeId: string, values: { nationalId: string; email?: string | null; firstName: string; lastName: string }) {
@@ -220,6 +236,10 @@ export async function POST(request: NextRequest) {
     const hospitalFields = HOSPITAL_FIELD_CANDIDATES.filter((field) => fieldsMeta[field]);
     const analyticFields = ANALYTIC_FIELD_CANDIDATES.filter((field) => fieldsMeta[field]);
     const extendedProfileFields = EXTENDED_PROFILE_FIELD_CANDIDATES.filter((field) => fieldsMeta[field]);
+    const employeeNumberFields = [
+      ...EMPLOYEE_NUMBER_CANDIDATE_FIELDS.filter((field) => fieldsMeta[field]),
+      ...Object.keys(fieldsMeta).filter((field) => /^x_.*(employee|emp|badge).*(number|code|no|id)$/i.test(field)),
+    ];
     const requestedFields = [
       "id",
       "name",
@@ -243,6 +263,7 @@ export async function POST(request: NextRequest) {
       ...hospitalFields,
       ...analyticFields,
       ...extendedProfileFields,
+      ...employeeNumberFields,
     ];
     const fields = requestedFields.filter((field, index) =>
       (field === "id" || Boolean(fieldsMeta[field])) && requestedFields.indexOf(field) === index
@@ -267,16 +288,30 @@ export async function POST(request: NextRequest) {
       if (page.length < batchSize) break;
     }
 
+    const configuredEmployeeNumberField = await getConfiguredEmployeeNumberField(true);
+    const detectedEmployeeNumberField = detectAuthoritativeEmployeeNumberField(rows, Object.keys(fieldsMeta));
+    const configuredCoverage = configuredEmployeeNumberField && rows.length
+      ? rows.filter((row) => resolveEmployeeNumberFromRecord(row as Record<string, unknown>, configuredEmployeeNumberField)?.source === configuredEmployeeNumberField).length / rows.length
+      : 0;
+    // Preserve a configured source that is still populated. This prevents a
+    // partial/paginated batch from accidentally changing the source of truth.
+    const authoritativeEmployeeNumberField = configuredCoverage >= 0.5
+      ? configuredEmployeeNumberField
+      : detectedEmployeeNumberField?.field || configuredEmployeeNumberField;
+    if (detectedEmployeeNumberField && authoritativeEmployeeNumberField === detectedEmployeeNumberField.field && !dryRun) {
+      await setConfiguredEmployeeNumberField(detectedEmployeeNumberField);
+    }
+
     const odooIds = rows.map((row) => Number(row.id)).filter(Boolean);
     const nationalIds = rows.map(nationalIdFrom).filter(Boolean);
-    const employeeNumbers = rows.map(employeeNumberFrom).filter(Boolean);
+    const employeeNumbers = rows.map((row) => employeeNumberFrom(row, authoritativeEmployeeNumberField)).filter(Boolean);
     const emails = rows.map(emailFrom).filter(Boolean) as string[];
 
     // Fetch all contracts from Odoo hr.contract to pull exact Analytic Account (cost center) and wage per employee
     const contractFieldsMeta: Record<string, Record<string, unknown>> = await client.fieldsGet("hr.contract", [], ["string", "type", "relation"]).catch(() => ({}));
     const contractAnalyticCandidates = ["analytic_account_id", "analytic_account", "x_cost_center", "x_analytic_account_id", "analytic_distribution", "x_studio_cost_center"];
     const validContractAnalyticFields = contractAnalyticCandidates.filter((f) => contractFieldsMeta[f]);
-    const contractFields = ["id", "employee_id", "name", "state", "wage", "date_start", "date_end", ...validContractAnalyticFields];
+    const contractFields = discoverContractFields(contractFieldsMeta, validContractAnalyticFields);
     
     const contractsFromOdoo = await client.search_read<Record<string, any>>(
       "hr.contract",
@@ -325,7 +360,8 @@ export async function POST(request: NextRequest) {
       const odooId = Number(row.id);
       const names = splitName(row.name);
       const nationalId = nationalIdFrom(row);
-      const employeeNumber = employeeNumberFrom(row);
+      const employeeNumberResolution = resolveEmployeeNumberFromRecord(row as Record<string, unknown>, authoritativeEmployeeNumberField);
+      const employeeNumber = employeeNumberResolution?.value || `ODOO-${row.id}`;
       const email = emailFrom(row);
       const existing = byOdooId.get(odooId) || byNationalId.get(nationalId) || byEmployeeNumber.get(employeeNumber) || (email ? byEmail.get(email) : undefined) || null;
       const hospitalName = hospitalFields.map((f) => many2oneName((row as any)[f]) || clean((row as any)[f])).find(Boolean) || clean((row as any).school) || many2oneName((row as any).work_location_id) || clean((row as any).work_location_id) || null;
@@ -373,7 +409,12 @@ export async function POST(request: NextRequest) {
           odooJobId: many2oneId(row.job_id),
           odooCompanyId: many2oneId(row.company_id),
           odooParentId: many2oneId(row.parent_id),
+          odooRawData: safeEmployeeSnapshot(row as Record<string, unknown>),
+          odooRawDataSyncedAt: new Date(),
         } as any,
+        employeeNumberSource: employeeNumberResolution?.source || null,
+        missingNationalId: !clean(row.identification_id),
+        missingHireDate: !firstDate(row, ["join_date", "joining_date", "date_joining", "first_contract_date", "create_date"]),
       };
     });
 
@@ -443,6 +484,13 @@ export async function POST(request: NextRequest) {
         plannedCreates: plan.filter((item) => !item.existing).length,
         plannedUpdates: plan.filter((item) => item.existing).length,
         forcedCodeDisplacements: staged.length,
+        authoritativeEmployeeNumberField,
+        quality: {
+          complete: plan.every((item) => Boolean(item.employeeNumberSource) && !item.missingNationalId && !item.missingHireDate),
+          missingOfficialEmployeeNumber: plan.filter((item) => !item.employeeNumberSource).length,
+          missingNationalId: plan.filter((item) => item.missingNationalId).length,
+          missingHireDate: plan.filter((item) => item.missingHireDate).length,
+        },
         sampleDisplacements: staged.slice(0, 20),
       });
     }
@@ -480,14 +528,24 @@ export async function POST(request: NextRequest) {
         }
         if (item.contractData) {
           const cData = item.contractData;
+          const salaryProfile = salaryProfileFromOdooContract(cData);
+          const structureName = odooStructureName(cData);
           await prisma.employeeContract.upsert({
             where: { contractNumber: `ODOO-CONT-${cData.id}` },
             update: {
+              employeeId,
               title: clean(cData.name) || "عقد العمل (Odoo)",
               salaryAmount: Number(cData.wage || 0) || undefined,
+              currency: "SAR",
               status: cData.state === "open" ? "ACTIVE" : cData.state === "close" ? "EXPIRED" : "DRAFT",
               startDate: dateValue(cData.date_start) || new Date(),
               endDate: dateValue(cData.date_end) || undefined,
+              odooId: Number(cData.id),
+              odooEmployeeId: item.odooId,
+              odooWriteDate: dateValue(cData.write_date),
+              odooState: clean(cData.state) || undefined,
+              odooStructureType: structureName,
+              salaryDetails: salaryProfile as any,
               odooRawData: cData
             },
             create: {
@@ -495,12 +553,21 @@ export async function POST(request: NextRequest) {
               contractNumber: `ODOO-CONT-${cData.id}`,
               title: clean(cData.name) || "عقد العمل (Odoo)",
               salaryAmount: Number(cData.wage || 0) || 0,
+              currency: "SAR",
               status: cData.state === "open" ? "ACTIVE" : cData.state === "close" ? "EXPIRED" : "DRAFT",
               startDate: dateValue(cData.date_start) || new Date(),
               endDate: dateValue(cData.date_end) || undefined,
+              odooId: Number(cData.id),
+              odooEmployeeId: item.odooId,
+              odooWriteDate: dateValue(cData.write_date),
+              odooState: clean(cData.state) || undefined,
+              odooStructureType: structureName,
+              salaryDetails: salaryProfile as any,
               odooRawData: cData
             }
           });
+          await saveEmployeeSalaryProfile(employeeId, salaryProfile);
+          await syncSocialInsuranceFromPayroll(employeeId, salaryProfile).catch(() => null);
         }
         if (!body.skipUserProvisioning) {
           const userResult = await ensureEmployeeUser(employeeId, item.data).catch((error) => ({ created: false, reason: error instanceof Error ? error.message : String(error) }));
@@ -527,8 +594,17 @@ export async function POST(request: NextRequest) {
     // Trigger high-speed bulk document sync for all attachments (< 400KB embedded, > 400KB on-demand)
     const docSyncResult = await bulkSyncAllOdooDocuments(client, 1500, 0).catch(() => ({ imported: 0, errors: 0 }));
 
+    const quality = {
+      complete: errors.length === 0 && plan.every((item) => Boolean(item.employeeNumberSource) && !item.missingNationalId && !item.missingHireDate),
+      missingOfficialEmployeeNumber: plan.filter((item) => !item.employeeNumberSource).length,
+      missingNationalId: plan.filter((item) => item.missingNationalId).length,
+      missingHireDate: plan.filter((item) => item.missingHireDate).length,
+      contractsFound: plan.filter((item) => Boolean(item.contractData)).length,
+      salaryProfilesSynced: plan.filter((item) => Boolean(item.contractData?.wage)).length,
+    };
     const result = {
-      success: true,
+      success: errors.length === 0,
+      complete: quality.complete,
       pages,
       totalFetched: rows.length,
       created,
@@ -541,6 +617,9 @@ export async function POST(request: NextRequest) {
       sponsorFields,
       hospitalFields,
       analyticFields,
+      authoritativeEmployeeNumberField,
+      contractFields,
+      quality,
       startedAfterId,
       lastOdooId,
       durationMs: Date.now() - startedAt,

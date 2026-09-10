@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 
 type SyncResult = {
   success: boolean;
+  complete?: boolean;
   message?: string;
   totalFetched?: number;
   created?: number;
@@ -16,6 +17,14 @@ type SyncResult = {
   skipped?: number;
   durationMs?: number;
   sponsorFields?: string[];
+  authoritativeEmployeeNumberField?: string;
+  quality?: {
+    missingOfficialEmployeeNumber?: number;
+    missingNationalId?: number;
+    missingHireDate?: number;
+    contractsFound?: number;
+    salaryProfilesSynced?: number;
+  };
 };
 
 export function OdooEmployeeMasterSyncButton() {
@@ -54,7 +63,7 @@ export function OdooEmployeeMasterSyncButton() {
       </div>
 
       {result ? (
-        <div className={`mt-4 rounded-xl border p-3 text-sm ${result.success ? "border-emerald-200 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300" : "border-red-200 bg-red-50 text-red-900"}`}>
+        <div className={`mt-4 rounded-xl border p-3 text-sm ${result.success && result.complete !== false ? "border-emerald-200 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300" : result.success ? "border-amber-200 bg-amber-50 text-amber-950" : "border-red-200 bg-red-50 text-red-900"}`}>
           {result.success ? (
             <div className="grid gap-2 md:grid-cols-4 font-semibold">
               <div>المجلوب من Odoo: <strong className="text-primary font-black">{result.totalFetched ?? 0}</strong></div>
@@ -66,6 +75,9 @@ export function OdooEmployeeMasterSyncButton() {
               <div>أكواد متعارضة تم نقلها: <strong className="font-black">{result.forcedCodeDisplacements ?? 0}</strong></div>
               <div>أخطاء/متجاوز: <strong className="font-black">{result.skipped ?? 0}</strong></div>
               <div className="md:col-span-4 space-y-1 text-xs pt-1 border-t border-emerald-200/60 dark:border-emerald-800/60">
+                <div>حقل الرقم الوظيفي المعتمد: <strong>{result.authoritativeEmployeeNumberField || "لم يُكتشف"}</strong></div>
+                <div>جودة البيانات: أرقام رسمية ناقصة <strong>{result.quality?.missingOfficialEmployeeNumber ?? 0}</strong>، هويات ناقصة <strong>{result.quality?.missingNationalId ?? 0}</strong>، تواريخ تعيين ناقصة <strong>{result.quality?.missingHireDate ?? 0}</strong>.</div>
+                <div>العقود: <strong>{result.quality?.contractsFound ?? 0}</strong>، ملفات الرواتب المتزامنة: <strong>{result.quality?.salaryProfilesSynced ?? 0}</strong>.</div>
                 <div>حقول الكفيل المكتشفة في Odoo: <strong>{result.sponsorFields?.join(", ") || "لا يوجد حقل مخصص لكفيل في هذا السيرفر"}</strong></div>
                 <div>حقول المستشفيات/مواقع العمل المكتشفة: <strong>{(result as any).hospitalFields?.join(", ") || "لا يوجد حقل مخصص للمستشفى (تم استخدام الافتراضي)"}</strong></div>
                 <div>حقول الحساب التحليلي المكتشفة: <strong>{(result as any).analyticFields?.join(", ") || "لا يوجد حقل مخصص للحساب التحليلي (تم استخدام الافتراضي)"}</strong></div>
