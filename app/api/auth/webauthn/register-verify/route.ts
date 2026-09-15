@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { verifyRegistrationResponse } from "@simplewebauthn/server";
+import { verifyOrBindEmployeeDevice } from "@/lib/cache/device-cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -85,6 +86,10 @@ export async function POST(req: NextRequest) {
     const employee = await prisma.employee.findFirst({ where: { userId: user.id } }).catch(() => null);
     if (employee) {
       const deviceId = `webauthn-hw-${credentialID.slice(0, 16)}`;
+      const deviceCheck = await verifyOrBindEmployeeDevice(employee.id, deviceId, "WebAuthn Biometric PWA");
+      if (!deviceCheck.allowed) {
+        return NextResponse.json({ success: false, message: deviceCheck.reason }, { status: 403 });
+      }
       await prisma.employeeMobileDevice.upsert({
         where: { deviceId },
         update: {

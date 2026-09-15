@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { verifyOrBindEmployeeDevice } from "@/lib/cache/device-cache";
 
 export interface PushNotificationOptions {
   clickAction?: string;
@@ -108,6 +109,11 @@ export async function registerDevicePushToken({
       empId = emp?.id;
     }
     if (!empId || !deviceId || !fcmToken) return false;
+
+    // All device-creation paths must enforce the same one/two-device policy;
+    // otherwise push-token registration could silently add a third device.
+    const deviceCheck = await verifyOrBindEmployeeDevice(empId, deviceId, platform);
+    if (!deviceCheck.allowed) return false;
 
     await prisma.employeeMobileDevice.upsert({
       where: { employeeId_deviceId: { employeeId: empId, deviceId: deviceId.trim() } },

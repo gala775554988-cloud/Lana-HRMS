@@ -157,7 +157,7 @@ export function MultiDeviceAccessClient({
           </div>
           <div>
             <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">أجهزة الموظفين</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">ابحث عن موظف لإدارة أجهزته المسجلة.</p>
+            <p className="text-xs text-muted-foreground mt-0.5">الحد الطبيعي جهازان لكل حساب. أوقف التبديل لتقييد الحساب بجهاز واحد، أو فك الارتباط للسماح بربط أجهزة جديدة.</p>
           </div>
         </div>
 

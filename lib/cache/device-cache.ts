@@ -3,6 +3,8 @@ import { clearMemoryCache } from "@/lib/cache/memory-cache";
 import { writeAuditLog } from "@/lib/audit";
 
 const DEVICE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const MAX_DEVICES_WITH_MULTI_DEVICE_ACCESS = 2;
+const MAX_DEVICES_WITHOUT_MULTI_DEVICE_ACCESS = 1;
 
 type DeviceVerificationResult = {
   allowed: boolean;
@@ -77,9 +79,25 @@ export async function notifyAdminOnUnauthorizedDeviceAttempt(
 }
 
 /**
- * Every employee may use any number of devices. A device remains globally
- * unique, so one browser/device UUID cannot be silently attached to a second
- * employee account.
+ * Returns the binding limit for an employee. The normal policy permits two
+ * devices per account. A Super Admin can turn off multi-device access for an
+ * individual user from Permissions, which reduces that account to one device.
+ */
+async function getEmployeeDeviceLimit(employeeId: string): Promise<number> {
+  const employee = await prisma.employee.findUnique({
+    where: { id: employeeId },
+    select: { user: { select: { canUseMultipleDevices: true } } },
+  }).catch(() => null);
+
+  return employee?.user?.canUseMultipleDevices === false
+    ? MAX_DEVICES_WITHOUT_MULTI_DEVICE_ACCESS
+    : MAX_DEVICES_WITH_MULTI_DEVICE_ACCESS;
+}
+
+/**
+ * Binds at most two devices to each employee by default. A browser/device UUID
+ * remains globally unique, so the same browser profile cannot silently become
+ * a login device for a second employee account.
  */
 export async function verifyOrBindEmployeeDevice(
   employeeId: string,
@@ -114,6 +132,34 @@ export async function verifyOrBindEmployeeDevice(
       return { allowed: true, boundDeviceId: cleanDeviceId, reason: "DEVICE_VERIFIED_SQL_HIT" };
     }
 
+    // A device ID is globally unique. Check this before the per-account cap
+    // so a shared browser profile gets the correct, actionable explanation.
+    const existingDevice = await prisma.employeeMobileDevice.findUnique({
+      where: { deviceId: cleanDeviceId },
+      select: { id: true, employeeId: true, deviceId: true },
+    });
+    if (existingDevice?.employeeId && existingDevice.employeeId !== employeeId) {
+      notifyAdminOnUnauthorizedDeviceAttempt(employeeId, cleanDeviceId, existingDevice.deviceId).catch(() => {});
+      return {
+        allowed: false,
+        boundDeviceId: existingDevice.deviceId,
+        reason: "هذا المتصفح أو الجهاز مرتبط بحساب موظف آخر. من الصلاحيات، فك ارتباط أجهزة الحساب السابق أولاً.",
+      };
+    }
+    if (existingDevice?.employeeId === employeeId) {
+      setCachedDevices(cacheKey, [...deviceIds, cleanDeviceId]);
+      return { allowed: true, boundDeviceId: cleanDeviceId, reason: "DEVICE_VERIFIED_CONCURRENT_HIT" };
+    }
+
+    const deviceLimit = await getEmployeeDeviceLimit(employeeId);
+    if (boundDevices.length >= deviceLimit) {
+      const label = deviceLimit === 1 ? "جهاز واحد" : "جهازين";
+      return {
+        allowed: false,
+        reason: `وصل هذا الحساب إلى الحد المسموح وهو ${label}. يمكنك فك ارتباط الأجهزة من صفحة الصلاحيات ثم المحاولة مجدداً.`,
+      };
+    }
+
     try {
       await prisma.employeeMobileDevice.create({ data: { employeeId, deviceId: cleanDeviceId, platform } });
       setCachedDevices(cacheKey, [...deviceIds, cleanDeviceId]);
@@ -123,10 +169,11 @@ export async function verifyOrBindEmployeeDevice(
       // if it belongs to another account, reject only that unsafe reuse.
       const existing = await prisma.employeeMobileDevice.findUnique({ where: { deviceId: cleanDeviceId } });
       if (existing?.employeeId === employeeId) {
+        setCachedDevices(cacheKey, [...deviceIds, cleanDeviceId]);
         return { allowed: true, boundDeviceId: cleanDeviceId, reason: "DEVICE_CONCURRENT_BIND_SUCCESS" };
       }
       notifyAdminOnUnauthorizedDeviceAttempt(employeeId, cleanDeviceId, existing?.deviceId).catch(() => {});
-      return { allowed: false, boundDeviceId: existing?.deviceId, reason: "هذا الجهاز مسجل لحساب موظف آخر. يرجى فك ارتباطه أولاً." };
+      return { allowed: false, boundDeviceId: existing?.deviceId, reason: "هذا المتصفح أو الجهاز مرتبط بحساب موظف آخر. من الصلاحيات، فك ارتباط أجهزة الحساب السابق أولاً." };
     }
   } catch {
     return { allowed: true, reason: "DEVICE_CHECK_FAILSAFE_ALLOWED" };
