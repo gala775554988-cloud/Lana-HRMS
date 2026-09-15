@@ -85,7 +85,7 @@ export default async function PermissionsPage({ searchParams }: { searchParams: 
       roleNames: Array.from(new Set(u.roles.map((r) => r.role.name))),
       employeeLabel: u.employeeProfile ? `${u.employeeProfile.firstName} ${u.employeeProfile.lastName} (${u.employeeProfile.employeeNumber})` : null
     }));
-    devicesContent = <MultiDeviceAccessClient users={users} />;
+    devicesContent = <MultiDeviceAccessClient users={users} canResetAllDevices={roles.includes("SUPER_ADMIN")} />;
   }
 
   return (

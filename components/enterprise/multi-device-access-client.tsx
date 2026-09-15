@@ -16,9 +16,16 @@ type AdminUser = {
   employeeLabel: string | null;
 };
 
-export function MultiDeviceAccessClient({ users }: { users: AdminUser[] }) {
+export function MultiDeviceAccessClient({
+  users,
+  canResetAllDevices = false,
+}: {
+  users: AdminUser[];
+  canResetAllDevices?: boolean;
+}) {
   const [rows, setRows] = useState(users);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [isResettingAll, setIsResettingAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedNewUserId, setSelectedNewUserId] = useState("");
   const [selectedNewUserLabel, setSelectedNewUserLabel] = useState("");
@@ -105,6 +112,41 @@ export function MultiDeviceAccessClient({ users }: { users: AdminUser[] }) {
     }
   }
 
+  async function handleResetAllDevices() {
+    const accepted = confirm(
+      "تحذير: سيؤدي هذا إلى فك ارتباط جميع أجهزة جميع الموظفين. سيحتاج كل موظف إلى تسجيل الدخول وربط جهازه من جديد. هل تريد المتابعة؟"
+    );
+    if (!accepted) return;
+
+    const typedConfirmation = window.prompt("للتأكيد اكتب: UNBIND_ALL_DEVICES");
+    if (typedConfirmation !== "UNBIND_ALL_DEVICES") {
+      alert("تم إلغاء العملية؛ نص التأكيد غير صحيح.");
+      return;
+    }
+
+    setError(null);
+    setIsResettingAll(true);
+    try {
+      const res = await fetch("/api/enterprise/reset-all-devices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmation: "UNBIND_ALL_DEVICES" }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        setError(json.message || "تعذر فك ارتباط جميع الأجهزة");
+        return;
+      }
+
+      alert(`${json.message || "تم فك ارتباط جميع الأجهزة."}\n\nمهم: أعد نشر/تشغيل التطبيق الآن لمسح cache من أي خوادم تعمل بالفعل.`);
+      window.location.reload();
+    } catch {
+      setError("تعذر الاتصال بالخادم أثناء فك ارتباط الأجهزة");
+    } finally {
+      setIsResettingAll(false);
+    }
+  }
+
   return (
     <div className="space-y-6" dir="rtl">
       {/* 1. Add Employee / Grant Multi-Device & Unbind Control Card */}
@@ -142,6 +184,25 @@ export function MultiDeviceAccessClient({ users }: { users: AdminUser[] }) {
           </Button>
         </div>
       </div>
+
+      {canResetAllDevices ? (
+        <div className="flex flex-col gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-rose-900/70 dark:bg-rose-950/25">
+          <div>
+            <p className="font-bold text-rose-900 dark:text-rose-200">إعادة تعيين جميع الأجهزة</p>
+            <p className="mt-1 text-xs leading-5 text-rose-800 dark:text-rose-300">استخدم هذا الإجراء عند ظهور خطأ ارتباط الجهاز على نطاق واسع. سيتم حذف جميع الارتباطات، ثم يربط كل موظف جهازه عند أول دخول ناجح.</p>
+          </div>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={handleResetAllDevices}
+            disabled={isResettingAll}
+            className="shrink-0 gap-2 font-bold"
+          >
+            {isResettingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unlink className="h-4 w-4" />}
+            <span>{isResettingAll ? "جارٍ فك الارتباط..." : "فك ارتباط جميع الأجهزة"}</span>
+          </Button>
+        </div>
+      ) : null}
 
       {error ? (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-bold text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">{error}</div>
