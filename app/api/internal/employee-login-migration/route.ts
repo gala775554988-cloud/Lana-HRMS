@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
       await tx.$executeRawUnsafe(`SET LOCAL lock_timeout = '10s'`);
       await tx.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "loginEmail" TEXT, ADD COLUMN IF NOT EXISTS "loginEmailVerifiedAt" TIMESTAMP(3), ADD COLUMN IF NOT EXISTS "employeePasswordMode" TEXT NOT NULL DEFAULT 'IDENTITY_SUFFIX', ADD COLUMN IF NOT EXISTS "sessionVersion" INTEGER NOT NULL DEFAULT 0`);
       await tx.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "User_loginEmail_key" ON "User"("loginEmail")`);
+      await tx.auditLog.create({ data: { action: "database:employee_login_migrated", entity: "User", metadata: { migration: "20261028000100_employee_login_enrollment", source: "authorized-deployment" } } });
     }, { timeout: 30000 });
     const columns = await client.$queryRawUnsafe<Array<{ column_name: string }>>(`SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'User' AND column_name IN ('loginEmail','loginEmailVerifiedAt','employeePasswordMode','sessionVersion') ORDER BY column_name`);
     const indexes = await client.$queryRawUnsafe<Array<{ indexname: string }>>(`SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename = 'User' AND indexname = 'User_loginEmail_key'`);
