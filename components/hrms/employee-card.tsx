@@ -46,11 +46,13 @@ const InfoRow = memo(function InfoRow({ icon: Icon, value }: { icon: LucideIcon;
 });
 
 export const EmployeeCard = memo(function EmployeeCard({ employee, locale = "ar", onView, onEdit, onDocuments, onMore, onArchive }: EmployeeCardProps) {
+  const date = (value?: string | null) => value && !Number.isNaN(new Date(value).getTime()) ? new Date(value).toLocaleDateString(locale === "ar" ? "ar-SA" : "en-US", { year: "numeric", month: "short", day: "numeric" }) : (locale === "ar" ? "غير مسجل" : "Not recorded");
   const fullName = `${employee.firstName} ${employee.lastName}`;
   const initials = `${employee.firstName.charAt(0)}${employee.lastName.charAt(0)}`.toUpperCase();
 
   return (
-    <div className="employee-card group border-slate-200/80 bg-white/95 dark:border-slate-800 dark:bg-slate-900/85">
+    <div className="employee-card group relative overflow-hidden border-slate-200/80 bg-white/95 shadow-sm transition duration-200 hover:-translate-y-1 dark:border-slate-800 dark:bg-slate-900/85">
+      <div className="h-1 w-full bg-gradient-to-l from-indigo-600 via-blue-500 to-cyan-400 opacity-75" />
       <button type="button" className="block w-full p-5 pb-3 text-start" onClick={() => onView(employee.id)}>
         <div className="flex items-start gap-4">
           {employee.profilePhotoUrl ? (
@@ -61,8 +63,8 @@ export const EmployeeCard = memo(function EmployeeCard({ employee, locale = "ar"
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <h3 className="font-semibold text-foreground truncate text-base">{fullName}</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">{employee.employeeNumber}</p>
+                <h3 title={fullName} className="min-h-12 text-sm font-bold leading-6 text-foreground line-clamp-2">{fullName}</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">{locale === "ar" ? "رقم الموظف · " : "Employee · "}{employee.employeeNumber}</p>
               </div>
               <StatusBadge status={employee.status} locale={locale} size="sm" />
             </div>
@@ -75,12 +77,12 @@ export const EmployeeCard = memo(function EmployeeCard({ employee, locale = "ar"
         <InfoRow icon={Building2} value={employee.department?.name} />
         <InfoRow icon={Briefcase} value={employee.branch?.name} />
         <InfoRow icon={FileText} value={employee.employmentType?.name} />
-        <InfoRow icon={Calendar} value={employee.hireDate} />
-        <InfoRow icon={Clock} value={employee.lastLoginAt || (locale === "ar" ? "لم يسجل" : "Never")} />
+        <InfoRow icon={Calendar} value={date(employee.hireDate)} />
+        <InfoRow icon={Clock} value={employee.lastLoginAt ? `${locale === "ar" ? "آخر دخول · " : "Last login · "}${date(employee.lastLoginAt)}` : (locale === "ar" ? "لم يسجل الدخول بعد" : "No login yet")} />
       </div>
 
-      <div className="border-t border-slate-100 bg-slate-50/50 px-3 py-2.5 flex items-center justify-between dark:border-slate-800 dark:bg-slate-900/50">
-        <div className="flex items-center gap-1">
+      <div className="border-t border-slate-100 bg-slate-50/50 px-3 py-2.5 flex flex-wrap items-center justify-between gap-1 dark:border-slate-800 dark:bg-slate-900/50">
+        <div className="flex flex-wrap items-center gap-1">
           <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs text-slate-600 hover:bg-primary/10 hover:text-primary dark:text-slate-300 dark:hover:bg-primary/15 dark:hover:text-primary" onClick={() => onEdit(employee.id)}>
             <Eye className="h-3.5 w-3.5" />{locale === "ar" ? "الملف الكامل" : "Full Profile"}
           </Button>

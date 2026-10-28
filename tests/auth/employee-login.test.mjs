@@ -295,3 +295,16 @@ test('loginAction omits absent optional fields before Auth.js URLSearchParams se
   assert.equal(Object.hasOwn(forwarded[1], 'enrollmentEmail'), false);
   assert.equal(Object.hasOwn(forwarded[1], 'activationCode'), false);
 });
+
+test('employee activity summaries never forward raw device metadata or unrecognized account fields', async () => {
+  const subject = await loadModule('lib/hrms/employee-activity.ts', {});
+  const secret = 'private-device-or-password-value';
+  const legacy = subject.presentEmployeeActivity('auth:device_binding_blocked', { attemptedDeviceId: secret, ip: '192.0.2.1' });
+  assert.equal(JSON.stringify(legacy).includes(secret), false);
+  assert.equal(legacy.description.includes('لم يعد ارتباط الجهاز شرطاً'), true);
+  const account = subject.presentEmployeeActivity('employee:account_updated', { fields: ['password', '__proto__', 'toString', secret], password: secret });
+  assert.equal(account.description, 'تم تحديث: كلمة المرور.');
+  assert.equal(JSON.stringify(account).includes(secret), false);
+  const other = subject.presentEmployeeActivity(secret, { raw: secret });
+  assert.equal(JSON.stringify(other).includes(secret), false);
+});

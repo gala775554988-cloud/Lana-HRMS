@@ -129,9 +129,9 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
   }, [router, fromHref]);
   
   const handleDocuments = useCallback((id: string) => {
-    router.prefetch(`/contracts?tab=documents&documents__employeeId=${id}`);
+    router.prefetch(`/employees/${id}?tab=documents`);
     startTransition(() => {
-      router.push(`/contracts?tab=documents&documents__employeeId=${id}`);
+      router.push(`/employees/${id}?tab=documents`);
     });
   }, [router]);
 

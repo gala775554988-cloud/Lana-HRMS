@@ -7,7 +7,8 @@ import PasswordManagementClient from "@/components/hrms/password-management-clie
 
 export const dynamic = "force-dynamic";
 
-export default async function PasswordManagementPage() {
+export default async function PasswordManagementPage({ searchParams }: { searchParams?: Promise<{ employee?: string }> }) {
+  const query = await searchParams;
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   if (!canManageEmployeeAccounts(session.user.roles ?? [])) redirect("/");
@@ -20,7 +21,7 @@ export default async function PasswordManagementPage() {
     <div className="space-y-6 p-6" dir="rtl">
       <div>
         <h1 className="text-3xl font-bold">إدارة حسابات الموظفين وكلمات المرور</h1>
-        <p className="text-muted-foreground mt-2">إنشاء كلمات مرور مؤقتة آمنة مع إجبار الموظف على تغييرها عند أول دخول — متاح لإدارة الموارد البشرية ومدير النظام فقط.</p>
+        <p className="text-muted-foreground mt-2">إدارة بيانات الدخول والبريد وإصدار رموز تفعيل الموظفين من مساحة واحدة — لمدير النظام ومدير الموارد البشرية.</p>
         <div className="mt-4 grid gap-4 md:grid-cols-3">
           <div className="rounded-lg border p-4">
             <div className="text-sm text-muted-foreground">إجمالي الموظفين</div>
@@ -37,7 +38,7 @@ export default async function PasswordManagementPage() {
           </div>
         </div>
       </div>
-      <EmployeeAccountManagement />
+      <EmployeeAccountManagement initialEmployeeId={query?.employee} />
       <PasswordManagementClient totalEmployees={totalEmployees} />
     </div>
   );

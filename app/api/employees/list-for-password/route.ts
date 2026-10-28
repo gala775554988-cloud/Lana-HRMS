@@ -25,9 +25,11 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     const search = searchParams.get("search") || "";
-    const take = Math.min(Number(searchParams.get("take") || 100), 500);
+    const requestedTake = Number(searchParams.get("take") || 100);
+    const take = Number.isFinite(requestedTake) ? Math.max(1, Math.min(Math.floor(requestedTake), 500)) : 100;
 
-    const where: any = {};
+    const employeeId = searchParams.get("employeeId");
+    const where: any = employeeId ? { id: employeeId } : {};
     if (search) {
       where.OR = [
         { firstName: { contains: search, mode: "insensitive" } },

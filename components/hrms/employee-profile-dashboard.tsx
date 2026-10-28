@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { 
@@ -11,6 +11,8 @@ import {
   CalendarDays, Clock3, Award, File, Upload, Trash2, Eye,
   Search, Filter, Plus, Smartphone, RefreshCw, Landmark, History
 } from "lucide-react";
+import { ProfileHero, ProfileOverview, ProfileActivityFeed, EmployeeDocumentLibrary } from "@/components/hrms/employee-profile-sections";
+import { EmployeeAccountManagement } from "@/components/hrms/employee-account-management";
 import { SocialInsuranceEditDialog } from "@/components/enterprise/social-insurance-client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -53,6 +55,10 @@ interface Props {
   permissionsScopeContent?: React.ReactNode;
   deviceBinding?: DeviceBinding | null;
   canEditLeaveBalance?: boolean;
+  canManageAccounts?: boolean;
+  canEditProfile?: boolean;
+  canManageDocuments?: boolean;
+  initialTab?: string;
   backHref?: string;
   dictionary: any;
   locale: string;
@@ -82,15 +88,43 @@ export function EmployeeProfileDashboard({
   permissionsScopeContent,
   deviceBinding,
   canEditLeaveBalance,
+  canManageAccounts = false,
+  canEditProfile = false,
+  canManageDocuments = false,
+  initialTab = "overview",
   backHref,
   dictionary,
   locale,
 }: Props) {
   const router = useRouter();
   const isAr = locale === "ar";
-  const [activeTab, setActiveTab] = useState("personal");
+  const sections = [
+    { value: "overview", label: "نظرة عامة", icon: Activity },
+    { value: "personal", label: "البيانات الشخصية", icon: User },
+    { value: "job", label: "الملف الوظيفي", icon: Briefcase },
+    { value: "documents", label: "المستندات والمرفقات", icon: FileText },
+    { value: "salary", label: "الرواتب والمزايا", icon: Wallet },
+    { value: "contracts", label: "العقود", icon: FileCheck },
+    ...(canManageAccounts ? [{ value: "account", label: "الحساب والتفعيل", icon: KeyRound }] : []),
+    { value: "attendance", label: "الحضور", icon: Clock },
+    { value: "leaves", label: "الإجازات", icon: Calendar },
+    { value: "career", label: "المؤهلات والخبرات", icon: Award },
+    { value: "social-insurance", label: "التأمينات", icon: Landmark },
+    { value: "performance", label: "الأداء", icon: BarChart3 },
+    { value: "assets", label: "العهد والأصول", icon: Laptop },
+    { value: "permissions", label: "الصلاحيات", icon: Shield },
+    { value: "activity", label: "سجل النشاط", icon: History },
+  ];
+  const [activeTab, setActiveTab] = useState(sections.some(section => section.value === initialTab) ? initialTab : "overview");
+  const selectTab = (value: string) => {
+    setActiveTab(value);
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", value);
+    window.history.replaceState(null, "", url.toString());
+  };
   const [searchDocs, setSearchDocs] = useState("");
   const [docs, setDocs] = useState<any[]>(documents || []);
+  useEffect(() => { setDocs(documents || []); }, [documents]);
   const [folders, setFolders] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isSyncingOdooDocs, setIsSyncingOdooDocs] = useState(false);
@@ -354,77 +388,17 @@ export function EmployeeProfileDashboard({
           </Button>
         </div>
       )}
-      <Card className="overflow-hidden">
-        <CardContent className="p-0">
-          <div className="p-5">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
-              <Avatar className="h-20 w-20 rounded-xl border">
-                {employee.profilePhotoUrl ? (
-                  <AvatarImage src={employee.profilePhotoUrl} alt={fullName} className="object-cover" />
-                ) : (
-                  <AvatarFallback className="text-xl font-bold bg-primary/10 text-primary">{initials}</AvatarFallback>
-                )}
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <h1 className="text-2xl font-bold tracking-tight">{fullName}</h1>
-                    </div>
-                    <p className="text-muted-foreground mt-1 flex flex-wrap gap-2 text-sm">
-                      <span className="font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full text-xs">{employee.employeeNumber}</span>
-                      <span className="font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full text-xs">{employee.nationalId}</span>
-                      <Badge variant={employee.status === "ACTIVE" ? "default" : "secondary"}>{employee.status}</Badge>
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
-                      <div className="flex items-center gap-2"><Briefcase className="h-4 w-4 text-muted-foreground" /><span>{employee.position?.title || "-"}</span></div>
-                      <div className="flex items-center gap-2"><Building2 className="h-4 w-4 text-muted-foreground" /><span>{employee.department?.name || "-"}</span></div>
-                      <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-muted-foreground" /><span>{employee.branch?.name || "-"}</span></div>
-                      <div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-muted-foreground" /><span>{employee.hireDate ? new Date(employee.hireDate).toLocaleDateString(isAr ? "ar-SA" : "en-US") : "-"}</span></div>
-                      <div className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-muted-foreground" /><span>{yearsOfService}</span></div>
-                      <div className="flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground" /><span>المدير: {(employee as any).manager ? `${(employee as any).manager.firstName} ${(employee as any).manager.lastName}` : "-"}</span></div>
-                      <div className="flex items-center gap-2"><Activity className="h-4 w-4 text-muted-foreground" /><span>آخر دخول: {employee.user?.lastLoginAt ? new Date(employee.user.lastLoginAt).toLocaleDateString(isAr ? "ar-SA" : "en-US") : "لم يسجل"}</span></div>
-                      <div className="flex items-center gap-2"><FileCheck className="h-4 w-4 text-muted-foreground" /><span>آخر مزامنة Odoo: {lastSync ? new Date(lastSync).toLocaleDateString(isAr ? "ar-SA" : "en-US") : "-"}</span></div>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" onClick={() => router.push(`/employees/${employee.id}/edit`)}><Edit className="h-4 w-4 ml-1" />تعديل</Button>
-                    <Button size="sm" variant="outline" onClick={() => window.print()}><Printer className="h-4 w-4 ml-1" />طباعة</Button>
-                    <Button size="sm" variant={employee.status === "INACTIVE" ? "outline" : "destructive"} onClick={handleArchive} className="gap-1">
-                      {employee.status === "INACTIVE" ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
-                      {employee.status === "INACTIVE" ? "إلغاء الأرشفة" : "أرشفة"}
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={handleResetPassword} className="gap-1"><KeyRound className="h-4 w-4" />إعادة تعيين كلمة المرور</Button>
-                    <Button size="sm" variant="outline" onClick={handleUnbindDevice} className="gap-1.5 border-amber-300 hover:bg-amber-50 text-amber-800 dark:border-amber-800 dark:hover:bg-amber-950/50 dark:text-amber-300">
-                      <Smartphone className="h-4 w-4" />
-                      {isAr ? "إلغاء ربط الجهاز" : "Unbind Device"}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <ProfileHero employee={employee} yearsOfService={yearsOfService} isAr={isAr} canEdit={canEditProfile} canManageAccounts={canManageAccounts} onSelect={selectTab} onArchive={handleArchive} onResetPassword={handleResetPassword} onUnbind={handleUnbindDevice} />
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="sticky top-0 z-10 overflow-x-auto border-b bg-background py-2">
-          <TabsList className="inline-flex h-10 min-w-max gap-1 bg-transparent">
-            <TabsTrigger value="personal" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><User className="h-4 w-4 ml-1" />الشخصية</TabsTrigger>
-            <TabsTrigger value="job" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Briefcase className="h-4 w-4 ml-1" />الوظيفة</TabsTrigger>
-            <TabsTrigger value="career" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Award className="h-4 w-4 ml-1" />المؤهلات والخبرات</TabsTrigger>
-            <TabsTrigger value="salary" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Wallet className="h-4 w-4 ml-1" />الرواتب</TabsTrigger>
-            <TabsTrigger value="attendance" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Clock className="h-4 w-4 ml-1" />الحضور</TabsTrigger>
-            <TabsTrigger value="leaves" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Calendar className="h-4 w-4 ml-1" />الإجازات</TabsTrigger>
-            <TabsTrigger value="documents" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><FileText className="h-4 w-4 ml-1" />المستندات</TabsTrigger>
-            <TabsTrigger value="contracts" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><FileCheck className="h-4 w-4 ml-1" />العقود</TabsTrigger>
-            <TabsTrigger value="social-insurance" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Landmark className="h-4 w-4 ml-1" />التأمينات الاجتماعية</TabsTrigger>
-            <TabsTrigger value="performance" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><BarChart3 className="h-4 w-4 ml-1" />الأداء</TabsTrigger>
-            <TabsTrigger value="assets" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Laptop className="h-4 w-4 ml-1" />الأصول</TabsTrigger>
-            <TabsTrigger value="permissions" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Shield className="h-4 w-4 ml-1" />الصلاحيات</TabsTrigger>
-            <TabsTrigger value="activity" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white"><Activity className="h-4 w-4 ml-1" />النشاط</TabsTrigger>
+      <Tabs dir={isAr ? "rtl" : "ltr"} value={activeTab} onValueChange={selectTab} className="w-full">
+        <div className="sticky top-16 z-20 rounded-2xl border bg-card/95 p-2 shadow-sm backdrop-blur print:static">
+          <div className="flex items-center gap-3 px-2 sm:hidden"><label htmlFor="profile-section" className="shrink-0 text-xs font-semibold">انتقل إلى</label><select id="profile-section" value={activeTab} onChange={event => selectTab(event.target.value)} className="min-w-0 flex-1 rounded-xl border bg-background p-2.5 text-sm">{sections.map(section => <option key={section.value} value={section.value}>{section.label}</option>)}</select></div>
+          <TabsList className="hidden h-auto w-full flex-wrap justify-start gap-1 bg-transparent p-0 sm:flex">
+            {sections.map(({ value, label, icon: Icon }) => <TabsTrigger key={value} value={value} className="gap-2 rounded-xl px-3 py-2.5 text-xs text-muted-foreground transition data-[state=active]:bg-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-sm"><Icon className="h-3.5 w-3.5 shrink-0" />{label}</TabsTrigger>)}
           </TabsList>
         </div>
+        <TabsContent value="overview" className="mt-6"><ProfileOverview employee={employee} documents={docs} contracts={contracts} payrollItems={payrollItems} activity={auditLogs} canManageAccounts={canManageAccounts} onSelect={selectTab} /></TabsContent>
+        {canManageAccounts ? <TabsContent value="account" className="mt-6"><EmployeeAccountManagement initialEmployeeId={employee.id} /></TabsContent> : null}
 
         {/* 1- Personal */}
         <TabsContent value="personal" className="space-y-4 mt-6">
@@ -480,29 +454,22 @@ export function EmployeeProfileDashboard({
         </TabsContent>
 
         {/* 3- Salaries */}
-        <TabsContent value="salary" className="space-y-4 mt-6">
+        <TabsContent value="salary" className="space-y-5 mt-6">
+          <div className="flex flex-col justify-between gap-4 rounded-2xl border bg-card p-5 sm:flex-row sm:items-center"><div><p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-indigo-600">الملف المالي</p><h2 className="text-xl font-bold">الرواتب والمزايا المالية</h2><p className="mt-2 text-xs text-muted-foreground">تفاصيل الاستحقاقات والبدلات والاستقطاعات وكشوف الرواتب المسجلة.</p></div>{payrollItems[0] ? <Button asChild className="gap-2 rounded-xl"><a href={`/print-reports/payslip?itemId=${payrollItems[0].id}`} target="_blank" rel="noreferrer"><Download className="h-4 w-4" />آخر كشف راتب</a></Button> : null}</div>
           {(() => {
             const activeContract = contracts.find((c: any) => c.status === "ACTIVE") ?? contracts[0];
             const latestItem = payrollItems[0];
             const primaryBank = bankAccounts.find((b: any) => b.isPrimary) ?? bankAccounts[0];
-            const grossFromProfile =
-              (salaryProfile?.salaryBase ?? 0) +
-              (salaryProfile?.salaryHousingAllowance ?? 0) +
-              (salaryProfile?.salaryTransportAllowance ?? 0) +
-              (salaryProfile?.salaryFoodAllowance ?? 0) +
-              (salaryProfile?.salaryCommunicationAllowance ?? 0) +
-              (salaryProfile?.salaryOtherAllowances ?? 0);
+            const grossFromProfile = [salaryProfile?.salaryBase, salaryProfile?.salaryHousingAllowance, salaryProfile?.salaryTransportAllowance, salaryProfile?.salaryFoodAllowance, salaryProfile?.salaryCommunicationAllowance, salaryProfile?.salaryOtherAllowances].reduce((sum: number, value: unknown) => sum + (Number(value) || 0), 0);
             const runStatusLabel: Record<string, string> = {
               DRAFT: "مسودة", PROCESSING: "قيد المراجعة", APPROVED: "تم الاعتماد", PAID: "تم الصرف", CANCELLED: "ملغي"
             };
             const bonusTypeLabel: Record<string, string> = { BONUS: "مكافأة", COMMISSION: "عمولة", INCENTIVE: "حافز", REWARD: "جائزة" };
             return (
               <>
-                <div className="grid gap-4 md:grid-cols-4">
-                  <Card className="rounded-2xl"><CardContent className="p-4"><p className="text-xs text-muted-foreground">الراتب الأساسي</p><p className="text-xl font-bold mt-1">{Number(salaryProfile?.salaryBase ?? activeContract?.salaryAmount ?? 0).toLocaleString("ar-SA")}</p></CardContent></Card>
-                  <Card className="rounded-2xl"><CardContent className="p-4"><p className="text-xs text-muted-foreground">الراتب الإجمالي</p><p className="text-xl font-bold mt-1">{grossFromProfile.toLocaleString("ar-SA")}</p></CardContent></Card>
-                  <Card className="rounded-2xl"><CardContent className="p-4"><p className="text-xs text-muted-foreground">صافي الراتب</p><p className="text-xl font-bold mt-1 text-emerald-600">{Number(latestItem?.netPay ?? salaryProfile?.salaryNet ?? 0).toLocaleString("ar-SA")} {latestItem?.currency ?? activeContract?.currency ?? "SAR"}</p></CardContent></Card>
-                  <Card className="rounded-2xl"><CardContent className="p-4"><p className="text-xs text-muted-foreground">حالة آخر مسير رواتب</p><p className="text-xl font-bold mt-1">{latestItem?.payrollRun ? (runStatusLabel[latestItem.payrollRun.status] ?? latestItem.payrollRun.status) : "-"}</p></CardContent></Card>
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  {[{ label: "الراتب الأساسي", value: salaryProfile?.salaryBase ?? activeContract?.salaryAmount, icon: Briefcase }, { label: "الإجمالي الشهري", value: grossFromProfile, icon: Wallet }, { label: "صافي آخر راتب", value: latestItem?.netPay ?? salaryProfile?.salaryNet, icon: FileCheck }].map(({ label, value, icon: Icon }) => <div key={label} className={`rounded-2xl border p-5 ${label === "صافي آخر راتب" ? "border-indigo-600 bg-gradient-to-l from-indigo-700 to-blue-900 text-white shadow-sm" : "bg-card"}`}><div className="mb-4 flex items-center justify-between"><p className={`text-xs ${label === "صافي آخر راتب" ? "text-blue-100" : "text-muted-foreground"}`}>{label}</p><Icon className="h-4 w-4 opacity-60" /></div><p className="text-2xl font-bold tabular-nums">{value === null || value === undefined ? "—" : Number(value).toLocaleString("ar-SA")}<span className="ms-2 text-[11px] font-normal opacity-70">{latestItem?.currency ?? activeContract?.currency ?? "SAR"}</span></p></div>)}
+                  <div className="rounded-2xl border bg-card p-5"><p className="mb-5 text-xs text-muted-foreground">آخر دورة رواتب</p><p className="text-sm font-bold">{latestItem?.payrollRun ? (runStatusLabel[latestItem.payrollRun.status] ?? latestItem.payrollRun.status) : "لا يوجد مسير مسجل"}</p><p className="mt-2 text-xs text-muted-foreground">{latestItem?.payrollRun?.period ?? "تظهر الحالة عند تسجيل مسير رواتب"}</p></div>
                 </div>
 
                 <Card className="rounded-2xl">
@@ -595,7 +562,7 @@ export function EmployeeProfileDashboard({
                 </Card>
 
                 <Card className="rounded-2xl">
-                  <CardHeader><CardTitle>سجل الرواتب (لا يُحذف أبداً)</CardTitle></CardHeader>
+                  <CardHeader><CardTitle>كشوف الرواتب السابقة</CardTitle></CardHeader>
                   <CardContent>
                     {payrollItems.length === 0 ? (
                       <p className="text-center text-muted-foreground py-8">لا يوجد سجل رواتب بعد</p>
@@ -605,7 +572,7 @@ export function EmployeeProfileDashboard({
                           <thead><tr className="border-b text-right text-xs text-muted-foreground"><th className="p-2">الفترة</th><th className="p-2">الإجمالي</th><th className="p-2">الاستقطاعات</th><th className="p-2">الصافي</th><th className="p-2">الحالة</th><th className="p-2">تاريخ الصرف</th><th className="p-2">كشف الراتب</th></tr></thead>
                           <tbody>
                             {payrollItems.map((item: any) => (
-                              <tr key={item.id} className="border-b">
+                              <tr key={item.id} className="border-b transition-colors hover:bg-muted/40">
                                 <td className="p-2 font-medium">{item.payrollRun?.period ?? "-"}</td>
                                 <td className="p-2">{Number(item.grossPay ?? item.baseSalary).toLocaleString("ar-SA")}</td>
                                 <td className="p-2 text-rose-600">-{Number(item.deductionTotal).toLocaleString("ar-SA")}</td>
@@ -739,68 +706,13 @@ export function EmployeeProfileDashboard({
         </TabsContent>
 
         {/* 6- Documents */}
-        <TabsContent value="documents" className="space-y-4 mt-6">
-          <Card className="rounded-2xl">
-            <CardHeader>
-              <CardTitle>المستندات</CardTitle>
-              <CardDescription>مساحة مستندات الموظف - يدعم جميع الصيغ: PDF, Word, Excel, PPT, ZIP, RAR, PNG, JPG, WEBP, MP4, MOV, TXT, CSV, XML</CardDescription>
-              <div className="flex flex-wrap gap-2 mt-4">
-                <div className="relative flex-1 min-w-[240px] max-w-sm"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input value={searchDocs} onChange={(e) => setSearchDocs(e.target.value)} placeholder="بحث سريع..." className="pl-9" /></div>
-                <Button 
-                  size="sm" 
-                  disabled={isSyncingOdooDocs || !employee?.odooId} 
-                  onClick={handleSyncThisEmployeeDocs}
-                  className="bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold hover:from-teal-700 hover:to-emerald-700 shadow-sm"
-                >
-                  <RefreshCw className={`h-4 w-4 ml-1 ${isSyncingOdooDocs ? "animate-spin" : ""}`} />
-                  {isSyncingOdooDocs ? "جاري سحب المرفقات..." : "⚡ مزامنة مستندات الموظف من أودو الآن"}
-                </Button>
-                <Button size="sm" disabled={isUploading} onClick={() => fileInputRef.current?.click()}><Upload className="h-4 w-4 ml-1" />رفع متعدد</Button>
-                <Button size="sm" variant="outline" onClick={createFolder}>مجلد جديد</Button>
-                <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(event) => event.target.files && uploadDocuments(event.target.files)} />
-              </div>
-              {odooSyncResultMsg ? (
-                <div className="mt-2 p-2.5 rounded-xl bg-teal-50 dark:bg-teal-950/50 border border-teal-200 dark:border-teal-800 text-xs font-bold text-teal-800 dark:text-teal-200">
-                  {odooSyncResultMsg}
-                </div>
-              ) : null}
-              {folders.length ? <div className="mt-3 flex flex-wrap gap-2">{folders.map((folder) => <Badge key={folder} variant="outline">📁 {folder}</Badge>)}</div> : null}
-            </CardHeader>
-            <CardContent>
-              <div
-                className="border-2 border-dashed rounded-2xl p-12 text-center hover:border-primary/30 transition-colors"
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={(event) => { event.preventDefault(); uploadDocuments(event.dataTransfer.files); }}
-              >
-                <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-                <p className="font-bold">اسحب وأفلت الملفات هنا</p>
-                <p className="text-xs text-muted-foreground mt-1">يدعم: PDF, Word, Excel, PPT, ZIP, RAR, PNG, JPG, JPEG, WEBP, MP4, MOV, TXT, CSV, XML وأي صيغة أخرى</p>
-                <Button className="mt-4" size="sm" disabled={isUploading} onClick={() => fileInputRef.current?.click()}>اختر ملفات</Button>
-              </div>
-              <div className="mt-6 space-y-2">
-                {filteredDocs.map((doc: any) => (
-                  <div key={doc.id} className="flex items-center justify-between border rounded-xl p-3 hover:bg-muted/30">
-                    <div className="flex items-center gap-3"><File className="h-8 w-8 text-primary" /><div><p className="font-medium text-sm">{doc.name}</p><p className="text-xs text-muted-foreground">{doc.fileName} - {(doc.sizeBytes ? (Number(doc.sizeBytes)/1024).toFixed(1)+'KB' : '')} - {doc.type} - {doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString() : ''}</p></div></div>
-                    <div className="flex gap-1">
-                      <Button size="sm" variant="ghost" onClick={() => handleViewDocument(doc)} title="عرض المستند داخل النظام">
-                        <Eye className="h-4 w-4 text-primary" />
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => handleDownloadDocument(doc)} title="تنزيل المستند بسهولة">
-                        <Download className="h-4 w-4 text-primary" />
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => doc.id && deleteDocument(doc.id)} title="حذف المستند">
-                        <Trash2 className="h-4 w-4 text-rose-600" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-                {filteredDocs.length===0 && <p className="text-center text-muted-foreground py-8">لا يوجد مستندات - ارفع أول مستند</p>}
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent value="documents" className="mt-6 space-y-4">
+          <input aria-label="اختيار مستندات للرفع" ref={fileInputRef} type="file" multiple className="hidden" onChange={event => { if (event.target.files) void uploadDocuments(event.target.files); event.target.value = ""; }} />
+          <EmployeeDocumentLibrary files={filteredDocs} total={docs.length} search={searchDocs} onSearch={setSearchDocs} onView={handleViewDocument} onDownload={handleDownloadDocument} onDelete={deleteDocument} onUpload={() => fileInputRef.current?.click()} onDrop={uploadDocuments} onSync={handleSyncThisEmployeeDocs} onFolder={createFolder} uploading={isUploading} syncing={isSyncingOdooDocs} canSync={Boolean(employee.odooId)} canEdit={canManageDocuments} />
+          {odooSyncResultMsg ? <p role="status" className="rounded-xl border bg-card p-4 text-xs">{odooSyncResultMsg}</p> : null}
+          {folders.length ? <div className="flex flex-wrap gap-2">{folders.map(folder => <Badge key={folder} variant="outline">{folder}</Badge>)}</div> : null}
         </TabsContent>
 
-        {/* 7- Contracts */}
         <TabsContent value="contracts" className="space-y-4 mt-6">
           <Card className="rounded-2xl"><CardHeader><CardTitle>العقود</CardTitle><CardDescription>العقد الحالي والعقود السابقة والمرفقات المتاحة</CardDescription></CardHeader><CardContent>
             <div className="space-y-3">{contracts.map((c: any) => (<div key={c.id} className="border rounded-xl p-4 flex justify-between items-center"><div><p className="font-bold">{c.contractNumber} - {c.title}</p><p className="text-xs text-muted-foreground">{c.startDate ? new Date(c.startDate).toLocaleDateString() : ""} - {c.endDate ? new Date(c.endDate).toLocaleDateString() : "حتى الآن"} | {c.status} | {c.salaryAmount?.toString()} {c.currency}</p></div>{c.attachmentUrl ? <Button size="sm" variant="outline" onClick={() => handleViewDocument(c)}>عرض العقد</Button> : <span className="text-xs text-muted-foreground">لا يوجد مرفق</span>}</div>))}{contracts.length===0 && <p className="text-center text-muted-foreground py-8">لا توجد عقود مسجلة</p>}</div>
@@ -987,7 +899,7 @@ export function EmployeeProfileDashboard({
                 }`}
               >
                 <span className={`h-2.5 w-2.5 rounded-full ${deviceBound ? "bg-emerald-500 animate-pulse" : "bg-red-500"}`} />
-                {deviceBound ? (isAr ? "مرتبط بجهاز" : "Device bound") : (isAr ? "غير مرتبط" : "Not bound")}
+                {deviceBound ? (isAr ? "يوجد سجل جهاز سابق" : "Device bound") : (isAr ? "لا توجد سجلات أجهزة" : "Not bound")}
               </button>
             </CardHeader>
             <CardContent className="text-xs text-amber-800 dark:text-amber-300/90 leading-relaxed">
@@ -1013,23 +925,7 @@ export function EmployeeProfileDashboard({
         </TabsContent>
 
         {/* 11- Activity */}
-        <TabsContent value="activity" className="space-y-4 mt-6">
-          <Card className="rounded-2xl"><CardHeader><CardTitle>سجل النشاط - الخط الزمني</CardTitle><CardDescription>كل عملية تمت على الموظف - من عدل، متى، IP، جهاز، ما الذي تغير</CardDescription></CardHeader><CardContent>
-            <div className="space-y-4 relative before:absolute before:inset-y-0 before:left-4 before:w-0.5 before:bg-slate-200 dark:before:bg-slate-800">
-              {auditLogs.map((log: any, i: number) => (
-                <div key={log.id || i} className="relative flex gap-4">
-                  <div className="h-8 w-8 rounded-full bg-primary text-white grid place-items-center text-xs font-bold relative z-10">{i+1}</div>
-                  <div className="flex-1 border rounded-xl p-4 bg-white dark:bg-slate-900">
-                    <p className="font-bold text-sm">{log.action} - {log.entity}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{log.createdAt ? new Date(log.createdAt).toLocaleString() : ""} - IP: {(log.metadata as any)?.ip || "غير متوفر"} - جهاز: {(log.metadata as any)?.device || "غير متوفر"}</p>
-                    <pre className="text-xs mt-2 bg-slate-50 dark:bg-slate-800 p-2 rounded overflow-x-auto">{JSON.stringify(log.metadata || {}, null, 2).slice(0,200)}</pre>
-                  </div>
-                </div>
-              ))}
-              {auditLogs.length===0 && <p className="text-center text-muted-foreground py-8">لا يوجد نشاط</p>}
-            </div>
-          </CardContent></Card>
-        </TabsContent>
+        <TabsContent value="activity" className="mt-6"><Card className="rounded-2xl"><CardHeader><CardTitle>سجل نشاط الموظف</CardTitle><CardDescription>تسلسل واضح لتحديثات الملف والحساب. الأحداث القديمة محفوظة للمراجعة.</CardDescription></CardHeader><CardContent><ProfileActivityFeed entries={auditLogs} /></CardContent></Card></TabsContent>
 
         {/* 12- AI */}
         <TabsContent value="ai" className="space-y-4 mt-6">
@@ -1042,8 +938,8 @@ export function EmployeeProfileDashboard({
       {/* In-App Universal Document Preview Modal (عرض المستند داخل النظام بدون تعقيد) */}
       {activePreviewDoc ? (
         <Dialog open={true} onOpenChange={() => setActivePreviewDoc(null)}>
-          <DialogContent className="max-w-4xl w-full h-[88vh] flex flex-col p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl transition-all duration-300 animate-in fade-in slide-in-from-top-4" dir="rtl">
-            <DialogHeader className="flex flex-row items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4 shrink-0">
+          <DialogContent className="max-w-4xl w-[calc(100vw-2rem)] h-[88vh] flex flex-col p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl transition-all duration-300 animate-in fade-in slide-in-from-top-4" dir="rtl">
+            <DialogHeader className="flex flex-col gap-3 sm:flex-row sm:items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4 shrink-0">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary font-bold">
                   📄
@@ -1063,7 +959,7 @@ export function EmployeeProfileDashboard({
                   className="bg-primary text-white hover:bg-primary/90 font-black text-xs h-10 px-5 rounded-xl shadow-xs gap-1.5"
                 >
                   <Download className="h-4 w-4" />
-                  <span>تنزيل المستند بسهولة إلى جهازك</span>
+                  <span>تنزيل المستند</span>
                 </Button>
                 <DialogClose onClick={() => setActivePreviewDoc(null)} />
               </div>
@@ -1077,12 +973,14 @@ export function EmployeeProfileDashboard({
                   alt={activePreviewDoc.fileName || activePreviewDoc.name}
                   className="max-h-full max-w-full object-contain rounded-xl shadow-md mx-auto"
                 />
-              ) : (
+              ) : activePreviewDoc.mimeType === "application/pdf" || (activePreviewDoc.fileUrl || activePreviewDoc.attachmentUrl)?.startsWith("data:application/pdf") || /\.pdf(?:$|\?)/i.test(activePreviewDoc.fileName || activePreviewDoc.fileUrl || activePreviewDoc.attachmentUrl || "") ? (
                 <iframe
                   src={activePreviewDoc.fileUrl || activePreviewDoc.attachmentUrl}
                   title={activePreviewDoc.fileName || activePreviewDoc.name}
                   className="w-full h-full rounded-xl border-0 bg-white shadow-inner"
                 />
+              ) : (
+                <div className="max-w-sm p-6 text-center"><FileText className="mx-auto mb-4 h-12 w-12 text-indigo-500" /><h3 className="text-base font-bold">الملف جاهز للتنزيل</h3><p className="mt-3 text-xs leading-6 text-muted-foreground">المعاينة المباشرة غير متاحة لهذا النوع. نزّل الملف لفتحه بالتطبيق المناسب على جهازك.</p><Button className="mt-5 gap-2 rounded-xl" onClick={() => handleDownloadDocument(activePreviewDoc)}><Download className="h-4 w-4" />تنزيل الملف</Button></div>
               )}
             </div>
           </DialogContent>
@@ -1094,13 +992,13 @@ export function EmployeeProfileDashboard({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
               <Smartphone className="h-5 w-5" />
-              {isAr ? "فك ارتباط جهاز الموظف" : "Unbind employee device"}
+              {isAr ? "تنظيف سجل الأجهزة السابق" : "Unbind employee device"}
             </DialogTitle>
             <DialogClose onClick={() => setShowUnbindModal(false)} />
           </DialogHeader>
           <p className="text-sm text-muted-foreground leading-relaxed">
             {isAr
-              ? `هل أنت متأكد من فك ارتباط جهاز الجوال للموظف (${fullName})؟ سيتمكن الموظف من تسجيل الدخول من جهاز جديد بعد هذه العملية.`
+              ? `هل أنت متأكد من فك ارتباط جهاز الجوال للموظف (${fullName})؟ سيتم تنظيف السجل السابق فقط؛ ارتباط الأجهزة لم يعد شرطاً لتسجيل الدخول.`
               : `Unbind the mobile device for ${fullName}? They will be able to sign in from a new device afterward.`}
           </p>
           {deviceBinding?.bound && (

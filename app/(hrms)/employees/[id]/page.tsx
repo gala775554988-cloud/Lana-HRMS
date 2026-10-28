@@ -9,6 +9,9 @@ import { memoryCache } from "@/lib/cache/memory-cache";
 import { getAllLeaveTypeBalances } from "@/lib/enterprise/leave-engine";
 import { EmployeeProfileDashboard } from "@/components/hrms/employee-profile-dashboard";
 import { PermissionsScope } from "@/components/hrms/permissions-scope";
+import { presentEmployeeActivity } from "@/lib/hrms/employee-activity";
+import { canManageEmployeeAccounts } from "@/lib/auth/account-management";
+import { hasPermission } from "@/lib/rbac";
 import { hasAnyRole } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
@@ -185,7 +188,8 @@ export default async function EmployeeProfilePage({
       include: { payrollRun: { select: { name: true, period: true, status: true, paidAt: true } } }
     }).catch(() => []),
     prisma.auditLog.findMany({
-      where: { entityId: id },
+      where: { entityId: { in: [id, ...(employee.userId ? [employee.userId] : [])] } },
+      include: { actor: { select: { name: true } } },
       orderBy: { createdAt: 'desc' },
       take: 20,
     }).catch(() => []),
@@ -251,7 +255,7 @@ export default async function EmployeeProfilePage({
       assets={assets as any}
       evaluations={evaluations as any}
       payrollItems={payrollItems as any}
-      auditLogs={auditLogs as any}
+      auditLogs={auditLogs.map(log => ({ id: log.id, createdAt: log.createdAt, actorName: log.actor?.name, ...presentEmployeeActivity(log.action, log.metadata) }))}
       socialInsurance={socialInsurance as any}
       socialInsuranceDocuments={socialInsuranceDocuments as any}
       bankAccounts={bankAccounts as any}
@@ -261,6 +265,10 @@ export default async function EmployeeProfilePage({
       permissionsScopeContent={<PermissionsScope employeeId={id} />}
       deviceBinding={deviceBinding}
       canEditLeaveBalance={hasAnyRole(session, ["SUPER_ADMIN", "HR_MANAGER"])}
+      canManageAccounts={canManageEmployeeAccounts(session.user.roles ?? []) && employee.userId !== session.user.id}
+      canEditProfile={hasPermission(session.user.permissions, { action: "manage", resource: "employees" }, session.user.roles)}
+      canManageDocuments={hasPermission(session.user.permissions, { action: "manage", resource: "documents" }, session.user.roles)}
+      initialTab={typeof query.tab === "string" ? query.tab : "overview"}
       backHref={backHref}
       dictionary={dictionary}
       locale={locale}
