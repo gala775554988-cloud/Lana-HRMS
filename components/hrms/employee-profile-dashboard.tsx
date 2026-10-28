@@ -182,8 +182,8 @@ export function EmployeeProfileDashboard({
 
   const handleArchive = async () => {
     const isArchived = employee.status === "INACTIVE" || employee.status === "TERMINATED";
-    const reason = isArchived ? "" : prompt(isAr ? "سبب الأرشفة (اختياري):" : "Archive reason (optional):") || "";
-    if (!isArchived && reason === null) return;
+    const reason = isArchived ? "" : prompt(isAr ? "سبب الأرشفة (اختياري):" : "Archive reason (optional):");
+    if (reason === null) return;
     try {
       const res = await fetch("/api/employees/archive", {
         method: "POST",

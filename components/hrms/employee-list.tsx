@@ -137,8 +137,8 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
 
   const handleArchive = useCallback(async (id: string, currentStatus: string) => {
     const isArchived = currentStatus === "INACTIVE" || currentStatus === "TERMINATED";
-    const reason = isArchived ? "" : prompt(isAr ? "سبب الأرشفة (اختياري):" : "Archive reason (optional):") || "";
-    if (!isArchived && reason === null) return; // cancelled
+    const reason = isArchived ? "" : prompt(isAr ? "سبب الأرشفة (اختياري):" : "Archive reason (optional):");
+    if (reason === null) return; // cancelled
 
     try {
       const res = await fetch("/api/employees/archive", {
