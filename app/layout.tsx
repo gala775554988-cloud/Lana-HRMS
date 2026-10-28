@@ -1,3 +1,4 @@
+import { FloatingBackButton } from "@/components/ui/floating-back-button";
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans_Arabic } from "next/font/google";
 import { cookies, headers } from "next/headers";
@@ -84,6 +85,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               <PWARegister />
               <I18nRuntime initialLocale={locale} />
               {children}
+              <FloatingBackButton />
               <PWAInstallPrompt />
             </ThemeProvider>
           </QueryProvider>

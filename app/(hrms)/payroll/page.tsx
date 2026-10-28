@@ -25,14 +25,14 @@ export default async function PayrollPage({
   const activeTab = typeof query.tab === "string" ? query.tab : "dashboard";
   return (
     <div className="space-y-6" dir="rtl">
-      <header className="overflow-hidden rounded-3xl bg-gradient-to-l from-slate-950 via-blue-950 to-indigo-950 p-6 text-white shadow-sm sm:p-8">
+      <header className="overflow-hidden rounded-3xl lana-contrast-banner bg-slate-950 p-6 text-white shadow-sm sm:p-8">
         <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
           <div>
-            <p className="mb-2 text-[10px] tracking-widest text-blue-200/70">
+            <p className="mb-2 text-[10px] tracking-widest text-blue-100">
               الرواتب والاستحقاقات
             </p>
             <h1 className="text-2xl font-bold">المساحة المالية للموظفين</h1>
-            <p className="mt-3 max-w-xl text-xs leading-6 text-blue-100/75">
+            <p className="mt-3 max-w-xl text-xs leading-6 text-blue-100">
               نظرة منظمة على المسيرات والمستحقات، مع وصول مباشر للفترات وكشوف
               الرواتب.
             </p>

@@ -86,9 +86,9 @@ export function ProfileHero({
       className="overflow-hidden rounded-3xl border border-slate-200 bg-card shadow-sm dark:border-slate-800"
       aria-label="ملخص ملف الموظف"
     >
-      <div className="relative overflow-hidden bg-gradient-to-l from-slate-950 via-blue-950 to-indigo-950 px-5 pb-14 pt-6 text-white sm:px-8">
+      <div className="relative overflow-hidden lana-contrast-banner bg-slate-950 px-5 pb-14 pt-6 text-white sm:px-8">
         <div className="pointer-events-none absolute -end-12 -top-28 h-80 w-80 rounded-full border-[45px] border-white/[0.025]" />
-        <div className="relative flex flex-wrap items-center justify-between gap-3 text-xs text-blue-100/75">
+        <div className="relative flex flex-wrap items-center justify-between gap-3 text-xs text-blue-100">
           <Link
             href="/employees"
             className="flex items-center gap-2 hover:text-white"
@@ -121,7 +121,7 @@ export function ProfileHero({
             <h1 className="max-w-4xl text-2xl font-bold leading-relaxed tracking-tight sm:text-3xl">
               {name}
             </h1>
-            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-blue-100/80">
+            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-blue-100">
               <span className="flex items-center gap-1.5">
                 <Briefcase className="h-3.5 w-3.5" />
                 {employee.position?.title || "المسمى الوظيفي غير مسجل"}
