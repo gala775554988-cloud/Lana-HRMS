@@ -256,3 +256,42 @@ test('account API enforces access and commits overrides, OTP invalidation and au
   const invalid = await subject.PATCH(request({ employeeId: 'e', password: '123', restoreIdentityPassword: true }));
   assert.equal(invalid.status, 400);
 });
+
+test('loginAction omits absent optional fields before Auth.js URLSearchParams serialization', async () => {
+  const validations = await loadModule('lib/validations/auth.ts', {}, { imports: { zod: { z } } });
+  let employee = null;
+  const forwarded = [];
+  const subject = await loadModule('lib/auth/actions.ts', {}, { imports: {
+    'next/dist/client/components/redirect-error': { isRedirectError: () => false },
+    '@/auth': {
+      findUser: async () => ({ id: 'u', isActive: true, loginEmail: email }),
+      signOut: async () => {},
+      signIn: async (_provider, options) => {
+        const { redirect, ...rest } = options;
+        assert.equal(redirect, false);
+        const serialized = Object.fromEntries(new URLSearchParams(rest));
+        assert.equal(validations.loginSchema.safeParse(serialized).success, true);
+        assert.equal(Object.values(serialized).includes('undefined'), false);
+        forwarded.push(serialized);
+      },
+    },
+    '@/lib/password': { hashPassword: async () => 'hash' },
+    '@/lib/tokens': { hashToken: value => value },
+    '@/lib/auth/employee-enrollment': { resolveEmployeeLoginEmail: async () => email },
+    '@/lib/auth/employee-login': { checkLoginPassword: async () => ({ valid: true, employee }) },
+    '@/lib/auth/employee-otp': { sendEmployeeOtp: async () => {}, OTP_UNAVAILABLE: 'unavailable' },
+    '@/lib/validations/auth': {
+      loginSchema: validations.loginSchema,
+      emailVerificationSchema: validations.emailVerificationSchema,
+      forgotPasswordSchema: validations.forgotPasswordSchema,
+      resetPasswordSchema: validations.resetPasswordSchema,
+    },
+  } });
+  assert.equal((await subject.loginAction({ identifier: 'admin', password: 'test-password' })).success, true);
+  assert.deepEqual(Object.keys(forwarded[0]).sort(), ['identifier', 'password']);
+  employee = { email };
+  assert.equal((await subject.loginAction({ identifier: '1234567890', password: '7890', verificationCode: '012345' })).success, true);
+  assert.equal(forwarded[1].verificationCode, '012345');
+  assert.equal(Object.hasOwn(forwarded[1], 'enrollmentEmail'), false);
+  assert.equal(Object.hasOwn(forwarded[1], 'activationCode'), false);
+});

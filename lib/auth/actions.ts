@@ -40,7 +40,16 @@ export async function loginAction(input: unknown): Promise<ActionState> {
       }
       return { success: false, requiresOtp: true, message: "أُرسل رمز التحقق إلى بريدك الإلكتروني. الرمز صالح لمدة خمس دقائق." };
     }
-    await signIn("credentials", { identifier, password, verificationCode, enrollmentEmail, activationCode, redirect: false });
+    // Auth.js serializes these options with URLSearchParams. Omit absent
+    // fields: undefined becomes the literal "undefined" and fails validation.
+    await signIn("credentials", {
+      identifier,
+      password,
+      ...(verificationCode ? { verificationCode } : {}),
+      ...(enrollmentEmail ? { enrollmentEmail } : {}),
+      ...(activationCode ? { activationCode } : {}),
+      redirect: false,
+    });
     return { success: true, message: "" };
   } catch (error) {
     if (isRedirectError(error)) throw error;
