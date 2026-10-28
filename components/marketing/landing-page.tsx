@@ -65,6 +65,7 @@ export function LandingPage({ locale }: { locale: Locale }) {
           <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">{t.subtitle}</p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href="/login" className="inline-flex h-12 items-center gap-2 rounded-lg bg-primary px-6 text-sm font-semibold text-white transition-colors hover:bg-primary/90">{t.signIn}<NextIcon className="h-4 w-4" /></Link>
+            <Link href="/careers" className="inline-flex h-12 items-center rounded-lg bg-indigo-700 px-6 text-sm font-semibold text-white">التقديم على وظيفة</Link>
             <a href="#features" className="inline-flex h-12 items-center rounded-lg border border-slate-300 bg-white px-6 text-sm font-semibold text-slate-700 transition-colors hover:border-primary/40 hover:text-primary">{t.explore}</a>
           </div>
         </div>

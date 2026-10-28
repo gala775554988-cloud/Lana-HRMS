@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ModulePageBody } from "@/components/hrms/module-page-body";
 import { MergedModuleTabs } from "@/components/hrms/merged-module-tabs";
 import { Briefcase, UserPlus } from "lucide-react";
@@ -6,12 +7,12 @@ export default async function RecruitmentPage({ searchParams }: { searchParams: 
   const query = await searchParams;
   const activeTab = typeof query.tab === "string" ? query.tab : "recruitment";
   return (
-    <MergedModuleTabs
+    <><Link href="/recruitment/talent" className="mb-5 inline-flex rounded-xl bg-indigo-700 px-5 py-3 font-bold text-white">مكتبة السير الذاتية · المقارنة · باركود التقديم</Link><MergedModuleTabs
       defaultValue="recruitment"
       items={[
         { value: "recruitment", label: "الوظائف الشاغرة", icon: <Briefcase className="h-4 w-4" />, content: activeTab === "recruitment" ? <ModulePageBody resourceKey="recruitment" query={query} showModuleTabs={false} tabValue="recruitment" /> : null },
         { value: "candidates", label: "المرشحون", icon: <UserPlus className="h-4 w-4" />, content: activeTab === "candidates" ? <ModulePageBody resourceKey="candidates" query={query} showModuleTabs={false} tabValue="candidates" /> : null }
       ]}
-    />
+    /></>
   );
 }

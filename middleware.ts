@@ -13,6 +13,7 @@ const AUTH_SECRET = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? ""
 const PUBLIC_API_PREFIXES = [
   "/api/auth/", // NextAuth handler + change/force-change-password (session-checked internally)
   "/api/health",
+  "/api/careers/apply", // public applications: signed, expiring form token and upload validation
   "/api/metrics/prometheus",
   "/api/attendance/biometric/zkteco", // authenticates via its own bearer token
   "/api/attendance/zkbio-sync", // authenticates via its own bearer token (ZKBIO_SYNC_TOKEN)
@@ -84,7 +85,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // Skip getToken for public pages — no JWT verify needed
-    if (!isApi && !isRoot && (p.startsWith("/login") || p.startsWith("/forgot-password") || p.startsWith("/reset-password") || p.startsWith("/verify-email"))) {
+    if (!isApi && !isRoot && ((p === "/careers" || p.startsWith("/careers/")) || p.startsWith("/login") || p.startsWith("/forgot-password") || p.startsWith("/reset-password") || p.startsWith("/verify-email"))) {
       return NextResponse.next();
     }
     if (isApi && isPublicApiRoute(p)) {
