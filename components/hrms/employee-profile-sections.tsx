@@ -31,6 +31,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 export type ProfileActivity = {
   id?: string;
@@ -101,20 +102,10 @@ export function ProfileHero({
           </span>
         </div>
         <div className="relative mt-6 flex flex-col gap-5 sm:flex-row sm:items-center">
-          <div className="h-24 w-24 shrink-0 overflow-hidden rounded-3xl border-4 border-white/15 bg-white/10 shadow-xl">
-            {employee.profilePhotoUrl ? (
-              <img
-                src={employee.profilePhotoUrl}
-                alt={name}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="grid h-full w-full place-items-center text-3xl font-semibold">
-                {employee.firstName?.[0]}
-                {employee.lastName?.[0]}
-              </div>
-            )}
-          </div>
+          <Avatar className="h-24 w-24 shrink-0 overflow-hidden rounded-3xl border-4 border-white/15 bg-white/10 shadow-xl">
+            {employee.profilePhotoUrl ? <AvatarImage src={employee.profilePhotoUrl} alt={name} className="object-cover" /> : null}
+            <AvatarFallback className="rounded-none bg-transparent text-3xl font-semibold text-white">{employee.firstName?.[0]}{employee.lastName?.[0]}</AvatarFallback>
+          </Avatar>
           <div className="min-w-0 flex-1">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-medium">
