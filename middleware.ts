@@ -11,6 +11,7 @@ const AUTH_SECRET = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? ""
 // are genuinely meant to be public or that authenticate themselves
 // (NextAuth's own handler, a bearer-token hardware bridge, etc).
 const PUBLIC_API_PREFIXES = [
+  "/api/internal/employee-login-migration", // Temporary, requires dedicated one-time bearer token
   "/api/auth/", // NextAuth handler + change/force-change-password (session-checked internally)
   "/api/health",
   "/api/metrics/prometheus",
