@@ -1,14 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { verifyOrBindEmployeeDevice, unbindEmployeeDevice } from "@/lib/cache/device-cache";
 
-/**
- * Enterprise Device Binding & Security Verification (`verifyDeviceBinding`)
- * -------------------------------------------------------------------------
- * 1. Checks `EmployeeMobileDevice` in Neon PostgreSQL using `userId` or `employeeId`.
- * 2. If `device` exists and `device.deviceId !== currentDeviceId`, rejects with exact Arabic lock message:
- *    `"DEVICE_LOCKED: تم تسجيل دخولك من جهاز آخر. يرجى مراجعة الموارد البشرية لإعادة ضبط الجهاز."`
- * 3. If no device bound, auto-binds this `currentDeviceId` to the user/employee instantly.
- */
+/** Compatibility adapter: session authentication replaces UUID account locking. */
 export async function verifyDeviceBinding(userId: string, currentDeviceId: string, platform = "mobile-pwa"): Promise<boolean> {
   const cleanId = (currentDeviceId || "").trim();
   if (!cleanId || cleanId === "unknown" || cleanId === "server-side" || cleanId === "mobile-session-fallback") {

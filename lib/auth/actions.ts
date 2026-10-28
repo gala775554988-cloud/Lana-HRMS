@@ -1,12 +1,13 @@
 "use server";
 
-import { AuthError } from "next-auth";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { signIn, signOut, findUser } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { hashPassword, verifyPassword } from "@/lib/password";
+import { hashPassword } from "@/lib/password";
 import { hashToken } from "@/lib/tokens";
-import { verifyOrBindEmployeeDevice } from "@/lib/cache/device-cache";
+import { resolveEmployeeLoginEmail } from "@/lib/auth/employee-enrollment";
+import { checkLoginPassword } from "@/lib/auth/employee-login";
+import { sendEmployeeOtp, OTP_UNAVAILABLE } from "@/lib/auth/employee-otp";
 import {
   emailVerificationSchema,
   forgotPasswordSchema,
@@ -14,82 +15,36 @@ import {
   resetPasswordSchema,
 } from "@/lib/validations/auth";
 
-type ActionState = { success: boolean; message: string };
+type ActionState = { success: boolean; message: string; requiresOtp?: boolean; requiresEmail?: boolean };
 
-const BAD_CREDENTIALS = "بيانات الدخول غير صحيحة (تأكد من رقم الهوية أو كلمة المرور أو حالة ارتباط الجهاز).";
+const BAD_CREDENTIALS = "بيانات الدخول أو رمز التحقق غير صحيحة.";
 
 export async function loginAction(input: unknown): Promise<ActionState> {
   const parsed = loginSchema.safeParse(input);
-  if (!parsed.success) {
-    return { success: false, message: parsed.error.errors[0]?.message ?? "بيانات الدخول غير صحيحة." };
-  }
-
+  if (!parsed.success) return { success: false, message: parsed.error.errors[0]?.message ?? BAD_CREDENTIALS };
   try {
-    const { identifier, password, deviceId } = parsed.data;
-
-    // 1. Pre-verify identity & password with exact error diagnostics
+    const { identifier, password, verificationCode, enrollmentEmail, activationCode } = parsed.data;
     const user = await findUser(identifier);
-    if (!user) {
-      return {
-        success: false,
-        message: "بيانات الدخول غير صحيحة: لم يتم العثور على حساب أو موظف مطابق لرقم الهوية أو اسم المستخدم المرفق."
-      };
-    }
-    if (!user.isActive) {
-      return {
-        success: false,
-        message: "حساب الموظف غير مفعل حالياً. يرجى مراجعة إدارة الموارد البشرية لتفعيل الحساب."
-      };
-    }
-    if (!user.passwordHash) {
-      return {
-        success: false,
-        message: "بيانات الدخول غير صحيحة: لا توجد كلمة مرور معينة للحساب، يرجى مراجعة إدارة الموارد البشرية."
-      };
-    }
-
-    const passwordOk = await verifyPassword(password, user.passwordHash);
-    if (!passwordOk) {
-      return {
-        success: false,
-        message: "بيانات الدخول غير صحيحة: كلمة المرور المدخلة غير مطابقة لحسابك."
-      };
-    }
-
-    // 2. Device Binding Pre-check (Strict Policy & Freeze on mismatch)
-    if (deviceId && deviceId !== "unknown" && deviceId !== "server-side" && deviceId !== "mobile-session-fallback") {
-      const employee = await prisma.employee.findFirst({
-        where: {
-          OR: [
-            { userId: user.id },
-            { nationalId: user.username || "" },
-            { employeeNumber: user.username || "" }
-          ]
-        },
-        select: { id: true }
-      });
-
-      if (employee) {
-        const deviceCheck = await verifyOrBindEmployeeDevice(employee.id, deviceId, "mobile");
-        if (!deviceCheck.allowed) {
-          return {
-            success: false,
-            message: deviceCheck.reason || "حسابك مرتبط بجهاز آخر. يرجى مراجعة الموارد البشرية لإعادة التعيين."
-          };
-        }
+    if (!user?.isActive) return { success: false, message: BAD_CREDENTIALS };
+    const { valid, employee } = await checkLoginPassword(user, password);
+    if (!valid) return { success: false, message: BAD_CREDENTIALS };
+    if (employee && !verificationCode) {
+      if (!user.loginEmail && !enrollmentEmail) return { success: false, requiresEmail: true, message: "أدخل بريدك الإلكتروني لأول مرة. إذا كان مختلفاً عن البريد المسجل لدى الموارد البشرية، أدخل رمز التفعيل الذي تحصل عليه من المسؤول." };
+      const email = await resolveEmployeeLoginEmail(user, employee.email, enrollmentEmail, activationCode);
+      if (!email) return { success: false, requiresEmail: !user.loginEmail, message: "تعذر اعتماد البريد. استخدم البريد المسجل لدى الموارد البشرية أو رمز تفعيل صالحاً من المسؤول." };
+      try {
+        await sendEmployeeOtp(user.id, email);
+      } catch (error) {
+        const message = error instanceof Error && [OTP_UNAVAILABLE, "انتظر دقيقة قبل طلب رمز جديد.", "تجاوزت عدد المحاولات المسموح. حاول لاحقاً."].includes(error.message) ? error.message : OTP_UNAVAILABLE;
+        return { success: false, message };
       }
+      return { success: false, requiresOtp: true, message: "أُرسل رمز التحقق إلى بريدك الإلكتروني. الرمز صالح لمدة خمس دقائق." };
     }
-
-    await signIn("credentials", {
-      identifier,
-      password,
-      deviceId,
-      redirect: false,
-    });
+    await signIn("credentials", { identifier, password, verificationCode, enrollmentEmail, activationCode, redirect: false });
     return { success: true, message: "" };
   } catch (error) {
-    if (error instanceof AuthError) return { success: false, message: BAD_CREDENTIALS };
-    throw error;
+    if (isRedirectError(error)) throw error;
+    return { success: false, message: BAD_CREDENTIALS };
   }
 }
 

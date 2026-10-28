@@ -4,9 +4,11 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations/auth";
-import { verifyPassword, hashPassword } from "@/lib/password";
+import { hashPassword } from "@/lib/password";
 import { getCachedEffectivePermissions, PERMISSION_TEMPLATES } from "@/lib/enterprise/permissions";
-import { verifyOrBindEmployeeDevice } from "@/lib/cache/device-cache";
+import { resolveEmployeeLoginEmail, completeEmployeeEmailEnrollment } from "@/lib/auth/employee-enrollment";
+import { checkLoginPassword } from "@/lib/auth/employee-login";
+import { verifyEmployeeOtp } from "@/lib/auth/employee-otp";
 
 async function getAuthorization(userId: string) {
   const assignments = await prisma.userRole.findMany({
@@ -186,7 +188,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       credentials: {
         identifier: { label: "Username", type: "text" },
         password: { label: "Password", type: "password" },
-        deviceId: { label: "Device ID", type: "text" },
+        verificationCode: { label: "Verification code", type: "text" },
+        enrollmentEmail: { label: "Email", type: "text" },
+        activationCode: { label: "Activation code", type: "text" },
       },
       async authorize(credentials) {
         try {
@@ -194,37 +198,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           if (!parsed.success) return null;
 
           const user = await findUser(parsed.data.identifier);
-          if (!user?.passwordHash || !user.isActive) return null;
-          const ok = await verifyPassword(parsed.data.password, user.passwordHash);
-          if (!ok) return null;
+          if (!user?.isActive) return null;
+          const { valid, employee } = await checkLoginPassword(user, parsed.data.password);
+          if (!valid) return null;
+          if (employee) {
+            const email = await resolveEmployeeLoginEmail(user, employee.email, parsed.data.enrollmentEmail, parsed.data.activationCode);
+            if (!email || !await verifyEmployeeOtp(user.id, parsed.data.verificationCode ?? "", email)) return null;
+            await completeEmployeeEmailEnrollment(user, email, user.sessionVersion);
+          }
 
           await ensureAuthenticatedEmployeeLink(user).catch((linkError) => {
             console.error("[Auth][EMPLOYEE_LINK_REPAIR_ERROR]", linkError);
           });
-
-          const deviceId = parsed.data.deviceId;
-          if (deviceId && deviceId !== "unknown" && deviceId !== "server-side" && deviceId !== "mobile-session-fallback") {
-            try {
-              const employee = await prisma.employee.findFirst({
-                where: {
-                  OR: [
-                    { userId: user.id },
-                    { nationalId: user.username || "" },
-                    { employeeNumber: user.username || "" }
-                  ]
-                },
-                select: { id: true }
-              });
-              if (employee) {
-                const deviceCheck = await verifyOrBindEmployeeDevice(employee.id, deviceId, "mobile");
-                if (!deviceCheck.allowed) {
-                  return null;
-                }
-              }
-            } catch (deviceErr: any) {
-              console.error("[Auth][DEVICE_BINDING_ERROR] Stack trace:", deviceErr?.stack || deviceErr);
-            }
-          }
 
           await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }).catch(() => {});
           const { roles, hasGrantedAdminAccess } = await getAuthorization(user.id);
@@ -233,9 +218,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return {
             id: user.id, name: user.name, email: user.email, image: user.image,
             roles,
+            sessionVersion: user.sessionVersion,
             hasGrantedAdminAccess,
-            mustChangePassword: user.mustChangePassword ?? false,
-            passwordChanged: user.passwordChanged ?? false,
+            mustChangePassword: employee && user.employeePasswordMode !== "CUSTOM" ? false : (user.mustChangePassword ?? false),
+            passwordChanged: employee && user.employeePasswordMode !== "CUSTOM" ? true : (user.passwordChanged ?? false),
           };
         } catch (authorizeErr: any) {
           console.error("[Auth][AUTHORIZE_FATAL_ERROR] Stack trace:", authorizeErr?.stack || authorizeErr);
@@ -250,6 +236,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       try {
         if (user) {
           token.sub = user.id!;
+          (token as any).sessionVersion = (user as any).sessionVersion ?? 0;
           token.name = user.name ?? undefined;
           token.email = user.email ?? undefined;
           token.picture = user.image ?? undefined;
@@ -257,6 +244,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           (token as any).hasGrantedAdminAccess = (user as any).hasGrantedAdminAccess ?? false;
           (token as any).mustChangePassword = (user as any).mustChangePassword ?? false;
           (token as any).passwordChanged = (user as any).passwordChanged ?? false;
+        }
+        if (token.sub) {
+          const currentUser = await prisma.user.findUnique({ where: { id: token.sub }, select: { isActive: true, sessionVersion: true } });
+          if (!currentUser?.isActive || currentUser.sessionVersion !== ((token as any).sessionVersion ?? 0)) return null;
         }
         if (trigger === "update" && token.sub) {
           try {
@@ -268,7 +259,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
         }
       } catch (jwtErr: any) {
-        console.error("[Auth][JWT_FATAL_ERROR] Stack trace:", jwtErr?.stack || jwtErr);
+        console.error("[Auth][JWT_FATAL_ERROR]", jwtErr?.name);
+        return null;
       }
       return token;
     },

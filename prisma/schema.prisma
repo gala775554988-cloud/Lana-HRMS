@@ -14,6 +14,10 @@ model User {
   username                String?                  @unique
   email                   String?                  @unique
   emailVerified           DateTime?
+  loginEmail              String?                  @unique
+  loginEmailVerifiedAt    DateTime?
+  employeePasswordMode    String                   @default("IDENTITY_SUFFIX")
+  sessionVersion          Int                      @default(0)
   image                   String?
   passwordHash            String?
   isActive                Boolean                  @default(true)

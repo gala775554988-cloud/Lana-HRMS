@@ -54,6 +54,11 @@ export async function GET(request: NextRequest) {
         user: {
           select: {
             id: true,
+            username: true,
+            loginEmail: true,
+            loginEmailVerifiedAt: true,
+            employeePasswordMode: true,
+            isActive: true,
             mustChangePassword: true,
             passwordChanged: true,
             passwordChangedAt: true,

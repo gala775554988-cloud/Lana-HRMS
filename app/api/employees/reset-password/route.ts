@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { generateTemporaryPassword, hashPassword } from "@/lib/password";
 import { writeAuditLog } from "@/lib/audit";
-import { hasPermission } from "@/lib/rbac";
+import { canManageEmployeeAccounts, canEditEmployeeAccount } from "@/lib/auth/account-management";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,15 +16,8 @@ export async function POST(request: NextRequest) {
     }
 
     const roles = (session.user.roles as string[]) || [];
-    const permissions = (session.user.permissions as string[]) || [];
-    
-    // Only HR and Super Admin can reset
-    const isSuperAdmin = roles.includes("SUPER_ADMIN");
-    const isHRManager = roles.includes("HR_MANAGER");
-    const hasManagePermission = hasPermission(permissions, { action: "manage", resource: "employees" }, roles);
-    
-    if (!isSuperAdmin && !isHRManager && !hasManagePermission) {
-      return NextResponse.json({ success: false, message: "Forbidden: Only HR and Super Admin can reset passwords" }, { status: 403 });
+    if (!canManageEmployeeAccounts(roles)) {
+      return NextResponse.json({ success: false, message: "صلاحية مدير النظام أو مدير الموارد البشرية مطلوبة." }, { status: 403 });
     }
 
     const body = await request.json();
@@ -56,12 +49,18 @@ export async function POST(request: NextRequest) {
       try {
         const employee = await prisma.employee.findUnique({
           where: { id },
-          include: { user: true },
+          include: { user: { include: { roles: { select: { role: { select: { name: true } } } } } } },
         });
 
         if (!employee) {
           skippedCount++;
           errors.push({ id, reason: "Employee not found" });
+          continue;
+        }
+
+        if (employee.user && !canEditEmployeeAccount(roles, employee.user.roles.map(r => r.role.name), session.user.id, employee.user.id)) {
+          skippedCount++;
+          errors.push({ id, reason: "لا تملك صلاحية تعديل هذا الحساب." });
           continue;
         }
 
@@ -81,6 +80,8 @@ export async function POST(request: NextRequest) {
             where: { id: employee.user.id },
             data: {
               passwordHash: newHash,
+              employeePasswordMode: "CUSTOM",
+              sessionVersion: { increment: 1 },
               mustChangePassword: true,
               passwordChanged: false,
               passwordChangedAt: null,
@@ -97,6 +98,7 @@ export async function POST(request: NextRequest) {
               email: employee.email ? employee.email.toLowerCase() : `employee.${employee.nationalId}@lana.local`,
               name: `${employee.firstName} ${employee.lastName}`.trim(),
               passwordHash: newHash,
+              employeePasswordMode: "CUSTOM",
               isActive: true,
               emailVerified: new Date(),
               mustChangePassword: true,

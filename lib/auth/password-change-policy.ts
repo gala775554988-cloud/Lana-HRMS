@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { employeeLoginProfile } from "@/lib/auth/employee-login";
 
 const KEY = "employee.passwordChangeRequired";
 
@@ -34,6 +35,8 @@ export async function clearPasswordChangeRequirement(userId: string) {
 }
 
 export async function isPasswordChangeRequired(userId: string) {
+  const mode = await prisma.user.findUnique({ where: { id: userId }, select: { employeePasswordMode: true } });
+  if (mode?.employeePasswordMode !== "CUSTOM" && await employeeLoginProfile(userId)) return false;
   const [store, user] = await Promise.all([
     readStore(),
     prisma.user.findUnique({ where: { id: userId }, select: { mustChangePassword: true } }).catch(() => null)

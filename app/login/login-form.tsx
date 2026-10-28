@@ -4,7 +4,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff, IdCard, Loader2 } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
-import { useRouter } from "next/navigation";
 import { loginAction } from "@/lib/auth/actions";
 import { loginSchema, type LoginInput } from "@/lib/validations/auth";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -12,10 +11,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Dictionary } from "@/lib/i18n";
-import { getOrCreateMobileDeviceUUID } from "@/lib/employee/device-uuid";
 
 export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictionary; onLoginSuccess?: () => void | Promise<void> }) {
-  const router = useRouter();
+  const [requiresEmail, setRequiresEmail] = useState(false);
+  const [requiresOtp, setRequiresOtp] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -36,9 +35,10 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
     setMessage(null);
     if (rememberMe) window.localStorage.setItem("lana.hrms.rememberedIdentifier", values.identifier);
     else window.localStorage.removeItem("lana.hrms.rememberedIdentifier");
-    const deviceId = getOrCreateMobileDeviceUUID();
     startTransition(async () => {
-      const result = await loginAction({ ...values, deviceId });
+      const result = await loginAction(values);
+      if (result.requiresEmail) setRequiresEmail(true);
+      if (result.requiresOtp) setRequiresOtp(true);
       if (result.success) {
         // A hard navigation here, not router.push(). A soft/transition-based
         // push landed users on a permanently blank page whenever the
@@ -63,7 +63,7 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
   return (
     <form className="space-y-7" onSubmit={form.handleSubmit(onSubmit)} noValidate>
       {message ? (
-        <Alert variant="destructive">
+        <Alert variant={requiresOtp || requiresEmail ? "default" : "destructive"}>
           <AlertDescription>{message}</AlertDescription>
         </Alert>
       ) : null}
@@ -84,6 +84,7 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
             placeholder=" "
             className="peer h-9 rounded-none border-0 bg-transparent px-0 pe-7 pt-1 text-sm shadow-none placeholder:text-transparent focus-visible:ring-0"
             aria-invalid={identifierError}
+            readOnly={requiresOtp}
             {...form.register("identifier")}
           />
           <Label
@@ -94,7 +95,7 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
           </Label>
           <IdCard className="pointer-events-none absolute end-0 top-2.5 h-4 w-4 text-muted-foreground" />
         </div>
-        <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">للموظفين: استخدم رقم الهوية وكلمة المرور المؤقتة الصادرة من إدارة الموارد البشرية.</p>
+        <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">للموظفين: استخدم رقم الهوية وآخر 4 أرقام منها، أو كلمة المرور التي عينها المسؤول، ثم رمز التحقق بالبريد. سجّل بريدك مرة واحدة عند أول دخول.</p>
         {form.formState.errors.identifier ? <p className="text-xs text-destructive" role="alert">{form.formState.errors.identifier.message}</p> : null}
       </div>
       <div
@@ -112,6 +113,7 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
             placeholder=" "
             className="peer h-9 rounded-none border-0 bg-transparent px-0 pe-7 pt-1 text-sm shadow-none placeholder:text-transparent focus-visible:ring-0"
             aria-invalid={passwordError}
+            readOnly={requiresOtp}
             {...form.register("password")}
           />
           <Label
@@ -123,6 +125,25 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
           <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute end-0 top-1.5 rounded p-1 text-muted-foreground transition-colors duration-300 ease-in-out hover:text-foreground">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
         </div>
       </div>
+      {requiresEmail ? (
+        <div className="space-y-3">
+          <Label htmlFor="enrollmentEmail">بريدك الإلكتروني — يُطلب أول مرة فقط</Label>
+          <Input id="enrollmentEmail" type="email" autoComplete="email" dir="ltr" readOnly={requiresOtp} {...form.register("enrollmentEmail")} />
+          {form.formState.errors.enrollmentEmail ? <p role="alert" className="text-xs text-destructive">{form.formState.errors.enrollmentEmail.message}</p> : null}
+          <Label htmlFor="activationCode">رمز التفعيل من المسؤول</Label>
+          <Input id="activationCode" autoComplete="off" dir="ltr" readOnly={requiresOtp} {...form.register("activationCode", { setValueAs: value => value?.trim() || undefined })} />
+          <p className="text-xs text-muted-foreground">اترك رمز التفعيل فارغاً إذا استخدمت البريد المسجل مسبقاً لدى الموارد البشرية. لن يُحفظ البريد الجديد إلا بعد التحقق منه.</p>
+          {form.formState.errors.activationCode ? <p role="alert" className="text-xs text-destructive">{form.formState.errors.activationCode.message}</p> : null}
+        </div>
+      ) : null}
+      {requiresOtp ? (
+        <div className="space-y-3">
+          <Label htmlFor="verificationCode">رمز التحقق بالبريد الإلكتروني</Label>
+          <Input id="verificationCode" inputMode="numeric" autoComplete="one-time-code" maxLength={6} dir="ltr" {...form.register("verificationCode")} />
+          {form.formState.errors.verificationCode ? <p role="alert" className="text-xs text-destructive">{form.formState.errors.verificationCode.message}</p> : null}
+          <Button type="button" variant="outline" disabled={isPending} onClick={() => { form.unregister("verificationCode"); form.unregister("enrollmentEmail"); form.unregister("activationCode"); setRequiresEmail(false); setRequiresOtp(false); setMessage(null); }}>تغيير بيانات الدخول أو طلب رمز جديد</Button>
+        </div>
+      ) : null}
       <label className="flex cursor-pointer items-center gap-2.5 select-none">
         <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} className="h-4 w-4 rounded border-input text-[#1E3A64] focus-visible:ring-[#1E3A64]" />
         <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{dictionary?.auth?.rememberTitle || "تذكر مساحة العمل"}</span>
@@ -134,7 +155,7 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
         type="submit"
         disabled={isPending}
       >
-        {isPending ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : null}{dictionary?.auth?.submit || "تسجيل الدخول"}
+        {isPending ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : null}{requiresOtp ? "التحقق وتسجيل الدخول" : (dictionary?.auth?.submit || "تسجيل الدخول")}
       </Button>
     </form>
   );

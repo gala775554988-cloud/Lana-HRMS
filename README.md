@@ -103,6 +103,10 @@ See `.env.example` for a copy-pasteable template with placeholder values and inl
 
 `SEED_ADMIN_EMAIL` — overrides the default seeded admin email (`admin@lana.local`).
 
+## Employee login verification
+
+Employee-only accounts use their national ID and its last four digits (or an administrator-assigned password), followed by a mandatory six-digit email code. On first sign-in employees enter their email and verify it; a new address requires a private HR-issued activation code unless it matches the HR-recorded address. Subsequent sign-ins send directly to the saved login email. HR managers and administrators manage accounts at `/employees/password-management`. Apply migration `20261028000100_employee_login_enrollment` before starting this version. Browser/device ownership locks are removed. Administrative accounts retain their password. Configure `RESEND_API_KEY` and `OTP_EMAIL_FROM` for email delivery; Twilio is no longer required. Resend has a limited free tier, but a valid account and authorized sender are still needed. See [email login setup and validation](tests/auth/README.md). Missing delivery settings fail closed; do not deploy until live mail delivery has been validated.
+
 ## Production Checks
 
 Run `npm run lint`, `npm run typecheck`, and `npm run build` before deployment. Run `npm run test:smoke` against a running instance to cover login/logout, per-role dashboard load, a full HR module CRUD cycle, and the Odoo sync auth boundary (see `tests/smoke/`).

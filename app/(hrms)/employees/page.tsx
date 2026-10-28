@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { unstable_cache } from "next/cache";
 import { auth } from "@/auth";
+import { canManageEmployeeAccounts } from "@/lib/auth/account-management";
 import { getHrmsModule } from "@/config/hrms";
 import { listModuleRecords } from "@/lib/hrms/actions";
 import { getRequestDictionary } from "@/lib/i18n-server";
@@ -265,6 +266,7 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="space-y-6">
+      {canManageEmployeeAccounts(session.user.roles ?? []) ? <div className="flex justify-end"><Link href="/employees/password-management" className="rounded-xl border bg-card px-4 py-2 text-sm font-semibold shadow-sm hover:bg-muted">إدارة حسابات الموظفين وكلمات المرور</Link></div> : null}
       {hospitalName && (
         <div className="flex items-center justify-between rounded-2xl border border-primary/20 bg-primary/80 p-4 text-primary shadow-sm dark:border-primary/60 dark:bg-primary/40 dark:text-primary/20">
           <div className="flex items-center gap-3">
