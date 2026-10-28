@@ -219,6 +219,19 @@ export function EmployeeProfileDashboard({
   const handleUnbindDevice = () => setShowUnbindModal(true);
 
   const [activePreviewDoc, setActivePreviewDoc] = useState<any | null>(null);
+  const previewObjectUrl = useRef<string | null>(null);
+  const previewRequest = useRef<AbortController | null>(null);
+  const closePreview = () => {
+    previewRequest.current?.abort();
+    previewRequest.current = null;
+    if (previewObjectUrl.current) URL.revokeObjectURL(previewObjectUrl.current);
+    previewObjectUrl.current = null;
+    setActivePreviewDoc(null);
+  };
+  useEffect(() => () => {
+    previewRequest.current?.abort();
+    if (previewObjectUrl.current) URL.revokeObjectURL(previewObjectUrl.current);
+  }, []);
 
   const handleDownloadDocument = (doc: any) => {
     const url = doc.fileUrl || doc.attachmentUrl;
@@ -263,13 +276,43 @@ export function EmployeeProfileDashboard({
     document.body.removeChild(link);
   };
 
-  const handleViewDocument = (doc: any) => {
+  const handleViewDocument = async (doc: any) => {
     const url = doc.fileUrl || doc.attachmentUrl;
     if (!url) {
       alert(isAr ? "لا يوجد ملف مرفق لهذا السجل" : "No file is attached to this record");
       return;
     }
-    setActivePreviewDoc(doc);
+    closePreview();
+    const isPdf = doc.mimeType === "application/pdf" || url.startsWith("data:application/pdf") || /\.pdf(?:$|\?)/i.test(doc.fileName || url);
+    if (!isPdf) { setActivePreviewDoc(doc); return; }
+    const controller = new AbortController();
+    previewRequest.current = controller;
+    setActivePreviewDoc({ ...doc, previewLoading: true });
+    try {
+      const parsed = new URL(url, window.location.origin);
+      if (!["https:", "http:", "data:"].includes(parsed.protocol)) throw new Error("Unsupported document URL");
+      let blob: Blob;
+      if (parsed.protocol === "data:") {
+        // Decode inline attachments locally; no data: fetch or permissive connect-src is needed.
+        const comma = url.indexOf(",");
+        if (comma < 0 || url.length > 28 * 1024 * 1024) throw new Error("Inline PDF preview unavailable");
+        const body = url.slice(comma + 1);
+        const binary = /;base64$/i.test(url.slice(0, comma)) ? atob(body) : decodeURIComponent(body);
+        const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
+        blob = new Blob([bytes]);
+      } else {
+        const response = await fetch(url, { signal: controller.signal, credentials: parsed.origin === window.location.origin ? "same-origin" : "omit", cache: "no-store" });
+        if (!response.ok) throw new Error("Document unavailable");
+        blob = await response.blob();
+      }
+      if (blob.size > 20 * 1024 * 1024 || await blob.slice(0, 5).text() !== "%PDF-") throw new Error("PDF preview unavailable");
+      if (controller.signal.aborted) return;
+      const previewUrl = URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
+      previewObjectUrl.current = previewUrl;
+      setActivePreviewDoc({ ...doc, previewUrl });
+    } catch {
+      if (!controller.signal.aborted) setActivePreviewDoc({ ...doc, previewUnavailable: true });
+    }
   };
 
   const confirmUnbindDevice = async () => {
@@ -937,7 +980,7 @@ export function EmployeeProfileDashboard({
 
       {/* In-App Universal Document Preview Modal (عرض المستند داخل النظام بدون تعقيد) */}
       {activePreviewDoc ? (
-        <Dialog open={true} onOpenChange={() => setActivePreviewDoc(null)}>
+        <Dialog open={true} onOpenChange={open => { if (!open) closePreview(); }}>
           <DialogContent className="max-w-4xl w-[calc(100vw-2rem)] h-[88vh] flex flex-col p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl transition-all duration-300 animate-in fade-in slide-in-from-top-4" dir="rtl">
             <DialogHeader className="flex flex-col gap-3 sm:flex-row sm:items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4 shrink-0">
               <div className="flex items-center gap-3 min-w-0">
@@ -961,26 +1004,28 @@ export function EmployeeProfileDashboard({
                   <Download className="h-4 w-4" />
                   <span>تنزيل المستند</span>
                 </Button>
-                <DialogClose onClick={() => setActivePreviewDoc(null)} />
+                <DialogClose onClick={closePreview} />
               </div>
             </DialogHeader>
 
             {/* Document Viewer Frame */}
             <div className="flex-1 w-full bg-slate-100 dark:bg-slate-950 rounded-2xl overflow-hidden relative border border-slate-200/80 dark:border-slate-800 flex items-center justify-center p-3 mt-3">
-              {(activePreviewDoc.fileUrl || activePreviewDoc.attachmentUrl)?.startsWith("data:image/") || activePreviewDoc.fileName?.match(/\.(png|jpg|jpeg|webp|gif)$/i) ? (
+              {activePreviewDoc.previewLoading ? (
+                <div role="status" className="p-8 text-center"><RefreshCw className="mx-auto mb-4 h-8 w-8 animate-spin text-indigo-500" /><p className="text-sm text-muted-foreground">جارٍ تجهيز معاينة المستند…</p></div>
+              ) : !activePreviewDoc.previewUnavailable && ((activePreviewDoc.fileUrl || activePreviewDoc.attachmentUrl)?.startsWith("data:image/") || activePreviewDoc.fileName?.match(/\.(png|jpg|jpeg|webp|gif)$/i)) ? (
                 <img
                   src={activePreviewDoc.fileUrl || activePreviewDoc.attachmentUrl}
                   alt={activePreviewDoc.fileName || activePreviewDoc.name}
                   className="max-h-full max-w-full object-contain rounded-xl shadow-md mx-auto"
                 />
-              ) : activePreviewDoc.mimeType === "application/pdf" || (activePreviewDoc.fileUrl || activePreviewDoc.attachmentUrl)?.startsWith("data:application/pdf") || /\.pdf(?:$|\?)/i.test(activePreviewDoc.fileName || activePreviewDoc.fileUrl || activePreviewDoc.attachmentUrl || "") ? (
+              ) : activePreviewDoc.previewUrl ? (
                 <iframe
-                  src={activePreviewDoc.fileUrl || activePreviewDoc.attachmentUrl}
+                  src={activePreviewDoc.previewUrl}
                   title={activePreviewDoc.fileName || activePreviewDoc.name}
                   className="w-full h-full rounded-xl border-0 bg-white shadow-inner"
                 />
               ) : (
-                <div className="max-w-sm p-6 text-center"><FileText className="mx-auto mb-4 h-12 w-12 text-indigo-500" /><h3 className="text-base font-bold">الملف جاهز للتنزيل</h3><p className="mt-3 text-xs leading-6 text-muted-foreground">المعاينة المباشرة غير متاحة لهذا النوع. نزّل الملف لفتحه بالتطبيق المناسب على جهازك.</p><Button className="mt-5 gap-2 rounded-xl" onClick={() => handleDownloadDocument(activePreviewDoc)}><Download className="h-4 w-4" />تنزيل الملف</Button></div>
+                <div className="max-w-sm p-6 text-center"><FileText className="mx-auto mb-4 h-12 w-12 text-indigo-500" /><h3 className="text-base font-bold">الملف جاهز للتنزيل</h3><p className="mt-3 text-xs leading-6 text-muted-foreground">المعاينة المباشرة غير متاحة لهذا المستند. نزّل الملف لفتحه بالتطبيق المناسب على جهازك.</p><Button className="mt-5 gap-2 rounded-xl" onClick={() => handleDownloadDocument(activePreviewDoc)}><Download className="h-4 w-4" />تنزيل الملف</Button></div>
               )}
             </div>
           </DialogContent>
