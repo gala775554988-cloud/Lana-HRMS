@@ -5,9 +5,7 @@ import { signIn, signOut, findUser } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
 import { hashToken } from "@/lib/tokens";
-import { resolveEmployeeLoginEmail } from "@/lib/auth/employee-enrollment";
 import { checkLoginPassword } from "@/lib/auth/employee-login";
-import { sendEmployeeOtp, OTP_UNAVAILABLE } from "@/lib/auth/employee-otp";
 import {
   emailVerificationSchema,
   forgotPasswordSchema,
@@ -15,38 +13,25 @@ import {
   resetPasswordSchema,
 } from "@/lib/validations/auth";
 
-type ActionState = { success: boolean; message: string; requiresOtp?: boolean; requiresEmail?: boolean };
+type ActionState = { success: boolean; message: string; requiresActivation?: boolean };
 
-const BAD_CREDENTIALS = "بيانات الدخول أو رمز التحقق غير صحيحة.";
+const BAD_CREDENTIALS = "بيانات الدخول أو رمز التفعيل غير صحيحة. بعد ٥ محاولات خاطئة انتظر ١٥ دقيقة أو راجع المسؤول.";
 
 export async function loginAction(input: unknown): Promise<ActionState> {
   const parsed = loginSchema.safeParse(input);
   if (!parsed.success) return { success: false, message: parsed.error.errors[0]?.message ?? BAD_CREDENTIALS };
   try {
-    const { identifier, password, verificationCode, enrollmentEmail, activationCode } = parsed.data;
+    const { identifier, password, activationCode } = parsed.data;
     const user = await findUser(identifier);
     if (!user?.isActive) return { success: false, message: BAD_CREDENTIALS };
     const { valid, employee } = await checkLoginPassword(user, password);
     if (!valid) return { success: false, message: BAD_CREDENTIALS };
-    if (employee && !verificationCode) {
-      if (!user.loginEmail && !enrollmentEmail) return { success: false, requiresEmail: true, message: "أدخل بريدك الإلكتروني لأول مرة. إذا كان مختلفاً عن البريد المسجل لدى الموارد البشرية، أدخل رمز التفعيل الذي تحصل عليه من المسؤول." };
-      const email = await resolveEmployeeLoginEmail(user, employee.email, enrollmentEmail, activationCode);
-      if (!email) return { success: false, requiresEmail: !user.loginEmail, message: "تعذر اعتماد البريد. استخدم البريد المسجل لدى الموارد البشرية أو رمز تفعيل صالحاً من المسؤول." };
-      try {
-        await sendEmployeeOtp(user.id, email);
-      } catch (error) {
-        const message = error instanceof Error && [OTP_UNAVAILABLE, "انتظر دقيقة قبل طلب رمز جديد.", "تجاوزت عدد المحاولات المسموح. حاول لاحقاً."].includes(error.message) ? error.message : OTP_UNAVAILABLE;
-        return { success: false, message };
-      }
-      return { success: false, requiresOtp: true, message: "أُرسل رمز التحقق إلى بريدك الإلكتروني. الرمز صالح لمدة خمس دقائق." };
-    }
+    if (employee && !activationCode) return { success: false, requiresActivation: true, message: "أدخل رمز التفعيل المكون من ٤ أرقام الذي استلمته من المسؤول. لا يلزم بريد إلكتروني." };
     // Auth.js serializes these options with URLSearchParams. Omit absent
     // fields: undefined becomes the literal "undefined" and fails validation.
     await signIn("credentials", {
       identifier,
       password,
-      ...(verificationCode ? { verificationCode } : {}),
-      ...(enrollmentEmail ? { enrollmentEmail } : {}),
       ...(activationCode ? { activationCode } : {}),
       redirect: false,
     });

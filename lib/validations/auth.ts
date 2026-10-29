@@ -17,7 +17,7 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Password is required."),
   deviceId: z.string().optional(),
   enrollmentEmail: z.string().email("أدخل بريداً إلكترونياً صحيحاً.").max(254).optional(),
-  activationCode: z.string().regex(/^[a-f0-9]{64}$/, "رمز التفعيل غير صحيح.").optional(),
+  activationCode: z.string().regex(/^\d{4}$/, "أدخل رمز التفعيل المكون من ٤ أرقام.").optional(),
   verificationCode: z.string().regex(/^\d{6}$/, "أدخل رمز التحقق المكون من 6 أرقام.").optional()
 });
 

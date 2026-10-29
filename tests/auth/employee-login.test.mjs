@@ -127,7 +127,7 @@ test('legacy shared device identifiers never query or bind accounts', async () =
   assert.equal((await subject.verifyOrBindEmployeeDevice('b', 'shared-browser')).allowed, true);
 });
 
-test('the Credentials provider itself rejects missing OTP and cannot be bypassed with a shared device UUID', async () => {
+test('the Credentials provider requires the employee activation PIN and cannot be bypassed with email or a shared device UUID', async () => {
   let options;
   let accepted = false;
   const user = { id: 'u', username: '1234567890', passwordHash: 'old', isActive: true, mustChangePassword: true, passwordChanged: false };
@@ -145,14 +145,14 @@ test('the Credentials provider itself rejects missing OTP and cannot be bypassed
     '@/lib/enterprise/permissions': { getCachedEffectivePermissions: async () => [], PERMISSION_TEMPLATES: { EMPLOYEE: [] } },
     '@/lib/auth/employee-login': { checkLoginPassword: async (_user, password) => ({ valid: password === '7890', employee: { email } }) },
     '@/lib/auth/employee-enrollment': { resolveEmployeeLoginEmail: async () => email, completeEmployeeEmailEnrollment: async () => {} },
-    '@/lib/auth/employee-otp': { verifyEmployeeOtp: async (_userId, code, destination) => accepted && destination === email && code === '123456' },
+    '@/lib/auth/employee-activation': { verifyEmployeeActivation: async (_user, code) => accepted && code === '0123' },
   } });
   const authorize = options.providers[0].authorize;
   assert.equal(await authorize({ identifier: '1234567890', password: '7890', deviceId: 'shared-device' }), null);
   assert.equal(await authorize({ identifier: '1234567890', password: '7890', verificationCode: '111111' }), null);
   accepted = true;
-  assert.equal(await authorize({ identifier: '1234567890', password: 'wrong', verificationCode: '123456' }), null);
-  const result = await authorize({ identifier: '1234567890', password: '7890', verificationCode: '123456', deviceId: 'shared-device' });
+  assert.equal(await authorize({ identifier: '1234567890', password: 'wrong', activationCode: '0123' }), null);
+  const result = await authorize({ identifier: '1234567890', password: '7890', activationCode: '0123', deviceId: 'shared-device' });
   assert.equal(result.id, 'u');
   assert.equal(result.mustChangePassword, false);
 });
@@ -218,9 +218,10 @@ test('account API enforces access and commits overrides, OTP invalidation and au
   let audit;
   let deleted;
   const tx = {
+    $executeRaw: async () => {},
     employee: { findUnique: async () => ({ id: 'e', user: { id: 'target', loginEmail: null, roles: targetRoles.map(name => ({ role: { name } })) } }) },
     user: { update: async query => { updated = query.data; } },
-    verificationToken: { deleteMany: async query => { deleted = query; }, create: async () => ({}) },
+    verificationToken: { findUnique: async () => null, deleteMany: async query => { deleted = query; }, create: async () => ({}) },
     auditLog: { create: async query => { audit = query.data; } },
   };
   const subject = await loadModule('app/api/employees/account/route.ts', { $transaction: async run => { calls++; return run(tx); } }, { imports: {
@@ -228,7 +229,7 @@ test('account API enforces access and commits overrides, OTP invalidation and au
     'next/server': { NextResponse: { json: (data, options = {}) => ({ data, status: options.status ?? 200 }) } },
     zod: { z },
     '@/lib/password': { hashPassword: async () => 'hashed-value', generateTemporaryPassword: () => 'generated-password' },
-    '@/lib/auth/employee-enrollment': { activationToken: code => crypto.createHash('sha256').update(code).digest('hex') },
+    '@/lib/auth/employee-activation': { activationPinIdentifier: id => `employee-activation-pin:${id}`, activationPinToken: (id, code) => crypto.createHash('sha256').update(id + code).digest('hex') },
     '@/lib/auth/employee-otp': { normalizeEmployeeEmail: value => value.toLowerCase() },
     '@/lib/auth/account-management': { canManageEmployeeAccounts: permissions.canManageEmployeeAccounts, canEditEmployeeAccount: permissions.canEditEmployeeAccount },
   } });
@@ -251,7 +252,7 @@ test('account API enforces access and commits overrides, OTP invalidation and au
   assert.equal(JSON.stringify(audit).includes('new-password-123'), false);
   assert.equal(JSON.stringify(audit).includes(email), false);
   const activation = await subject.PATCH(request({ employeeId: 'e', clearLoginEmail: true, issueActivation: true }));
-  assert.equal(activation.data.activationCode.length, 64);
+  assert.equal(activation.data.activationCode.length, 4);
   assert.equal(updated.loginEmail, null);
   const invalid = await subject.PATCH(request({ employeeId: 'e', password: '123', restoreIdentityPassword: true }));
   assert.equal(invalid.status, 400);
@@ -290,10 +291,10 @@ test('loginAction omits absent optional fields before Auth.js URLSearchParams se
   assert.equal((await subject.loginAction({ identifier: 'admin', password: 'test-password' })).success, true);
   assert.deepEqual(Object.keys(forwarded[0]).sort(), ['identifier', 'password']);
   employee = { email };
-  assert.equal((await subject.loginAction({ identifier: '1234567890', password: '7890', verificationCode: '012345' })).success, true);
-  assert.equal(forwarded[1].verificationCode, '012345');
+  assert.equal((await subject.loginAction({ identifier: '1234567890', password: '7890', activationCode: '0123' })).success, true);
+  assert.equal(forwarded[1].activationCode, '0123');
   assert.equal(Object.hasOwn(forwarded[1], 'enrollmentEmail'), false);
-  assert.equal(Object.hasOwn(forwarded[1], 'activationCode'), false);
+  assert.equal(Object.hasOwn(forwarded[1], 'verificationCode'), false);
 });
 
 test('employee activity summaries never forward raw device metadata or unrecognized account fields', async () => {
@@ -307,4 +308,30 @@ test('employee activity summaries never forward raw device metadata or unrecogni
   assert.equal(JSON.stringify(account).includes(secret), false);
   const other = subject.presentEmployeeActivity(secret, { raw: secret });
   assert.equal(JSON.stringify(other).includes(secret), false);
+});
+
+
+test('four-digit activation PINs are user-bound, reusable, rate-limited durably, and account-version checked', async () => {
+  const store = tokenStore();
+  const users = new Map([['u', { isActive: true, sessionVersion: 1 }], ['v', { isActive: true, sessionVersion: 1 }]]);
+  let queue = Promise.resolve();
+  const tx = { $executeRaw: async () => {}, verificationToken: store, user: { findUnique: async ({ where }) => users.get(where.id) } };
+  const subject = await loadModule('lib/auth/employee-activation.ts', { $transaction: fn => { const run = queue.then(() => fn(tx)); queue = run.catch(() => {}); return run; } }, { env: { AUTH_SECRET: 'activation-test-secret' } });
+  const token = subject.activationPinToken('u', '0123');
+  assert.equal(token.includes('0123'), false);
+  await store.create({ data: { token, identifier: subject.activationPinIdentifier('u'), expires: new Date(Date.now() + 86400000) } });
+  assert.equal(await subject.verifyEmployeeActivation({ id: 'u', sessionVersion: 1 }, '0123'), true);
+  assert.equal(await subject.verifyEmployeeActivation({ id: 'u', sessionVersion: 1 }, '0123'), true);
+  assert.equal(await subject.verifyEmployeeActivation({ id: 'v', sessionVersion: 1 }, '0123'), false);
+  assert.equal(await subject.verifyEmployeeActivation({ id: 'u', sessionVersion: 0 }, '0123'), false);
+  assert.equal(await subject.verifyEmployeeActivation({ id: 'u', sessionVersion: 1 }, '123'), false);
+  const failures = await Promise.all(Array.from({ length: 8 }, () => subject.verifyEmployeeActivation({ id: 'u', sessionVersion: 1 }, '9999')));
+  assert.equal(failures.every(value => value === false), true);
+  assert.equal(store.rows.get('employee-activation-attempts:u').identifier, '5');
+  assert.equal(await subject.verifyEmployeeActivation({ id: 'u', sessionVersion: 1 }, '0123'), false);
+  store.rows.get('employee-activation-attempts:u').expires = new Date(Date.now() - 1);
+  assert.equal(await subject.verifyEmployeeActivation({ id: 'u', sessionVersion: 1 }, '0123'), true);
+  assert.equal(store.rows.has('employee-activation-attempts:u'), false);
+  users.set('u', { isActive: false, sessionVersion: 1 });
+  assert.equal(await subject.verifyEmployeeActivation({ id: 'u', sessionVersion: 1 }, '0123'), false);
 });

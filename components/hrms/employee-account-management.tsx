@@ -143,7 +143,7 @@ export function EmployeeAccountManagement({
             </h2>
             <p className="mt-2 max-w-3xl text-xs leading-6 text-muted-foreground">
               رمز التفعيل يصدر من هنا بعد اختيار الموظف. يُسلّم له مرة واحدة
-              لتسجيل بريده، ثم يتحقق النظام من البريد برمز الدخول.
+              للدخول برقم الهوية وكلمة المرور دون الحاجة للبريد.
             </p>
           </div>
         </div>
@@ -263,7 +263,7 @@ export function EmployeeAccountManagement({
                     className="flex items-center gap-1 text-xs"
                   >
                     <Mail className="h-3.5 w-3.5" />
-                    بريد الدخول والتحقق
+                    بريد التواصل (اختياري، لا يستخدم للدخول)
                   </Label>
                   <Input
                     id="account-email"
@@ -291,7 +291,7 @@ export function EmployeeAccountManagement({
                     className="rounded-xl"
                   />
                   <p className="text-[11px] leading-5 text-muted-foreground">
-                    تُستخدم بدلاً من آخر 4 أرقام، مع استمرار التحقق بالبريد.
+                    تُستخدم بدلاً من آخر 4 أرقام، مع رمز التفعيل الخاص بالموظف.
                   </p>
                 </div>
                 <div className="flex items-center">
@@ -334,11 +334,11 @@ export function EmployeeAccountManagement({
                 <div>
                   <h4 className="flex items-center gap-2 text-sm font-bold">
                     <KeyRound className="h-4 w-4 text-amber-700" />
-                    تفعيل البريد لأول مرة
+                    رمز دخول الموظف — ٤ أرقام
                   </h4>
                   <p className="mt-2 max-w-xl text-xs leading-6 text-muted-foreground">
-                    إصدار رمز جديد يلغي بريد الدخول السابق والجلسات القديمة.
-                    الرمز صالح 7 أيام، ويختفي بعد مغادرة الصفحة.
+                    إصدار رمز جديد يلغي الرمز السابق والجلسات القديمة.
+                    يُستخدم الرمز عند كل دخول حتى يستبدله المسؤول، ويظهر هنا مرة واحدة فقط.
                   </p>
                 </div>
                 <Button
@@ -348,11 +348,10 @@ export function EmployeeAccountManagement({
                   onClick={() => {
                     if (
                       confirm(
-                        "إلغاء بريد الدخول السابق وإصدار رمز تفعيل جديد؟ سلّم الرمز للموظف بعد التحقق من هويته.",
+                        "إلغاء رمز الدخول السابق وإصدار رمز جديد من ٤ أرقام؟ سلّمه للموظف بعد التحقق من هويته.",
                       )
                     )
                       void save({
-                        clearLoginEmail: true,
                         email: undefined,
                         issueActivation: true,
                       });
@@ -371,7 +370,7 @@ export function EmployeeAccountManagement({
                   اختر الموظف لإدارة حسابه
                 </h3>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  سيظهر هنا البريد وكلمة المرور وخيار إصدار رمز التفعيل.
+                  ستظهر هنا بيانات الحساب وخيار إصدار رمز التفعيل.
                 </p>
               </div>
             </div>

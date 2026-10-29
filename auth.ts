@@ -6,9 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations/auth";
 import { hashPassword } from "@/lib/password";
 import { getCachedEffectivePermissions, PERMISSION_TEMPLATES } from "@/lib/enterprise/permissions";
-import { resolveEmployeeLoginEmail, completeEmployeeEmailEnrollment } from "@/lib/auth/employee-enrollment";
+import { verifyEmployeeActivation } from "@/lib/auth/employee-activation";
 import { checkLoginPassword } from "@/lib/auth/employee-login";
-import { verifyEmployeeOtp } from "@/lib/auth/employee-otp";
 
 async function getAuthorization(userId: string) {
   const assignments = await prisma.userRole.findMany({
@@ -188,8 +187,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       credentials: {
         identifier: { label: "Username", type: "text" },
         password: { label: "Password", type: "password" },
-        verificationCode: { label: "Verification code", type: "text" },
-        enrollmentEmail: { label: "Email", type: "text" },
         activationCode: { label: "Activation code", type: "text" },
       },
       async authorize(credentials) {
@@ -201,11 +198,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           if (!user?.isActive) return null;
           const { valid, employee } = await checkLoginPassword(user, parsed.data.password);
           if (!valid) return null;
-          if (employee) {
-            const email = await resolveEmployeeLoginEmail(user, employee.email, parsed.data.enrollmentEmail, parsed.data.activationCode);
-            if (!email || !await verifyEmployeeOtp(user.id, parsed.data.verificationCode ?? "", email)) return null;
-            await completeEmployeeEmailEnrollment(user, email, user.sessionVersion);
-          }
+          if (employee && !await verifyEmployeeActivation(user, parsed.data.activationCode ?? "")) return null;
 
           await ensureAuthenticatedEmployeeLink(user).catch((linkError) => {
             console.error("[Auth][EMPLOYEE_LINK_REPAIR_ERROR]", linkError);
