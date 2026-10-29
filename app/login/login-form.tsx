@@ -2,7 +2,7 @@
 
 import { startAuthentication, startRegistration, browserSupportsWebAuthn } from "@simplewebauthn/browser";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, IdCard, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Fingerprint, IdCard, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { loginAction } from "@/lib/auth/actions";
@@ -14,6 +14,10 @@ import { Label } from "@/components/ui/label";
 import type { Dictionary } from "@/lib/i18n";
 
 export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictionary; onLoginSuccess?: () => void | Promise<void> }) {
+  const [step, setStep] = useState<"credentials" | "verification">("credentials");
+  const [passwordLogin, setPasswordLogin] = useState(false);
+  const [useActivation, setUseActivation] = useState(false);
+  const verifiedValues = useRef<LoginInput | null>(null);
   const [enrollmentPending, setEnrollmentPending] = useState(false);
   const automaticAttempt = useRef("");
   const [message, setMessage] = useState<string | null>(null);
@@ -29,19 +33,33 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
 
   useEffect(() => {
     const id = window.localStorage.getItem("lana.hrms.rememberedIdentifier");
-    if (id) { form.setValue("identifier", id); setRememberMe(true); }
+    if (id && /^\d{10}$/.test(id)) { form.setValue("identifier", id); setRememberMe(true); }
   }, [form]);
 
   function onSubmit(values: LoginInput) {
     setMessage(null);
+    if (!passwordLogin && !/^\d{10}$/.test(values.identifier)) {
+      form.setError("identifier", { message: "أدخل رقم الهوية المكون من ١٠ أرقام." });
+      return;
+    }
+    if (!passwordLogin && (!/^\d{4}$/.test(values.password) || !values.identifier.endsWith(values.password))) {
+      form.setError("password", { message: "أدخل آخر ٤ أرقام من رقم الهوية." });
+      return;
+    }
     if (rememberMe) window.localStorage.setItem("lana.hrms.rememberedIdentifier", values.identifier);
     else window.localStorage.removeItem("lana.hrms.rememberedIdentifier");
     startTransition(async () => {
       try {
         let result = await loginAction(values);
+        if (result.requiresActivation || result.biometricOptions) {
+          verifiedValues.current = { identifier: values.identifier, password: values.password };
+          setStep("verification");
+          setUseActivation(Boolean(result.requiresActivation));
+        }
         if (result.biometricOptions) {
           if (!browserSupportsWebAuthn()) {
-            setMessage("هذا المتصفح لا يدعم البصمة. أدخل رمز التفعيل للدخول.");
+            setUseActivation(true);
+            setMessage("هذا المتصفح لا يدعم التحقق بالجهاز. استخدم رمز التفعيل.");
             return;
           }
           const response = await startAuthentication(result.biometricOptions);
@@ -90,7 +108,7 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
   const password = form.watch("password");
   const activationCode = form.watch("activationCode");
   useEffect(() => {
-    if (isPending || enrollmentPending || activationCode || !/^\d{10}$/.test(identifier) || password.length !== 4 || !identifier.endsWith(password)) return;
+    if (step !== "credentials" || passwordLogin || isPending || enrollmentPending || activationCode || !/^\d{10}$/.test(identifier) || password.length !== 4 || !identifier.endsWith(password)) return;
     const attempt = `${identifier}:${password}`;
     if (automaticAttempt.current === attempt) return;
     const timer = window.setTimeout(() => {
@@ -100,13 +118,42 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
     return () => window.clearTimeout(timer);
     // onSubmit reads the current form values through handleSubmit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [identifier, password, activationCode, isPending, enrollmentPending, form]);
+  }, [identifier, password, activationCode, isPending, enrollmentPending, form, step, passwordLogin]);
 
   if (enrollmentPending) return (
     <div className="space-y-4" role="status">
       <p>{message}</p>
       <Button disabled={isPending} onClick={() => startTransition(enrollBiometric)}>إعادة ربط البصمة</Button>
       <Button variant="outline" disabled={isPending} onClick={() => void finishLogin()}>المتابعة إلى النظام</Button>
+    </div>
+  );
+
+  if (step === "verification") return (
+    <div className="space-y-5">
+      <div className="space-y-2 text-center">
+        <Fingerprint className="mx-auto h-10 w-10 text-[#1E3A64]" />
+        <h2 className="text-lg font-bold">تأكيد هويتك</h2>
+        <p className="text-sm text-muted-foreground">استخدم بصمة الجهاز أو رمز قفل الجهاز لإكمال الدخول.</p>
+      </div>
+      {message ? <p role="status" className="text-sm text-muted-foreground">{message}</p> : null}
+      {useActivation ? (
+        <form className="space-y-4" onSubmit={form.handleSubmit(values => onSubmit({ ...verifiedValues.current!, activationCode: values.activationCode }))} noValidate>
+          <Label htmlFor="activationCode">رمز التفعيل من الموارد البشرية</Label>
+          <Input id="activationCode" type="password" inputMode="numeric" autoComplete="off" maxLength={4} dir="ltr" autoFocus placeholder="••••" disabled={isPending} {...form.register("activationCode", { setValueAs: value => value?.trim() || undefined })} />
+          {form.formState.errors.activationCode ? <p role="alert" className="text-xs text-destructive">{form.formState.errors.activationCode.message}</p> : null}
+          <Button type="submit" className="w-full" disabled={isPending}>{isPending ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : null}تأكيد الدخول</Button>
+        </form>
+      ) : (
+        <div className="space-y-3">
+          <Button className="w-full" disabled={isPending} onClick={() => verifiedValues.current && onSubmit(verifiedValues.current)}>
+            {isPending ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : <Fingerprint className="me-2 h-4 w-4" />}البصمة أو رمز قفل الجهاز
+          </Button>
+          <button type="button" disabled={isPending} className="w-full text-sm text-muted-foreground underline" onClick={() => { setUseActivation(true); setMessage(null); }}>استخدام رمز التفعيل بدلًا من البصمة</button>
+        </div>
+      )}
+      <button type="button" disabled={isPending} className="w-full text-sm text-muted-foreground" onClick={() => {
+        setStep("credentials"); setUseActivation(false); setMessage(null); form.setValue("activationCode", undefined); verifiedValues.current = null;
+      }}>العودة لتعديل رقم الهوية</button>
     </div>
   );
 
@@ -131,7 +178,9 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
           <Input
             id="identifier"
             type="text"
-            inputMode="numeric"
+            inputMode={passwordLogin ? "text" : "numeric"}
+            maxLength={passwordLogin ? 64 : 10}
+            disabled={isPending}
             autoComplete="username"
             autoFocus
             placeholder=" "
@@ -143,25 +192,24 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
             htmlFor="identifier"
             className="pointer-events-none absolute start-0 top-1 origin-left rtl:origin-right -translate-y-5 scale-75 text-xs font-bold uppercase tracking-wider text-slate-500 transition-all duration-300 ease-in-out peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100 peer-placeholder-shown:text-sm peer-placeholder-shown:font-medium peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-placeholder-shown:text-slate-400 peer-focus:-translate-y-5 peer-focus:scale-75 peer-focus:text-xs peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-[#1E3A64] dark:text-slate-400 dark:peer-placeholder-shown:text-slate-500"
           >
-            اسم المستخدم أو رقم الهوية
+            {passwordLogin ? "اسم المستخدم أو رقم الهوية" : "رقم الهوية"}
           </Label>
           <IdCard className="pointer-events-none absolute end-0 top-2.5 h-4 w-4 text-muted-foreground" />
         </div>
-        <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">للموظفين: رقم الهوية وآخر ٤ أرقام منها أو كلمة المرور التي عينها المسؤول، ثم بصمة الجهاز تلقائيًا. عند أول دخول استخدم رمز التفعيل لربط البصمة. لا يلزم بريد إلكتروني.</p>
+
         {form.formState.errors.identifier ? <p className="text-xs text-destructive" role="alert">{form.formState.errors.identifier.message}</p> : null}
       </div>
       <div
         className={`relative border-b-2 pb-1.5 pt-3 focus-within:border-[#1E3A64] ${passwordError ? "border-destructive" : "border-slate-200 dark:border-slate-700"}`}
       >
-        <div className="flex items-center justify-end">
-          {/* The identity's grey (#707070), pixel-matched to the real logo. */}
-          <span className="text-xs font-medium text-[#707070]">إذا نسيت كلمة المرور يرجى مراجعة إدارة الموارد البشرية</span>
-        </div>
         <div className="relative">
           <Input
             id="password"
             type={showPassword ? "text" : "password"}
-            autoComplete="current-password"
+            inputMode={passwordLogin ? "text" : "numeric"}
+            maxLength={passwordLogin ? undefined : 4}
+            disabled={isPending}
+            autoComplete={passwordLogin ? "current-password" : "off"}
             placeholder=" "
             className="peer h-9 rounded-none border-0 bg-transparent px-0 pe-7 pt-1 text-sm shadow-none placeholder:text-transparent focus-visible:ring-0"
             aria-invalid={passwordError}
@@ -171,17 +219,12 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
             htmlFor="password"
             className="pointer-events-none absolute start-0 top-1 origin-left rtl:origin-right -translate-y-5 scale-75 text-xs font-bold uppercase tracking-wider text-slate-500 transition-all duration-300 ease-in-out peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100 peer-placeholder-shown:text-sm peer-placeholder-shown:font-medium peer-placeholder-shown:normal-case peer-placeholder-shown:tracking-normal peer-placeholder-shown:text-slate-400 peer-focus:-translate-y-5 peer-focus:scale-75 peer-focus:text-xs peer-focus:font-bold peer-focus:uppercase peer-focus:tracking-wider peer-focus:text-[#1E3A64] dark:text-slate-400 dark:peer-placeholder-shown:text-slate-500"
           >
-            {dictionary?.auth?.password || "كلمة المرور"}
+            {passwordLogin ? (dictionary?.auth?.password || "كلمة المرور") : "آخر ٤ أرقام من رقم الهوية"}
           </Label>
           <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute end-0 top-1.5 rounded p-1 text-muted-foreground transition-colors duration-300 ease-in-out hover:text-foreground">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
         </div>
       </div>
-      <div className="space-y-3">
-        <Label htmlFor="activationCode">رمز التفعيل من المسؤول — ٤ أرقام</Label>
-        <Input id="activationCode" type="password" inputMode="numeric" autoComplete="off" maxLength={4} dir="ltr" placeholder="••••" {...form.register("activationCode", { setValueAs: value => value?.trim() || undefined })} />
-        <p className="text-xs text-muted-foreground">لأول دخول أو عند تعذر البصمة. احصل على رمزك الخاص من الموارد البشرية. المسؤول يدخل بكلمة مروره دون رمز.</p>
-        {form.formState.errors.activationCode ? <p role="alert" className="text-xs text-destructive">{form.formState.errors.activationCode.message}</p> : null}
-      </div>
+      {form.formState.errors.password ? <p role="alert" className="text-xs text-destructive">{form.formState.errors.password.message}</p> : null}
       <label className="flex cursor-pointer items-center gap-2.5 select-none">
         <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} className="h-4 w-4 rounded border-input text-[#1E3A64] focus-visible:ring-[#1E3A64]" />
         <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{dictionary?.auth?.rememberTitle || "تذكر مساحة العمل"}</span>
@@ -193,8 +236,11 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
         type="submit"
         disabled={isPending}
       >
-        {isPending ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : null}{dictionary?.auth?.submit || "تسجيل الدخول"}
+        {isPending ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : null}{passwordLogin ? (dictionary?.auth?.submit || "تسجيل الدخول") : "متابعة"}
       </Button>
+      <button type="button" disabled={isPending} className="w-full text-xs text-muted-foreground underline" onClick={() => {
+        setPasswordLogin(!passwordLogin); form.reset({ identifier: "", password: "" }); setMessage(null); automaticAttempt.current = "";
+      }}>{passwordLogin ? "دخول الموظفين برقم الهوية" : "دخول المسؤول أو بكلمة مرور مخصصة"}</button>
     </form>
   );
 }
