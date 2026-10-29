@@ -12,6 +12,9 @@ export function getAccount(role: string): SmokeAccount | null {
 
 export async function login(page: Page, account: SmokeAccount) {
   await page.goto("/login");
+  if (!/^\d{10}$/.test(account.identifier) || !/^\d{4}$/.test(account.password)) {
+    await page.getByRole("button", { name: "دخول المسؤول أو بكلمة مرور مخصصة" }).click();
+  }
   await page.locator("#identifier").fill(account.identifier);
   await page.locator("#password").fill(account.password);
   await page.locator('button[type="submit"]').click();
