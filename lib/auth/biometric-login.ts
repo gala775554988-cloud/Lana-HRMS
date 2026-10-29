@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
-import { generateAuthenticationOptions, verifyAuthenticationResponse } from "@simplewebauthn/server";
-import type { AuthenticationResponseJSON } from "@simplewebauthn/types";
+import { generateAuthenticationOptions, verifyAuthenticationResponse, generateRegistrationOptions, verifyRegistrationResponse } from "@simplewebauthn/server";
+import type { AuthenticationResponseJSON, RegistrationResponseJSON } from "@simplewebauthn/types";
 import { prisma } from "@/lib/prisma";
 
 async function relyingParty() {
@@ -44,6 +44,53 @@ export async function verifyBiometricLogin(userId: string, serializedResponse: s
       const consumed = await tx.user.updateMany({ where: { id: userId, isActive: true, sessionVersion: credential.user.sessionVersion, currentChallenge: savedChallenge }, data: { currentChallenge: null } });
       if (consumed.count !== 1) return false;
       await tx.biometricCredential.update({ where: { id: credential.id }, data: { counter: BigInt(result.authenticationInfo.newCounter), lastUsedAt: new Date() } });
+      return true;
+    });
+  } catch {
+    return false;
+  }
+}
+
+/** Initial enrollment requires the checked account password and a verified device
+ * ceremony. An account with any existing credential must authenticate instead. */
+export async function prepareBiometricEnrollment(userId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId }, include: { biometricCredentials: true } });
+  if (!user?.isActive || user.biometricCredentials.length) return null;
+  const { rpID } = await relyingParty();
+  const options = await generateRegistrationOptions({
+    rpID, rpName: "Lana HRMS", userID: user.id,
+    userName: user.username || user.email || user.id,
+    userDisplayName: user.name || "Employee",
+    attestationType: "none",
+    authenticatorSelection: { authenticatorAttachment: "platform", residentKey: "preferred", userVerification: "required" },
+  });
+  await prisma.user.update({ where: { id: userId }, data: { currentChallenge: JSON.stringify({ purpose: "enroll", sessionVersion: user.sessionVersion, challenge: options.challenge, expires: Date.now() + 120000 }) } });
+  return options;
+}
+
+export async function verifyBiometricEnrollment(userId: string, serializedResponse: string) {
+  try {
+    const response = JSON.parse(serializedResponse) as RegistrationResponseJSON;
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user?.isActive || !user.currentChallenge) return false;
+    const savedChallenge = user.currentChallenge;
+    const pending = JSON.parse(savedChallenge);
+    if (pending.purpose !== "enroll" || pending.sessionVersion !== user.sessionVersion || pending.expires <= Date.now()) return false;
+    const { origin, rpID } = await relyingParty();
+    const result = await verifyRegistrationResponse({ response, expectedChallenge: pending.challenge, expectedOrigin: origin, expectedRPID: rpID, requireUserVerification: true });
+    if (!result.verified || !result.registrationInfo) return false;
+    const info = result.registrationInfo;
+    return await prisma.$transaction(async tx => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`employee-device-enrollment:${userId}`}))`;
+      if (await tx.biometricCredential.count({ where: { userId } })) return false;
+      const consumed = await tx.user.updateMany({ where: { id: userId, isActive: true, sessionVersion: user.sessionVersion, currentChallenge: savedChallenge }, data: { currentChallenge: null } });
+      if (consumed.count !== 1) return false;
+      await tx.biometricCredential.create({ data: {
+        userId, credentialID: Buffer.from(info.credentialID).toString("base64url"),
+        publicKey: Buffer.from(info.credentialPublicKey), counter: BigInt(info.counter),
+        deviceType: info.credentialDeviceType, backedUp: info.credentialBackedUp,
+        transports: response.response.transports || ["internal"], deviceName: "Device passkey", lastUsedAt: new Date(),
+      } });
       return true;
     });
   } catch {

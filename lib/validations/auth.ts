@@ -15,10 +15,10 @@ export const loginSchema = z.object({
     .max(64, "Identifier is too long.")
     .trim(),
   password: z.string().min(1, "Password is required."),
+  biometricRegistration: z.string().max(32768).optional(),
   biometricResponse: z.string().max(16384).optional(),
   deviceId: z.string().optional(),
   enrollmentEmail: z.string().email("أدخل بريداً إلكترونياً صحيحاً.").max(254).optional(),
-  activationCode: z.string().regex(/^\d{4}$/, "أدخل رمز التفعيل المكون من ٤ أرقام.").optional(),
   verificationCode: z.string().regex(/^\d{6}$/, "أدخل رمز التحقق المكون من 6 أرقام.").optional()
 });
 

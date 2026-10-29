@@ -19,7 +19,6 @@ export function presentEmployeeActivity(action: string, metadata: unknown) {
       username: "اسم المستخدم",
       password: "كلمة المرور",
       isActive: "حالة الحساب",
-      issueActivation: "رمز التفعيل",
       clearLoginEmail: "إعادة تسجيل البريد",
       restoreIdentityPassword: "طريقة الدخول",
     };

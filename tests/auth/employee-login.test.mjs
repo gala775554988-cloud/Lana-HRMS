@@ -12,7 +12,7 @@ async function loadModule(file, prisma, extras = {}) {
   const context = vm.createContext({ Buffer, Date, URL, URLSearchParams, AbortSignal, process: { env: extras.env ?? {} }, fetch: extras.fetch });
   const subject = new vm.SourceTextModule(ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText, { context });
   await subject.link(async name => {
-    const exports = extras.imports?.[name] ?? (name === '@/lib/auth/biometric-login' ? { prepareBiometricLogin: async () => null, verifyBiometricLogin: async () => false } : name === '@/lib/prisma' ? { prisma } : name === 'node:crypto' ? { timingSafeEqual: crypto.timingSafeEqual, createHash: crypto.createHash, createHmac: crypto.createHmac, randomBytes: crypto.randomBytes, randomInt: crypto.randomInt } : { verifyPassword: async (password, hash) => password === hash });
+    const exports = extras.imports?.[name] ?? (name === '@/lib/auth/biometric-login' ? { prepareBiometricLogin: async () => null, prepareBiometricEnrollment: async () => null, verifyBiometricLogin: async () => false, verifyBiometricEnrollment: async () => false } : name === '@/lib/prisma' ? { prisma } : name === 'node:crypto' ? { timingSafeEqual: crypto.timingSafeEqual, createHash: crypto.createHash, createHmac: crypto.createHmac, randomBytes: crypto.randomBytes, randomInt: crypto.randomInt } : { verifyPassword: async (password, hash) => password === hash });
     const dependency = new vm.SyntheticModule(Object.keys(exports), function () { for (const [key, value] of Object.entries(exports)) this.setExport(key, value); }, { context });
     return dependency;
   });
@@ -127,9 +127,9 @@ test('legacy shared device identifiers never query or bind accounts', async () =
   assert.equal((await subject.verifyOrBindEmployeeDevice('b', 'shared-browser')).allowed, true);
 });
 
-test('the Credentials provider requires the employee activation PIN and cannot be bypassed with email or a shared device UUID', async () => {
+test('the Credentials provider requires a verified device ceremony and rejects legacy activation codes', async () => {
   let options;
-  let accepted = false;
+  let enrollmentAccepted = false;
   let biometricAccepted = false;
   const user = { id: 'u', username: '1234567890', passwordHash: 'old', isActive: true, mustChangePassword: true, passwordChanged: false };
   const prisma = {
@@ -138,7 +138,7 @@ test('the Credentials provider requires the employee activation PIN and cannot b
     userRole: { findMany: async () => [{ role: { name: 'EMPLOYEE' } }] },
   };
   await loadModule('auth.ts', prisma, { imports: {
-    '@/lib/auth/biometric-login': { verifyBiometricLogin: async (_id, response) => biometricAccepted && response === 'signed-response' },
+    '@/lib/auth/biometric-login': { verifyBiometricLogin: async (_id, response) => biometricAccepted && response === 'signed-response', verifyBiometricEnrollment: async (_id, response) => enrollmentAccepted && response === 'new-device' },
     'next-auth': { default: config => { options = config; return {}; } },
     'next-auth/providers/credentials': { default: config => config },
     '@auth/prisma-adapter': { PrismaAdapter: () => ({}) },
@@ -147,14 +147,14 @@ test('the Credentials provider requires the employee activation PIN and cannot b
     '@/lib/enterprise/permissions': { getCachedEffectivePermissions: async () => [], PERMISSION_TEMPLATES: { EMPLOYEE: [] } },
     '@/lib/auth/employee-login': { checkLoginPassword: async (_user, password) => ({ valid: password === '7890', employee: { email } }) },
     '@/lib/auth/employee-enrollment': { resolveEmployeeLoginEmail: async () => email, completeEmployeeEmailEnrollment: async () => {} },
-    '@/lib/auth/employee-activation': { verifyEmployeeActivation: async (_user, code) => accepted && code === '0123' },
   } });
   const authorize = options.providers[0].authorize;
   assert.equal(await authorize({ identifier: '1234567890', password: '7890', deviceId: 'shared-device' }), null);
   assert.equal(await authorize({ identifier: '1234567890', password: '7890', verificationCode: '111111' }), null);
-  accepted = true;
   assert.equal(await authorize({ identifier: '1234567890', password: 'wrong', activationCode: '0123' }), null);
-  const result = await authorize({ identifier: '1234567890', password: '7890', activationCode: '0123', deviceId: 'shared-device' });
+  assert.equal(await authorize({ identifier: '1234567890', password: '7890', activationCode: '0123', deviceId: 'shared-device' }), null);
+  enrollmentAccepted = true;
+  const result = await authorize({ identifier: '1234567890', password: '7890', biometricRegistration: 'new-device' });
   assert.equal(await authorize({ identifier: '1234567890', password: '7890', biometricResponse: 'invalid' }), null);
   biometricAccepted = true;
   assert.equal((await authorize({ identifier: '1234567890', password: '7890', biometricResponse: 'signed-response' })).id, 'u');
@@ -235,7 +235,6 @@ test('account API enforces access and commits overrides, OTP invalidation and au
     'next/server': { NextResponse: { json: (data, options = {}) => ({ data, status: options.status ?? 200 }) } },
     zod: { z },
     '@/lib/password': { hashPassword: async () => 'hashed-value', generateTemporaryPassword: () => 'generated-password' },
-    '@/lib/auth/employee-activation': { activationPinIdentifier: id => `employee-activation-pin:${id}`, activationPinToken: (id, code) => crypto.createHash('sha256').update(id + code).digest('hex') },
     '@/lib/auth/employee-otp': { normalizeEmployeeEmail: value => value.toLowerCase() },
     '@/lib/auth/account-management': { canManageEmployeeAccounts: permissions.canManageEmployeeAccounts, canEditEmployeeAccount: permissions.canEditEmployeeAccount },
   } });
@@ -257,9 +256,7 @@ test('account API enforces access and commits overrides, OTP invalidation and au
   assert.equal(deleted.where.OR[0].token, 'employee-email-login:target:pending');
   assert.equal(JSON.stringify(audit).includes('new-password-123'), false);
   assert.equal(JSON.stringify(audit).includes(email), false);
-  const activation = await subject.PATCH(request({ employeeId: 'e', clearLoginEmail: true, issueActivation: true }));
-  assert.equal(activation.data.activationCode.length, 4);
-  assert.equal(updated.loginEmail, null);
+  assert.equal((await subject.PATCH(request({ employeeId: 'e', issueActivation: true }))).status, 400);
   const invalid = await subject.PATCH(request({ employeeId: 'e', password: '123', restoreIdentityPassword: true }));
   assert.equal(invalid.status, 400);
 });
@@ -268,7 +265,9 @@ test('loginAction omits absent optional fields before Auth.js URLSearchParams se
   const validations = await loadModule('lib/validations/auth.ts', {}, { imports: { zod: { z } } });
   let employee = null;
   const forwarded = [];
+  let hasDevice = false;
   const subject = await loadModule('lib/auth/actions.ts', {}, { imports: {
+    '@/lib/auth/biometric-login': { prepareBiometricLogin: async () => hasDevice ? { challenge: 'login' } : null, prepareBiometricEnrollment: async () => ({ challenge: 'enroll' }) },
     'next/dist/client/components/redirect-error': { isRedirectError: () => false },
     '@/auth': {
       findUser: async () => ({ id: 'u', isActive: true, loginEmail: email }),
@@ -297,8 +296,18 @@ test('loginAction omits absent optional fields before Auth.js URLSearchParams se
   assert.equal((await subject.loginAction({ identifier: 'admin', password: 'test-password' })).success, true);
   assert.deepEqual(Object.keys(forwarded[0]).sort(), ['identifier', 'password']);
   employee = { email };
-  assert.equal((await subject.loginAction({ identifier: '1234567890', password: '7890', activationCode: '0123' })).success, true);
-  assert.equal(forwarded[1].activationCode, '0123');
+  const firstStep = await subject.loginAction({ identifier: '1234567890', password: '7890' });
+  assert.equal(firstStep.success, false);
+  assert.equal(firstStep.registrationOptions.challenge, 'enroll');
+  assert.equal(forwarded.length, 1, 'identity credentials alone never issue a session');
+  hasDevice = true;
+  const existingDevice = await subject.loginAction({ identifier: '1234567890', password: '7890' });
+  assert.equal(existingDevice.biometricOptions.challenge, 'login');
+  assert.equal(existingDevice.registrationOptions, undefined);
+  assert.equal(forwarded.length, 1);
+  assert.equal((await subject.loginAction({ identifier: '1234567890', password: '7890', biometricResponse: 'signed-response' })).success, true);
+  assert.equal(forwarded[1].biometricResponse, 'signed-response');
+  assert.equal(Object.hasOwn(forwarded[1], 'activationCode'), false);
   assert.equal(Object.hasOwn(forwarded[1], 'enrollmentEmail'), false);
   assert.equal(Object.hasOwn(forwarded[1], 'verificationCode'), false);
 });
@@ -314,32 +323,6 @@ test('employee activity summaries never forward raw device metadata or unrecogni
   assert.equal(JSON.stringify(account).includes(secret), false);
   const other = subject.presentEmployeeActivity(secret, { raw: secret });
   assert.equal(JSON.stringify(other).includes(secret), false);
-});
-
-
-test('four-digit activation PINs are user-bound, reusable, rate-limited durably, and account-version checked', async () => {
-  const store = tokenStore();
-  const users = new Map([['u', { isActive: true, sessionVersion: 1 }], ['v', { isActive: true, sessionVersion: 1 }]]);
-  let queue = Promise.resolve();
-  const tx = { $executeRaw: async () => {}, verificationToken: store, user: { findUnique: async ({ where }) => users.get(where.id) } };
-  const subject = await loadModule('lib/auth/employee-activation.ts', { $transaction: fn => { const run = queue.then(() => fn(tx)); queue = run.catch(() => {}); return run; } }, { env: { AUTH_SECRET: 'activation-test-secret' } });
-  const token = subject.activationPinToken('u', '0123');
-  assert.equal(token.includes('0123'), false);
-  await store.create({ data: { token, identifier: subject.activationPinIdentifier('u'), expires: new Date(Date.now() + 86400000) } });
-  assert.equal(await subject.verifyEmployeeActivation({ id: 'u', sessionVersion: 1 }, '0123'), true);
-  assert.equal(await subject.verifyEmployeeActivation({ id: 'u', sessionVersion: 1 }, '0123'), true);
-  assert.equal(await subject.verifyEmployeeActivation({ id: 'v', sessionVersion: 1 }, '0123'), false);
-  assert.equal(await subject.verifyEmployeeActivation({ id: 'u', sessionVersion: 0 }, '0123'), false);
-  assert.equal(await subject.verifyEmployeeActivation({ id: 'u', sessionVersion: 1 }, '123'), false);
-  const failures = await Promise.all(Array.from({ length: 8 }, () => subject.verifyEmployeeActivation({ id: 'u', sessionVersion: 1 }, '9999')));
-  assert.equal(failures.every(value => value === false), true);
-  assert.equal(store.rows.get('employee-activation-attempts:u').identifier, '5');
-  assert.equal(await subject.verifyEmployeeActivation({ id: 'u', sessionVersion: 1 }, '0123'), false);
-  store.rows.get('employee-activation-attempts:u').expires = new Date(Date.now() - 1);
-  assert.equal(await subject.verifyEmployeeActivation({ id: 'u', sessionVersion: 1 }, '0123'), true);
-  assert.equal(store.rows.has('employee-activation-attempts:u'), false);
-  users.set('u', { isActive: false, sessionVersion: 1 });
-  assert.equal(await subject.verifyEmployeeActivation({ id: 'u', sessionVersion: 1 }, '0123'), false);
 });
 
 
@@ -361,6 +344,8 @@ test('biometric login binds credentials to the account, expires challenges and a
   }, { imports: {
     'next/headers': { headers: async () => new Map([['host', 'localhost']]) },
     '@simplewebauthn/server': {
+      generateRegistrationOptions: async () => ({}),
+      verifyRegistrationResponse: async () => ({}),
       generateAuthenticationOptions: async () => ({}),
       verifyAuthenticationResponse: async options => {
         assert.equal(options.requireUserVerification, true);
@@ -386,4 +371,60 @@ test('biometric login binds credentials to the account, expires challenges and a
   const results = await Promise.all([subject.verifyBiometricLogin('u', response), subject.verifyBiometricLogin('u', response)]);
   assert.equal(results.filter(Boolean).length, 1);
   assert.equal(await subject.verifyBiometricLogin('u', response), false);
+});
+
+
+test('first-device enrollment requires verification and atomically refuses existing, stale or replayed enrollment', async () => {
+  let active = true;
+  let challenge;
+  let registered = 0;
+  let verified = false;
+  let queue = Promise.resolve();
+  const pending = () => JSON.stringify({ purpose: 'enroll', sessionVersion: 1, challenge: 'nonce', expires: Date.now() + 60000 });
+  challenge = pending();
+  const tx = {
+    $executeRaw: async () => {},
+    user: { updateMany: async ({ where }) => {
+      if (challenge !== where.currentChallenge) return { count: 0 };
+      challenge = null; return { count: 1 };
+    } },
+    biometricCredential: { count: async () => registered, create: async ({ data }) => { assert.equal(data.userId, 'u'); registered++; } },
+  };
+  const subject = await loadModule('lib/auth/biometric-login.ts', {
+    user: { findUnique: async () => ({ id: 'u', isActive: active, sessionVersion: 1, currentChallenge: challenge, biometricCredentials: registered ? [{}] : [] }), update: async ({ data }) => { challenge = data.currentChallenge; } },
+    $transaction: fn => { const result = queue.then(() => fn(tx)); queue = result.catch(() => {}); return result; },
+  }, { imports: {
+    'next/headers': { headers: async () => new Map([['host', 'localhost']]) },
+    '@simplewebauthn/server': {
+      generateAuthenticationOptions: async () => ({}), verifyAuthenticationResponse: async () => ({}),
+      generateRegistrationOptions: async options => { assert.equal(options.authenticatorSelection.userVerification, 'required'); return { challenge: 'nonce' }; },
+      verifyRegistrationResponse: async options => {
+        assert.equal(options.requireUserVerification, true);
+        return { verified, registrationInfo: { credentialID: Buffer.from('credential'), credentialPublicKey: Buffer.from('key'), counter: 0, credentialDeviceType: 'singleDevice', credentialBackedUp: false } };
+      },
+    },
+  } });
+  const response = JSON.stringify({ response: { transports: ['internal'] } });
+  assert.equal(await subject.verifyBiometricEnrollment('u', response), false);
+  assert.equal(registered, 0);
+  verified = true;
+  active = false;
+  assert.equal(await subject.verifyBiometricEnrollment('u', response), false);
+  active = true;
+  challenge = JSON.stringify({ purpose: 'enroll', sessionVersion: 0, challenge: 'nonce', expires: Date.now() + 60000 });
+  assert.equal(await subject.verifyBiometricEnrollment('u', response), false);
+  challenge = JSON.stringify({ purpose: 'enroll', sessionVersion: 1, challenge: 'nonce', expires: Date.now() - 1 });
+  assert.equal(await subject.verifyBiometricEnrollment('u', response), false);
+  challenge = JSON.stringify({ purpose: 'login', sessionVersion: 1, challenge: 'nonce', expires: Date.now() + 60000 });
+  assert.equal(await subject.verifyBiometricEnrollment('u', response), false);
+  challenge = pending();
+  registered = 1;
+  assert.equal(await subject.prepareBiometricEnrollment('u'), null);
+  assert.equal(await subject.verifyBiometricEnrollment('u', response), false);
+  registered = 0;
+  await subject.prepareBiometricEnrollment('u');
+  const results = await Promise.all([subject.verifyBiometricEnrollment('u', response), subject.verifyBiometricEnrollment('u', response)]);
+  assert.equal(results.filter(Boolean).length, 1);
+  assert.equal(registered, 1);
+  assert.equal(await subject.verifyBiometricEnrollment('u', response), false);
 });

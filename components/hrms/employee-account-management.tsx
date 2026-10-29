@@ -4,12 +4,10 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  KeyRound,
   Search,
   ShieldCheck,
   User,
   Mail,
-  Copy,
   CheckCircle2,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
@@ -38,7 +36,6 @@ export function EmployeeAccountManagement({
   const [password, setPassword] = useState("");
   const [active, setActive] = useState(true);
   const [message, setMessage] = useState("");
-  const [activation, setActivation] = useState("");
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const choose = useCallback((employee: Employee) => {
@@ -48,7 +45,6 @@ export function EmployeeAccountManagement({
     setEmail(employee.user?.loginEmail || "");
     setActive(employee.user?.isActive ?? true);
     setPassword("");
-    setActivation("");
     setMessage("");
   }, []);
   useEffect(() => {
@@ -91,22 +87,16 @@ export function EmployeeAccountManagement({
     if (!selected || busy) return;
     setBusy(true);
     setMessage("");
-    setActivation("");
-    const issueOnly = extra.issueActivation === true;
     try {
       const response = await fetch("/api/employees/account", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           employeeId: selected.id,
-          ...(!issueOnly
-            ? {
-                ...(username ? { username } : {}),
-                ...(email ? { email } : {}),
-                isActive: active,
-                ...(password ? { password } : {}),
-              }
-            : {}),
+          ...(username ? { username } : {}),
+          ...(email ? { email } : {}),
+          isActive: active,
+          ...(password ? { password } : {}),
           ...extra,
         }),
       });
@@ -117,7 +107,6 @@ export function EmployeeAccountManagement({
       setPassword("");
       setRefresh((value) => value + 1);
       if (extra.clearLoginEmail) setEmail("");
-      if (result.activationCode) setActivation(result.activationCode);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "تعذر تحديث الحساب.");
     } finally {
@@ -139,19 +128,18 @@ export function EmployeeAccountManagement({
               وصول آمن للموظفين
             </p>
             <h2 id="account-management-title" className="text-lg font-bold">
-              الحساب ورموز التفعيل
+              إدارة الحساب
             </h2>
             <p className="mt-2 max-w-3xl text-xs leading-6 text-muted-foreground">
-              رمز التفعيل يصدر من هنا بعد اختيار الموظف. يُسلّم له مرة واحدة
-              للدخول برقم الهوية وكلمة المرور دون الحاجة للبريد.
+              يدخل الموظف برقم الهوية وآخر أربعة أرقام، ثم البصمة أو رمز قفل الجهاز.
             </p>
           </div>
         </div>
         <ol className="mt-5 grid gap-3 text-xs sm:grid-cols-3">
           {[
             "اختر الموظف",
-            "أصدر رمز التفعيل",
-            "سلّم الرمز بعد التحقق من الهوية",
+            "راجع بيانات الحساب",
+            "احفظ التغييرات",
           ].map((step, index) => (
             <li
               key={step}
@@ -291,7 +279,7 @@ export function EmployeeAccountManagement({
                     className="rounded-xl"
                   />
                   <p className="text-[11px] leading-5 text-muted-foreground">
-                    تُستخدم بدلاً من آخر 4 أرقام، مع رمز التفعيل الخاص بالموظف.
+                    تُستخدم بدلاً من آخر 4 أرقام، ثم البصمة أو رمز قفل الجهاز.
                   </p>
                 </div>
                 <div className="flex items-center">
@@ -330,37 +318,6 @@ export function EmployeeAccountManagement({
                   </Button>
                 </div>
               </form>
-              <div className="mt-6 flex flex-col justify-between gap-4 rounded-2xl border border-amber-200/70 bg-amber-50/50 p-4 dark:border-amber-900 dark:bg-amber-950/20 sm:flex-row sm:items-center">
-                <div>
-                  <h4 className="flex items-center gap-2 text-sm font-bold">
-                    <KeyRound className="h-4 w-4 text-amber-700" />
-                    رمز دخول الموظف — ٤ أرقام
-                  </h4>
-                  <p className="mt-2 max-w-xl text-xs leading-6 text-muted-foreground">
-                    إصدار رمز جديد يلغي الرمز السابق والجلسات القديمة.
-                    يُستخدم الرمز عند كل دخول حتى يستبدله المسؤول، ويظهر هنا مرة واحدة فقط.
-                  </p>
-                </div>
-                <Button
-                  disabled={busy}
-                  type="button"
-                  className="shrink-0 gap-2 rounded-xl bg-slate-900 text-white hover:bg-slate-800 dark:bg-indigo-600"
-                  onClick={() => {
-                    if (
-                      confirm(
-                        "إلغاء رمز الدخول السابق وإصدار رمز جديد من ٤ أرقام؟ سلّمه للموظف بعد التحقق من هويته.",
-                      )
-                    )
-                      void save({
-                        email: undefined,
-                        issueActivation: true,
-                      });
-                  }}
-                >
-                  <KeyRound className="h-4 w-4" />
-                  إصدار رمز تفعيل
-                </Button>
-              </div>
             </>
           ) : (
             <div className="grid min-h-64 place-items-center text-center">
@@ -370,7 +327,7 @@ export function EmployeeAccountManagement({
                   اختر الموظف لإدارة حسابه
                 </h3>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  ستظهر هنا بيانات الحساب وخيار إصدار رمز التفعيل.
+                  ستظهر هنا بيانات الحساب وخيارات تعديله.
                 </p>
               </div>
             </div>
@@ -383,40 +340,7 @@ export function EmployeeAccountManagement({
               {message}
             </p>
           ) : null}
-          {activation ? (
-            <div className="mt-5 space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5 dark:border-emerald-900 dark:bg-emerald-950/20">
-              <h4 className="flex items-center gap-2 text-sm font-bold text-emerald-800 dark:text-emerald-200">
-                <CheckCircle2 className="h-4 w-4" />
-                رمز التفعيل جاهز
-              </h4>
-              <p className="text-xs leading-6 text-muted-foreground">
-                سلّمه للموظف بعد التأكد من هويته، ولا تشاركه مع غيره.
-              </p>
-              <Input
-                aria-label="رمز التفعيل"
-                value={activation}
-                readOnly
-                dir="ltr"
-                className="rounded-xl bg-card font-mono text-xs"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                className="gap-2 rounded-xl bg-card"
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(activation);
-                    setMessage("تم نسخ رمز التفعيل.");
-                  } catch {
-                    setMessage("تعذر النسخ التلقائي؛ انسخ الرمز من الحقل.");
-                  }
-                }}
-              >
-                <Copy className="h-4 w-4" />
-                نسخ رمز التفعيل
-              </Button>
-            </div>
-          ) : null}
+
         </div>
       </div>
     </section>

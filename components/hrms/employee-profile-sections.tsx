@@ -181,7 +181,7 @@ export function ProfileHero({
               className="gap-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700"
             >
               <KeyRound className="h-4 w-4" />
-              الحساب ورموز التفعيل
+              إدارة الحساب
             </Button>
           ) : null}
           {canEdit ? (
@@ -372,10 +372,9 @@ export function ProfileOverview({
               <KeyRound className="h-5 w-5" />
             </span>
             <div>
-              <h2 className="text-sm font-bold">أين أجد رمز تفعيل الموظف؟</h2>
+              <h2 className="text-sm font-bold">إدارة حساب الموظف</h2>
               <p className="mt-1 text-xs leading-6 text-muted-foreground">
-                من تبويب الحساب والتفعيل، اختر إصدار رمز تفعيل وسلّمه للموظف بعد
-                التحقق من هويته.
+                من تبويب الحساب يمكنك مراجعة بيانات الدخول وحالة حساب الموظف.
               </p>
             </div>
           </div>
@@ -384,7 +383,7 @@ export function ProfileOverview({
             className="shrink-0 gap-2 rounded-xl bg-card"
             onClick={() => onSelect("account")}
           >
-            فتح الحساب والتفعيل
+            فتح إدارة الحساب
             <ArrowUpLeft className="h-4 w-4" />
           </Button>
         </div>
