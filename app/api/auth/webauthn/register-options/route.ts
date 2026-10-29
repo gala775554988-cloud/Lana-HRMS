@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
       })),
       authenticatorSelection: {
         residentKey: "preferred",
-        userVerification: "preferred",
+        userVerification: "required",
         authenticatorAttachment: "platform" // Platform authenticator enforces Touch ID / Face ID / Windows Hello Hardware
       }
     });
