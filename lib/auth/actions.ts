@@ -13,36 +13,43 @@ import {
   resetPasswordSchema,
 } from "@/lib/validations/auth";
 
-import { prepareBiometricLogin } from "@/lib/auth/biometric-login";
+import { prepareBiometricLogin, prepareBiometricEnrollment } from "@/lib/auth/biometric-login";
 
-type ActionState = { success: boolean; message: string; requiresActivation?: boolean; biometricOptions?: Awaited<ReturnType<typeof prepareBiometricLogin>>; enrollBiometric?: boolean };
+type ActionState = {
+  success: boolean;
+  message: string;
+  biometricOptions?: Awaited<ReturnType<typeof prepareBiometricLogin>>;
+  registrationOptions?: Awaited<ReturnType<typeof prepareBiometricEnrollment>>;
+};
 
-const BAD_CREDENTIALS = "بيانات الدخول أو رمز التفعيل غير صحيحة. بعد ٥ محاولات خاطئة انتظر ١٥ دقيقة أو راجع المسؤول.";
+const BAD_CREDENTIALS = "تعذر تسجيل الدخول. تحقق من بياناتك وأعد المحاولة.";
 
 export async function loginAction(input: unknown): Promise<ActionState> {
   const parsed = loginSchema.safeParse(input);
   if (!parsed.success) return { success: false, message: parsed.error.errors[0]?.message ?? BAD_CREDENTIALS };
   try {
-    const { identifier, password, activationCode, biometricResponse } = parsed.data;
+    const { identifier, password, biometricResponse, biometricRegistration } = parsed.data;
     const user = await findUser(identifier);
     if (!user?.isActive) return { success: false, message: BAD_CREDENTIALS };
     const { valid, employee } = await checkLoginPassword(user, password);
     if (!valid) return { success: false, message: BAD_CREDENTIALS };
-    if (employee && !activationCode && !biometricResponse) {
+    if (employee && !biometricRegistration && !biometricResponse) {
       const biometricOptions = await prepareBiometricLogin(user.id);
-      if (biometricOptions) return { success: false, message: "أكد الدخول ببصمة الجهاز", biometricOptions };
+      if (biometricOptions) return { success: false, message: "", biometricOptions };
+      const registrationOptions = await prepareBiometricEnrollment(user.id);
+      if (registrationOptions) return { success: false, message: "", registrationOptions };
+      return { success: false, message: "تعذر تجهيز التحقق بالجهاز. أعد المحاولة." };
     }
-    if (employee && !activationCode && !biometricResponse) return { success: false, requiresActivation: true, message: "أدخل رمز التفعيل المكون من ٤ أرقام الذي استلمته من المسؤول. لا يلزم بريد إلكتروني." };
     // Auth.js serializes these options with URLSearchParams. Omit absent
     // fields: undefined becomes the literal "undefined" and fails validation.
     await signIn("credentials", {
       identifier,
       password,
       ...(biometricResponse ? { biometricResponse } : {}),
-      ...(activationCode ? { activationCode } : {}),
+      ...(biometricRegistration ? { biometricRegistration } : {}),
       redirect: false,
     });
-    return { success: true, message: "", enrollBiometric: Boolean(employee && !biometricResponse) };
+    return { success: true, message: "" };
   } catch (error) {
     if (isRedirectError(error)) throw error;
     return { success: false, message: BAD_CREDENTIALS };

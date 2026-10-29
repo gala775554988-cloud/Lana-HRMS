@@ -105,7 +105,7 @@ export function EmployeeProfileDashboard({
     { value: "documents", label: "المستندات والمرفقات", icon: FileText },
     { value: "salary", label: "الرواتب والمزايا", icon: Wallet },
     { value: "contracts", label: "العقود", icon: FileCheck },
-    ...(canManageAccounts ? [{ value: "account", label: "الحساب والتفعيل", icon: KeyRound }] : []),
+    ...(canManageAccounts ? [{ value: "account", label: "إدارة الحساب", icon: KeyRound }] : []),
     { value: "attendance", label: "الحضور", icon: Clock },
     { value: "leaves", label: "الإجازات", icon: Calendar },
     { value: "career", label: "المؤهلات والخبرات", icon: Award },

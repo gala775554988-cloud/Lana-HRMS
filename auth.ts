@@ -1,4 +1,4 @@
-import { verifyBiometricLogin } from "@/lib/auth/biometric-login";
+import { verifyBiometricLogin, verifyBiometricEnrollment } from "@/lib/auth/biometric-login";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
@@ -7,7 +7,6 @@ import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations/auth";
 import { hashPassword } from "@/lib/password";
 import { getCachedEffectivePermissions, PERMISSION_TEMPLATES } from "@/lib/enterprise/permissions";
-import { verifyEmployeeActivation } from "@/lib/auth/employee-activation";
 import { checkLoginPassword } from "@/lib/auth/employee-login";
 
 async function getAuthorization(userId: string) {
@@ -188,8 +187,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       credentials: {
         identifier: { label: "Username", type: "text" },
         password: { label: "Password", type: "password" },
+        biometricRegistration: { label: "Device registration", type: "text" },
         biometricResponse: { label: "Biometric response", type: "text" },
-        activationCode: { label: "Activation code", type: "text" },
       },
       async authorize(credentials) {
         try {
@@ -203,7 +202,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           if (employee) {
             const verified = parsed.data.biometricResponse
               ? await verifyBiometricLogin(user.id, parsed.data.biometricResponse)
-              : await verifyEmployeeActivation(user, parsed.data.activationCode ?? "");
+              : parsed.data.biometricRegistration
+                ? await verifyBiometricEnrollment(user.id, parsed.data.biometricRegistration)
+                : false;
             if (!verified) return null;
           }
 

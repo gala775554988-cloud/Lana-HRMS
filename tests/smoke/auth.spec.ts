@@ -21,16 +21,17 @@ test.describe("auth", () => {
       if (route.request().method() !== "POST") return route.continue();
       await route.fulfill({
         contentType: "text/x-component",
-        body: '0:{"a":"$@1","f":"","b":"test"}\n1:{"success":false,"requiresActivation":true,"message":"أكد هويتك"}\n',
+        body: '0:{"a":"$@1","f":"","b":"test"}\n1:{"success":false,"registrationOptions":{"challenge":"test-challenge"},"message":""}\n',
       });
     });
     await page.locator("#identifier").fill("1234567890");
     await page.locator("#password").fill("7890");
-    await expect(page.getByRole("heading", { name: "تأكيد هويتك" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "البصمة أو رمز قفل الجهاز" })).toBeVisible();
     await expect(page.locator("#identifier")).toHaveCount(0);
     await expect(page.locator("#password")).toHaveCount(0);
-    await expect(page.locator("#activationCode")).toBeVisible();
-    await page.getByRole("button", { name: "العودة لتعديل رقم الهوية" }).click();
+    await expect(page.locator("#activationCode")).toHaveCount(0);
+    await expect(page.getByText(/رمز التفعيل/)).toHaveCount(0);
+    await page.getByRole("button", { name: "العودة" }).click();
     await expect(page.locator("#identifier")).toBeVisible();
     await expect(page.locator("#activationCode")).toHaveCount(0);
   });
