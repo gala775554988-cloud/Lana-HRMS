@@ -1,3 +1,4 @@
+import { verifyBiometricLogin } from "@/lib/auth/biometric-login";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
@@ -187,6 +188,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       credentials: {
         identifier: { label: "Username", type: "text" },
         password: { label: "Password", type: "password" },
+        biometricResponse: { label: "Biometric response", type: "text" },
         activationCode: { label: "Activation code", type: "text" },
       },
       async authorize(credentials) {
@@ -198,7 +200,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           if (!user?.isActive) return null;
           const { valid, employee } = await checkLoginPassword(user, parsed.data.password);
           if (!valid) return null;
-          if (employee && !await verifyEmployeeActivation(user, parsed.data.activationCode ?? "")) return null;
+          if (employee) {
+            const verified = parsed.data.biometricResponse
+              ? await verifyBiometricLogin(user.id, parsed.data.biometricResponse)
+              : await verifyEmployeeActivation(user, parsed.data.activationCode ?? "");
+            if (!verified) return null;
+          }
 
           await ensureAuthenticatedEmployeeLink(user).catch((linkError) => {
             console.error("[Auth][EMPLOYEE_LINK_REPAIR_ERROR]", linkError);

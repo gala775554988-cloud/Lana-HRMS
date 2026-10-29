@@ -34,7 +34,8 @@ export async function POST(req: NextRequest) {
       response: body.response,
       expectedChallenge: user.currentChallenge,
       expectedOrigin: origin,
-      expectedRPID: rpID
+      expectedRPID: rpID,
+      requireUserVerification: true
     });
 
     if (!verification.verified || !verification.registrationInfo) {

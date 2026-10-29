@@ -1,8 +1,9 @@
 "use client";
 
+import { startAuthentication, startRegistration, browserSupportsWebAuthn } from "@simplewebauthn/browser";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff, IdCard, Loader2 } from "lucide-react";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { loginAction } from "@/lib/auth/actions";
 import { loginSchema, type LoginInput } from "@/lib/validations/auth";
@@ -13,6 +14,8 @@ import { Label } from "@/components/ui/label";
 import type { Dictionary } from "@/lib/i18n";
 
 export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictionary; onLoginSuccess?: () => void | Promise<void> }) {
+  const [enrollmentPending, setEnrollmentPending] = useState(false);
+  const automaticAttempt = useRef("");
   const [message, setMessage] = useState<string | null>(null);
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -34,24 +37,78 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
     if (rememberMe) window.localStorage.setItem("lana.hrms.rememberedIdentifier", values.identifier);
     else window.localStorage.removeItem("lana.hrms.rememberedIdentifier");
     startTransition(async () => {
-      const result = await loginAction(values);
-      if (result.success) {
-        // A hard navigation here, not router.push(). A soft/transition-based
-        // push landed users on a permanently blank page whenever the
-        // destination route hit a (separately real, since-fixed) hydration
-        // mismatch: React can abandon a transition's pending render on error
-        // without falling back to anything, leaving the URL updated but the
-        // DOM never actually replaced. A full navigation re-does the whole
-        // request/hydration cycle from scratch the same way a fresh page
-        // load does, which the same mismatch only ever produced a
-        // recoverable console warning for, not a blank screen.
-        if (onLoginSuccess) await onLoginSuccess();
-        window.location.href = "/";
-      } else {
-        setMessage(result.message);
+      try {
+        let result = await loginAction(values);
+        if (result.biometricOptions) {
+          if (!browserSupportsWebAuthn()) {
+            setMessage("هذا المتصفح لا يدعم البصمة. أدخل رمز التفعيل للدخول.");
+            return;
+          }
+          const response = await startAuthentication(result.biometricOptions);
+          result = await loginAction({ ...values, biometricResponse: JSON.stringify(response) });
+        }
+        if (result.success) {
+          if (result.enrollBiometric && browserSupportsWebAuthn()) {
+            setEnrollmentPending(true);
+            await enrollBiometric();
+          } else {
+            await finishLogin();
+          }
+        } else {
+          setMessage(result.message);
+        }
+      } catch {
+        setMessage("لم تكتمل المصادقة بالبصمة. أعد المحاولة أو أدخل رمز التفعيل للدخول.");
       }
     });
   }
+
+  async function finishLogin() {
+    if (onLoginSuccess) await onLoginSuccess();
+    window.location.href = "/";
+  }
+
+  async function enrollBiometric() {
+    try {
+      setMessage("أكد ربط بصمة هذا الجهاز للدخول القادم.");
+      const optionsResponse = await fetch("/api/auth/webauthn/register-options", { method: "POST" });
+      const options = await optionsResponse.json();
+      if (!optionsResponse.ok || !options.success) throw new Error();
+      const response = await startRegistration(options.options);
+      const verification = await fetch("/api/auth/webauthn/register-verify", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ response }),
+      });
+      const result = await verification.json();
+      if (!verification.ok || !result.success) throw new Error();
+      await finishLogin();
+    } catch {
+      setMessage("تم تسجيل الدخول، لكن لم تُربط البصمة. يمكنك إعادة المحاولة أو المتابعة.");
+    }
+  }
+
+  const identifier = form.watch("identifier");
+  const password = form.watch("password");
+  const activationCode = form.watch("activationCode");
+  useEffect(() => {
+    if (isPending || enrollmentPending || activationCode || !/^\d{10}$/.test(identifier) || password.length !== 4 || !identifier.endsWith(password)) return;
+    const attempt = `${identifier}:${password}`;
+    if (automaticAttempt.current === attempt) return;
+    const timer = window.setTimeout(() => {
+      automaticAttempt.current = attempt;
+      void form.handleSubmit(onSubmit)();
+    }, 500);
+    return () => window.clearTimeout(timer);
+    // onSubmit reads the current form values through handleSubmit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identifier, password, activationCode, isPending, enrollmentPending, form]);
+
+  if (enrollmentPending) return (
+    <div className="space-y-4" role="status">
+      <p>{message}</p>
+      <Button disabled={isPending} onClick={() => startTransition(enrollBiometric)}>إعادة ربط البصمة</Button>
+      <Button variant="outline" disabled={isPending} onClick={() => void finishLogin()}>المتابعة إلى النظام</Button>
+    </div>
+  );
 
   const identifierError = Boolean(form.formState.errors.identifier) || Boolean(message);
   const passwordError = Boolean(form.formState.errors.password) || Boolean(message);
@@ -90,7 +147,7 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
           </Label>
           <IdCard className="pointer-events-none absolute end-0 top-2.5 h-4 w-4 text-muted-foreground" />
         </div>
-        <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">للموظفين: رقم الهوية وآخر ٤ أرقام منها أو كلمة المرور التي عينها المسؤول، ثم رمز التفعيل المكون من ٤ أرقام. لا يلزم بريد إلكتروني.</p>
+        <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">للموظفين: رقم الهوية وآخر ٤ أرقام منها أو كلمة المرور التي عينها المسؤول، ثم بصمة الجهاز تلقائيًا. عند أول دخول استخدم رمز التفعيل لربط البصمة. لا يلزم بريد إلكتروني.</p>
         {form.formState.errors.identifier ? <p className="text-xs text-destructive" role="alert">{form.formState.errors.identifier.message}</p> : null}
       </div>
       <div
@@ -122,7 +179,7 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
       <div className="space-y-3">
         <Label htmlFor="activationCode">رمز التفعيل من المسؤول — ٤ أرقام</Label>
         <Input id="activationCode" type="password" inputMode="numeric" autoComplete="off" maxLength={4} dir="ltr" placeholder="••••" {...form.register("activationCode", { setValueAs: value => value?.trim() || undefined })} />
-        <p className="text-xs text-muted-foreground">للموظفين فقط. احصل على رمزك الخاص من الموارد البشرية. المسؤول يدخل بكلمة مروره دون رمز.</p>
+        <p className="text-xs text-muted-foreground">لأول دخول أو عند تعذر البصمة. احصل على رمزك الخاص من الموارد البشرية. المسؤول يدخل بكلمة مروره دون رمز.</p>
         {form.formState.errors.activationCode ? <p role="alert" className="text-xs text-destructive">{form.formState.errors.activationCode.message}</p> : null}
       </div>
       <label className="flex cursor-pointer items-center gap-2.5 select-none">

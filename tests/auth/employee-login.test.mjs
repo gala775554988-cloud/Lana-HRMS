@@ -9,10 +9,10 @@ import { z } from 'zod';
 // Execute the real TypeScript modules with controlled database/provider adapters.
 async function loadModule(file, prisma, extras = {}) {
   const source = await fs.readFile(new URL(`../../${file}`, import.meta.url), 'utf8');
-  const context = vm.createContext({ Buffer, Date, URLSearchParams, AbortSignal, process: { env: extras.env ?? {} }, fetch: extras.fetch });
+  const context = vm.createContext({ Buffer, Date, URL, URLSearchParams, AbortSignal, process: { env: extras.env ?? {} }, fetch: extras.fetch });
   const subject = new vm.SourceTextModule(ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText, { context });
   await subject.link(async name => {
-    const exports = extras.imports?.[name] ?? (name === '@/lib/prisma' ? { prisma } : name === 'node:crypto' ? { timingSafeEqual: crypto.timingSafeEqual, createHash: crypto.createHash, createHmac: crypto.createHmac, randomBytes: crypto.randomBytes, randomInt: crypto.randomInt } : { verifyPassword: async (password, hash) => password === hash });
+    const exports = extras.imports?.[name] ?? (name === '@/lib/auth/biometric-login' ? { prepareBiometricLogin: async () => null, verifyBiometricLogin: async () => false } : name === '@/lib/prisma' ? { prisma } : name === 'node:crypto' ? { timingSafeEqual: crypto.timingSafeEqual, createHash: crypto.createHash, createHmac: crypto.createHmac, randomBytes: crypto.randomBytes, randomInt: crypto.randomInt } : { verifyPassword: async (password, hash) => password === hash });
     const dependency = new vm.SyntheticModule(Object.keys(exports), function () { for (const [key, value] of Object.entries(exports)) this.setExport(key, value); }, { context });
     return dependency;
   });
@@ -130,6 +130,7 @@ test('legacy shared device identifiers never query or bind accounts', async () =
 test('the Credentials provider requires the employee activation PIN and cannot be bypassed with email or a shared device UUID', async () => {
   let options;
   let accepted = false;
+  let biometricAccepted = false;
   const user = { id: 'u', username: '1234567890', passwordHash: 'old', isActive: true, mustChangePassword: true, passwordChanged: false };
   const prisma = {
     employee: { findFirst: async query => query.include ? { user } : { id: 'employee' } },
@@ -137,6 +138,7 @@ test('the Credentials provider requires the employee activation PIN and cannot b
     userRole: { findMany: async () => [{ role: { name: 'EMPLOYEE' } }] },
   };
   await loadModule('auth.ts', prisma, { imports: {
+    '@/lib/auth/biometric-login': { verifyBiometricLogin: async (_id, response) => biometricAccepted && response === 'signed-response' },
     'next-auth': { default: config => { options = config; return {}; } },
     'next-auth/providers/credentials': { default: config => config },
     '@auth/prisma-adapter': { PrismaAdapter: () => ({}) },
@@ -153,6 +155,10 @@ test('the Credentials provider requires the employee activation PIN and cannot b
   accepted = true;
   assert.equal(await authorize({ identifier: '1234567890', password: 'wrong', activationCode: '0123' }), null);
   const result = await authorize({ identifier: '1234567890', password: '7890', activationCode: '0123', deviceId: 'shared-device' });
+  assert.equal(await authorize({ identifier: '1234567890', password: '7890', biometricResponse: 'invalid' }), null);
+  biometricAccepted = true;
+  assert.equal((await authorize({ identifier: '1234567890', password: '7890', biometricResponse: 'signed-response' })).id, 'u');
+  assert.equal(await authorize({ identifier: '1234567890', password: 'wrong', biometricResponse: 'signed-response' }), null);
   assert.equal(result.id, 'u');
   assert.equal(result.mustChangePassword, false);
 });
@@ -334,4 +340,50 @@ test('four-digit activation PINs are user-bound, reusable, rate-limited durably,
   assert.equal(store.rows.has('employee-activation-attempts:u'), false);
   users.set('u', { isActive: false, sessionVersion: 1 });
   assert.equal(await subject.verifyEmployeeActivation({ id: 'u', sessionVersion: 1 }, '0123'), false);
+});
+
+
+test('biometric login binds credentials to the account, expires challenges and atomically consumes them', async () => {
+  let challenge = JSON.stringify({ purpose: 'login', sessionVersion: 1, challenge: 'nonce', expires: Date.now() + 60000 });
+  let active = true;
+  let verified = true;
+  const credential = () => ({ id: 'c', userId: 'u', credentialID: 'YQ', publicKey: Buffer.from('key'), counter: 0n, user: { isActive: active, sessionVersion: 1, currentChallenge: challenge } });
+  const tx = {
+    user: { updateMany: async ({ where }) => {
+      if (challenge !== where.currentChallenge) return { count: 0 };
+      challenge = null; return { count: 1 };
+    } },
+    biometricCredential: { update: async () => ({}) },
+  };
+  const subject = await loadModule('lib/auth/biometric-login.ts', {
+    biometricCredential: { findUnique: async () => credential() },
+    $transaction: async fn => fn(tx),
+  }, { imports: {
+    'next/headers': { headers: async () => new Map([['host', 'localhost']]) },
+    '@simplewebauthn/server': {
+      generateAuthenticationOptions: async () => ({}),
+      verifyAuthenticationResponse: async options => {
+        assert.equal(options.requireUserVerification, true);
+        assert.equal(options.expectedChallenge, 'nonce');
+        return { verified, authenticationInfo: { newCounter: 1 } };
+      },
+    },
+  } });
+  const response = JSON.stringify({ id: 'YQ' });
+  assert.equal(await subject.verifyBiometricLogin('other', response), false);
+  active = false;
+  assert.equal(await subject.verifyBiometricLogin('u', response), false);
+  active = true;
+  const pending = challenge;
+  challenge = JSON.stringify({ purpose: 'login', sessionVersion: 1, challenge: 'nonce', expires: Date.now() - 1 });
+  assert.equal(await subject.verifyBiometricLogin('u', response), false);
+  challenge = JSON.stringify({ purpose: 'login', sessionVersion: 0, challenge: 'nonce', expires: Date.now() + 60000 });
+  assert.equal(await subject.verifyBiometricLogin('u', response), false);
+  challenge = pending;
+  verified = false;
+  assert.equal(await subject.verifyBiometricLogin('u', response), false);
+  verified = true;
+  const results = await Promise.all([subject.verifyBiometricLogin('u', response), subject.verifyBiometricLogin('u', response)]);
+  assert.equal(results.filter(Boolean).length, 1);
+  assert.equal(await subject.verifyBiometricLogin('u', response), false);
 });
