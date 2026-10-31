@@ -6,6 +6,7 @@ export type ModuleField = {
   type: FieldType;
   required?: boolean;
   options?: readonly string[];
+  optionItems?: readonly { value: string; label: string }[];
   placeholder?: string;
   /** For type: "number" -- restricts input to whole numbers (step=1, min=0, no decimals). */
   integer?: boolean;
@@ -51,20 +52,25 @@ export const hrmsModules = [
       { name: "iqamahJobName", label: "المهنة في الإقامة", type: "text" },
       { name: "mobilePhone", label: "الجوال", type: "text" },
       { name: "workPhone", label: "هاتف العمل", type: "text" },
-      { name: "maritalStatus", label: "الحالة الاجتماعية", type: "select", options: ["SINGLE", "MARRIED", "DIVORCED", "WIDOWED"] },
+      { name: "maritalStatus", label: "الحالة الاجتماعية", type: "select", options: ["single", "married", "divorced", "widower", "cohabitant", "SINGLE", "MARRIED", "DIVORCED", "WIDOWED"] },
       { name: "emergencyContact", label: "جهة اتصال الطوارئ", type: "text" },
-      { name: "gender", label: "Gender", type: "select", options: ["Female", "Male", "Not specified"] },
+      { name: "gender", label: "Gender", type: "select", options: ["female", "male", "other", "Female", "Male", "Not specified"] },
       { name: "dateOfBirth", label: "Date of birth", type: "date" },
       { name: "hireDate", label: "Hire date", type: "date", required: true },
       { name: "firstContractDate", label: "تاريخ بداية أول عقد", type: "date" },
       { name: "workingStatus", label: "حالة العمل", type: "text" },
       { name: "status", label: "Status", type: "select", required: true, options: ["ACTIVE", "ON_LEAVE", "TERMINATED", "INACTIVE"] },
       { name: "positionId", label: "المنصب", type: "select", options: ["موظف", "مشرف", "مدير فرع", "مدير إدارة", "مدير مشاريع", "مدير الموارد البشرية", "مسؤول الرواتب", "مسؤول التأمين", "مسؤول الإقامة", "مسؤول الطلبات", "مسؤول المستلزمات", "مسؤول الأصول", "مسؤول التدريب", "مسؤول الأداء"] },
-      { name: "departmentId", label: "Department ID", type: "text" },
-      { name: "branchId", label: "Branch ID", type: "text" },
-      { name: "employmentTypeId", label: "Employment type ID", type: "text" },
-      { name: "nationalityId", label: "Nationality ID", type: "text" },
-      { name: "hospitalId", label: "Hospital ID", type: "text" },
+      { name: "departmentId", label: "الإدارة", type: "select" },
+      { name: "branchId", label: "الفرع", type: "select" },
+      { name: "managerId", label: "المدير المباشر", type: "text" },
+      { name: "companyId", label: "الشركة", type: "select" },
+      { name: "projectId", label: "المشروع", type: "select" },
+      { name: "sponsor", label: "الكفيل", type: "text" },
+      { name: "terminationDate", label: "تاريخ انتهاء الخدمة", type: "date" },
+      { name: "employmentTypeId", label: "نوع التوظيف", type: "select" },
+      { name: "nationalityId", label: "الجنسية", type: "select" },
+      { name: "hospitalId", label: "المستشفى", type: "select" },
       { name: "costCenter", label: "Cost Center", type: "text" },
       { name: "analyticAccount", label: "Analytic Account", type: "text" },
       { name: "workLocationName", label: "Work Location", type: "text" },

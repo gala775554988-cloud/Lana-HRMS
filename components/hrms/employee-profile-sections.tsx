@@ -29,6 +29,7 @@ import {
   FileImage,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -151,7 +152,7 @@ export function ProfileHero({
             label: "المدير المباشر",
             value: employee.manager
               ? `${employee.manager.firstName} ${employee.manager.lastName}`
-              : "غير مسجل",
+              : (Array.isArray(employee.odooRawData?.parent_id) ? employee.odooRawData.parent_id[1] : "غير مسجل"),
           },
           {
             icon: ShieldCheck,
@@ -198,45 +199,18 @@ export function ProfileHero({
             طباعة
           </Button>
           {canEdit || canManageAccounts ? (
-            <details className="relative">
-              <summary
-                aria-label="إجراءات إضافية"
-                className="grid h-10 w-10 cursor-pointer list-none place-items-center rounded-xl border hover:bg-muted"
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </summary>
-              <div className="absolute end-0 top-12 z-30 w-56 rounded-2xl border bg-card p-2 shadow-xl">
-                {canManageAccounts ? (
-                  <>
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start text-xs"
-                      onClick={onResetPassword}
-                    >
-                      إعادة تعيين كلمة المرور
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start text-xs"
-                      onClick={onUnbind}
-                    >
-                      تنظيف ارتباطات الأجهزة السابقة
-                    </Button>
-                  </>
-                ) : null}
-                {canEdit ? (
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-xs text-rose-600"
-                    onClick={onArchive}
-                  >
-                    {["INACTIVE", "TERMINATED"].includes(employee.status)
-                      ? "استعادة الموظف من الأرشيف"
-                      : "أرشفة الموظف"}
-                  </Button>
-                ) : null}
-              </div>
-            </details>
+            <DropdownMenu dir={isAr ? "rtl" : "ltr"}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="rounded-xl" aria-label="المزيد من إجراءات الموظف"><MoreHorizontal className="h-4 w-4" /></Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64" collisionPadding={12}>
+                {canManageAccounts ? <>
+                  <DropdownMenuItem onSelect={onResetPassword}>إعادة تعيين كلمة المرور</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={onUnbind}>تنظيف ارتباطات الأجهزة السابقة</DropdownMenuItem>
+                </> : null}
+                {canEdit ? <DropdownMenuItem variant="destructive" onSelect={onArchive}>{["INACTIVE", "TERMINATED"].includes(employee.status) ? "استعادة الموظف من الأرشيف" : "أرشفة الموظف"}</DropdownMenuItem> : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : null}
         </div>
       </div>

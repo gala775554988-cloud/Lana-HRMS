@@ -7,6 +7,7 @@ import { hasPermission } from "@/lib/rbac";
 import { isOdooIntegrationEnabled } from "@/lib/settings";
 import { hasValidInternalSyncToken } from "@/lib/internal-sync-auth";
 import { getOdooEnvConfig } from "./config";
+import { syncEmployeeManager } from "./manager-sync";
 import { OdooClient } from "./client";
 import { OdooConfigurationError } from "./auth";
 import { discoverSyncableFields, sanitizeRawRecord, SENSITIVE_FIELDS } from "./dynamic-fields";
@@ -585,6 +586,7 @@ export class OdooSyncService {
     };
 
     const updatedEmployee = await delegate("employee").update({ where: { id: empId }, data: vals });
+    await syncEmployeeManager(this.client, empId, row);
 
     try {
       await syncEmployeeDocuments(this.client, odooId, empId);
@@ -950,7 +952,7 @@ export class OdooSyncService {
                 ...(dId && deptMap.get(dId) ? { departmentId: deptMap.get(dId) } : {}),
                 ...(jId && jobMap.get(jId) ? { positionId: jobMap.get(jId) } : {}),
                 ...(cId && compMap.get(cId) ? { branchId: compMap.get(cId) } : (hospitalName && hospitalBranchMap.get(hospitalName) ? { branchId: hospitalBranchMap.get(hospitalName) } : {})),
-                ...(mId && managerMap.get(mId) ? { managerId: managerMap.get(mId) } : {}),
+                managerId: mId ? managerMap.get(mId) ?? null : null,
                 ...(hospitalName && hospitalMap.get(hospitalName) ? { hospitalId: hospitalMap.get(hospitalName) } : {}),
                 odooRawData: sanitizeRawRecord(row as Record<string, unknown>, excludedBankFields),
                 odooRawDataSyncedAt: new Date(),

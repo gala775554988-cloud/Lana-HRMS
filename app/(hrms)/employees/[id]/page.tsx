@@ -31,8 +31,8 @@ export default async function EmployeeProfilePage({
   if (!session?.user?.id) redirect("/login");
   const viewerFieldAccess = await getEmployeeFieldAccess(session.user.id, (session.user.roles as string[]) ?? []);
 
-  // Fetch employee with all relations for header and tabs (cached in-memory for 20s for ultra-fast navigation)
-  const employee = await memoryCache(`emp-master:${id}`, 20_000, async () => prisma.employee.findUnique({
+  // Read the profile header fresh so saves and Odoo manager updates are immediately visible.
+  const employee = await prisma.employee.findUnique({
     where: { id },
     include: {
       department: { select: { id: true, name: true, code: true } },
@@ -64,7 +64,7 @@ export default async function EmployeeProfilePage({
       skills: { orderBy: { name: "asc" } },
       languages: { orderBy: { name: "asc" } },
     },
-  }));
+  });
 
   if (!employee) notFound();
 
@@ -95,6 +95,7 @@ export default async function EmployeeProfilePage({
             employeeEnglishName: true, iqamahJobName: true, workPhone: true, mobilePhone: true, maritalStatus: true,
             firstContractDate: true, workingStatus: true, hrPresenceState: true, workLocationName: true, costCenter: true,
             odooRawDataSyncedAt: true, firstName: true, lastName: true,
+            managerId: true, odooParentId: true, odooRawData: true, manager: { select: { id: true, firstName: true, lastName: true, employeeNumber: true } },
           }
         });
         if (refreshed) {
@@ -145,7 +146,7 @@ export default async function EmployeeProfilePage({
     loans,
     salaryAdvances,
     bonuses,
-  ] = await memoryCache(`emp-tabs:${id}`, 20_000, async () => Promise.all([
+  ] = await memoryCache(`emp-tabs:${id}:${employee.updatedAt.toISOString()}`, 20_000, async () => Promise.all([
     getEmployeeSalaryProfile(id).catch(() => null),
     prisma.attendanceRecord.groupBy({
       by: ['status'],
@@ -266,7 +267,7 @@ export default async function EmployeeProfilePage({
       deviceBinding={deviceBinding}
       canEditLeaveBalance={hasAnyRole(session, ["SUPER_ADMIN", "HR_MANAGER"])}
       canManageAccounts={canManageEmployeeAccounts(session.user.roles ?? []) && employee.userId !== session.user.id}
-      canEditProfile={hasPermission(session.user.permissions, { action: "manage", resource: "employees" }, session.user.roles)}
+      canEditProfile={hasPermission(session.user.permissions, { action: "edit", resource: "employees" }, session.user.roles)}
       canManageDocuments={hasPermission(session.user.permissions, { action: "manage", resource: "documents" }, session.user.roles)}
       initialTab={typeof query.tab === "string" ? query.tab : "overview"}
       backHref={backHref}

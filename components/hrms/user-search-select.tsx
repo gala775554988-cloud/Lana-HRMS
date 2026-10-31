@@ -17,11 +17,13 @@ type EmployeeSearchResult = {
 
 export function UserSearchSelect({
   value,
+  id,
   onChange,
   placeholder = "بحث بالاسم أو الرقم الوظيفي أو الهوية...",
   initialLabel = ""
 }: {
   value: string;
+  id?: string;
   onChange: (userId: string, label?: string, employee?: any) => void;
   placeholder?: string;
   initialLabel?: string;
@@ -93,6 +95,7 @@ export function UserSearchSelect({
       <div className="relative">
         <Search className="pointer-events-none absolute start-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
         <input
+          id={id}
           type="text"
           value={query}
           onChange={(e) => { setQuery(e.target.value); setOpen(true); }}

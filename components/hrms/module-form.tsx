@@ -94,6 +94,7 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
           setPhotoRemoved(false);
           setSelectedDocumentFile(null);
           setMessage({ text: result.message, type: 'success' });
+          if (isEmployeeForm && recordId) router.push(`/employees/${recordId}`);
           router.refresh();
         } else {
           const errorMsg = result.message || (result as any).error?.message || "فشل في حفظ البيانات";
@@ -166,9 +167,11 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
           return (
             <div key={field.name} className={field.type === "textarea" ? "space-y-2 md:col-span-2" : "space-y-2"}>
               <Label htmlFor={field.name}>{label}{field.required && <span className="text-destructive mr-1">*</span>}</Label>
-              {field.name === "employeeId" ? (
+              {(field.name === "employeeId" || (isEmployeeForm && field.name === "managerId")) ? (
                 <UserSearchSelect
+                  id={field.name}
                   value={String(form.watch(field.name) || "")}
+                  initialLabel={field.name === "managerId" && form.watch(field.name) && form.watch(field.name) === initialValues?.managerId ? String(initialValues?.managerLabel || "") : ""}
                   onChange={(userId, _label, employee) => form.setValue(field.name, employee?.id || userId || "", { shouldDirty: true, shouldValidate: true })}
                   placeholder="ابحث باسم الموظف أو رقمه الوظيفي أو هويته..."
                 />
@@ -196,7 +199,7 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
                 <div className="space-y-2">
                   <select id={field.name} className={`h-10 w-full rounded-xl border bg-background px-3 py-2 text-sm transition-all duration-300 ease-premium hover:border-primary/30 focus-visible:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${error ? 'border-destructive' : 'border-input'}`} {...form.register(field.name)}>
                     <option value="">{dictionary.form.select}</option>
-                    {[...(field.options ?? []), ...customPositionOptions].map((option) => <option key={option} value={option}>{option}</option>)}
+                    {[...(field.optionItems?.map(item => item.value) ?? field.options ?? []), ...customPositionOptions].filter((value, index, all) => all.indexOf(value) === index).map((option) => <option key={option} value={option}>{field.optionItems?.find(item => item.value === option)?.label ?? option}</option>)}
                   </select>
                   <Button type="button" variant="outline" size="sm" onClick={() => {
                     const title = window.prompt("إضافة منصب جديد");
@@ -211,7 +214,7 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
               ) : field.type === "select" ? (
                 <select id={field.name} className={`h-10 w-full rounded-xl border bg-background px-3 py-2 text-sm transition-all duration-300 ease-premium hover:border-primary/30 focus-visible:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${error ? 'border-destructive' : 'border-input'}`} {...form.register(field.name)}>
                   <option value="">{dictionary.form.select}</option>
-                  {field.options?.map((option) => <option key={option} value={option}>{option}</option>)}
+                  {(field.optionItems?.map(item => item.value) ?? field.options)?.map((option) => <option key={option} value={option}>{field.optionItems?.find(item => item.value === option)?.label ?? option}</option>)}
                 </select>
               ) : field.type === "boolean" ? (
                 <input id={field.name} type="checkbox" className="h-5 w-5 rounded-md border-input accent-primary transition-colors" {...form.register(field.name)} />
@@ -224,14 +227,21 @@ export function ModuleForm({ resource, dictionary, initialValues, recordId, loca
         })}
       </div>
 
-      {isEmployeeForm ? (
-        <div className="rounded-xl border border-dashed bg-muted/20 p-4 text-center text-sm text-muted-foreground">
-          <p>تفاصيل الراتب تتم مزامنتها تلقائياً من Odoo</p>
-          <p className="text-xs mt-1">اضغط على زر <strong>الراتب الإجمالي</strong> في ملف الحساب لعرض التفاصيل المتزامنة مع Odoo</p>
-        </div>
+      {isEmployeeForm && recordId ? (
+        <fieldset className="space-y-4 rounded-2xl border p-4">
+          <legend className="px-2 font-semibold">الرواتب والبدلات</legend>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {salaryProfileFields.filter(field => !["salaryNet", "salaryInsuranceDeduction", "salaryTotal"].includes(field)).map(field => <div key={field} className="space-y-2"><Label htmlFor={field}>{salaryProfileLabels[field]}</Label><Input id={field} type="number" step="0.01" min="0" value={String(salaryValues[field] ?? "")} onChange={event => setSalaryValues(current => ({ ...current, [field]: event.target.value, salaryNet: "", salaryTotal: "", salaryInsuranceDeduction: "" }))} /></div>)}
+          </div>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(salaryValues.salaryDeductInsurance)} onChange={event => setSalaryValues(current => ({ ...current, salaryDeductInsurance: event.target.checked, salaryNet: "", salaryTotal: "", salaryInsuranceDeduction: "" }))} />احتساب خصم التأمينات</label>
+          <p className="text-sm text-muted-foreground">إجمالي الراتب قبل الخصم: {derivedNetSalary} · خصم التأمينات: {insuranceDeduction} · الصافي بعد الخصم: {totalSalary}</p>
+        </fieldset>
       ) : null}
 
-      <Button type="submit" disabled={isPending}>{isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}{recordId ? dictionary.form.saveChanges : dictionary.form.createRecord}</Button>
+      <div className="sticky bottom-3 z-20 flex gap-3 rounded-2xl border bg-card p-3 shadow-lg">
+      <Button type="submit" disabled={isPending}>{isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}{recordId ? (locale === "ar" ? "حفظ التعديلات" : dictionary.form.saveChanges) : dictionary.form.createRecord}</Button>
+      {isEmployeeForm && recordId ? <Button type="button" variant="outline" disabled={isPending} onClick={() => router.push(`/employees/${recordId}`)}>إلغاء</Button> : null}
+      </div>
     </form>
   );
 }

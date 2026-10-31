@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from "next/cache";
+import { clearMemoryCache } from "@/lib/cache/memory-cache";
 import { auth } from "@/auth";
 import { getHrmsModule, type HrmsModule, type ModuleField } from "@/config/hrms";
 import { prisma } from "@/lib/prisma";
@@ -734,12 +735,29 @@ export async function updateModuleRecord(input: MutationInput) {
   const existingRecord = await delegateFor(resource.model).findUnique({ where: { id: input.id } });
   await assertRecordVisible(resource, existingRecord, session);
   const salaryProfile = resource.key === "employees" ? extractSalaryProfile(input.values) : {};
-  const parsed = buildModuleSchema(resource).safeParse(input.values);
+  const requiredDefaults = Object.fromEntries(resource.fields.filter((field: ModuleField) => field.required && !Object.hasOwn(input.values, field.name)).map(field => [field.name, existingRecord?.[field.name]]));
+  const parsed = buildModuleSchema(resource).safeParse({ ...requiredDefaults, ...input.values });
   if (!parsed.success) return { success: false, message: parsed.error.errors[0]?.message ?? "Invalid input." };
   const data = normalizeValues(resource, parsed.data) as Record<string, unknown>;
 
   if (resource.key === "employees" && resource.model === "employee") {
-    data.positionId = await resolveEmployeePositionId(data.positionId);
+    // Empty optional inputs explicitly clear saved values; omitted fields stay unchanged.
+    for (const field of resource.fields as readonly ModuleField[]) {
+      if (!field.required && field.name !== "profilePhotoUrl" && Object.hasOwn(input.values, field.name) && input.values[field.name] === "") data[field.name] = null;
+    }
+    if (data.managerId === input.id) return { success: false, message: "لا يمكن اختيار الموظف مديراً لنفسه." };
+    if (typeof data.managerId === "string") {
+      const visited = new Set<string>([input.id]);
+      let managerId: string | null = data.managerId;
+      while (managerId) {
+        if (visited.has(managerId)) return { success: false, message: "لا يمكن حفظ علاقة إدارية دائرية." };
+        visited.add(managerId);
+        const manager: { managerId: string | null } | null = await prisma.employee.findUnique({ where: { id: managerId }, select: { managerId: true } });
+        if (!manager) return { success: false, message: "المدير المحدد غير موجود." };
+        managerId = manager.managerId;
+      }
+    }
+    if (data.positionId !== null && data.positionId !== undefined) data.positionId = await resolveEmployeePositionId(data.positionId);
     // Real, server-side field-level enforcement: strip any sensitive field
     // (nationalId, email, phone, photo, address, emergency contact, DOB)
     // the acting user isn't explicitly granted EDIT on. This is the actual
@@ -747,15 +765,28 @@ export async function updateModuleRecord(input: MutationInput) {
     // direct call to this action.
     const fieldAccess = await getEmployeeFieldAccess(session.user.id, (session.user.roles as string[]) ?? []);
     const { data: allowedData, blockedFields } = filterEditableFields(data, fieldAccess);
+    if (existingRecord?.odooId && Object.hasOwn(allowedData, "managerId") && allowedData.managerId !== existingRecord.managerId) {
+      const manager = allowedData.managerId ? await prisma.employee.findUnique({ where: { id: String(allowedData.managerId) }, select: { odooId: true } }) : null;
+      if (allowedData.managerId && !manager?.odooId) return { success: false, message: "المدير المختار غير مرتبط بأودو. اختر مديراً مرتبطاً بأودو لهذا الموظف." };
+      try {
+        const { OdooSyncService } = await import("@/lib/integrations/odoo/sync");
+        const service = await OdooSyncService.forConnection();
+        const saved = await service.client.write("hr.employee", [Number(existingRecord.odooId)], { parent_id: manager?.odooId || false });
+        if (!saved) return { success: false, message: "لم يُحفظ تغيير المدير في أودو. أعد المحاولة." };
+        allowedData.odooParentId = manager?.odooId || null;
+      } catch { return { success: false, message: "تعذر حفظ تغيير المدير في أودو. لم يُحفظ التعديل، أعد المحاولة." }; }
+    }
     const record = await delegateFor(resource.model).update({ where: { id: input.id }, data: allowedData });
     await saveEmployeeSalaryProfile(input.id, salaryProfile);
     await syncSocialInsuranceFromPayroll(input.id, salaryProfile, session.user.id).catch(() => null);
 
     await writeAuditLog({ actorUserId: session.user.id, action: "update", entity: resource.model, entityId: input.id, metadata: { before: serialize(existingRecord), after: serialize({ ...allowedData, salaryProfileUpdated: true }), blockedFields: blockedFields.length ? blockedFields : undefined } });
     await notifyRole(["SUPER_ADMIN", "HR_MANAGER"], "تعديل موظف", `Employee record ${input.id} was updated.`, "INFO", `/employees/${input.id}`).catch(() => null);
+    clearMemoryCache("emp-master:");
+    clearMemoryCache(`emp-tabs:${input.id}`);
     revalidatePath("/" + resource.key);
     revalidatePath("/" + resource.key + "/" + input.id);
-    return { success: true, message: resource.title + " record updated.", id: String(record.id) };
+    return { success: true, message: "تم حفظ تعديلات ملف الموظف.", id: String(record.id) };
   }
 
   const dataClean = data;

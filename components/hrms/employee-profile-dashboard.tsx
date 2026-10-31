@@ -97,6 +97,15 @@ export function EmployeeProfileDashboard({
   locale,
 }: Props) {
   const router = useRouter();
+  useEffect(() => {
+    if (!canEditProfile || !employee.odooId) return;
+    const controller = new AbortController();
+    fetch(`/api/employees/${employee.id}/sync-manager`, { method: "POST", signal: controller.signal })
+      .then(response => response.ok ? response.json() : null)
+      .then(result => { if (result?.changed) router.refresh(); })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [employee.id, employee.odooId, canEditProfile, router]);
   const isAr = locale === "ar";
   const sections = [
     { value: "overview", label: "نظرة عامة", icon: Activity },
