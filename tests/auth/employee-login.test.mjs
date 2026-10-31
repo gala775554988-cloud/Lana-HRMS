@@ -127,7 +127,7 @@ test('legacy shared device identifiers never query or bind accounts', async () =
   assert.equal((await subject.verifyOrBindEmployeeDevice('b', 'shared-browser')).allowed, true);
 });
 
-test('the Credentials provider requires a verified device ceremony and rejects legacy activation codes', async () => {
+test('the Credentials provider accepts employee suffix credentials without a device ceremony', async () => {
   let options;
   let enrollmentAccepted = false;
   let biometricAccepted = false;
@@ -149,16 +149,8 @@ test('the Credentials provider requires a verified device ceremony and rejects l
     '@/lib/auth/employee-enrollment': { resolveEmployeeLoginEmail: async () => email, completeEmployeeEmailEnrollment: async () => {} },
   } });
   const authorize = options.providers[0].authorize;
-  assert.equal(await authorize({ identifier: '1234567890', password: '7890', deviceId: 'shared-device' }), null);
-  assert.equal(await authorize({ identifier: '1234567890', password: '7890', verificationCode: '111111' }), null);
-  assert.equal(await authorize({ identifier: '1234567890', password: 'wrong', activationCode: '0123' }), null);
-  assert.equal(await authorize({ identifier: '1234567890', password: '7890', activationCode: '0123', deviceId: 'shared-device' }), null);
-  enrollmentAccepted = true;
-  const result = await authorize({ identifier: '1234567890', password: '7890', biometricRegistration: 'new-device' });
-  assert.equal(await authorize({ identifier: '1234567890', password: '7890', biometricResponse: 'invalid' }), null);
-  biometricAccepted = true;
-  assert.equal((await authorize({ identifier: '1234567890', password: '7890', biometricResponse: 'signed-response' })).id, 'u');
-  assert.equal(await authorize({ identifier: '1234567890', password: 'wrong', biometricResponse: 'signed-response' }), null);
+  assert.equal(await authorize({ identifier: '1234567890', password: 'wrong' }), null);
+  const result = await authorize({ identifier: '1234567890', password: '7890' });
   assert.equal(result.id, 'u');
   assert.equal(result.mustChangePassword, false);
 });
@@ -297,16 +289,10 @@ test('loginAction omits absent optional fields before Auth.js URLSearchParams se
   assert.deepEqual(Object.keys(forwarded[0]).sort(), ['identifier', 'password']);
   employee = { email };
   const firstStep = await subject.loginAction({ identifier: '1234567890', password: '7890' });
-  assert.equal(firstStep.success, false);
-  assert.equal(firstStep.registrationOptions.challenge, 'enroll');
-  assert.equal(forwarded.length, 1, 'identity credentials alone never issue a session');
-  hasDevice = true;
-  const existingDevice = await subject.loginAction({ identifier: '1234567890', password: '7890' });
-  assert.equal(existingDevice.biometricOptions.challenge, 'login');
-  assert.equal(existingDevice.registrationOptions, undefined);
-  assert.equal(forwarded.length, 1);
+  assert.equal(firstStep.success, true);
+  assert.deepEqual(Object.keys(forwarded[1]).sort(), ['identifier', 'password']);
   assert.equal((await subject.loginAction({ identifier: '1234567890', password: '7890', biometricResponse: 'signed-response' })).success, true);
-  assert.equal(forwarded[1].biometricResponse, 'signed-response');
+  assert.equal(forwarded[2].biometricResponse, 'signed-response');
   assert.equal(Object.hasOwn(forwarded[1], 'activationCode'), false);
   assert.equal(Object.hasOwn(forwarded[1], 'enrollmentEmail'), false);
   assert.equal(Object.hasOwn(forwarded[1], 'verificationCode'), false);

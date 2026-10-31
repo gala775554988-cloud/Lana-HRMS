@@ -13,13 +13,10 @@ import {
   resetPasswordSchema,
 } from "@/lib/validations/auth";
 
-import { prepareBiometricLogin, prepareBiometricEnrollment } from "@/lib/auth/biometric-login";
 
 type ActionState = {
   success: boolean;
   message: string;
-  biometricOptions?: Awaited<ReturnType<typeof prepareBiometricLogin>>;
-  registrationOptions?: Awaited<ReturnType<typeof prepareBiometricEnrollment>>;
 };
 
 const BAD_CREDENTIALS = "تعذر تسجيل الدخول. تحقق من بياناتك وأعد المحاولة.";
@@ -31,15 +28,8 @@ export async function loginAction(input: unknown): Promise<ActionState> {
     const { identifier, password, biometricResponse, biometricRegistration } = parsed.data;
     const user = await findUser(identifier);
     if (!user?.isActive) return { success: false, message: BAD_CREDENTIALS };
-    const { valid, employee } = await checkLoginPassword(user, password);
+    const { valid } = await checkLoginPassword(user, password);
     if (!valid) return { success: false, message: BAD_CREDENTIALS };
-    if (employee && !biometricRegistration && !biometricResponse) {
-      const biometricOptions = await prepareBiometricLogin(user.id);
-      if (biometricOptions) return { success: false, message: "", biometricOptions };
-      const registrationOptions = await prepareBiometricEnrollment(user.id);
-      if (registrationOptions) return { success: false, message: "", registrationOptions };
-      return { success: false, message: "تعذر تجهيز التحقق بالجهاز. أعد المحاولة." };
-    }
     // Auth.js serializes these options with URLSearchParams. Omit absent
     // fields: undefined becomes the literal "undefined" and fails validation.
     await signIn("credentials", {

@@ -1,4 +1,3 @@
-import { verifyBiometricLogin, verifyBiometricEnrollment } from "@/lib/auth/biometric-login";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
@@ -199,15 +198,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           if (!user?.isActive) return null;
           const { valid, employee } = await checkLoginPassword(user, parsed.data.password);
           if (!valid) return null;
-          if (employee) {
-            const verified = parsed.data.biometricResponse
-              ? await verifyBiometricLogin(user.id, parsed.data.biometricResponse)
-              : parsed.data.biometricRegistration
-                ? await verifyBiometricEnrollment(user.id, parsed.data.biometricRegistration)
-                : false;
-            if (!verified) return null;
-          }
-
           await ensureAuthenticatedEmployeeLink(user).catch((linkError) => {
             console.error("[Auth][EMPLOYEE_LINK_REPAIR_ERROR]", linkError);
           });

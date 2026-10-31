@@ -14,7 +14,11 @@ export function FloatingBackButton() {
   const router = useRouter();
   const [previous, setPrevious] = useState<string | null>(null);
   useEffect(() => {
-    if (!isInternalPage(pathname)) return;
+    if (!isInternalPage(pathname)) {
+      sessionStorage.removeItem(storageKey);
+      setPrevious(null);
+      return;
+    }
     try {
       const parsed: unknown = JSON.parse(sessionStorage.getItem(storageKey) || "[]");
       const trail: string[] = Array.isArray(parsed) ? parsed.filter(isInternalPage).slice(-30) : [];
@@ -27,11 +31,8 @@ export function FloatingBackButton() {
     } catch { setPrevious(null); }
   }, [pathname]);
 
-  if (!isInternalPage(pathname) || pathname === "/") return null;
-  const parent = pathname.split("/").filter(Boolean).slice(0, -1).join("/");
-  const target = previous || (parent ? `/${parent}` : "/");
-  return <button type="button" className="lana-back-control" aria-label="الرجوع إلى الصفحة السابقة" title="الرجوع" onClick={() => router.push(target)} dir="ltr">
+  if (!isInternalPage(pathname) || pathname === "/" || !previous) return null;
+  return <button type="button" className="lana-back-control" aria-label="الرجوع إلى الصفحة السابقة" onClick={() => router.push(previous)} dir="ltr">
     <ArrowLeft aria-hidden="true" className="h-5 w-5 shrink-0" />
-    <span className="lana-back-label" dir="rtl">الرجوع</span>
   </button>;
 }
