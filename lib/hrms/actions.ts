@@ -745,8 +745,8 @@ export async function updateModuleRecord(input: MutationInput) {
     for (const field of resource.fields as readonly ModuleField[]) {
       if (!field.required && field.name !== "profilePhotoUrl" && Object.hasOwn(input.values, field.name) && input.values[field.name] === "") data[field.name] = null;
     }
-    if (data.managerId === input.id) return { success: false, message: "لا يمكن اختيار الموظف مديراً لنفسه." };
-    if (typeof data.managerId === "string") {
+    if (data.managerId !== existingRecord?.managerId && data.managerId === input.id) return { success: false, message: "لا يمكن اختيار الموظف مديراً لنفسه." };
+    if (typeof data.managerId === "string" && data.managerId !== existingRecord?.managerId) {
       const visited = new Set<string>([input.id]);
       let managerId: string | null = data.managerId;
       while (managerId) {

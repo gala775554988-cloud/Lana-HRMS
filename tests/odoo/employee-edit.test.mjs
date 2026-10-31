@@ -17,8 +17,8 @@ async function load(file, imports) {
   await mod.evaluate();
   return mod.namespace;
 }
-async function setup({ phoneAccess = 'EDIT', permissions = ['edit:employees', 'read:employees'] } = {}) {
-  const record = { id: 'employee', employeeNumber: '1', nationalId: '1234567890', firstName: 'Existing', lastName: 'Employee', hireDate: '2020-01-01', status: 'ACTIVE', phone: '123', managerId: null };
+async function setup({ phoneAccess = 'EDIT', permissions = ['edit:employees', 'read:employees'], existingManagerId = null } = {}) {
+  const record = { id: 'employee', employeeNumber: '1', nationalId: '1234567890', firstName: 'Existing', lastName: 'Employee', hireDate: '2020-01-01', status: 'ACTIVE', phone: '123', managerId: existingManagerId };
   const writes = []; const cleared = [];
   const prisma = {
     user: { findUnique: async () => ({ username: 'actor' }) },
@@ -75,4 +75,10 @@ test('read-only users cannot mutate employee profiles', async () => {
   const s = await setup({ permissions: ['read:employees'] });
   await assert.rejects(s.update({ phone: 'new' }), /Forbidden/);
   assert.equal(s.writes.length, 0);
+});
+
+test('an unchanged legacy manager chain does not block unrelated employee edits', async () => {
+  const s = await setup({ existingManagerId: 'legacy-cycle' });
+  assert.equal((await s.update({ phone: 'new-value', managerId: 'legacy-cycle' })).success, true);
+  assert.equal(s.writes[0].phone, 'new-value');
 });
