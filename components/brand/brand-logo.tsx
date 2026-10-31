@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
-export const BRAND_LOGO_SRC = "";
+export const BRAND_LOGO_SRC = "/brand/lana-company-logo.jpg";
 
 type BrandLogoSize = "xs" | "sm" | "md" | "lg" | "xl" | "hero";
 
@@ -73,7 +73,7 @@ export function BrandLogo({
         )}
       >
         {logoSrc ? (
-          <Image src={logoSrc} alt="شعار HRMS" width={176} height={176} unoptimized className={cn("h-full w-full object-contain p-1", imageClassName)} />
+          <Image src={logoSrc} alt="شعار شركة لانا" width={176} height={176} unoptimized className={cn("h-full w-full object-contain bg-white p-0.5", imageClassName)} />
         ) : (
           <span className="text-[0.58em] font-black tracking-[-0.06em]" aria-hidden="true">HR</span>
         )}
