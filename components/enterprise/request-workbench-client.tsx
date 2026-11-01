@@ -29,6 +29,9 @@ const typeLabels: Record<string, string> = {
 
 const scopeOptions = [
   ["all", "كل الطلبات"],
+  ["pending", "قيد المراجعة"],
+  ["cancelled", "الملغاة"],
+  ["returned", "المعادة للتعديل"],
   ["waiting", "بانتظار موافقتي"],
   ["mine", "طلباتي"],
   ["transferred", "تم تحويلها"],
@@ -48,9 +51,10 @@ const STATUS_BADGE: Record<string, string> = {
 
 const STATUS_LABEL: Record<string, string> = {
   APPROVED: "تمت الموافقة",
-  COMPLETED: "مكتملة",
+  COMPLETED: "معتمدة",
   REJECTED: "مرفوض",
   PENDING: "قيد الانتظار",
+  CANCELLED: "ملغاة",
   RETURNED: "أُرجع"
 };
 
@@ -80,6 +84,7 @@ type RequestRecord = {
   type: string;
   entityId: string;
   status: string;
+  leave?: { startDate: string; endDate: string; days: number; reason?: string; decisionNote?: string; leaveType: { name: string } } | null;
   currentStep: number;
   createdAt: string;
   updatedAt: string;
@@ -100,7 +105,7 @@ type RequestRecord = {
 };
 
 type Approver = { userId: string; label: string; position: string };
-type Stats = { total: number; waiting: number; highPriority: number; deferred: number; completed: number; rejected: number };
+type Stats = { pending?: number; cancelled?: number; returned?: number; total: number; waiting: number; highPriority: number; deferred: number; completed: number; rejected: number };
 type WorkbenchData = {
   requests: RequestRecord[];
   types: string[];
@@ -125,6 +130,9 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
   const highlightId = searchParams.get("highlight");
   const [type, setType] = useState("ALL");
   const [scope, setScope] = useState(highlightId ? "all" : mode === "inbox" ? "waiting" : mode === "outbox" ? "mine" : "all");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [reportBusy, setReportBusy] = useState(false);
   const [sort, setSort] = useState("newest");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -156,17 +164,17 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
 
   // Reset row selection whenever the visible set of requests changes
   // underneath it (new filters, new page).
-  useEffect(() => { setSelected(new Set()); }, [type, scope, sort, debouncedSearch, mode, page]);
+  useEffect(() => { setSelected(new Set()); }, [type, scope, sort, debouncedSearch, mode, page, from, to]);
 
   const queryKey = useMemo(
-    () => ["enterprise-requests", type, scope, sort, debouncedSearch, mode, page] as const,
-    [type, scope, sort, debouncedSearch, mode, page]
+    () => ["enterprise-requests", type, scope, sort, debouncedSearch, mode, page, from, to] as const,
+    [type, scope, sort, debouncedSearch, mode, page, from, to]
   );
 
-  const { data, isFetching, refetch } = useQuery<WorkbenchData>({
+  const { data, isFetching, refetch, error: loadError } = useQuery<WorkbenchData>({
     queryKey,
     queryFn: async () => {
-      const params = new URLSearchParams({ type, scope, sort, search: debouncedSearch, mode, page: String(page), pageSize: "30" });
+      const params = new URLSearchParams({ type, scope, sort, search: debouncedSearch, mode, page: String(page), pageSize: "30", from, to });
       const response = await fetch(`/api/enterprise/requests?${params.toString()}`, { cache: "no-store" });
       const json = await response.json();
       if (!json.success) throw new Error(json.message || "Failed to load requests");
@@ -180,6 +188,8 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
     },
     placeholderData: keepPreviousData
   });
+
+  useEffect(() => { setPage(1); }, [type, scope, sort, debouncedSearch, from, to]);
 
   const requests = data?.requests ?? [];
   const types = data?.types ?? ["ALL"];
@@ -307,6 +317,48 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
     if (comments !== null) decide(id, "NOTE", { comments });
   }
 
+  async function exportReport(print: boolean) {
+    setReportBusy(true);
+    // Open synchronously so browser popup protection does not hide the report.
+    const target = print ? window.open("", "_blank") : null;
+    try {
+      if (print && !target) throw new Error("اسمح بفتح نافذة الطباعة في المتصفح");
+      const params = new URLSearchParams({ type, scope, sort, search: debouncedSearch, from, to, report: "1" });
+      const response = await fetch(`/api/enterprise/requests?${params}`, { cache: "no-store" });
+      const json = await response.json();
+      if (!response.ok || !json.success) throw new Error(json.message || "تعذر إعداد الكشف");
+      const rows = (json.requests as RequestRecord[]).map((row) => ({
+        "مرجع الطلب": row.entityId, "الرقم الوظيفي": row.employee?.employeeNumber ?? "",
+        "الموظف": `${row.employee?.firstName ?? ""} ${row.employee?.lastName ?? ""}`,
+        "القسم": row.employee?.department?.name ?? "", "الفرع": row.employee?.branch?.name ?? "",
+        "نوع الطلب": typeLabels[row.type] ?? row.type, "الحالة": STATUS_LABEL[row.status] ?? row.status,
+        "تاريخ التقديم": new Date(row.createdAt).toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }),
+        "آخر تحديث": new Date(row.updatedAt).toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }),
+        "نوع الإجازة": row.leave?.leaveType.name ?? "", "من تاريخ": row.leave?.startDate?.slice(0, 10) ?? "",
+        "إلى تاريخ": row.leave?.endDate?.slice(0, 10) ?? "", "الأيام": row.leave ? Number(row.leave.days) : "",
+        "المعتمد الحالي": row.status === "PENDING" ? row.currentApprover : "",
+        "ملاحظة القرار": row.leave?.decisionNote ?? ""
+      }));
+      if (!rows.length) throw new Error("لا توجد طلبات مطابقة لإصدار الكشف");
+      if (print && target) {
+        const escape = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]!));
+        target.document.write(`<html lang="ar" dir="rtl"><head><title>كشف الطلبات</title><style>body{font:12px Arial;padding:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:6px}th{background:#eee}@page{size:A3 landscape;margin:12mm}</style></head><body><h1>كشف الطلبات والموافقات — Lana HRMS</h1><p>${escape(typeLabels[type])} | ${escape(scopeOptions.find(([value]) => value === scope)?.[1])} | فترة التقديم: ${escape(from || "البداية")} — ${escape(to || "اليوم")} | البحث: ${escape(debouncedSearch || "الكل")} | الإجمالي: ${rows.length}</p><table><thead><tr>${Object.keys(rows[0]).map((key) => `<th>${escape(key)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${Object.values(row).map((value) => `<td>${escape(value)}</td>`).join("")}</tr>`).join("")}</tbody></table></body></html>`);
+        target.document.close(); target.focus(); target.print();
+      } else {
+        const XLSX = await import("xlsx");
+        const sheet = XLSX.utils.json_to_sheet(rows);
+        sheet["!autofilter"] = { ref: sheet["!ref"]! };
+        sheet["!cols"] = Object.keys(rows[0]).map(() => ({ wch: 24 }));
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, sheet, "كشف الطلبات");
+        workbook.Workbook = { Views: [{ RTL: true }] };
+        XLSX.writeFile(workbook, `requests-${new Date().toISOString().slice(0, 10)}.xlsx`);
+      }
+    } catch (error) {
+      target?.close(); setMessageTone("error"); setMessage(error instanceof Error ? error.message : "تعذر إصدار الكشف");
+    } finally { setReportBusy(false); }
+  }
+
   const isPending = decideMutation.isPending || bulkMutation.isPending;
   // Which exact row+decision is in flight, so only that button shows a
   // spinner instead of every action on every row looking identically
@@ -326,9 +378,13 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
       <MetricStrip items={[
         { label: "الإجمالي", value: stats.total }, { label: "بانتظار موافقتي", value: stats.waiting },
         { label: "عالية الأولوية", value: stats.highPriority }, { label: "المؤجلة", value: stats.deferred },
-        { label: "المكتملة", value: stats.completed }, { label: "المرفوضة", value: stats.rejected }
+        { label: "المعتمدة", value: stats.completed }, { label: "المرفوضة", value: stats.rejected }
       ]} />
 
+      <div className="flex flex-wrap gap-2" aria-label="حالة الطلبات">
+        {([['all', 'الكل', stats.total], ['pending', 'قيد المراجعة', stats.pending], ['completed', type === 'LEAVE' ? 'الإجازات المعتمدة' : 'المعتمدة', stats.completed], ['rejected', type === 'LEAVE' ? 'الإجازات المرفوضة' : 'المرفوضة', stats.rejected], ['returned', 'المعادة للتعديل', stats.returned], ['cancelled', 'الملغاة', stats.cancelled]] as const).map(([value, label, count]) => <Button key={value} variant={scope === value ? "default" : "outline"} onClick={() => setScope(value)}>{label} ({count ?? 0})</Button>)}
+      </div>
+      <p className="text-xs text-muted-foreground">تظهر الإجازة في المعتمدة بعد اكتمال الاعتماد النهائي. كشف الطلبات يشمل جميع النتائج المطابقة للفلاتر، وليس الصفحة الحالية فقط.</p>
       <div className="rounded-xl border bg-card p-3">
         <div className="flex flex-wrap gap-2">
           {types.map((item) => (
@@ -352,6 +408,13 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
         </div>
       </div>
 
+      <div className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-3">
+        <label className="grid gap-1 text-sm">تاريخ تقديم الطلب من<Input type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label>
+        <label className="grid gap-1 text-sm">إلى<Input type="date" value={to} min={from} onChange={(event) => setTo(event.target.value)} /></label>
+        <Button variant="outline" disabled={reportBusy || isFetching} onClick={() => exportReport(false)}>تصدير كشف Excel</Button>
+        <Button variant="outline" disabled={reportBusy || isFetching} onClick={() => exportReport(true)}>طباعة الكشف / PDF</Button>
+        {reportBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
+      </div>
       {selectedIds.length > 0 ? <div className="rounded-xl border bg-card p-3">
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" size="sm" disabled={!selectedIds.length || isPending} onClick={() => bulk("APPROVE")}>اعتماد المحدد</Button>
@@ -385,6 +448,7 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
         </div>
       </div> : null}
 
+      {loadError ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{loadError instanceof Error ? loadError.message : "تعذر تحميل الطلبات"}</p> : null}
       {message ? (
         <div className={`rounded-xl border p-3 text-sm ${messageTone === "error" ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-400" : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-400"}`}>
           {message}
@@ -436,9 +500,10 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
               </div>
 
               <div className="grid grid-cols-2 gap-3 text-xs rounded-2xl bg-slate-50/80 dark:bg-slate-800/40 p-3">
+                {request.leave ? <div className="col-span-2"><p className="font-bold">{request.leave.leaveType.name} — {Number(request.leave.days)} يوم</p><p>{request.leave.startDate.slice(0, 10)} — {request.leave.endDate.slice(0, 10)}</p>{request.leave.decisionNote ? <p>ملاحظة القرار: {request.leave.decisionNote}</p> : null}</div> : null}
                 <div><p className="text-muted-foreground">تاريخ الإنشاء</p><p className="font-bold mt-0.5">{new Date(request.createdAt).toLocaleDateString("ar-SA")}</p></div>
                 <div><p className="text-muted-foreground">آخر تحديث</p><p className="font-bold mt-0.5">{new Date(request.updatedAt).toLocaleDateString("ar-SA")}</p></div>
-                <div><p className="text-muted-foreground">المعتمد الحالي</p><p className="font-bold mt-0.5 truncate">{request.currentApprover || "-"}</p></div>
+                <div><p className="text-muted-foreground">المعتمد الحالي</p><p className="font-bold mt-0.5 truncate">{request.status === "PENDING" ? request.currentApprover || "-" : "—"}</p></div>
                 <div><p className="text-muted-foreground">الأولوية</p><p className="font-bold mt-0.5">{({ Low: "منخفضة", Normal: "عادية", High: "عالية" } as Record<string, string>)[request.priority] ?? request.priority}</p></div>
               </div>
 

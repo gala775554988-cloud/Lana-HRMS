@@ -96,6 +96,11 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const type = searchParams.get("type") ?? "ALL";
   const scope = searchParams.get("scope") ?? "all";
+  const report = searchParams.get("report") === "1";
+  const from = searchParams.get("from");
+  const to = searchParams.get("to");
+  const validDate = (value: string | null) => !value || (/^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)));
+  if (!validDate(from) || !validDate(to) || (from && to && from > to)) return NextResponse.json({ success: false, message: "تحقق من فترة الكشف" }, { status: 400 });
   const sort = searchParams.get("sort") ?? "newest";
   const search = searchParams.get("search") ?? "";
   const page = Math.max(Number(searchParams.get("page") ?? 1), 1);
@@ -105,40 +110,55 @@ export async function GET(request: NextRequest) {
   const employeeWhere = await applyScopedWhere("employees", {}, profile);
 
   const visibility = { OR: [{ employee: employeeWhere }, { steps: { some: { approverUserId: session.user.id } } }] };
-  const where: any = { ...visibility };
-  if (type !== "ALL") where.type = type;
-  if (scope === "mine") where.employee = { userId: session.user.id };
-  if (scope === "waiting") where.steps = { some: { approverUserId: session.user.id, status: "PENDING" } };
-  if (scope === "transferred") where.steps = { some: { comments: { contains: "transferred", mode: "insensitive" } } };
-  if (scope === "deferred") where.steps = { some: { status: "DEFERRED" } };
-  if (scope === "completed") where.status = { in: ["COMPLETED", "APPROVED"] };
-  if (scope === "rejected") where.status = "REJECTED";
-  if (scope === "decided") where.status = { in: ["COMPLETED", "APPROVED", "REJECTED"] };
-
-  const [allScoped, raw, approvers] = await Promise.all([
-    prisma.workflowInstance.findMany({
-      where: visibility,
-      include: { steps: true, employee: { select: { id: true, employeeNumber: true, nationalId: true, firstName: true, lastName: true, department: { select: { name: true } }, branch: { select: { name: true } }, position: { select: { title: true } } } } },
-      take: 5000
-    }),
-    prisma.workflowInstance.findMany({
-      where,
-      include: {
-        employee: { select: { id: true, employeeNumber: true, nationalId: true, firstName: true, lastName: true, department: { select: { name: true } }, branch: { select: { name: true } }, position: { select: { title: true } } } },
-        steps: { orderBy: { step: "asc" } }
-      },
-      take: 5000
-    }),
-    getAssignableApprovers()
-  ]);
-
-  const searched = sortRequests(raw.filter((workflow) => requestMatchesSearch(workflow, search)), sort);
+  const baseWhere: any = { ...visibility };
+  if (type !== "ALL") baseWhere.type = type;
+  if (from || to) baseWhere.createdAt = { ...(from ? { gte: new Date(`${from}T00:00:00+03:00`) } : {}), ...(to ? { lt: new Date(new Date(`${to}T00:00:00+03:00`).getTime() + 86400000) } : {}) };
+  // Load in bounded batches without silently truncating historical reports.
+  const allScoped: any[] = [];
+  let cursor: string | undefined;
+  for (;;) {
+    const batch = await prisma.workflowInstance.findMany({
+      where: baseWhere,
+      include: { steps: { orderBy: { step: "asc" } }, employee: { select: { id: true, userId: true, employeeNumber: true, nationalId: true, firstName: true, lastName: true, department: { select: { name: true } }, branch: { select: { name: true } }, position: { select: { title: true } } } } },
+      orderBy: { id: "asc" }, take: 1000, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {})
+    });
+    allScoped.push(...batch);
+    if (batch.length < 1000) break;
+    cursor = batch[batch.length - 1].id;
+  }
+  const leaveIds = allScoped.filter((row) => row.type === "LEAVE").map((row) => row.entityId);
+  const leaves: any[] = [];
+  for (let offset = 0; offset < leaveIds.length; offset += 1000) {
+    leaves.push(...await prisma.leaveRequest.findMany({ where: { id: { in: leaveIds.slice(offset, offset + 1000) } }, select: { id: true, status: true, startDate: true, endDate: true, days: true, reason: true, decisionNote: true, leaveType: { select: { name: true } } } }));
+  }
+  const leaveMap = new Map(leaves.map((row) => [row.id, row]));
+  for (const row of allScoped) {
+    row.leave = row.type === "LEAVE" ? leaveMap.get(row.entityId) ?? null : null;
+    // A manager's intermediate approval is not a final leave approval.
+    if (row.leave) row.status = row.leave.status === "APPROVED" ? "COMPLETED" : row.leave.status === "PENDING" && row.status === "RETURNED" ? "RETURNED" : row.leave.status;
+  }
+  const scoped = allScoped.filter((row) => requestMatchesSearch(row, search));
+  const raw = scoped.filter((row) => {
+    if (scope === "mine") return row.employee?.userId === session.user.id;
+    if (scope === "waiting") return row.status === "PENDING" && row.steps.some((step: any) => step.approverUserId === session.user.id && step.status === "PENDING");
+    if (scope === "pending") return row.status === "PENDING";
+    if (scope === "transferred") return row.steps.some((step: any) => step.comments?.toLowerCase().includes("transferred"));
+    if (scope === "deferred") return row.steps.some((step: any) => step.status === "DEFERRED");
+    if (scope === "completed") return ["COMPLETED", "APPROVED"].includes(row.status);
+    if (scope === "rejected") return row.status === "REJECTED";
+    if (scope === "cancelled") return row.status === "CANCELLED";
+    if (scope === "returned") return row.status === "RETURNED";
+    if (scope === "decided") return ["COMPLETED", "APPROVED", "REJECTED"].includes(row.status);
+    return true;
+  });
+  const approvers = report ? [] : await getAssignableApprovers();
+  const searched = sortRequests(raw, sort);
   const approverIds = Array.from(new Set(searched.flatMap((workflow) => workflow.steps.map((step: any) => step.approverUserId)).filter((id): id is string => Boolean(id))));
   const approverUsers = approverIds.length ? await prisma.user.findMany({ where: { id: { in: approverIds } }, select: { id: true, name: true, email: true, employeeProfile: { select: { firstName: true, lastName: true } } } }) : [];
   const approverUserMap = new Map(approverUsers.map((user) => [user.id, { name: user.employeeProfile ? `${user.employeeProfile.firstName} ${user.employeeProfile.lastName}` : user.name, email: user.email }]));
   const total = searched.length;
   const elevated = canManageApprovalRouting(profile.roles, session.user.permissions);
-  const requests = searched.slice((page - 1) * pageSize, page * pageSize).map((workflow) => ({
+  const requests = (report ? searched : searched.slice((page - 1) * pageSize, page * pageSize)).map((workflow) => ({
     id: workflow.id,
     type: workflow.type,
     entityId: workflow.entityId,
@@ -155,6 +175,7 @@ export async function GET(request: NextRequest) {
       branch: workflow.employee.branch,
       position: workflow.employee.position
     } : null,
+    leave: workflow.leave,
     steps: workflow.steps,
     priority: priorityOf(workflow),
     currentApprover: currentApprover(workflow, approverUserMap),
@@ -166,12 +187,15 @@ export async function GET(request: NextRequest) {
 
   const types = Array.from(new Set([...DEFAULT_TYPES, ...allScoped.map((workflow) => workflow.type)])).sort();
   const stats = {
-    total: allScoped.length,
-    waiting: allScoped.filter((workflow) => workflow.steps.some((step) => step.approverUserId === session.user.id && step.status === "PENDING")).length,
-    highPriority: allScoped.filter((workflow) => priorityOf(workflow).toLowerCase() === "high").length,
-    deferred: allScoped.filter((workflow) => workflow.steps.some((step) => step.status === "DEFERRED")).length,
-    completed: allScoped.filter((workflow) => ["COMPLETED", "APPROVED"].includes(workflow.status)).length,
-    rejected: allScoped.filter((workflow) => workflow.status === "REJECTED").length
+    total: scoped.length,
+    pending: scoped.filter((workflow) => workflow.status === "PENDING").length,
+    cancelled: scoped.filter((workflow) => workflow.status === "CANCELLED").length,
+    returned: scoped.filter((workflow) => workflow.status === "RETURNED").length,
+    waiting: scoped.filter((workflow) => workflow.steps.some((step: any) => step.approverUserId === session.user.id && step.status === "PENDING")).length,
+    highPriority: scoped.filter((workflow) => priorityOf(workflow).toLowerCase() === "high").length,
+    deferred: scoped.filter((workflow) => workflow.steps.some((step: any) => step.status === "DEFERRED")).length,
+    completed: scoped.filter((workflow) => ["COMPLETED", "APPROVED"].includes(workflow.status)).length,
+    rejected: scoped.filter((workflow) => workflow.status === "REJECTED").length
   };
 
   return NextResponse.json({ success: true, requests, types, stats, approvers, page, pageSize, total, pageCount: Math.max(Math.ceil(total / pageSize), 1) });
