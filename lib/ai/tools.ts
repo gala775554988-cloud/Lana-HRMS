@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { tool } from "ai";
 import { prisma } from "@/lib/prisma";
+import { resolveApprovalChain } from "@/lib/enterprise/approval-engine";
+import { persistEnterpriseWorkflow, notifyWorkflowSubmission, decideWorkflowStep } from "@/lib/enterprise/workflow";
 import { memoryCache } from "@/lib/cache/memory-cache";
 import { applyScopedWhere } from "@/lib/enterprise/hierarchy";
 import { executiveCommands, executeDirectModifyDB, type UiActionType, type DbOperationType } from "@/lib/ai/executiveControl";
@@ -646,27 +648,21 @@ export function createScopedHrTools(context: ToolAuthContext) {
         try {
           const s = new Date(startDate);
           const e = new Date(endDate);
-          if (isNaN(s.getTime()) || isNaN(e.getTime())) return { error: "Invalid date format. Use YYYY-MM-DD." };
+          if (isNaN(s.getTime()) || isNaN(e.getTime()) || e < s) return { error: "Invalid date format. Use YYYY-MM-DD." };
           
-          let typeRecord = await prisma.leaveType.findFirst({ where: { name: { contains: leaveType, mode: "insensitive" } } });
-          if (!typeRecord) {
-            typeRecord = await prisma.leaveType.findFirst();
-          }
-          if (!typeRecord) return { error: "No leave types configured in system." };
-
-          const days = Math.max(1, Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)));
-
-          const req = await prisma.leaveRequest.create({
-            data: {
-              employeeId: context.employeeId,
-              leaveTypeId: typeRecord.id,
-              startDate: s,
-              endDate: e,
-              days,
-              reason: reason || `Requested via Lana AI (${leaveType})`,
-              status: "PENDING"
-            }
+          const aliases: Record<string, string> = { "annual leave": "ANNUAL", annual: "ANNUAL", sick: "SICK", "sick leave": "SICK", emergency: "EMERGENCY", unpaid: "UNPAID" };
+          const code = aliases[String(leaveType).trim().toLowerCase()] || String(leaveType).trim().toUpperCase();
+          const typeRecord = await prisma.leaveType.findFirst({ where: { isActive: true, OR: [{ code: { equals: code, mode: "insensitive" } }, { name: { equals: leaveType, mode: "insensitive" } }] } });
+          if (!typeRecord) return { error: "نوع الإجازة غير مُعرّف؛ اختر نوعاً معتمداً في النظام." };
+          const days = Math.floor((e.getTime() - s.getTime()) / 86400000) + 1;
+          const approvers = await resolveApprovalChain(context.employeeId, "LEAVE");
+          const result = await prisma.$transaction(async tx => {
+            const request = await tx.leaveRequest.create({ data: { employeeId: context.employeeId!, leaveTypeId: typeRecord.id, startDate: s, endDate: e, days, reason: reason || `Requested via Lana AI (${leaveType})`, status: "PENDING" } });
+            const workflow = await persistEnterpriseWorkflow(tx, context.employeeId!, "LEAVE", request.id, approvers);
+            return { request, workflow };
           });
+          await notifyWorkflowSubmission(result.workflow, approvers);
+          const req = result.request;
           return { success: true, message: `Created leave request from ${startDate} to ${endDate} (${leaveType})`, requestId: req.id };
         } catch (err: any) {
           return { error: err.message };
@@ -680,13 +676,9 @@ export function createScopedHrTools(context: ToolAuthContext) {
         requestId: z.string().describe("The ID of the leave request to approve.")
       }) as any,
       execute: async ({ requestId }: any) => {
-        if (!canManageHr(context) && !context.permissions.includes("manage:leave")) {
-          return { error: "Access Denied: You do not have permission to approve leave requests." };
-        }
-        await prisma.leaveRequest.update({
-          where: { id: requestId },
-          data: { status: "APPROVED", decidedAt: new Date(), decisionNote: `Approved via Lana AI by ${context.userId}` }
-        });
+        const workflow = await prisma.workflowInstance.findFirst({ where: { type: "LEAVE", entityId: requestId, status: "PENDING" }, orderBy: { createdAt: "desc" }, select: { id: true } });
+        if (!workflow) return { error: "لا يوجد مسار معلق قابل للاعتماد لهذا الطلب." };
+        await decideWorkflowStep({ workflowInstanceId: workflow.id, actorUserId: context.userId, decision: "APPROVE" });
         return { success: true, message: `Approved leave request #${requestId}.` };
       }
     }),
@@ -698,13 +690,10 @@ export function createScopedHrTools(context: ToolAuthContext) {
         reason: z.string().optional().describe("Rejection notes.")
       }) as any,
       execute: async ({ requestId, reason }: any) => {
-        if (!canManageHr(context) && !context.permissions.includes("manage:leave")) {
-          return { error: "Access Denied." };
-        }
-        await prisma.leaveRequest.update({
-          where: { id: requestId },
-          data: { status: "REJECTED", decidedAt: new Date(), decisionNote: reason || `Rejected via Lana AI by ${context.userId}` }
-        });
+        if (!reason?.trim()) return { error: "سبب الرفض مطلوب." };
+        const workflow = await prisma.workflowInstance.findFirst({ where: { type: "LEAVE", entityId: requestId, status: "PENDING" }, orderBy: { createdAt: "desc" }, select: { id: true } });
+        if (!workflow) return { error: "لا يوجد مسار معلق قابل للرفض لهذا الطلب." };
+        await decideWorkflowStep({ workflowInstanceId: workflow.id, actorUserId: context.userId, decision: "REJECT", comments: reason });
         return { success: true, message: `Rejected leave request #${requestId}.` };
       }
     }),

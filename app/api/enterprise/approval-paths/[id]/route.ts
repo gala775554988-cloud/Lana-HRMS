@@ -1,40 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { canManageApprovalRouting } from "@/config/request-routing";
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
+import { validateStages, validateActiveApprovers } from "@/lib/enterprise/approval-path-validation";
 
 async function requireSuperAdmin() {
   const session = await auth();
   if (!session?.user?.id) return { error: NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 }) } as const;
   const roles = ((session.user as any).roles as string[] | undefined) ?? [];
-  if (!roles.includes("SUPER_ADMIN") && !roles.includes("HR_MANAGER")) {
+  if (!canManageApprovalRouting(roles, session.user.permissions)) {
     return { error: NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 }) } as const;
   }
   return { session } as const;
-}
-
-type StageInput = { order: number; name?: string | null; approverEmployeeId: string; isMandatory?: boolean };
-
-function validateStages(stages: unknown): StageInput[] {
-  if (!Array.isArray(stages) || !stages.length) throw new Error("يجب إضافة مرحلة واحدة على الأقل");
-  const seenApprovers = new Set<string>();
-  return stages.map((raw, index) => {
-    const stage = raw as Record<string, unknown>;
-    if (!stage.approverEmployeeId || typeof stage.approverEmployeeId !== "string") {
-      throw new Error(`المرحلة رقم ${index + 1}: يجب اختيار الموظف المسؤول عن الموافقة`);
-    }
-    const approverEmployeeId = stage.approverEmployeeId.trim();
-    if (seenApprovers.has(approverEmployeeId)) {
-      throw new Error(`المرحلة رقم ${index + 1}: لا يمكن تكرار المعتمد نفسه في المسار`);
-    }
-    seenApprovers.add(approverEmployeeId);
-    return {
-      order: index + 1,
-      name: typeof stage.name === "string" ? stage.name.trim() || null : null,
-      approverEmployeeId,
-      isMandatory: stage.isMandatory !== false
-    };
-  });
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -55,6 +33,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     if (Array.isArray(body.stages)) {
       const stages = validateStages(body.stages);
+      await validateActiveApprovers(stages);
       await prisma.$transaction([
         prisma.approvalStage.deleteMany({ where: { approvalPathId: id } }),
         prisma.approvalStage.createMany({ data: stages.map((stage) => ({ ...stage, approvalPathId: id })) }),

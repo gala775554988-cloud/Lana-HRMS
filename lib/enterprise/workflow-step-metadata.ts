@@ -1,5 +1,7 @@
 export type WorkflowStepMetadata = {
   note?: string;
+  stageName?: string;
+  slaHours?: number;
   priority?: "Low" | "Normal" | "High";
   deferredUntil?: string;
   transferred?: boolean;
@@ -12,6 +14,8 @@ export function parseWorkflowStepMetadata(value: string | null | undefined): Wor
     const parsed = JSON.parse(value) as Record<string, unknown>;
     if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") return { note: value };
     return {
+      stageName: typeof parsed.stageName === "string" ? parsed.stageName : undefined,
+      slaHours: typeof parsed.slaHours === "number" && parsed.slaHours > 0 ? parsed.slaHours : undefined,
       note: typeof parsed.note === "string" ? parsed.note : undefined,
       priority: parsed.priority === "Low" || parsed.priority === "Normal" || parsed.priority === "High" ? parsed.priority : undefined,
       deferredUntil: typeof parsed.deferredUntil === "string" ? parsed.deferredUntil : undefined,

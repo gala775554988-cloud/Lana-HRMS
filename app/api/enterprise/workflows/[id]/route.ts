@@ -43,14 +43,15 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   const approverUserIds = instance.steps.map((step) => step.approverUserId).filter((value): value is string => Boolean(value));
   const [approvers, details, definition, audit] = await Promise.all([
     approverUserIds.length
-      ? prisma.user.findMany({ where: { id: { in: approverUserIds } }, select: { id: true, name: true, email: true } })
+      ? prisma.user.findMany({ where: { id: { in: approverUserIds } }, select: { id: true, name: true, email: true, employeeProfile: { select: { firstName: true, lastName: true } } } })
       : Promise.resolve([]),
     getRequestEntityDetails(instance.type, instance.entityId),
     prisma.workflowDefinition.findFirst({ where: { entity: instance.type, isActive: true }, orderBy: { updatedAt: "desc" }, select: { name: true, slaHours: true } }).catch(() => null),
     prisma.auditLog.findMany({ where: { entity: "workflowInstance", entityId: instance.id }, orderBy: { createdAt: "desc" }, take: 25, select: { id: true, action: true, metadata: true, createdAt: true, actor: { select: { name: true, email: true } } } })
   ]);
-  const approverById = new Map(approvers.map((approver) => [approver.id, approver]));
-  const slaHours = definition?.slaHours ?? 48;
+  const approverById = new Map(approvers.map((approver) => [approver.id, { id: approver.id, email: approver.email, name: approver.employeeProfile ? `${approver.employeeProfile.firstName} ${approver.employeeProfile.lastName}` : approver.name }]));
+  const savedMetadata = parseWorkflowStepMetadata(instance.steps[0]?.comments);
+  const slaHours = savedMetadata.slaHours ?? definition?.slaHours ?? 48;
   const dueAt = new Date(instance.createdAt.getTime() + slaHours * 60 * 60 * 1000);
   const activeStep = instance.steps.find((step) => step.step === instance.currentStep);
   const activeMetadata = parseWorkflowStepMetadata(activeStep?.comments);

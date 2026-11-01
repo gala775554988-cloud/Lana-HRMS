@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { canManageApprovalRouting } from "@/config/request-routing";
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
+import { validateStages, validateActiveApprovers } from "@/lib/enterprise/approval-path-validation";
 import type { ApprovalEntityType } from "@prisma/client";
 
 async function requireSuperAdmin() {
   const session = await auth();
   if (!session?.user?.id) return { error: NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 }) } as const;
   const roles = ((session.user as any).roles as string[] | undefined) ?? [];
-  if (!roles.includes("SUPER_ADMIN") && !roles.includes("HR_MANAGER")) {
+  if (!canManageApprovalRouting(roles, session.user.permissions)) {
     return { error: NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 }) } as const;
   }
   return { session } as const;
@@ -90,30 +92,6 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ success: true, paths: result });
 }
 
-type StageInput = { order: number; name?: string | null; approverEmployeeId: string; isMandatory?: boolean };
-
-function validateStages(stages: unknown): StageInput[] {
-  if (!Array.isArray(stages) || !stages.length) throw new Error("يجب إضافة مرحلة واحدة على الأقل");
-  const seenApprovers = new Set<string>();
-  return stages.map((raw, index) => {
-    const stage = raw as Record<string, unknown>;
-    if (!stage.approverEmployeeId || typeof stage.approverEmployeeId !== "string") {
-      throw new Error(`المرحلة رقم ${index + 1}: يجب اختيار الموظف المسؤول عن الموافقة`);
-    }
-    const approverEmployeeId = stage.approverEmployeeId.trim();
-    if (seenApprovers.has(approverEmployeeId)) {
-      throw new Error(`المرحلة رقم ${index + 1}: لا يمكن تكرار المعتمد نفسه في المسار`);
-    }
-    seenApprovers.add(approverEmployeeId);
-    return {
-      order: index + 1,
-      name: typeof stage.name === "string" ? stage.name.trim() || null : null,
-      approverEmployeeId,
-      isMandatory: stage.isMandatory !== false
-    };
-  });
-}
-
 export async function POST(request: NextRequest) {
   const { session, error } = await requireSuperAdmin();
   if (error) return error;
@@ -132,6 +110,7 @@ export async function POST(request: NextRequest) {
     if (!entityIds.length) throw new Error("يجب اختيار جهة واحدة أو أكثر");
     if (!requestTypes.length) throw new Error("يجب اختيار نوع طلب واحد أو أكثر");
     const stages = validateStages(body.stages);
+      await validateActiveApprovers(stages);
 
     const createdPaths = await prisma.$transaction(async (tx) => {
       const results = [];

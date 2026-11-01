@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
+import { canManageApprovalRouting } from "@/config/request-routing";
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
 import { createEnterpriseNotification } from "@/lib/enterprise/notifications";
@@ -21,7 +22,7 @@ function deferDate(preset?: string, customDate?: string) {
 
 function canManageStep(session: any, approverUserId: string | null | undefined) {
   const roles = (session.user.roles as string[]) ?? [];
-  return approverUserId === session.user.id || roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER");
+  return approverUserId === session.user.id || canManageApprovalRouting(roles, session.user.permissions);
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -56,17 +57,24 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const instance = await prisma.workflowInstance.findUnique({ where: { id }, include: { steps: { orderBy: { step: "asc" } } } });
     if (!instance) return NextResponse.json({ success: false, message: "Workflow not found" }, { status: 404 });
+    if (instance.status !== "PENDING") return NextResponse.json({ success: false, message: "تم البت في الطلب بالفعل." }, { status: 409 });
     const currentStep = instance.steps.find((step) => step.step === instance.currentStep && ["PENDING", "DEFERRED"].includes(step.status));
     if (!currentStep) return NextResponse.json({ success: false, message: "No active workflow step" }, { status: 400 });
     if (!canManageStep(session, currentStep.approverUserId)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
 
+    async function updateActiveStep(data: { data: Parameters<typeof prisma.workflowStep.update>[0]["data"] }) {
+      const changed = await prisma.workflowStep.updateMany({ where: { id: currentStep!.id, status: { in: ["PENDING", "DEFERRED"] }, approverUserId: currentStep!.approverUserId, workflowInstance: { status: "PENDING", currentStep: instance!.currentStep } }, data: data.data });
+      if (changed.count !== 1) throw new Error("تغير الطلب أثناء الإجراء. حدّث الصفحة.");
+    }
+
     if (body.decision === "TRANSFER") {
       if (!body.targetUserId) return NextResponse.json({ success: false, message: "targetUserId is required" }, { status: 400 });
       if (body.targetUserId === session.user.id) return NextResponse.json({ success: false, message: "لا يمكن تحويل الطلب إلى نفسك" }, { status: 400 });
+      const requester = await prisma.employee.findUnique({ where: { id: instance.employeeId }, select: { userId: true } });
+      if (requester?.userId === body.targetUserId) return NextResponse.json({ success: false, message: "لا يمكن تحويل الطلب لمقدمه ليعتمده بنفسه." }, { status: 400 });
       const target = await prisma.user.findUnique({ where: { id: body.targetUserId }, select: { id: true, isActive: true } });
       if (!target?.isActive) return NextResponse.json({ success: false, message: "المعتمد المحدد غير موجود أو غير نشط" }, { status: 400 });
-      await prisma.workflowStep.update({
-        where: { id: currentStep.id },
+      await updateActiveStep({
         data: {
           approverUserId: body.targetUserId,
           status: "PENDING",
@@ -82,8 +90,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     if (body.decision === "DEFER") {
       const until = deferDate(body.deferPreset, body.deferUntil);
-      await prisma.workflowStep.update({
-        where: { id: currentStep.id },
+      await updateActiveStep({
         data: {
           status: "DEFERRED",
           comments: mergeWorkflowStepMetadata(currentStep.comments, {
@@ -95,15 +102,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     if (body.decision === "NOTE") {
-      await prisma.workflowStep.update({
-        where: { id: currentStep.id },
+      await updateActiveStep({
         data: { comments: mergeWorkflowStepMetadata(currentStep.comments, { note: body.comments?.trim() || undefined }) }
       });
     }
 
     if (body.decision === "PRIORITY") {
-      await prisma.workflowStep.update({
-        where: { id: currentStep.id },
+      await updateActiveStep({
         data: {
           comments: mergeWorkflowStepMetadata(currentStep.comments, {
             priority: body.priority ?? "Normal",

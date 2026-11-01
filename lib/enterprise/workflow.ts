@@ -1,66 +1,36 @@
 import { prisma } from "@/lib/prisma";
-import { writeAuditLog } from "@/lib/audit";
+import type { ResolvedApprover } from "./approval-engine";
+import { ApprovalRoutingError } from "./request-routing-policy";
+import { mergeWorkflowStepMetadata } from "./workflow-step-metadata";
 import { resolveApprovalChain } from "@/lib/enterprise/hierarchy";
 import { createEnterpriseNotification, notifyUsers } from "@/lib/enterprise/notifications";
-import { recordLeaveApprovalUsage } from "@/lib/employee/leave-balance";
-import { recordLeaveTypeApprovalUsage } from "@/lib/enterprise/leave-engine";
 
+type WorkflowTransaction = Omit<typeof prisma, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
+
+export async function persistEnterpriseWorkflow(tx: WorkflowTransaction, employeeId: string, type: string, entityId: string, approvers: ResolvedApprover[]) {
+  const firstMandatoryIndex = approvers.findIndex(approver => approver.isMandatory);
+  if (firstMandatoryIndex < 0) throw new ApprovalRoutingError("لا يوجد معتمد إلزامي صالح لهذا الطلب.");
+  const instance = await tx.workflowInstance.create({ data: { employeeId, type, entityId, status: "PENDING", currentStep: firstMandatoryIndex + 1 } });
+  await tx.workflowStep.createMany({ data: approvers.map((approver, index) => ({
+    workflowInstanceId: instance.id, step: index + 1, approverUserId: approver.userId,
+    status: !approver.isMandatory ? "NOTIFIED" : index === firstMandatoryIndex ? "PENDING" : "WAITING",
+    capabilities: approver.capabilities,
+    comments: mergeWorkflowStepMetadata(null, { stageName: approver.stageName || undefined, slaHours: approver.slaHours ?? 48, ...(!approver.isMandatory ? { note: "مرحلة اطلاع لا تتطلب اعتماداً" } : {}) }),
+  })) });
+  const requester = await tx.employee.findUnique({ where: { id: employeeId }, select: { userId: true } });
+  await tx.auditLog.create({ data: { actorUserId: requester?.userId, action: "workflow:submit", entity: "workflowInstance", entityId: instance.id, metadata: { type, employeeId, entityId, approverCount: approvers.length, autoApproved: false } } });
+  return instance;
+}
+export async function notifyWorkflowSubmission(instance: { id: string; employeeId: string; type: string }, approvers: ResolvedApprover[]) {
+  const first = approvers.find(approver => approver.isMandatory);
+  if (first) await notifyUsers([first.userId], "وصول طلب جديد", `طلب ${instance.type} بانتظار مراجعتك.`, "INFO", `/approvals?tab=inbox&highlight=${instance.id}`).catch(() => null);
+  const employee = await prisma.employee.findUnique({ where: { id: instance.employeeId }, select: { userId: true } }).catch(() => null);
+  if (employee?.userId) await createEnterpriseNotification({ userId: employee.userId, title: "تم إرسال الطلب", body: "أُرسل الطلب إلى أول مرحلة اعتماد. يمكنك متابعة تسلسله من الطلبات الصادرة.", type: "INFO", link: `/approvals?tab=outbox&highlight=${instance.id}` }).catch(() => null);
+}
 export async function createEnterpriseWorkflow(employeeId: string, type: string, entityId: string) {
-  const approvers = await resolveApprovalChain(employeeId, type.toLowerCase());
-  // Optional stages (isMandatory: false) never block progression -- they're
-  // auto-resolved to APPROVED right away (still recorded, VIEW-only) so the
-  // chain moves straight to the first mandatory stage. If every stage is
-  // optional (or there are none), the whole request auto-completes.
-  const firstMandatoryIndex = approvers.findIndex((approver) => approver.isMandatory);
-  const hasMandatoryStage = firstMandatoryIndex !== -1;
-
-  const instance = await prisma.workflowInstance.create({
-    data: {
-      employeeId,
-      type,
-      entityId,
-      status: approvers.length ? (hasMandatoryStage ? "PENDING" : "COMPLETED") : "COMPLETED",
-      currentStep: hasMandatoryStage ? firstMandatoryIndex + 1 : approvers.length ? approvers.length + 1 : 0
-    }
-  });
-
-  if (approvers.length) {
-    const now = new Date();
-    await prisma.workflowStep.createMany({
-      data: approvers.map((approver, index) => ({
-        workflowInstanceId: instance.id,
-        step: index + 1,
-        approverUserId: approver.userId,
-        status: !approver.isMandatory ? "APPROVED" : index === firstMandatoryIndex ? "PENDING" : "WAITING",
-        capabilities: approver.capabilities,
-        ...(!approver.isMandatory ? { approvedAt: now, comments: "تمت الموافقة تلقائياً (مرحلة اختيارية)" } : {})
-      }))
-    });
-    if (hasMandatoryStage) {
-      const firstApprover = approvers[firstMandatoryIndex];
-      await notifyUsers([firstApprover.userId], "وصول طلب جديد", `New ${type} request is waiting for your approval.`, "INFO", `/approvals?tab=inbox&highlight=${instance.id}`);
-    }
-  }
-
-  const employee = await prisma.employee.findUnique({ where: { id: employeeId }, select: { userId: true } });
-  if (employee?.userId) {
-    await createEnterpriseNotification({
-      userId: employee.userId,
-      title: hasMandatoryStage ? "تم إرسال الطلب" : "تم اعتماد الطلب",
-      body: hasMandatoryStage ? `Your ${type} request has been submitted.` : `Your ${type} request was approved automatically.`,
-      type: hasMandatoryStage ? "INFO" : "SUCCESS",
-      link: `/approvals?tab=outbox&highlight=${instance.id}`
-    });
-  }
-
-  await writeAuditLog({
-    actorUserId: employee?.userId ?? undefined,
-    action: "workflow:submit",
-    entity: "workflowInstance",
-    entityId: instance.id,
-    metadata: { type, employeeId, entityId, approverCount: approvers.length, autoApproved: !hasMandatoryStage }
-  });
-
+  const approvers = await resolveApprovalChain(employeeId, type);
+  const instance = await prisma.$transaction(tx => persistEnterpriseWorkflow(tx, employeeId, type, entityId, approvers));
+  await notifyWorkflowSubmission(instance, approvers);
   return instance;
 }
 
@@ -77,113 +47,48 @@ export async function decideWorkflowStep({
   comments?: string;
   ip?: string | null;
 }) {
-  const instance = await prisma.workflowInstance.findUnique({
-    where: { id: workflowInstanceId },
-    include: { steps: { orderBy: { step: "asc" } } }
-  });
-  if (!instance) throw new Error("Workflow not found");
-
-  const currentStep = instance.steps.find((step) => step.step === instance.currentStep && step.status === "PENDING");
-  if (!currentStep) throw new Error("No pending workflow step");
-
-  if (currentStep.approverUserId && currentStep.approverUserId !== actorUserId) {
-    // Dynamic Self-Healing Auth Check: re-verify if actor is live legitimate approver
-    const liveChain = await resolveApprovalChain(instance.employeeId, instance.type.toLowerCase());
-    const liveApprover = liveChain[instance.currentStep - 1];
-    if (!liveApprover || liveApprover.userId !== actorUserId) {
-      throw new Error("Forbidden");
+  const { updated, instance, workflowStatus } = await prisma.$transaction(async tx => {
+    const instance = await tx.workflowInstance.findUnique({ where: { id: workflowInstanceId }, include: { steps: { orderBy: { step: "asc" } } }, });
+    if (!instance || instance.status !== "PENDING") throw new Error("لا يوجد طلب معلق قابل لاتخاذ القرار.");
+    const employee = await tx.employee.findUnique({ where: { id: instance.employeeId }, select: { userId: true, odooRawData: true } });
+    if (employee?.userId === actorUserId) throw new Error("لا يمكنك اعتماد طلبك بنفسك.");
+    const current = instance.steps.find(step => step.step === instance.currentStep && ["PENDING", "DEFERRED"].includes(step.status));
+    if (!current || !current.approverUserId || current.approverUserId !== actorUserId) throw new Error("Forbidden");
+    const capability = decision === "REJECT" ? "REJECT" : "APPROVE";
+    if (!current.capabilities.includes(capability)) throw new Error("Forbidden");
+    if ((decision === "REJECT" || decision === "RETURN") && !comments?.trim()) throw new Error(decision === "REJECT" ? "سبب الرفض مطلوب" : "سبب الإرجاع مطلوب");
+    const next = decision === "APPROVE" ? instance.steps.find(step => step.step > current.step && step.status === "WAITING") : undefined;
+    const workflowStatus = decision === "REJECT" ? "REJECTED" : decision === "RETURN" ? "RETURNED" : next ? "PENDING" : "COMPLETED";
+    const changed = await tx.workflowInstance.updateMany({ where: { id: instance.id, status: "PENDING", currentStep: instance.currentStep }, data: { status: workflowStatus, currentStep: next?.step ?? (decision === "APPROVE" ? current.step + 1 : current.step) } });
+    if (changed.count !== 1) throw new Error("تغير الطلب أثناء المراجعة. أعد تحميله.");
+    const decided = await tx.workflowStep.updateMany({ where: { id: current.id, status: { in: ["PENDING", "DEFERRED"] }, approverUserId: actorUserId }, data: { status: decision === "APPROVE" ? "APPROVED" : decision === "REJECT" ? "REJECTED" : "RETURNED", approvedAt: new Date(), comments: mergeWorkflowStepMetadata(current.comments, comments?.trim() ? { note: comments.trim() } : {}) } });
+    if (decided.count !== 1) throw new Error("سبق اتخاذ قرار على هذه المرحلة. حدّث الصفحة.");
+    if (next) {
+      if (!next.approverUserId) throw new Error("المرحلة التالية بلا معتمد. راجع مسؤول النظام.");
+      await tx.workflowStep.update({ where: { id: next.id }, data: { status: "PENDING" } });
     }
-    await prisma.workflowStep.update({
-      where: { id: currentStep.id },
-      data: { approverUserId: actorUserId, capabilities: liveApprover.capabilities || currentStep.capabilities || ["VIEW", "APPROVE", "REJECT"] }
-    });
-  }
-
-  const capabilities = currentStep.capabilities?.length ? currentStep.capabilities : ["VIEW", "APPROVE", "REJECT"];
-  if (decision === "APPROVE" && !capabilities.includes("APPROVE")) throw new Error("Forbidden");
-  if (decision === "REJECT" && !capabilities.includes("REJECT")) throw new Error("Forbidden");
-  if (decision === "RETURN" && !capabilities.includes("APPROVE") && !capabilities.includes("REJECT")) throw new Error("Forbidden");
-
-  // A rejection reason is mandatory for transparency -- enforced here (not
-  // just in the client UI) so the requirement can't be bypassed by calling
-  // the API directly.
-  if ((decision === "REJECT" || decision === "RETURN") && !comments?.trim()) {
-    throw new Error(decision === "REJECT" ? "سبب الرفض مطلوب" : "سبب الإرجاع مطلوب");
-  }
-
-  const nextStatus = decision === "APPROVE" ? "APPROVED" : decision === "REJECT" ? "REJECTED" : "RETURNED";
-  await prisma.workflowStep.update({
-    where: { id: currentStep.id },
-    data: { status: nextStatus, approvedAt: new Date(), comments }
-  });
-
-  let workflowStatus = instance.status;
-  let currentStepNumber = instance.currentStep;
-  if (decision === "REJECT") {
-    workflowStatus = "REJECTED";
-  } else if (decision === "RETURN") {
-    workflowStatus = "RETURNED";
-  } else {
-    // Optional stages after this one were already auto-resolved to APPROVED
-    // at creation time (see createEnterpriseWorkflow) -- only a still-"WAITING"
-    // step is a real next stop; skipping past already-decided ones this way
-    // is what makes optional stages never block progression.
-    const nextStep = instance.steps.find((step) => step.step > instance.currentStep && step.status === "WAITING");
-    if (nextStep) {
-      currentStepNumber = nextStep.step;
-      const liveChain = await resolveApprovalChain(instance.employeeId, instance.type.toLowerCase());
-      const liveApproverForNext = liveChain[currentStepNumber - 1];
-      const updatedApproverUserId = liveApproverForNext?.userId || nextStep.approverUserId;
-      const updatedCapabilities = liveApproverForNext?.capabilities || nextStep.capabilities || ["VIEW", "APPROVE", "REJECT"];
-
-      await prisma.workflowStep.update({
-        where: { id: nextStep.id },
-        data: {
-          status: "PENDING",
-          approverUserId: updatedApproverUserId,
-          capabilities: updatedCapabilities
+    if (workflowStatus !== "PENDING") {
+      const status = workflowStatus === "COMPLETED" ? "APPROVED" : workflowStatus === "REJECTED" ? "REJECTED" : "PENDING";
+      if (instance.type === "LEAVE") {
+        const leave = await tx.leaveRequest.update({ where: { id: instance.entityId }, data: { status, decidedAt: new Date(), decisionNote: comments }, include: { leaveType: { select: { code: true } } } });
+        // Statutory/special leave must not consume the annual-leave aggregate.
+        if (status === "APPROVED" && leave.leaveType.code.toUpperCase().startsWith("ANNUAL")) {
+          const raw = (employee?.odooRawData as Record<string, unknown> | null) ?? {};
+          const csv = (raw._csvLeaveData as Record<string, unknown> | undefined) ?? {};
+          await tx.employeeLeaveBalance.upsert({ where: { employeeId: instance.employeeId }, update: { used: { increment: Number(leave.days) } }, create: { employeeId: instance.employeeId, accrued: Number(csv.daysAccrued ?? raw.leaveBalance ?? 30), used: Number(csv.daysUsed ?? raw.leaveUsed ?? 0) + Number(leave.days) } });
         }
-      });
-    } else {
-      workflowStatus = "COMPLETED";
-      currentStepNumber = instance.currentStep + 1;
+      } else if (instance.type === "OVERTIME") await tx.overtimeRequest.update({ where: { id: instance.entityId }, data: { status } });
+      else if (instance.type === "EXPENSE") await tx.expenseRequest.update({ where: { id: instance.entityId }, data: { status } });
+      else if (instance.type === "RESUMPTION") await tx.resumptionRequest.update({ where: { id: instance.entityId }, data: { status } });
+      else if (instance.type === "LOAN") await tx.loan.update({ where: { id: instance.entityId }, data: { status: status === "APPROVED" ? "ACTIVE" : status === "REJECTED" ? "CANCELLED" : "PENDING" } });
+      else await tx.letterRequest.update({ where: { id: instance.entityId }, data: { status } });
     }
-  }
-
-  const updated = await prisma.workflowInstance.update({
-    where: { id: workflowInstanceId },
-    data: { status: workflowStatus, currentStep: currentStepNumber }
+    await tx.auditLog.create({ data: { actorUserId, action: `workflow:${decision.toLowerCase()}`, entity: "workflowInstance", entityId: workflowInstanceId, metadata: { decision, comments, ip, entityId: instance.entityId, type: instance.type, employeeId: instance.employeeId, step: current.step } } });
+    const updated = await tx.workflowInstance.findUniqueOrThrow({ where: { id: instance.id } });
+    return { updated, instance, workflowStatus };
   });
 
-  if (instance.type === "OVERTIME") {
-    const nextOvertimeStatus = workflowStatus === "COMPLETED" ? "APPROVED" : workflowStatus === "REJECTED" ? "REJECTED" : workflowStatus === "RETURNED" ? "PENDING" : undefined;
-    if (nextOvertimeStatus) {
-      await prisma.overtimeRequest.update({ where: { id: instance.entityId }, data: { status: nextOvertimeStatus as any } }).catch(() => null);
-    }
-  }
-
-  if (instance.type === "LEAVE") {
-    const nextLeaveStatus = workflowStatus === "COMPLETED" ? "APPROVED" : workflowStatus === "REJECTED" ? "REJECTED" : workflowStatus === "RETURNED" ? "PENDING" : undefined;
-    if (nextLeaveStatus) {
-      const updatedLeave = await prisma.leaveRequest
-        .update({ where: { id: instance.entityId }, data: { status: nextLeaveStatus as any, decidedAt: new Date(), decisionNote: comments } })
-        .catch(() => null);
-      if (nextLeaveStatus === "APPROVED" && updatedLeave) {
-        await recordLeaveApprovalUsage(instance.employeeId, Number(updatedLeave.days)).catch(() => null);
-        await recordLeaveTypeApprovalUsage(instance.employeeId, updatedLeave.leaveTypeId, Number(updatedLeave.days), updatedLeave.startDate).catch(() => null);
-      }
-    }
-  }
-
-  await writeAuditLog({
-    actorUserId,
-    action: `workflow:${decision.toLowerCase()}`,
-    entity: "workflowInstance",
-    entityId: workflowInstanceId,
-    metadata: { decision, comments, ip, entityId: instance.entityId, type: instance.type, employeeId: instance.employeeId }
-  });
-
-  const employee = await prisma.employee.findUnique({ where: { id: instance.employeeId }, select: { userId: true } });
+  const employee = await prisma.employee.findUnique({ where: { id: instance.employeeId }, select: { userId: true } }).catch(() => null);
   if (employee?.userId) {
     await createEnterpriseNotification({
       userId: employee.userId,
@@ -191,61 +96,12 @@ export async function decideWorkflowStep({
       body: `Your ${instance.type} request status is now ${workflowStatus}.`,
       type: decision === "APPROVE" ? "SUCCESS" : decision === "REJECT" ? "ERROR" : "WARNING",
       link: `/approvals?tab=outbox&highlight=${workflowInstanceId}`
-    });
+    }).catch(() => null);
   }
-  const nextPendingStep = await prisma.workflowStep.findFirst({ where: { workflowInstanceId, status: "PENDING" }, select: { approverUserId: true } });
+  const nextPendingStep = await prisma.workflowStep.findFirst({ where: { workflowInstanceId, status: "PENDING" }, select: { approverUserId: true } }).catch(() => null);
   if (nextPendingStep?.approverUserId) {
-    await createEnterpriseNotification({ userId: nextPendingStep.approverUserId, title: "وصول طلب جديد", body: `A ${instance.type} request is waiting for your approval.`, type: "INFO", link: `/approvals?tab=inbox&highlight=${workflowInstanceId}` });
+    await createEnterpriseNotification({ userId: nextPendingStep.approverUserId, title: "وصول طلب جديد", body: `A ${instance.type} request is waiting for your approval.`, type: "INFO", link: `/approvals?tab=inbox&highlight=${workflowInstanceId}` }).catch(() => null);
   }
 
   return updated;
-}
-
-/**
- * Auto-Heal Dynamic Pipeline Engine:
- * Immediately updates the current approver (`approverUserId`) on all PENDING workflow steps
- * for an employee (or all employees in a hospital) whenever their hierarchy, permissions,
- * or hospital supervisor assignments change via `EnterpriseAccessManager` or `WorkflowManager`.
- */
-export async function autoHealPendingWorkflowsForEmployee(options: { employeeId?: string; hospitalId?: string }) {
-  try {
-    const where: Record<string, unknown> = { status: "PENDING" };
-    if (options.employeeId) {
-      where.employeeId = options.employeeId;
-    } else if (options.hospitalId) {
-      const emps = await prisma.employee.findMany({ where: { hospitalId: options.hospitalId }, select: { id: true } });
-      const empIds = emps.map((e) => e.id);
-      if (!empIds.length) return { healed: 0 };
-      where.employeeId = { in: empIds };
-    } else {
-      return { healed: 0 };
-    }
-
-    const pendingInstances = await prisma.workflowInstance.findMany({
-      where,
-      include: { steps: { orderBy: { step: "asc" } } }
-    });
-
-    let healedCount = 0;
-    for (const instance of pendingInstances) {
-      const currentStep = instance.steps.find((step) => step.step === instance.currentStep && step.status === "PENDING");
-      if (!currentStep) continue;
-
-      const liveChain = await resolveApprovalChain(instance.employeeId, instance.type.toLowerCase());
-      const liveApprover = liveChain[instance.currentStep - 1];
-      if (liveApprover && liveApprover.userId && liveApprover.userId !== currentStep.approverUserId) {
-        await prisma.workflowStep.update({
-          where: { id: currentStep.id },
-          data: {
-            approverUserId: liveApprover.userId,
-            capabilities: liveApprover.capabilities || currentStep.capabilities || ["VIEW", "APPROVE", "REJECT"]
-          }
-        });
-        healedCount++;
-      }
-    }
-    return { healed: healedCount };
-  } catch {
-    return { healed: 0 };
-  }
 }

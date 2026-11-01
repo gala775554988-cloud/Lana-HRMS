@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { resolveRoleDashboard, DEFAULT_LOGIN_REDIRECT } from "@/config/auth";
 import { PERMISSION_TEMPLATES } from "@/lib/enterprise/permissions";
 import { AppShell } from "@/components/hrms/app-shell";
@@ -37,7 +38,10 @@ export default async function HrmsLayout({ children }: { children: ReactNode }) 
     resolveRoleDashboard(roles, Boolean(session.user.hasGrantedAdminAccess)) !== DEFAULT_LOGIN_REDIRECT ||
     permissions.some((permission) => !baseEmployeePermissions.has(permission as any));
   if (!hasAdminAccess) {
-    redirect(DEFAULT_LOGIN_REDIRECT);
+    // An assignment may arrive while the cached permission snapshot is still old.
+    // Middleware only permits the approvals route for these employee sessions.
+    const assigned = await prisma.workflowStep.findFirst({ where: { approverUserId: session.user.id }, select: { id: true } });
+    if (!assigned) redirect(DEFAULT_LOGIN_REDIRECT);
   }
 
   try {

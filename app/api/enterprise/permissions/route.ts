@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { ALL_ENTERPRISE_PERMISSIONS, PERMISSION_CATEGORIES, PERMISSION_TEMPLATES, buildPermissionTree, getPermissionStore, setUserPermissions, type PermissionKey } from "@/lib/enterprise/permissions";
-import { autoHealPendingWorkflowsForEmployee } from "@/lib/enterprise/workflow";
 import { canManagePermissionAdministration } from "@/lib/enterprise/permissions-admin";
 
 function canManage(session: any) {
@@ -139,16 +138,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 3. Trigger Auto-Heal Pipeline Engine across all PENDING workflows
-    const healResult = await autoHealPendingWorkflowsForEmployee({
-      employeeId: employee.id,
-      hospitalId: employee.hospitalId || undefined
-    });
-
     return NextResponse.json({
       success: true,
-      message: `تم تحديث بطاقة الصلاحيات للموظف بنجاح، وإعادة توجيه (${healResult.healed}) طلب معلق إلى المرجع المعتمد الجديد تلقائياً.`,
-      healedWorkflows: healResult.healed
+      message: `تم تحديث بطاقة الصلاحيات للموظف بنجاح، مع الاحتفاظ بمسارات الطلبات الحالية.`,
+      healedWorkflows: 0
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

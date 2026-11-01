@@ -712,6 +712,24 @@ export async function createModuleRecord(input: MutationInput) {
     }
   }
 
+  const routedType = ({ leaveRequest: "LEAVE", overtimeRequest: "OVERTIME", loan: "LOAN" } as Record<string, string>)[resource.model];
+  if (routedType && typeof data.employeeId === "string") {
+    await assertRecordVisible(resource, { employeeId: data.employeeId }, session);
+    const { resolveApprovalChain } = await import("@/lib/enterprise/approval-engine");
+    const { persistEnterpriseWorkflow, notifyWorkflowSubmission } = await import("@/lib/enterprise/workflow");
+    const employeeId = data.employeeId;
+    const approvers = await resolveApprovalChain(employeeId, routedType);
+    const created = await prisma.$transaction(async tx => {
+      const delegate = (tx as unknown as Record<string, CrudDelegate>)[resource.model];
+      const record = await delegate.create({ data: { ...data, status: "PENDING" } });
+      const workflow = await persistEnterpriseWorkflow(tx, employeeId, routedType, String(record.id), approvers);
+      return { record, workflow };
+    });
+    await notifyWorkflowSubmission(created.workflow, approvers);
+    revalidatePath("/" + resource.key);
+    return { success: true, message: "أُرسل الطلب عبر مسار الاعتماد.", id: String(created.record.id) };
+  }
+
   // Standard create for all other modules
   try {
     const record = await delegateFor(resource.model).create({ data });
@@ -734,6 +752,11 @@ export async function updateModuleRecord(input: MutationInput) {
   const session = await requireModulePermission(resource, mutationAction(resource, "edit"));
   const existingRecord = await delegateFor(resource.model).findUnique({ where: { id: input.id } });
   await assertRecordVisible(resource, existingRecord, session);
+  if (["leaveRequest", "overtimeRequest", "loan"].includes(resource.model) && Object.hasOwn(input.values, "status") && input.values.status !== existingRecord?.status) {
+    const type = ({ leaveRequest: "LEAVE", overtimeRequest: "OVERTIME", loan: "LOAN" } as Record<string, string>)[resource.model];
+    const workflow = await prisma.workflowInstance.findFirst({ where: { entityId: input.id, type }, select: { status: true } });
+    if (workflow && !(resource.model === "loan" && workflow.status === "COMPLETED")) return { success: false, message: "حالة هذا الطلب تُدار من مسار الموافقات. استخدم إجراءات الطلب بدلاً من تغيير حالته مباشرة." };
+  }
   const salaryProfile = resource.key === "employees" ? extractSalaryProfile(input.values) : {};
   const requiredDefaults = Object.fromEntries(resource.fields.filter((field: ModuleField) => field.required && !Object.hasOwn(input.values, field.name)).map(field => [field.name, existingRecord?.[field.name]]));
   const parsed = buildModuleSchema(resource).safeParse({ ...requiredDefaults, ...input.values });

@@ -39,6 +39,7 @@ async function ensureDbSchema() {
   });
 
   const sqlStatements = [
+    `ALTER TYPE "LoanStatus" ADD VALUE IF NOT EXISTS 'PENDING';`,
     // Production-critical columns must run before the large legacy DDL list.
     // They directly back employee-portal screens; keeping all four together
     // prevents a build timeout from leaving one module unusable.

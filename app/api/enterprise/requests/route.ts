@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
+import { canManageApprovalRouting } from "@/config/request-routing";
 import { prisma } from "@/lib/prisma";
 import { applyScopedWhere, getAccessProfile } from "@/lib/enterprise/hierarchy";
 import { parseWorkflowStepMetadata } from "@/lib/enterprise/workflow-step-metadata";
@@ -103,7 +104,8 @@ export async function GET(request: NextRequest) {
   const profile = await getAccessProfile(session.user.id, (session.user.roles as string[]) ?? []);
   const employeeWhere = await applyScopedWhere("employees", {}, profile);
 
-  const where: any = { employee: employeeWhere };
+  const visibility = { OR: [{ employee: employeeWhere }, { steps: { some: { approverUserId: session.user.id } } }] };
+  const where: any = { ...visibility };
   if (type !== "ALL") where.type = type;
   if (scope === "mine") where.employee = { userId: session.user.id };
   if (scope === "waiting") where.steps = { some: { approverUserId: session.user.id, status: "PENDING" } };
@@ -115,7 +117,7 @@ export async function GET(request: NextRequest) {
 
   const [allScoped, raw, approvers] = await Promise.all([
     prisma.workflowInstance.findMany({
-      where: { employee: employeeWhere },
+      where: visibility,
       include: { steps: true, employee: { select: { id: true, employeeNumber: true, nationalId: true, firstName: true, lastName: true, department: { select: { name: true } }, branch: { select: { name: true } }, position: { select: { title: true } } } } },
       take: 5000
     }),
@@ -132,10 +134,10 @@ export async function GET(request: NextRequest) {
 
   const searched = sortRequests(raw.filter((workflow) => requestMatchesSearch(workflow, search)), sort);
   const approverIds = Array.from(new Set(searched.flatMap((workflow) => workflow.steps.map((step: any) => step.approverUserId)).filter((id): id is string => Boolean(id))));
-  const approverUsers = approverIds.length ? await prisma.user.findMany({ where: { id: { in: approverIds } }, select: { id: true, name: true, email: true } }) : [];
-  const approverUserMap = new Map(approverUsers.map((user) => [user.id, { name: user.name, email: user.email }]));
+  const approverUsers = approverIds.length ? await prisma.user.findMany({ where: { id: { in: approverIds } }, select: { id: true, name: true, email: true, employeeProfile: { select: { firstName: true, lastName: true } } } }) : [];
+  const approverUserMap = new Map(approverUsers.map((user) => [user.id, { name: user.employeeProfile ? `${user.employeeProfile.firstName} ${user.employeeProfile.lastName}` : user.name, email: user.email }]));
   const total = searched.length;
-  const elevated = profile.roles.includes("SUPER_ADMIN") || profile.roles.includes("HR_MANAGER");
+  const elevated = canManageApprovalRouting(profile.roles, session.user.permissions);
   const requests = searched.slice((page - 1) * pageSize, page * pageSize).map((workflow) => ({
     id: workflow.id,
     type: workflow.type,
@@ -156,8 +158,9 @@ export async function GET(request: NextRequest) {
     steps: workflow.steps,
     priority: priorityOf(workflow),
     currentApprover: currentApprover(workflow, approverUserMap),
+    canTransfer: elevated && workflow.status === "PENDING",
     canAct: workflow.status === "PENDING" && workflow.steps.some((step: any) =>
-      step.step === workflow.currentStep && step.status === "PENDING" && (step.approverUserId === session.user.id || elevated)
+      step.step === workflow.currentStep && ["PENDING", "DEFERRED"].includes(step.status) && step.approverUserId === session.user.id
     )
   }));
 

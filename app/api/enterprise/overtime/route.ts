@@ -4,7 +4,8 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/rbac";
 import { applyScopedWhere, canAccessEmployeeId, getAccessProfile } from "@/lib/enterprise/hierarchy";
-import { createEnterpriseWorkflow } from "@/lib/enterprise/workflow";
+import { persistEnterpriseWorkflow, notifyWorkflowSubmission } from "@/lib/enterprise/workflow";
+import { resolveApprovalChain } from "@/lib/enterprise/approval-engine";
 import { getEmployeeExtraSettings } from "@/lib/enterprise/hospitals";
 import { getEmployeeSalaryProfile } from "@/lib/employee/salary-profile-store";
 import { writeAuditLog } from "@/lib/audit";
@@ -58,20 +59,6 @@ async function calculateOvertimeAmount(employeeId: string, hours: number, compen
 async function getEmployeeScope(userId: string, roles: string[]) {
   const profile = await getAccessProfile(userId, roles);
   return applyScopedWhere("employees", {}, profile);
-}
-
-// Routes overtime requests through the same ApprovalPath-driven engine as
-// every other request type (see lib/enterprise/workflow.ts) instead of the
-// old HR-managers-only bypass -- an admin now configures overtime's approval
-// stages per hospital/department/branch/project from the Approval Workflows
-// page, same as leave/loan/expense/etc.
-async function createOvertimeWorkflow(employeeId: string, entityId: string, actorUserId: string) {
-  const instance = await createEnterpriseWorkflow(employeeId, "OVERTIME", entityId);
-  if (instance.status === "COMPLETED") {
-    await prisma.overtimeRequest.update({ where: { id: entityId }, data: { status: "APPROVED" } }).catch(() => null);
-  }
-  await writeAuditLog({ actorUserId, action: "overtime:workflow-create", entity: "workflowInstance", entityId: instance.id, metadata: { employeeId, entityId } }).catch(() => null);
-  return instance;
 }
 
 async function listData(session: any, request: NextRequest) {
@@ -265,7 +252,11 @@ export async function POST(request: NextRequest) {
   const amount = await calculateOvertimeAmount(body.employeeId, hours, compensationMode);
   const rate = 1.5;
 
-  const overtime = await prisma.overtimeRequest.create({
+  let approvers;
+  try { approvers = await resolveApprovalChain(body.employeeId, "OVERTIME"); }
+  catch (error) { return NextResponse.json({ success: false, message: (error as Error).message }, { status: 422 }); }
+  const created = await prisma.$transaction(async tx => {
+  const overtime = await tx.overtimeRequest.create({
     data: {
       employeeId: body.employeeId,
       workDate,
@@ -277,12 +268,16 @@ export async function POST(request: NextRequest) {
     }
   });
 
-  await prisma.appSetting.upsert({
+  await tx.appSetting.upsert({
     where: { key: `overtime.extra.${overtime.id}` },
     update: { value: { ...body, compensationMode, timeOffHours: compensationMode === "TIME_OFF" ? Number((hours * 1.5).toFixed(2)) : 0, amount, rate } as any },
     create: { key: `overtime.extra.${overtime.id}`, value: { ...body, compensationMode, timeOffHours: compensationMode === "TIME_OFF" ? Number((hours * 1.5).toFixed(2)) : 0, amount, rate } as any, description: "Overtime extra details" }
   });
-  await createOvertimeWorkflow(body.employeeId, overtime.id, session.user.id);
+  const workflow = await persistEnterpriseWorkflow(tx, body.employeeId, "OVERTIME", overtime.id, approvers);
+  return { overtime, workflow };
+  }, { timeout: 15000 });
+  const overtime = created.overtime;
+  await notifyWorkflowSubmission(created.workflow, approvers);
   await writeAuditLog({ actorUserId: session.user.id, action: "overtime:create", entity: "overtimeRequest", entityId: overtime.id, metadata: { amount, hours, rate } }).catch(() => null);
 
   return NextResponse.json({ success: true, overtime, amount });

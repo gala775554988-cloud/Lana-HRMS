@@ -86,6 +86,7 @@ type RequestRecord = {
   priority: string;
   currentApprover: string;
   canAct: boolean;
+  canTransfer?: boolean;
   steps?: Array<{ step: number; status: string }>;
   employee?: {
     employeeNumber: string;
@@ -316,7 +317,7 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
   // AND the current step number is itself still PENDING, not DEFERRED) so the
   // buttons are only shown when the API call would actually succeed.
   const isActionable = (request: RequestRecord) => request.canAct &&
-    request.status === "PENDING" && (request.steps ?? []).find((step) => step.step === request.currentStep)?.status === "PENDING";
+    request.status === "PENDING" && ["PENDING", "DEFERRED"].includes((request.steps ?? []).find((step) => step.step === request.currentStep)?.status || "");
 
   const actionableRequests = requests.filter(isActionable);
 
@@ -438,7 +439,7 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
                 <div><p className="text-muted-foreground">تاريخ الإنشاء</p><p className="font-bold mt-0.5">{new Date(request.createdAt).toLocaleDateString("ar-SA")}</p></div>
                 <div><p className="text-muted-foreground">آخر تحديث</p><p className="font-bold mt-0.5">{new Date(request.updatedAt).toLocaleDateString("ar-SA")}</p></div>
                 <div><p className="text-muted-foreground">المعتمد الحالي</p><p className="font-bold mt-0.5 truncate">{request.currentApprover || "-"}</p></div>
-                <div><p className="text-muted-foreground">الأولوية</p><p className="font-bold mt-0.5">{request.priority}</p></div>
+                <div><p className="text-muted-foreground">الأولوية</p><p className="font-bold mt-0.5">{({ Low: "منخفضة", Normal: "عادية", High: "عالية" } as Record<string, string>)[request.priority] ?? request.priority}</p></div>
               </div>
 
               <div className="flex flex-wrap gap-1.5 pt-1 border-t border-slate-200/60 dark:border-slate-800">
@@ -449,6 +450,7 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
                     and calling decideWorkflowStep on those always fails with
                     "No pending workflow step" (there's nothing left to decide),
                     which read as "the button does nothing" from the UI. */}
+                {request.canTransfer && !request.canAct ? <Button type="button" size="sm" variant="outline" disabled={isPending || !targetUserId} onClick={() => targetUserId && decide(request.id, "TRANSFER", { targetUserId })}><Send className="h-3.5 w-3.5" />تحويل المعتمد</Button> : null}
                 {isActionable(request) && rejectingId === request.id ? (
                   <div className="flex flex-1 min-w-full items-center gap-1.5 mt-1.5">
                     <Input

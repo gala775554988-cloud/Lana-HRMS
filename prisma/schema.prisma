@@ -694,6 +694,7 @@ enum PayrollStatus {
 }
 
 enum LoanStatus {
+  PENDING
   ACTIVE
   PAID
   DEFAULTED

@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { createWorkflow } from "@/lib/employee/workflow";
+import { persistEnterpriseWorkflow, notifyWorkflowSubmission } from "@/lib/enterprise/workflow";
+import { resolveApprovalChain } from "@/lib/enterprise/approval-engine";
+import { normalizeRequestType, REQUEST_CATEGORIES } from "@/config/request-routing";
+import { ApprovalRoutingError } from "@/lib/enterprise/request-routing-policy";
 import { formatApiError } from "@/lib/errors";
 import { detectLeaveConflict } from "@/lib/enterprise/leave-engine";
 
@@ -31,7 +34,7 @@ export async function POST(request: Request) {
     const body = isJsonRequest
       ? await request.json()
       : Object.fromEntries((await request.formData()).entries());
-    const { type, employeeId: _clientEmployeeId, ...data } = body as Record<string, any>;
+    const { type: rawType, employeeId: _clientEmployeeId, ...data } = body as Record<string, any>;
 
     // Always resolve employee from session — never trust client-sent employeeId
     const employee = await prisma.employee.findFirst({
@@ -57,6 +60,11 @@ export async function POST(request: Request) {
     }
 
     const employeeId = employee.id;
+    const normalizedType = normalizeRequestType(String(rawType || ""));
+    if (!REQUEST_CATEGORIES.some(category => category.code === normalizedType)) throw new ApprovalRoutingError("نوع الطلب غير صالح.");
+    const type = normalizedType.toLowerCase();
+    const approvers = await resolveApprovalChain(employeeId, normalizedType);
+    const created = await prisma.$transaction(async (tx): Promise<any> => {
     let result: any;
 
     switch (type) {
@@ -78,35 +86,9 @@ export async function POST(request: Request) {
 
         const resolvedCode = codeMap[leaveTypeCode] || leaveTypeCode;
 
-        // Try to find existing LeaveType by code
-        let leaveType = await prisma.leaveType.findFirst({
-          where: { code: { equals: resolvedCode, mode: "insensitive" } },
+        const leaveType = await tx.leaveType.findFirst({
+          where: { isActive: true, OR: [ ...(typeof data.leaveTypeId === "string" ? [{ id: data.leaveTypeId }] : []), { code: { equals: resolvedCode, mode: "insensitive" } }] },
         });
-
-        // If not found, try to find any active leave type
-        if (!leaveType) {
-          leaveType = await prisma.leaveType.findFirst({
-            where: { isActive: true },
-          });
-        }
-
-        // If still not found, auto-create the default leave types so the system works
-        if (!leaveType) {
-          await prisma.leaveType.createMany({
-            data: [
-              { name: "إجازة سنوية", code: "ANNUAL", annualLimit: 30, isPaid: true, isActive: true },
-              { name: "إجازة مرضية", code: "SICK", annualLimit: 15, isPaid: true, isActive: true },
-              { name: "إجازة طارئة", code: "EMERGENCY", annualLimit: 5, isPaid: true, isActive: true },
-            ],
-            skipDuplicates: true,
-          });
-
-          leaveType = await prisma.leaveType.findFirst({
-            where: { code: resolvedCode, isActive: true },
-          }) || await prisma.leaveType.findFirst({
-            where: { isActive: true },
-          });
-        }
 
         if (!leaveType) {
           return NextResponse.json(
@@ -116,8 +98,8 @@ export async function POST(request: Request) {
                 id: `VAL-${Date.now().toString(36)}`,
                 category: "validation",
                 name: "Leave Type Not Found",
-                message: "لا توجد أنواع إجازات مُعرّفة في النظام",
-                cause: "لم يتم العثور على نوع الإجازة المطلوب ولا أنواع إجازات افتراضية",
+                message: "نوع الإجازة المطلوب غير مُعرّف أو غير نشط. راجع الموارد البشرية.",
+                cause: "لن يُستبدل نوع الإجازة تلقائياً بنوع آخر",
                 suggestion: "تواصل مع الإدارة لإعداد أنواع الإجازات في النظام",
               },
             },
@@ -166,6 +148,7 @@ export async function POST(request: Request) {
 
         const requestStartDate = new Date(data.startDate);
         const requestEndDate = new Date(data.endDate);
+        if (!Number.isFinite(requestStartDate.getTime()) || !Number.isFinite(requestEndDate.getTime()) || requestEndDate < requestStartDate) throw new ApprovalRoutingError("تواريخ الإجازة غير صالحة.");
         const conflict = await detectLeaveConflict(employeeId, requestStartDate, requestEndDate);
         if (conflict) {
           return NextResponse.json(
@@ -184,7 +167,7 @@ export async function POST(request: Request) {
           );
         }
 
-        result = await prisma.leaveRequest.create({
+        result = await tx.leaveRequest.create({
           data: {
             employeeId,
             leaveTypeId: leaveType.id,
@@ -199,7 +182,7 @@ export async function POST(request: Request) {
       }
 
       case "expense": {
-        if (!data.amount || Number(data.amount) <= 0) {
+        if (!Number.isFinite(Number(data.amount)) || Number(data.amount) <= 0) {
           return NextResponse.json(
             {
               success: false,
@@ -215,7 +198,7 @@ export async function POST(request: Request) {
             { status: 400 }
           );
         }
-        result = await prisma.expenseRequest.create({
+        result = await tx.expenseRequest.create({
           data: {
             employeeId,
             amount: Number(data.amount) || 0,
@@ -228,7 +211,7 @@ export async function POST(request: Request) {
       }
 
       case "loan": {
-        if (!data.amount || Number(data.amount) <= 0) {
+        if (!Number.isFinite(Number(data.amount)) || Number(data.amount) <= 0) {
           return NextResponse.json(
             {
               success: false,
@@ -244,7 +227,7 @@ export async function POST(request: Request) {
             { status: 400 }
           );
         }
-        result = await prisma.loan.create({
+        result = await tx.loan.create({
           data: {
             employeeId,
             loanNumber: `LN-${Date.now()}`,
@@ -253,7 +236,7 @@ export async function POST(request: Request) {
             installmentAmount: Math.round((Number(data.amount) || 0) / 12),
             currency: "SAR",
             issuedAt: new Date(),
-            status: "ACTIVE",
+            status: "PENDING",
             notes: data.notes || "",
           },
         });
@@ -261,7 +244,7 @@ export async function POST(request: Request) {
       }
 
       case "letter":
-        result = await prisma.letterRequest.create({
+        result = await tx.letterRequest.create({
           data: {
             employeeId,
             letterType: data.letterType || "salary",
@@ -272,7 +255,7 @@ export async function POST(request: Request) {
         break;
 
       case "overtime": {
-        if (!data.workDate || !data.hours || Number(data.hours) <= 0) {
+        if (!data.workDate || !Number.isFinite(Number(data.hours)) || Number(data.hours) <= 0) {
           return NextResponse.json(
             {
               success: false,
@@ -291,7 +274,7 @@ export async function POST(request: Request) {
             { status: 400 }
           );
         }
-        result = await prisma.overtimeRequest.create({
+        result = await tx.overtimeRequest.create({
           data: {
             employeeId,
             workDate: new Date(data.workDate),
@@ -320,7 +303,7 @@ export async function POST(request: Request) {
             { status: 400 }
           );
         }
-        result = await prisma.resumptionRequest.create({
+        result = await tx.resumptionRequest.create({
           data: {
             employeeId,
             returnDate: new Date(data.returnDate),
@@ -339,7 +322,7 @@ export async function POST(request: Request) {
       case "document":
       case "documents":
       default:
-        result = await prisma.letterRequest.create({
+        result = await tx.letterRequest.create({
           data: {
             employeeId,
             letterType: String(type || "general"),
@@ -350,12 +333,12 @@ export async function POST(request: Request) {
         break;
     }
 
-    // Create Workflow automatically (non-blocking)
-    try {
-      await createWorkflow(employeeId, type.toUpperCase(), result.id);
-    } catch (workflowError) {
-      console.error("Workflow creation failed (non-blocking):", workflowError);
-    }
+    const workflow = await persistEnterpriseWorkflow(tx, employeeId, normalizedType, result.id, approvers);
+    return { record: result, workflow };
+    }, { timeout: 15000 });
+    if (created instanceof NextResponse) return created;
+    const result = created.record;
+    await notifyWorkflowSubmission(created.workflow, approvers);
 
     // Audit log
     try {

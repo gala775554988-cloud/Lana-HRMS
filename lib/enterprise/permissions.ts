@@ -232,6 +232,14 @@ export async function mergeEffectivePermissions(rolePermissions: string[] | unde
     }
   }
 
+  // Named dynamic approvers need the inbox, without changing their HR/job role.
+  const assignedStep = await prisma.workflowStep.findFirst({ where: { approverUserId: userId, status: { in: ["PENDING", "DEFERRED", "WAITING"] }, workflowInstance: { status: "PENDING" } }, select: { id: true } });
+  if (assignedStep) { base.add("read:requests"); base.add("manage:requests"); }
+  else if (!base.has("read:requests")) {
+    const history = await prisma.workflowStep.findFirst({ where: { approverUserId: userId }, select: { id: true } });
+    if (history) base.add("read:requests");
+  }
+
   const store = await getPermissionStore();
   const record = store.users[userId];
   if (!record) return Array.from(base).sort();

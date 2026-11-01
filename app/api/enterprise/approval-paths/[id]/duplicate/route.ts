@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { canManageApprovalRouting } from "@/config/request-routing";
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
+import { validateStages, validateActiveApprovers } from "@/lib/enterprise/approval-path-validation";
 
 async function requireSuperAdmin() {
   const session = await auth();
   if (!session?.user?.id) return { error: NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 }) } as const;
   const roles = ((session.user as any).roles as string[] | undefined) ?? [];
-  if (!roles.includes("SUPER_ADMIN") && !roles.includes("HR_MANAGER")) {
+  if (!canManageApprovalRouting(roles, session.user.permissions)) {
     return { error: NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 }) } as const;
   }
   return { session } as const;
@@ -25,6 +27,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     const source = await prisma.approvalPath.findUnique({ where: { id }, include: { stages: { orderBy: { order: "asc" } } } });
     if (!source) throw new Error("مسار الموافقة المصدر غير موجود");
+    validateStages(source.stages);
+    await validateActiveApprovers(source.stages);
 
     const entityId = typeof body.entityId === "string" && body.entityId ? body.entityId : source.entityId;
     const entityType = typeof body.entityType === "string" && body.entityType ? body.entityType : source.entityType;

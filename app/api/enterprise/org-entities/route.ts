@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { canManageApprovalRouting } from "@/config/request-routing";
 import { prisma } from "@/lib/prisma";
 
 async function requireSuperAdmin() {
   const session = await auth();
   if (!session?.user?.id) return { error: NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 }) } as const;
   const roles = ((session.user as any).roles as string[] | undefined) ?? [];
-  if (!roles.includes("SUPER_ADMIN") && !roles.includes("HR_MANAGER")) {
+  if (!canManageApprovalRouting(roles, session.user.permissions)) {
     return { error: NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 }) } as const;
   }
   return {} as const;

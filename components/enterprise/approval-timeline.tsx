@@ -40,6 +40,9 @@ type Workflow = {
 };
 
 const statusMeta: Record<string, { label: string; icon: typeof Check; className: string }> = {
+  CANCELLED: { label: "ملغى", icon: X, className: "bg-muted text-muted-foreground border-transparent" },
+  NOTIFIED: { label: "للاطلاع", icon: FileText, className: "bg-muted text-muted-foreground border-transparent" },
+  COMPLETED: { label: "مكتمل", icon: Check, className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
   APPROVED: { label: "تمت الموافقة", icon: Check, className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
   REJECTED: { label: "مرفوض", icon: X, className: "bg-destructive/10 text-destructive border-destructive/30" },
   RETURNED: { label: "أُرجع", icon: RotateCcw, className: "bg-amber-500/10 text-amber-600 border-amber-500/30" },
@@ -203,7 +206,7 @@ export function ApprovalTimeline({ workflowId, onClose, locale = "ar" }: { workf
                   const meta = statusMeta[step.status] ?? statusMeta.WAITING;
                   const details = parseWorkflowStepMetadata(step.comments);
                   const Icon = meta.icon;
-                  const isCurrent = step.step === workflow.currentStep && step.status === "PENDING";
+                  const isCurrent = step.step === workflow.currentStep && ["PENDING", "DEFERRED"].includes(step.status);
                   return (
                     <li key={step.id} className="relative ps-8">
                       {index < workflow.steps.length - 1 ? <span className="absolute start-[11px] top-6 h-full w-px bg-border" aria-hidden="true" /> : null}
@@ -212,7 +215,7 @@ export function ApprovalTimeline({ workflowId, onClose, locale = "ar" }: { workf
                       </span>
                       <div className={cn("rounded-xl border p-3", isCurrent ? "border-primary/40 bg-primary/5" : "bg-card")}>
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-semibold text-foreground">المرحلة {step.step}{isCurrent ? " (الحالية)" : ""}</p>
+                          <p className="text-sm font-semibold text-foreground">{details.stageName || `المرحلة ${step.step}`}{isCurrent ? " (الحالية)" : ""}</p>
                           <span className={cn("rounded-full border px-2 py-0.5 text-[11px] font-medium", meta.className)}>{meta.label}</span>
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">{step.approver?.name ?? step.approver?.email ?? "لم يُحدد معتمد"}</p>
