@@ -103,15 +103,18 @@ export function ProfileHero({
           </span>
         </div>
         <div className="relative mt-6 flex flex-col gap-5 sm:flex-row sm:items-center">
-          <Avatar className="h-24 w-24 shrink-0 overflow-hidden rounded-3xl border-4 border-white/15 bg-white/10 shadow-xl">
-            {employee.profilePhotoUrl ? <AvatarImage src={employee.profilePhotoUrl} alt={name} className="object-cover" /> : null}
-            <AvatarFallback className="rounded-none bg-transparent text-3xl font-semibold text-white">{employee.firstName?.[0]}{employee.lastName?.[0]}</AvatarFallback>
-          </Avatar>
+          <div className="flex shrink-0 items-center gap-4" data-employee-photo-number>
+            <Avatar className="h-24 w-24 shrink-0 overflow-hidden rounded-3xl border-4 border-white/15 bg-white/10 shadow-xl">
+              {employee.profilePhotoUrl ? <AvatarImage src={employee.profilePhotoUrl} alt={name} className="object-cover" /> : null}
+              <AvatarFallback className="rounded-none bg-transparent text-3xl font-semibold text-white">{employee.firstName?.[0]}{employee.lastName?.[0]}</AvatarFallback>
+            </Avatar>
+            <div className="space-y-1">
+              <p className="text-xs text-blue-100">{isAr ? "الرقم الوظيفي" : "Employee number"}</p>
+              <p className="text-2xl font-bold tabular-nums text-white" dir="ltr" data-employee-number>{employee.employeeNumber || "—"}</p>
+            </div>
+          </div>
           <div className="min-w-0 flex-1">
             <div className="mb-3 flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-medium">
-                رقم الموظف · {employee.employeeNumber}
-              </span>
               <span className="flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-3 py-1 text-[11px] text-emerald-100">
                 <span
                   className={`h-1.5 w-1.5 rounded-full ${employee.status === "ACTIVE" ? "bg-emerald-400" : "bg-amber-300"}`}
