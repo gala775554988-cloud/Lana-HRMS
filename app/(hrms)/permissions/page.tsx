@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import dynamicImport from "next/dynamic";
 import { Suspense } from "react";
 import { auth } from "@/auth";
@@ -6,7 +8,8 @@ import { prisma } from "@/lib/prisma";
 import { MergedModuleTabs } from "@/components/hrms/merged-module-tabs";
 import { PermissionsAdmin } from "@/app/(hrms)/permissions-system/admin-client";
 import { MultiDeviceAccessClient } from "@/components/enterprise/multi-device-access-client";
-import { KeyRound, Shield, ShieldCheck, Workflow, UserCog, Smartphone } from "lucide-react";
+import { WorkspaceHeader } from "@/components/hrms/workspace-ui";
+import { KeyRound, Shield, ShieldCheck, UserCog, Smartphone } from "lucide-react";
 import { canManagePermissionAdministration } from "@/lib/enterprise/permissions-admin";
 import { resolveRoleDashboard } from "@/config/auth";
 
@@ -18,16 +21,15 @@ const PermissionsManagementClient = dynamicImport(() =>
 const RolesManagementClient = dynamicImport(() =>
   import("@/components/enterprise/roles-management-client").then((mod) => mod.RolesManagementClient)
 );
-const ApprovalWorkflowsClient = dynamicImport(() =>
-  import("@/components/enterprise/approval-workflows-client").then((mod) => mod.ApprovalWorkflowsClient)
-);
 const SupervisorAssignmentsClient = dynamicImport(() =>
   import("@/components/enterprise/supervisor-assignments-client").then((mod) => mod.SupervisorAssignmentsClient)
 );
 
 export default async function PermissionsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const query = await searchParams;
-  const activeTab = typeof query.tab === "string" ? query.tab : "roles";
+  if (query.tab === "approval-workflows") redirect("/approvals?tab=routing&advanced=1");
+  const activeTab = typeof query.tab === "string" && ["roles", "management", "scopes", "supervisor-assignments", "devices"].includes(query.tab) ? query.tab : "roles";
+  const showAdvanced = query.advanced === "1" || ["supervisor-assignments", "devices"].includes(activeTab);
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   const roles = (session.user as any).roles || [];
@@ -89,6 +91,8 @@ export default async function PermissionsPage({ searchParams }: { searchParams: 
   }
 
   return (
+    <div className="space-y-5" dir="rtl">
+    <WorkspaceHeader title="الصلاحيات وإدارة الوصول" description="حدد من يستطيع استخدام النظام، وما الذي يمكنه رؤيته وتنفيذه. إعداد الموافقات متاح في قسم الطلبات فقط." actions={<Button asChild variant="outline"><Link href={showAdvanced ? "/permissions" : "/permissions?advanced=1"}>{showAdvanced ? "عرض الإعدادات الأساسية" : "إعدادات متقدمة"}</Link></Button>} />
     <MergedModuleTabs
       defaultValue="roles"
       items={[
@@ -119,17 +123,8 @@ export default async function PermissionsPage({ searchParams }: { searchParams: 
           content: scopesContent
         },
         {
-          value: "approval-workflows",
-          label: "سلسلة الموافقات",
-          icon: <Workflow className="h-4 w-4" />,
-          content: activeTab === "approval-workflows" ? (
-            <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">Loading...</div>}>
-              <ApprovalWorkflowsClient />
-            </Suspense>
-          ) : null
-        },
-        {
           value: "supervisor-assignments",
+          hidden: !showAdvanced,
           label: "تكليفات المشرفين",
           icon: <UserCog className="h-4 w-4" />,
           content: activeTab === "supervisor-assignments" ? (
@@ -140,11 +135,13 @@ export default async function PermissionsPage({ searchParams }: { searchParams: 
         },
         {
           value: "devices",
+          hidden: !showAdvanced,
           label: "تعدد الأجهزة",
           icon: <Smartphone className="h-4 w-4" />,
           content: devicesContent
         }
       ]}
     />
+    </div>
   );
 }

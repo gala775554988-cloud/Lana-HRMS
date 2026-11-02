@@ -48,7 +48,8 @@ function MergedModuleTabsInner({ items, defaultValue }: { items: MergedModuleTab
 
   return (
     <Tabs value={active} onValueChange={onChange} className="space-y-5">
-      <TabsList className="h-auto flex-wrap justify-start gap-1.5 rounded-xl bg-muted/60 p-1.5">
+      <p className="flex items-center gap-2 text-sm text-muted-foreground" aria-live="polite"><span className="h-2 w-2 rounded-full bg-primary"/>أنت الآن في: <strong className="text-foreground">{visible.find(item => item.value === active)?.label}</strong></p>
+      <TabsList aria-label="أقسام الصفحة" className="h-auto flex-wrap justify-start gap-1.5 rounded-xl bg-muted/60 p-1.5">
         {visible.map((item) => (
           <TabsTrigger
             key={item.value}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { MapPin, Plus, Save, Trash2 } from "lucide-react";
+import { MapPin, Plus, Save, Search, Pencil, Power } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,9 +18,13 @@ type Site = {
   requirePhoto?: boolean;
 };
 
+const assignmentLabels: Record<string,string> = { hospital: "المستشفى / الموقع", branch: "الفرع", department: "الإدارة", sponsor: "الكفيل", text: "بيانات الموظف" };
+
 const blank: Omit<Site, "id"> = { name: "", latitude: 24.7136, longitude: 46.6753, radiusMeters: 250, assignmentType: "hospital", assignmentValue: "", isActive: true, requirePhoto: false };
 
 export function AttendanceSitesClient({ initialSites }: { initialSites: Site[] }) {
+  const [search, setSearch] = useState("");
+  const [activeFilter, setActiveFilter] = useState("active");
   const [sites, setSites] = useState<Site[]>(initialSites);
   const [form, setForm] = useState<any>(blank);
   const [showForm, setShowForm] = useState(false);
@@ -49,6 +53,7 @@ export function AttendanceSitesClient({ initialSites }: { initialSites: Site[] }
     });
   }
 
+  const visible = sites.filter(site => (activeFilter === "all" || (activeFilter === "active" ? site.isActive : !site.isActive)) && `${site.name} ${site.assignmentValue}`.toLowerCase().includes(search.toLowerCase()));
   return (
     <div className="space-y-6" dir="rtl">
       <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-end sm:justify-between">
@@ -59,6 +64,8 @@ export function AttendanceSitesClient({ initialSites }: { initialSites: Site[] }
         <Button onClick={() => { setForm(blank); setShowForm(true); }}><Plus className="ml-2 h-4 w-4" />إضافة موقع</Button>
       </div>
 
+      <div className="grid gap-3 sm:grid-cols-3">{[["المواقع المسجلة",sites.length],["المواقع النشطة",sites.filter(site=>site.isActive).length],["تتطلب صورة تحقق",sites.filter(site=>site.isActive&&site.requirePhoto).length]].map(([label,value])=><div key={label} className="rounded-2xl border bg-card p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 text-2xl font-bold">{value}</p></div>)}</div>
+      <div className="flex flex-wrap gap-3 rounded-2xl border bg-card p-4"><label className="relative min-w-0 flex-1"><span className="sr-only">بحث في مواقع الحضور</span><Search className="absolute start-3 top-3 h-4 w-4 text-muted-foreground"/><Input className="ps-9" placeholder="ابحث باسم الموقع أو الجهة المرتبطة" value={search} onChange={event=>setSearch(event.target.value)}/></label><select aria-label="حالة الموقع" className="h-10 rounded-md border bg-background px-3 text-sm" value={activeFilter} onChange={event=>setActiveFilter(event.target.value)}><option value="active">المواقع النشطة</option><option value="inactive">المواقع المعطلة</option><option value="all">جميع المواقع</option></select></div>
       {showForm ? <Card className="rounded-2xl">
         <CardHeader><CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5 text-primary" />إضافة / تعديل موقع</CardTitle></CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-3">
@@ -84,19 +91,19 @@ export function AttendanceSitesClient({ initialSites }: { initialSites: Site[] }
       </Card> : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {sites.map((site) => (
-          <Card key={site.id} className="rounded-3xl">
+        {visible.map((site) => (
+          <Card key={site.id} className="w-full min-w-0 rounded-2xl">
             <CardContent className="space-y-3 p-5">
               <div className="flex items-start justify-between gap-3">
                 <div><h3 className="font-black">{site.name}</h3><p className="text-xs text-muted-foreground">{site.latitude}, {site.longitude} · {site.radiusMeters}م</p></div>
                 <span className={`rounded-full px-2 py-1 text-xs ${site.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{site.isActive ? 'نشط' : 'معطل'}</span>
               </div>
-              <p className="text-sm">الربط: <strong>{site.assignmentType}</strong> = {site.assignmentValue}</p>
-              <div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => edit(site)}>تعديل</Button><Button size="sm" variant="destructive" onClick={() => remove(site.id)}><Trash2 className="h-4 w-4" /></Button></div>
+              <div className="rounded-xl bg-muted/40 p-3 text-sm"><p className="text-xs text-muted-foreground">{assignmentLabels[site.assignmentType] || site.assignmentType}</p><p className="mt-1 font-semibold">{site.assignmentValue}</p><p className="mt-2 text-xs text-muted-foreground">{site.requirePhoto ? "يتطلب صورة تحقق عند التسجيل" : "لا يتطلب صورة تحقق"}</p></div>
+              <div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => edit(site)}><Pencil className="me-2 h-3.5 w-3.5"/>تعديل الموقع</Button>{site.isActive ? <Button size="sm" variant="ghost" disabled={pending} onClick={() => remove(site.id)}><Power className="me-2 h-3.5 w-3.5"/>تعطيل</Button> : null}</div>
             </CardContent>
           </Card>
         ))}
-        {!sites.length && <div className="rounded-2xl border border-dashed p-8 text-muted-foreground">لا توجد مواقع حضور حتى الآن.</div>}
+        {!visible.length && <div className="rounded-2xl border border-dashed p-8 text-center text-muted-foreground md:col-span-2 xl:col-span-3">لا توجد مواقع مطابقة للفلاتر. يمكنك إضافة موقع أو تغيير التصفية.</div>}
       </div>
     </div>
   );

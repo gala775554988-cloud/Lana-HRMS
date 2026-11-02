@@ -1,0 +1,17 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import {load} from '../workflows/helpers.mjs';
+const logic=await load('lib/attendance/console.ts');
+class NextResponse{static json(data,options={}){return{data,status:options.status||200};}}
+async function setup({signedIn=true,permitted=true,total=1}={}){
+  let received=[];let reads=0;
+  const record={id:'record1',workDate:new Date('2026-11-01'),checkIn:new Date('2026-11-01T07:00:00Z'),checkOut:new Date('2026-11-01T15:00:00Z'),status:'PRESENT',updatedAt:new Date(),notes:'{"source":"ZKTECO_MAIN_BRANCH","raw":{"nationalId":"secret"},"deviceIp":"private"}',employee:{id:'employee1',firstName:'Person',lastName:'Test',employeeNumber:'015',branch:{name:'Main'},department:null}};
+  const prisma={attendanceRecord:{fields:{checkIn:'checkInFieldRef'},count:async args=>{reads++;return total;},groupBy:async()=>[{status:'PRESENT',_count:{_all:total}}],findFirst:async()=>({updatedAt:new Date()}),findMany:async args=>{received.push(args);return[record];}},branch:{findMany:async()=>[]},shiftAssignment:{findMany:async()=>[]}};
+  const route=await load('app/api/attendance/console/route.ts',{'next/server':{NextResponse},'@/auth':{auth:async()=>signedIn?{user:{id:'actor',roles:['EMPLOYEE'],permissions:permitted?['read:attendance']:[]}}:null},'@/lib/prisma':{prisma},'@/lib/rbac':{hasPermission:(permissions)=>permissions.includes('read:attendance')},'@/lib/enterprise/hierarchy':{getAccessProfile:async()=>({}),applyScopedWhere:async resource=>resource==='attendance'?{employeeId:'employee1'}:{id:'employee1'}},'@/lib/enterprise/resource-access':{isEnterpriseResourceAllowed:()=>true},'@/lib/attendance/console':logic});
+  return {get:query=>route.GET({nextUrl:{searchParams:new URLSearchParams(query)}}),args:()=>received,reads:()=>reads};
+}
+test('anonymous and forbidden users cannot query attendance',async()=>{for(const setupArgs of [{signedIn:false},{permitted:false}]){const s=await setup(setupArgs);assert.equal((await s.get({})).status,setupArgs.signedIn===false?401:403);assert.equal(s.reads(),0);}});
+test('record list preserves visibility, clamps pages and strips raw device data',async()=>{const s=await setup();const result=await s.get({page:'999'});assert.equal(result.status,200);assert.equal(result.data.page,1);const args=s.args()[0];assert.equal(args.where.AND[0].employeeId,'employee1');assert.equal(args.take,25);assert.equal(result.data.records[0].employee.employeeNumber,'015');assert.equal(result.data.records[0].device.source,'ZKTECO_MAIN_BRANCH');assert.equal(result.data.records[0].notes,undefined);assert.equal(result.data.records[0].device.raw,undefined);});
+test('export uses same visibility and filters but includes all matches',async()=>{const s=await setup({total:150});const result=await s.get({report:'1',mode:'biometrics',search:'Test'});assert.equal(result.status,200);assert.equal(s.args()[0].take,150);assert.equal(s.args()[0].skip,0);assert.ok(s.args()[0].where.AND.some(item=>item.notes?.contains==='"source"'));});
+test('exports reject oversized sets explicitly instead of silently truncating',async()=>{const s=await setup({total:20001});assert.equal((await s.get({report:'1'})).status,400);assert.equal(s.args().length,0);});
+test('invalid date filters fail before database reads',async()=>{const s=await setup();assert.equal((await s.get({from:'2026-02-30'})).status,400);assert.equal(s.reads(),0);});

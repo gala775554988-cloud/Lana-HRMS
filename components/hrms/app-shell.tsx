@@ -81,7 +81,10 @@ export function AppShell({ children, dictionary }: AppShellProps) {
     await signOut({ redirect: true, callbackUrl: "/login" });
   }, []);
 
-  const isActive = useCallback((href: string) => pathname.startsWith(href), [pathname]);
+  const isActive = useCallback((href: string) => {
+    const path = pathname === "/approvals" || pathname.startsWith("/approvals/") ? "/request-center" : /^\/(shifts|shift-assignments|shifts-management)(\/|$)/.test(pathname) ? "/attendance" : pathname;
+    return path === href || path.startsWith(`${href}/`);
+  }, [pathname]);
 
   const isNavItemAllowed = useCallback((item: { resource: string | string[] }) => {
     const resources = Array.isArray(item.resource) ? item.resource : [item.resource];
@@ -173,6 +176,7 @@ export function AppShell({ children, dictionary }: AppShellProps) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  aria-current={active ? "page" : undefined}
                   prefetch={false}
                   onMouseEnter={() => prefetchRoute(item.href)}
                   onFocus={() => prefetchRoute(item.href)}
@@ -181,7 +185,7 @@ export function AppShell({ children, dictionary }: AppShellProps) {
                     "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors duration-150",
                     sidebarCollapsed ? "lg:justify-center lg:px-2.5" : "",
                     active
-                      ? "bg-white font-semibold text-primary shadow-sm"
+                      ? "bg-white font-bold text-primary shadow-md ring-2 ring-white/40"
                       : "text-blue-100/70 hover:bg-white/10 hover:text-white"
                   )}
                   title={sidebarCollapsed ? item.label : undefined}
@@ -294,6 +298,9 @@ export function AppShell({ children, dictionary }: AppShellProps) {
       </header>
 
       <main className="hrms-workspace relative min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-background p-4 lg:p-6">
+        <nav aria-label="موقعك في النظام" className="mb-5 flex items-center gap-2 rounded-xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm">
+          <span className="text-muted-foreground">أنت في</span><span className="text-muted-foreground">/</span><strong className="text-primary">{visibleNavItems.find(item => isActive(item.href))?.label || "مساحة العمل"}</strong>
+        </nav>
         {children}
       </main>
       </div>

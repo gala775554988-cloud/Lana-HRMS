@@ -1,5 +1,6 @@
 "use client";
 
+import { REQUEST_CATEGORIES } from "@/config/request-routing";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash2, Copy, Pencil, X, Check, ArrowUp, ArrowDown, ChevronDown, GripVertical, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -398,7 +399,7 @@ export function ApprovalWorkflowsClient() {
                   </div>
                   <Badge className={path.isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}>{path.isActive ? "نشط" : "متوقف"}</Badge>
                 </div>
-                <Badge variant="outline" className="font-bold">{path.requestType}</Badge>
+                <Badge variant="outline" className="font-bold">{requestTypeOptions.find(type => type.id === path.requestType)?.label || REQUEST_CATEGORIES.find(type => type.code === path.requestType)?.label || path.requestType}</Badge>
                 {path.name ? <p className="text-xs text-muted-foreground">{path.name}</p> : null}
                 <div className="rounded-lg bg-muted/60 p-3">
                   <p className="text-xs font-bold mb-1.5">{path.stages.length} مرحلة</p>
