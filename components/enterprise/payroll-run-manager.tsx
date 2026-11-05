@@ -302,7 +302,7 @@ export function PayrollRunManager({initialRunId,initialCreate=false}:{initialRun
         <CardContent className="grid gap-4 md:grid-cols-4">
           <div className="space-y-1.5">
             <Label>شهر المسير</Label>
-            <Input type="month" value={periodName} onChange={(e) => {setPeriodName(e.target.value);if(e.target.value){const dates=payrollMonthRange(e.target.value);setStartDate(dates.start);setEndDate(dates.end);}}} />
+            <Input type="month" value={periodName} onChange={(e) => {setPeriodName(e.target.value);try{const dates=payrollMonthRange(e.target.value);setStartDate(dates.start);setEndDate(dates.end);}catch{setStartDate("");setEndDate("");}}} />
           </div>
           <div className="space-y-1.5">
             <Label>تاريخ البداية</Label>

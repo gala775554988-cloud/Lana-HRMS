@@ -18,5 +18,8 @@ try{
  assert.equal((await reporting.payrollRegister({...filter,period:'2026-01'},'payslips')).total,2);assert.equal((await reporting.payrollRegister({...filter,source:'ODOO'},'runs')).total,2);assert.equal((await reporting.payrollRegister({...filter,employeeIds:[]},'payslips')).total,0);
  assert.equal((await reporting.payrollRegister({...filter,search:"' OR 1=1 --"},'payslips')).total,0);
  const page=await reporting.payrollRegister({...filter,pageSize:1,page:2},'payslips');assert.equal(page.rows.length,1);assert.equal(page.total,3);
+ assert.equal((await reporting.payrollRegister({...filter,source:'LOCAL',runId:runs[0].id},'payslips')).total,1);
+ await prisma.historicalPayslip.create({data:{...data,odooPayslipId:104,basic:200,gross:220,deductions:20,net:200,raw:{credit_note:true}}});await prisma.historicalPayslip.create({data:{...data,odooPayslipId:105,state:'cancel',net:999}});
+ const revised=await reporting.payrollRegister(filter,'payslips');assert.equal(revised.totals.find(row=>row.currency==='SAR').net,'1400');const grouped=await reporting.payrollRegister({...filter,source:'ODOO'},'runs');assert.equal(grouped.rows.find(row=>row.currency==='SAR').net,'900');
  console.log('PASS: scoped unified register, source-copy deduplication, currency-separated totals, two historical slips in one month, SQL-safe filters and database pagination');
 }finally{for(const run of runs)await prisma.payrollRun.delete({where:{id:run.id}});if(historyRun){await prisma.historicalPayslip.deleteMany({where:{runId:historyRun.id}});await prisma.historicalPayrollRun.delete({where:{id:historyRun.id}});}await prisma.employee.deleteMany({where:{id:{in:employees.map(e=>e.id)}}});await prisma.$disconnect();}
