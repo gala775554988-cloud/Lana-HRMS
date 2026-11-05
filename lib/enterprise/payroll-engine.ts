@@ -62,8 +62,13 @@ export type PayrollBreakdown = {
  * salary profile at all). Profile wins for the base salary when present;
  * its own allowance sub-fields are added on top of (not instead of) real
  * Allowance rows -- an employee can have either, both, or neither. */
+async function payrollProfile(employeeId:string){
+  const stored=await prisma.appSetting.findUnique({where:{key:`odoo.compensation.${employeeId}`},select:{value:true}});
+  const source=stored?.value as {profile?:Awaited<ReturnType<typeof getEmployeeSalaryProfile>>;currency?:string}|null;
+  return {profile:source?.profile??await getEmployeeSalaryProfile(employeeId),currency:source?.currency,odoo:!!source?.profile};
+}
 async function resolveBaseSalary(employeeId: string): Promise<{ base: number; currency: string; profileAllowanceTotal: number }> {
-  const profile = await getEmployeeSalaryProfile(employeeId);
+  const {profile,currency:sourceCurrency} = await payrollProfile(employeeId);
   const profileAllowanceTotal =
     (profile.salaryHousingAllowance ?? 0) +
     (profile.salaryTransportAllowance ?? 0) +
@@ -71,7 +76,7 @@ async function resolveBaseSalary(employeeId: string): Promise<{ base: number; cu
     (profile.salaryCommunicationAllowance ?? 0) +
     (profile.salaryOtherAllowances ?? 0);
   const profileBase = calculateNetSalary(profile) > 0 ? profile.salaryBase ?? 0 : 0;
-  if (profileBase > 0) return { base: profileBase, currency: "SAR", profileAllowanceTotal };
+  if (profileBase > 0) return { base: profileBase, currency: sourceCurrency ?? "SAR", profileAllowanceTotal };
 
   const contract = await prisma.employeeContract.findFirst({
     where: { employeeId, status: "ACTIVE" },
@@ -152,7 +157,7 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
   const [employee, policies, profile] = await Promise.all([
     prisma.employee.findUniqueOrThrow({ where: { id: employeeId }, select: { nationality: { select: { code: true } } } }),
     prisma.gosiSetting.findMany({ where: { effectiveFrom: { lte: periodEnd }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: periodStart } }] } }),
-    getEmployeeSalaryProfile(employeeId),
+    payrollProfile(employeeId).then(result=>result.profile),
   ]);
   const saudi = ["SA", "SAU", "SAUDI"].includes(employee.nationality?.code.toUpperCase() ?? "");
   const active = socialInsurance?.status === "ACTIVE";

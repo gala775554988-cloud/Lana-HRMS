@@ -4,7 +4,7 @@ type FieldMeta = Record<string, { string?: unknown; type?: unknown }>;
 
 const CORE_CONTRACT_FIELDS = [
   "id", "employee_id", "name", "state", "wage", "date_start", "date_end", "write_date",
-  "structure_type_id", "struct_id", "resource_calendar_id", "job_id", "department_id", "company_id",
+  "currency_id", "structure_type_id", "struct_id", "resource_calendar_id", "job_id", "department_id", "company_id",
   "trial_date_end", "schedule_pay", "wage_type", "hr_responsible_id",
 ] as const;
 

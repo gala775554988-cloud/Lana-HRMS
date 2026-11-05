@@ -1,191 +1,22 @@
-import Link from "next/link";
-import { ModulePageBody } from "@/components/hrms/module-page-body";
-import { MergedModuleTabs } from "@/components/hrms/merged-module-tabs";
-import { PayrollRunManager } from "@/components/enterprise/payroll-run-manager";
-import { PayrollDashboard } from "@/components/enterprise/payroll-dashboard";
-import { PayrollActivityFeed } from "@/components/enterprise/payroll-activity-feed";
-import {
-  LayoutDashboard,
-  DollarSign,
-  MinusCircle,
-  PlusCircle,
-  Receipt,
-  CalendarRange,
-  Building2,
-  Gift,
-  ListChecks,
-} from "lucide-react";
-
-export default async function PayrollPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const query = await searchParams;
-  const activeTab = typeof query.tab === "string" ? query.tab : "dashboard";
-  return (
-    <div className="space-y-6" dir="rtl">
-      <header className="overflow-hidden rounded-3xl lana-contrast-banner bg-slate-950 p-6 text-white shadow-sm sm:p-8">
-        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
-          <div>
-            <p className="mb-2 text-[10px] tracking-widest text-blue-100">
-              الرواتب والاستحقاقات
-            </p>
-            <h1 className="text-2xl font-bold">المساحة المالية للموظفين</h1>
-            <p className="mt-3 max-w-xl text-xs leading-6 text-blue-100">
-              نظرة منظمة على المسيرات والمستحقات، مع وصول مباشر للفترات وكشوف
-              الرواتب.
-            </p>
-          </div>
-          <Link
-            href="/payroll?tab=payroll-run"
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-xs font-bold text-indigo-950 shadow-sm hover:bg-blue-50"
-          >
-            <DollarSign className="h-4 w-4" />
-            فتح مسير الرواتب
-          </Link>
-        </div>
-        <nav
-          aria-label="اختصارات الرواتب"
-          className="mt-6 flex flex-wrap gap-2"
-        >
-          {[
-            ["payroll-items", "كشوف الموظفين"],
-            ["payroll-periods", "فترات الرواتب"],
-            ["payroll-runs", "سجل المسيرات"],
-          ].map(([tab, label]) => (
-            <Link
-              key={tab}
-              href={`/payroll?tab=${tab}`}
-              className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-[11px] text-blue-100 transition hover:bg-white/10"
-            >
-              {label}
-            </Link>
-          ))}
-        </nav>
-      </header>
-      <Link href="/payroll-compensation" className="inline-flex rounded-xl border px-4 py-2 text-sm font-semibold text-primary">إعداد التأمينات والتعويضات وربط Odoo</Link>
-      <MergedModuleTabs
-        defaultValue="dashboard"
-        items={[
-          {
-            value: "dashboard",
-            label: "لوحة المعلومات",
-            icon: <LayoutDashboard className="h-4 w-4" />,
-            content: activeTab === "dashboard" ? <PayrollDashboard /> : null,
-          },
-          {
-            value: "payroll-run",
-            label: "مسير الرواتب",
-            icon: <DollarSign className="h-4 w-4" />,
-            content: activeTab === "payroll-run" ? <PayrollRunManager /> : null,
-          },
-          {
-            value: "payroll-periods",
-            label: "الفترات",
-            icon: <CalendarRange className="h-4 w-4" />,
-            content:
-              activeTab === "payroll-periods" ? (
-                <ModulePageBody
-                  resourceKey="payroll-periods"
-                  query={query}
-                  showModuleTabs={false}
-                  tabValue="payroll-periods"
-                />
-              ) : null,
-          },
-          {
-            value: "payroll-cost-centers",
-            label: "مراكز التكلفة",
-            icon: <Building2 className="h-4 w-4" />,
-            content:
-              activeTab === "payroll-cost-centers" ? (
-                <ModulePageBody
-                  resourceKey="payroll-cost-centers"
-                  query={query}
-                  showModuleTabs={false}
-                  tabValue="payroll-cost-centers"
-                />
-              ) : null,
-          },
-          {
-            value: "payroll-runs",
-            label: "سجل المسيرات",
-            icon: <DollarSign className="h-4 w-4" />,
-            content:
-              activeTab === "payroll-runs" ? (
-                <ModulePageBody
-                  resourceKey="payroll-runs"
-                  query={query}
-                  showModuleTabs={false}
-                  tabValue="payroll-runs"
-                />
-              ) : null,
-          },
-          {
-            value: "payroll-items",
-            label: "بنود الرواتب",
-            icon: <Receipt className="h-4 w-4" />,
-            content:
-              activeTab === "payroll-items" ? (
-                <ModulePageBody
-                  resourceKey="payroll-items"
-                  query={query}
-                  showModuleTabs={false}
-                  tabValue="payroll-items"
-                />
-              ) : null,
-          },
-          {
-            value: "allowances",
-            label: "البدلات",
-            icon: <PlusCircle className="h-4 w-4" />,
-            content:
-              activeTab === "allowances" ? (
-                <ModulePageBody
-                  resourceKey="allowances"
-                  query={query}
-                  showModuleTabs={false}
-                  tabValue="allowances"
-                />
-              ) : null,
-          },
-          {
-            value: "deductions",
-            label: "الاستقطاعات",
-            icon: <MinusCircle className="h-4 w-4" />,
-            content:
-              activeTab === "deductions" ? (
-                <ModulePageBody
-                  resourceKey="deductions"
-                  query={query}
-                  showModuleTabs={false}
-                  tabValue="deductions"
-                />
-              ) : null,
-          },
-          {
-            value: "bonuses",
-            label: "المكافآت والعمولات",
-            icon: <Gift className="h-4 w-4" />,
-            content:
-              activeTab === "bonuses" ? (
-                <ModulePageBody
-                  resourceKey="bonuses"
-                  query={query}
-                  showModuleTabs={false}
-                  tabValue="bonuses"
-                />
-              ) : null,
-          },
-          {
-            value: "activity",
-            label: "سجل النشاط",
-            icon: <ListChecks className="h-4 w-4" />,
-            content: activeTab === "activity" ? <PayrollActivityFeed /> : null,
-          },
-        ]}
-      />
-    </div>
-  );
+import Link from 'next/link';
+import { LayoutDashboard,Layers3,Files,SlidersHorizontal,RefreshCw,Settings2,Plus,ChevronLeft } from 'lucide-react';
+import { PayrollRegister } from '@/components/payroll/register-workspace';
+import { PayrollRunManager } from '@/components/enterprise/payroll-run-manager';
+import { OdooMigrationConsole } from '@/components/integrations/odoo-migration-console';
+import { ModulePageBody } from '@/components/hrms/module-page-body';
+import { PayrollActivityFeed } from '@/components/enterprise/payroll-activity-feed';
+const tabs=[['overview','نظرة عامة',LayoutDashboard],['runs','مسيرات الرواتب',Layers3],['payslips','كشوف الموظفين',Files],['elements','عناصر الأجر',SlidersHorizontal],['sync','مزامنة Odoo',RefreshCw],['settings','الإعدادات والتقارير',Settings2]] as const;
+export default async function PayrollPage({searchParams}:{searchParams:Promise<Record<string,string|string[]|undefined>>}){
+ const q=await searchParams;const raw=typeof q.tab==='string'?q.tab:'overview';const alias:Record<string,string>={dashboard:'overview','payroll-runs':'runs','payroll-run':'process','payroll-items':'payslips','payroll-periods':'settings','payroll-cost-centers':'settings',allowances:'elements',deductions:'elements',bonuses:'elements',activity:'settings'};const requested=alias[raw]??raw;const active=[...tabs.map(t=>t[0]),'process'].includes(requested as 'overview')?requested:'overview';
+ const source=typeof q.source==='string'&&['ALL','ODOO','LOCAL'].includes(q.source)?q.source:'ALL';const runId=typeof q.runId==='string'?q.runId:'';
+ const element=typeof q.element==='string'&&['allowances','deductions','bonuses'].includes(q.element)?q.element:['allowances','deductions','bonuses'].includes(raw)?raw:'allowances';
+ const setting=typeof q.section==='string'?q.section:['payroll-periods','payroll-cost-centers','activity'].includes(raw)?raw:'';
+ return <main dir="rtl" className="space-y-5"><header className="flex flex-wrap items-center justify-between gap-4"><div><p className="mb-1 text-xs text-muted-foreground">الموارد البشرية / الإدارة المالية</p><h1 className="text-2xl font-bold tracking-tight">الرواتب والتعويضات</h1><p className="mt-2 text-sm text-muted-foreground">المسير يجمع رواتب الفترة، والقسيمة تفصّل مستحقات موظف واحد وبنوده.</p></div><div className="flex gap-2"><Link className="inline-flex items-center gap-2 rounded-lg border bg-card px-4 py-2.5 text-sm font-semibold" href="/payroll?tab=sync"><RefreshCw className="h-4 w-4"/>مزامنة من Odoo</Link><Link className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700" href="/payroll?tab=process&create=1"><Plus className="h-4 w-4"/>إنشاء مسير</Link></div></header>
+ <nav aria-label="أقسام الرواتب" className="flex gap-1 overflow-x-auto border-b">{tabs.map(([key,label,Icon])=><Link key={key} href={`/payroll?tab=${key}`} aria-current={active===key||active==='process'&&key==='runs'?'page':undefined} className={`inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-3.5 text-sm ${active===key||active==='process'&&key==='runs'?'border-indigo-600 font-bold text-indigo-700':'border-transparent text-muted-foreground hover:text-foreground'}`}><Icon className="h-4 w-4"/>{label}</Link>)}</nav>
+ {['overview','runs','payslips'].includes(active)&&<PayrollRegister key={`${active}:${runId}:${source}`} view={active as 'overview'|'runs'|'payslips'} initialRunId={runId} initialSource={source}/>}
+ {active==='process'&&<div className="space-y-4"><Link className="inline-flex items-center gap-1 text-sm text-indigo-600" href="/payroll?tab=runs">مسيرات الرواتب<ChevronLeft className="h-4 w-4"/>إعداد ومراجعة المسير</Link><PayrollRunManager initialRunId={runId||undefined} initialCreate={q.create==='1'}/></div>}
+ {active==='sync'&&<OdooMigrationConsole scope="PAYROLL"/>}
+ {active==='elements'&&<div className="space-y-4"><div><h2 className="text-lg font-bold">عناصر الأجر الثابتة والمتغيرة</h2><p className="mt-1 text-sm text-muted-foreground">إدارة البنود التشغيلية. البنود الفعلية المستوردة تُعرض داخل كل قسيمة ولا تتحول إلى بدلات متكررة.</p></div><div className="flex gap-2">{[['allowances','البدلات'],['deductions','الاستقطاعات'],['bonuses','المكافآت والعمولات']].map(([key,label])=><Link key={key} href={`/payroll?tab=elements&element=${key}`} className={`rounded-lg border px-4 py-2 text-sm ${element===key?'bg-indigo-600 text-white':'bg-card'}`}>{label}</Link>)}</div><ModulePageBody resourceKey={element} query={q} showModuleTabs={false}/></div>}
+ {active==='settings'&&<div className="space-y-5"><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[['/payroll-compensation','التأمينات وقواعد الرواتب','السياسات المؤرخة، تصنيف بنود Odoo والربط المحاسبي'],['/payroll?tab=settings&section=payroll-periods','الفترات المالية','فتح الفترات وإغلاقها وإدارة نطاق المعالجة'],['/payroll?tab=settings&section=payroll-cost-centers','مراكز التكلفة','تنظيم تكاليف الرواتب ومراجعتها حسب المركز'],['/payroll?tab=settings&section=activity','سجل المعالجة','الاعتمادات والصرف والإجراءات المسجلة']].map(([url,title,description])=><Link key={url} className="rounded-xl border bg-card p-5 hover:border-indigo-400" href={url}><h3 className="font-bold">{title}</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p></Link>)}</div>{['payroll-periods','payroll-cost-centers'].includes(setting)&&<ModulePageBody resourceKey={setting} query={q} showModuleTabs={false}/>} {setting==='activity'&&<PayrollActivityFeed/>}</div>}
+ </main>;
 }

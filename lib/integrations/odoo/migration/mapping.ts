@@ -4,6 +4,7 @@ export class MigrationRecordError extends Error {
 }
 const field = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/).max(100);
 export const migrationConfigSchema = z.object({
+  scope: z.enum(["FULL","PAYROLL"]).default("FULL"),
   connectionId: z.string().min(1).optional(),
   employeeNumberField: field.default("barcode"), nationalIdField: field.default("identification_id"), hireDateField: field.default("first_contract_date"),
   employeeStatusField: field.optional(), employeeStatusMap: z.record(z.enum(["ACTIVE", "INACTIVE", "RESIGNED", "DISMISSED"])).default({}),

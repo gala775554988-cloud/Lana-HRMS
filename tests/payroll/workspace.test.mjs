@@ -1,0 +1,7 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { load } from '../workflows/helpers.mjs';
+const period=await load('lib/payroll/period.ts');
+const rules=await load('lib/payroll/source-rules.ts',{'@/lib/prisma':{prisma:{}},'@/lib/integrations/odoo/migration/reader':{readAll:async()=>[]},'@/lib/integrations/odoo/migration/mapping':{externalId:()=>null}});
+test('month selection fills exact start and end dates including leap years',()=>{assert.equal(period.payrollMonthRange('2024-02').end,'2024-02-29');assert.equal(period.payrollMonthRange('2026-02').end,'2026-02-28');assert.equal(period.payrollMonthRange('2026-11').start,'2026-11-01');assert.throws(()=>period.payrollMonthRange('2026-13'));});
+test('salary rule discovery follows upstream categories and never guesses unknown earnings by name or sign',()=>{assert.equal(rules.categoryFromOdoo('HRA',['HOUSING','ALW','GROSS']),'ALLOWANCE');assert.equal(rules.categoryFromOdoo('LOAN',['LOAN','DED']),'DEDUCTION');assert.equal(rules.categoryFromOdoo('GOSI_CO',['COMP']),'EMPLOYER');assert.equal(rules.categoryFromOdoo('NET',[]),'NET');assert.equal(rules.categoryFromOdoo('UNKNOWN',[]),null);assert.equal(rules.categoryFromOdoo('INFO',[],true),'INFORMATION');});

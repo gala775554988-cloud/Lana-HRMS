@@ -1,3 +1,4 @@
+import { currencyCode } from "@/lib/integrations/odoo/migration/reader";
 import { pullOdooPayroll, odooPayrollSource, fetchDetailedPayslips } from "@/lib/payroll/odoo-payroll";
 import type { NextRequest } from "next/server";
 import { auth } from "@/auth";
@@ -446,6 +447,17 @@ export async function createOdooClientFromConnection(connectionId?: string) {
 }
 
 export class OdooSyncService {
+  private contractCurrencies = new Map<string, Promise<string>>();
+  private async contractCurrency(row: OdooRecord) {
+    const key = JSON.stringify([row.currency_id, row.company_id]);
+    let value = this.contractCurrencies.get(key);
+    if (!value) { value = currencyCode(this.client, row); this.contractCurrencies.set(key, value); }
+    return value;
+  }
+  private async contractFields() {
+    const fields = await this.client.fieldsGet("hr.contract");
+    return ["id", "name", "date_start", "date_end", "wage", "state", "employee_id", "write_date", "company_id", "currency_id"].filter(key => key in fields);
+  }
   readonly client: OdooClient;
   readonly connection?: RuntimeConnection;
 
@@ -594,17 +606,18 @@ export class OdooSyncService {
     } catch {}
 
     try {
-      const contracts = await this.client.search_read("hr.contract", [["employee_id", "=", odooId]], ["id", "name", "date_start", "date_end", "wage", "state"], { limit: 5, order: "date_start desc" }) as any[];
+      const contracts = await this.client.search_read("hr.contract", [["employee_id", "=", odooId]], await this.contractFields(), { limit: 5, order: "date_start desc" }) as any[];
       const openContract = contracts.find(c => c.state === "open") || contracts[0];
       if (openContract) {
-        const contractNumber = openContract.name ? String(openContract.name) : `ODOO-${openContract.id}`;
+        const contractNumber = `ODOO-CONT-${openContract.id}`;
         const startDate = openContract.date_start ? new Date(String(openContract.date_start)) : new Date();
         const endDate = openContract.date_end ? new Date(String(openContract.date_end)) : null;
         const salaryAmount = Number(openContract.wage) || 0;
         const statusMap: Record<string, string> = { open: "ACTIVE", close: "EXPIRED", cancel: "TERMINATED", draft: "DRAFT" };
         const status = statusMap[String(openContract.state)] || "DRAFT";
-        const existingC = await delegate("employeeContract").findFirst({ where: { contractNumber } }).catch(() => null) as any;
-        const cData = { employeeId: empId, contractNumber, title: contractNumber, startDate, endDate, salaryAmount, currency: "SAR", status };
+        const existingC = await delegate("employeeContract").findFirst({ where: { OR: [{ odooId: Number(openContract.id) }, { contractNumber }] } }).catch(() => null) as any;
+        const cData = { employeeId: empId, contractNumber, title: contractNumber, startDate, endDate, salaryAmount, currency: await this.contractCurrency(openContract), status, odooId: Number(openContract.id) };
+        if (existingC && existingC.employeeId !== empId) throw new Error("CONTRACT_OWNER_CONFLICT");
         if (existingC) await delegate("employeeContract").update({ where: { id: existingC.id }, data: cData });
         else await delegate("employeeContract").create({ data: cData });
       }
@@ -1000,7 +1013,7 @@ export class OdooSyncService {
                 const contracts = await this.client.search_read(
                   "hr.contract",
                   [["employee_id","in",empOdooIds]],
-                  ["id","name","date_start","date_end","wage","state","employee_id","write_date"],
+                  await this.contractFields(),
                   { limit: 5000, order: "date_start desc" }
                 ) as any[];
                 const grouped = new Map<number, any[]>();
@@ -1181,14 +1194,15 @@ export class OdooSyncService {
                   const contract = contractMap.get(odooId);
                   if(contract) {
                     try {
-                      const contractNumber = contract.name ? String(contract.name) : `ODOO-${contract.id}`;
+                      const contractNumber = `ODOO-CONT-${contract.id}`;
                       const startDate = contract.date_start ? new Date(String(contract.date_start)) : new Date();
                       const endDate = contract.date_end ? new Date(String(contract.date_end)) : null;
                       const salaryAmount = Number(contract.wage) || 0;
                       const statusMap: Record<string,string> = { open:"ACTIVE", close:"EXPIRED", cancel:"TERMINATED", draft:"DRAFT" };
                       const status = statusMap[String(contract.state)] || "DRAFT";
-                      const existingC = await delegate("employeeContract").findFirst({ where: { contractNumber } }).catch(()=>null) as any;
-                      const cData = { employeeId: localEmployeeId, contractNumber, title: contractNumber, startDate, endDate, salaryAmount, currency:"SAR", status };
+                      const existingC = await delegate("employeeContract").findFirst({ where: { OR: [{ odooId: Number(contract.id) }, { contractNumber }] } }).catch(()=>null) as any;
+                      const cData = { employeeId: localEmployeeId, contractNumber, title: contractNumber, startDate, endDate, salaryAmount, currency:await this.contractCurrency(contract), status, odooId: Number(contract.id) };
+                      if(existingC && existingC.employeeId !== localEmployeeId) throw new Error("CONTRACT_OWNER_CONFLICT");
                       if(existingC) await delegate("employeeContract").update({ where:{ id: existingC.id }, data: cData });
                       else await delegate("employeeContract").create({ data: cData });
                     } catch(contractErr) {
@@ -1606,7 +1620,7 @@ export class OdooSyncService {
         // ~1209 employees showing "no contract" on the payroll dashboard
         // despite Odoo having complete, correct contract/wage data.
         const contractFieldMeta = await this.client.fieldsGet(mapper.odooModel, [], ["string", "type"]).catch(() => ({} as Record<string, unknown>));
-        const compensationFields = ["structure_type_id", "struct_id", "salary_grade_id", "allowance"].filter((field) => field in contractFieldMeta);
+        const compensationFields = ["structure_type_id", "struct_id", "salary_grade_id", "allowance", "currency_id", "company_id"].filter((field) => field in contractFieldMeta);
         const fetchFields = [...mapper.odooFields, ...compensationFields];
 
         const baseDomain = odooIncrementalDomain(since) as any[];
@@ -1629,8 +1643,9 @@ export class OdooSyncService {
             try {
               const localEmployeeId = await this.findLocalEmployeeId(row.employee_id);
               if (!localEmployeeId) { result.skipped += 1; continue; }
-              const values = mapOdooContractToLana(row, localEmployeeId);
-              const existing = await delegate("employeeContract").findFirst({ where: { contractNumber: String(values.contractNumber) } });
+              const values = { ...mapOdooContractToLana(row, localEmployeeId), currency: await this.contractCurrency(row), odooId: Number(row.id), contractNumber: `ODOO-CONT-${row.id}` };
+              const existing = await delegate("employeeContract").findFirst({ where: { OR: [{ odooId: Number(row.id) }, { contractNumber: String(values.contractNumber) }] } });
+              if (existing && existing.employeeId !== localEmployeeId) throw new Error("CONTRACT_OWNER_CONFLICT");
               if (options.dryRun) result.operations.push({ operation: existing ? "update" : "create", model: mapper.lanaModel, localId: objectId(existing?.id), externalId: row.id, values });
               else if (existing) { await delegate("employeeContract").update({ where: { id: existing.id }, data: values }); result.updated += 1; }
               else { await delegate("employeeContract").create({ data: values }); result.created += 1; }
@@ -2068,7 +2083,7 @@ export class OdooSyncService {
       if (!contracts || contracts.length === 0) return;
       // Prefer open state, else first
       const contract = contracts.find((c: any) => c.state === "open") || contracts[0];
-      const contractNumber = contract.name ? String(contract.name) : `ODOO-${contract.id}`;
+      const contractNumber = `ODOO-CONT-${contract.id}`;
       const startDate = contract.date_start ? new Date(String(contract.date_start)) : new Date();
       const endDate = contract.date_end ? new Date(String(contract.date_end)) : null;
       const salaryAmount = Number(contract.wage) || 0;

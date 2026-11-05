@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { currentPayrollMonth,payrollMonthRange } from "@/lib/payroll/period";
+import { PayrollRegister } from "@/components/payroll/register-workspace";
 import { cn } from "@/lib/utils";
 import {
   Loader2, Play, CheckCircle2, Banknote, XCircle, RefreshCw, Printer, Search,
@@ -57,7 +59,8 @@ const SAVED_FILTERS_KEY = "payrollRunSavedFilters";
 const CANCELLABLE = ["DRAFT", "PROCESSING", "APPROVED"];
 const ARCHIVABLE = ["LOCKED", "CANCELLED"];
 
-export function PayrollRunManager() {
+export function PayrollRunManager({initialRunId,initialCreate=false}:{initialRunId?:string;initialCreate?:boolean}) {
+  const [showCreate,setShowCreate]=useState(initialCreate);
   const [periods, setPeriods] = useState<PayrollPeriod[]>([]);
   const [runs, setRuns] = useState<RunListItem[]>([]);
   const [selectedRun, setSelectedRun] = useState<RunDetail | null>(null);
@@ -65,9 +68,9 @@ export function PayrollRunManager() {
   const [actionLoading, setActionLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const [periodName, setPeriodName] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [periodName, setPeriodName] = useState(currentPayrollMonth());
+  const [startDate, setStartDate] = useState(()=>payrollMonthRange(currentPayrollMonth()).start);
+  const [endDate, setEndDate] = useState(()=>payrollMonthRange(currentPayrollMonth()).end);
   const [branchId, setBranchId] = useState("");
   const [departmentId, setDepartmentId] = useState("");
   const [branches, setBranches] = useState<OrgOption[]>([]);
@@ -113,6 +116,8 @@ export function PayrollRunManager() {
       })
       .catch(() => {});
   }, [loadRuns, loadPeriods]);
+
+  useEffect(()=>{if(initialRunId)void openRun(initialRunId);},[initialRunId]);
 
   async function openRun(id: string) {
     setLoading(true);
@@ -288,15 +293,16 @@ export function PayrollRunManager() {
 
   return (
     <div className="space-y-6" dir="rtl">
-      <Card className="rounded-2xl">
+      <div className="flex items-center justify-between"><p className="text-sm text-muted-foreground">إعداد المسودة ← مراجعة الموظفين والبنود ← الاعتماد ← تسجيل الصرف</p><Button variant="outline" onClick={()=>setShowCreate(v=>!v)}>{showCreate?"إغلاق نموذج الإنشاء":"إنشاء مسير جديد"}</Button></div>
+      {showCreate && <Card className="rounded-2xl">
         <CardHeader>
           <CardTitle>إنشاء مسير رواتب جديد</CardTitle>
           <CardDescription>اختر الفترة والنطاق، ثم احسب رواتب جميع الموظفين المطابقين تلقائياً عبر محرك الرواتب.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-4">
           <div className="space-y-1.5">
-            <Label>اسم الفترة (مثال: 2026-07)</Label>
-            <Input value={periodName} onChange={(e) => setPeriodName(e.target.value)} placeholder="2026-07" />
+            <Label>شهر المسير</Label>
+            <Input type="month" value={periodName} onChange={(e) => {setPeriodName(e.target.value);if(e.target.value){const dates=payrollMonthRange(e.target.value);setStartDate(dates.start);setEndDate(dates.end);}}} />
           </div>
           <div className="space-y-1.5">
             <Label>تاريخ البداية</Label>
@@ -329,6 +335,7 @@ export function PayrollRunManager() {
         </CardContent>
       </Card>
 
+      }
       {message && <div className="rounded-xl border bg-muted/40 p-3 text-sm">{message}</div>}
 
       {duplicating ? (
@@ -360,8 +367,8 @@ export function PayrollRunManager() {
         </Card>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="rounded-2xl lg:col-span-1">
+      <div className={initialRunId?"space-y-5":"grid gap-6 lg:grid-cols-3"}>
+        {!initialRunId && <Card className="rounded-2xl lg:col-span-1">
           <CardHeader className="space-y-3">
             <CardTitle>مسيرات الرواتب</CardTitle>
             <div className="relative">
@@ -448,9 +455,9 @@ export function PayrollRunManager() {
               );
             })}
           </CardContent>
-        </Card>
+        </Card>}
 
-        <Card className="rounded-2xl lg:col-span-2">
+        <Card className={initialRunId?"rounded-2xl":"rounded-2xl lg:col-span-2"}>
           <CardHeader><CardTitle>تفاصيل المسير</CardTitle></CardHeader>
           <CardContent>
             {loading ? (
@@ -525,6 +532,7 @@ export function PayrollRunManager() {
           </CardContent>
         </Card>
       </div>
+      {selectedRun && <PayrollRegister key={selectedRun.run.id} view="payslips" initialRunId={selectedRun.run.id} initialSource="LOCAL" />}
     </div>
   );
 }

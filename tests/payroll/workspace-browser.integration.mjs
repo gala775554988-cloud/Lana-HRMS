@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {randomUUID} from 'node:crypto';
+import {PrismaClient} from '@prisma/client';
+import {encode} from 'next-auth/jwt';
+import {chromium} from '@playwright/test';
+const url=new URL(process.env.PAYROLL_TEST_DATABASE_URL??'');if(!['localhost','127.0.0.1'].includes(url.hostname)||!url.pathname.endsWith('_test'))throw new Error('Local test database required');
+const prisma=new PrismaClient({datasourceUrl:url.href}),key=randomUUID();let user,employee,run,browser;
+try{
+ user=await prisma.user.create({data:{username:`workspace-${key}`}});employee=await prisma.employee.create({data:{employeeNumber:`WS-${key}`,nationalId:key,firstName:'موظف',lastName:'اختبار الواجهة',hireDate:new Date()}});
+ run=await prisma.payrollRun.create({data:{name:`مسير التحقق ${key}`,period:'2026-10',status:'DRAFT'}});
+ const item=await prisma.payrollItem.create({data:{payrollRunId:run.id,employeeId:employee.id,baseSalary:8000,allowanceTotal:2000,grossPay:10000,deductionTotal:500,netPay:9500,currency:'SAR',calculationSnapshot:{components:[{code:'BASIC',name:'الراتب الأساسي',kind:'EARNING',amount:8000},{code:'HOUSE',name:'بدل السكن للاختبار',kind:'EARNING',amount:2000},{code:'DED',name:'استقطاع للاختبار',kind:'DEDUCTION',amount:500}]}}});
+ const secret=await readFile('/tmp/lana-payroll-test-key','utf8');const token=await encode({secret,salt:'authjs.session-token',token:{sub:user.id,roles:['SUPER_ADMIN'],sessionVersion:0,passwordChanged:true,mustChangePassword:false},maxAge:600});
+ browser=await chromium.launch({executablePath:'/usr/bin/chromium',headless:true,args:['--no-sandbox']});const context=await browser.newContext({viewport:{width:1440,height:1000}});await context.addCookies([{name:'authjs.session-token',value:token,url:'http://localhost:3200',httpOnly:true,sameSite:'Lax'}]);const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('http://localhost:3200/payroll?tab=payslips');await page.getByRole('heading',{name:'كشوف الموظفين',exact:true}).waitFor();await page.getByRole('textbox',{name:'البحث في الرواتب'}).fill(employee.employeeNumber);await page.getByText(employee.employeeNumber,{exact:false}).waitFor();await page.screenshot({path:'/tmp/payroll-v2-desktop.png',fullPage:true});
+ await page.getByRole('button',{name:'تفاصيل البنود'}).first().click();await page.getByRole('dialog').getByText('بدل السكن للاختبار',{exact:true}).waitFor();await page.getByRole('button',{name:/الاستقطاعات/}).click();await page.getByRole('dialog').getByText('استقطاع للاختبار',{exact:true}).waitFor();await page.screenshot({path:'/tmp/payroll-v2-detail.png',fullPage:true});const pdf=await page.pdf({path:'/tmp/payroll-v2-detail.pdf',format:'A4'});assert.equal(pdf.subarray(0,4).toString(),'%PDF');await page.keyboard.press('Escape');
+ await page.goto('http://localhost:3200/payroll?tab=process&create=1');await page.getByRole('heading',{name:'إنشاء مسير رواتب جديد'}).waitFor();
+ await page.goto('http://localhost:3200/payroll?tab=sync');await page.getByRole('button',{name:/بدء مزامنة/}).waitFor();
+ const response=await context.request.get(`http://localhost:3200/api/enterprise/payroll/register?view=payslips&employeeId=${employee.id}`);assert.equal(response.status(),200);assert.equal((await response.json()).rows[0].id,item.id);
+ await page.setViewportSize({width:390,height:844});await page.goto('http://localhost:3200/payroll?tab=payslips');await page.getByRole('heading',{name:'كشوف الموظفين',exact:true}).waitFor();await page.screenshot({path:'/tmp/payroll-v2-mobile.png',fullPage:true});assert.equal(errors.length,0,errors.join('\n'));
+ console.log('PASS: payroll navigation, employee filtering, detailed earnings/deductions dialog, PDF, creation, sync, scoped register API and mobile rendering; zero browser errors');
+}finally{if(browser)await browser.close();if(run)await prisma.payrollRun.delete({where:{id:run.id}});if(employee)await prisma.employee.delete({where:{id:employee.id}});if(user)await prisma.user.delete({where:{id:user.id}});await prisma.$disconnect();}

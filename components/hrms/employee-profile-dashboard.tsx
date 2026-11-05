@@ -22,6 +22,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 
+import { EmployeeCompensation } from "@/components/payroll/employee-compensation";
+
 interface DeviceBinding {
   bound: boolean;
   deviceId?: string | null;
@@ -506,144 +508,7 @@ export function EmployeeProfileDashboard({
         </TabsContent>
 
         {/* 3- Salaries */}
-        <TabsContent value="salary" className="space-y-5 mt-6">
-          <div className="flex flex-col justify-between gap-4 rounded-2xl border bg-card p-5 sm:flex-row sm:items-center"><div><p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-indigo-600">الملف المالي</p><h2 className="text-xl font-bold">الرواتب والمزايا المالية</h2><p className="mt-2 text-xs text-muted-foreground">تفاصيل الاستحقاقات والبدلات والاستقطاعات وكشوف الرواتب المسجلة.</p></div>{payrollItems[0] ? <Button asChild className="gap-2 rounded-xl"><a href={`/print-reports/payslip?itemId=${payrollItems[0].id}`} target="_blank" rel="noreferrer"><Download className="h-4 w-4" />آخر كشف راتب</a></Button> : null}</div>
-          {(() => {
-            const activeContract = contracts.find((c: any) => c.status === "ACTIVE") ?? contracts[0];
-            const latestItem = payrollItems[0];
-            const primaryBank = bankAccounts.find((b: any) => b.isPrimary) ?? bankAccounts[0];
-            const grossFromProfile = [salaryProfile?.salaryBase, salaryProfile?.salaryHousingAllowance, salaryProfile?.salaryTransportAllowance, salaryProfile?.salaryFoodAllowance, salaryProfile?.salaryCommunicationAllowance, salaryProfile?.salaryOtherAllowances].reduce((sum: number, value: unknown) => sum + (Number(value) || 0), 0);
-            const runStatusLabel: Record<string, string> = {
-              DRAFT: "مسودة", PROCESSING: "قيد المراجعة", APPROVED: "تم الاعتماد", PAID: "تم الصرف", CANCELLED: "ملغي"
-            };
-            const bonusTypeLabel: Record<string, string> = { BONUS: "مكافأة", COMMISSION: "عمولة", INCENTIVE: "حافز", REWARD: "جائزة" };
-            return (
-              <>
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  {[{ label: "الراتب الأساسي", value: salaryProfile?.salaryBase ?? activeContract?.salaryAmount, icon: Briefcase }, { label: "الإجمالي الشهري", value: grossFromProfile, icon: Wallet }, { label: latestItem ? "صافي آخر مسير" : "صافي الراتب المسجل", value: latestItem?.netPay ?? salaryProfile?.salaryNet, icon: FileCheck }].map(({ label, value, icon: Icon }) => <div key={label} className={`rounded-2xl border p-5 ${Icon === FileCheck ? "border-indigo-600 lana-finance-highlight bg-indigo-800 text-white shadow-sm" : "bg-card"}`}><div className="mb-4 flex items-center justify-between"><p className={`text-xs ${Icon === FileCheck ? "text-blue-100" : "text-muted-foreground"}`}>{label}</p><Icon className="h-4 w-4 opacity-60" /></div><p className="text-2xl font-bold tabular-nums">{value === null || value === undefined ? "—" : Number(value).toLocaleString("ar-SA")}<span className="ms-2 text-[11px] font-normal opacity-70">{latestItem?.currency ?? activeContract?.currency ?? "SAR"}</span></p></div>)}
-                  <div className="rounded-2xl border bg-card p-5"><p className="mb-5 text-xs text-muted-foreground">آخر دورة رواتب</p><p className="text-sm font-bold">{latestItem?.payrollRun ? (runStatusLabel[latestItem.payrollRun.status] ?? latestItem.payrollRun.status) : "لا يوجد مسير مسجل"}</p><p className="mt-2 text-xs text-muted-foreground">{latestItem?.payrollRun?.period ?? "تظهر الحالة عند تسجيل مسير رواتب"}</p></div>
-                </div>
-
-                <Card className="rounded-2xl">
-                  <CardHeader><CardTitle>بيانات العقد والدفع</CardTitle></CardHeader>
-                  <CardContent className="grid gap-3 md:grid-cols-3 text-sm">
-                    <div><p className="text-xs text-muted-foreground">رقم العقد</p><p className="font-medium mt-1">{activeContract?.contractNumber ?? "-"}</p></div>
-                    <div><p className="text-xs text-muted-foreground">حالة العقد</p><p className="font-medium mt-1">{activeContract?.status ?? "-"}</p></div>
-                    <div><p className="text-xs text-muted-foreground">فترة الدفع</p><p className="font-medium mt-1">شهري</p></div>
-                    <div><p className="text-xs text-muted-foreground">العملة</p><p className="font-medium mt-1">{activeContract?.currency ?? "SAR"}</p></div>
-                    <div><p className="text-xs text-muted-foreground">تاريخ بداية العقد</p><p className="font-medium mt-1">{activeContract?.startDate ? new Date(activeContract.startDate).toLocaleDateString("ar-SA") : "-"}</p></div>
-                    <div><p className="text-xs text-muted-foreground">تاريخ نهاية العقد</p><p className="font-medium mt-1">{activeContract?.endDate ? new Date(activeContract.endDate).toLocaleDateString("ar-SA") : "-"}</p></div>
-                  </CardContent>
-                </Card>
-
-                <Card className="rounded-2xl">
-                  <CardHeader><CardTitle>الحساب البنكي</CardTitle></CardHeader>
-                  <CardContent>
-                    {bankAccounts.length === 0 ? (
-                      <p className="text-center text-muted-foreground py-6">لا يوجد حساب بنكي مسجل</p>
-                    ) : (
-                      <div className="grid gap-3 md:grid-cols-4 text-sm">
-                        <div><p className="text-xs text-muted-foreground">اسم البنك</p><p className="font-medium mt-1">{primaryBank?.bank ?? "-"}</p></div>
-                        <div><p className="text-xs text-muted-foreground">رقم الآيبان</p><p className="font-medium mt-1 font-mono">{primaryBank?.iban ?? "-"}</p></div>
-                        <div><p className="text-xs text-muted-foreground">رقم الحساب</p><p className="font-medium mt-1 font-mono">{primaryBank?.account ?? "-"}</p></div>
-                        <div><p className="text-xs text-muted-foreground">السويفت</p><p className="font-medium mt-1 font-mono">{primaryBank?.swift ?? "-"}</p></div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card className="rounded-2xl">
-                  <CardHeader><CardTitle>البدلات والاستقطاعات (حسب ملف الراتب)</CardTitle></CardHeader>
-                  <CardContent className="grid gap-3 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <p className="text-xs font-bold text-emerald-700">البدلات</p>
-                      {[
-                        ["بدل السكن", salaryProfile?.salaryHousingAllowance],
-                        ["بدل النقل", salaryProfile?.salaryTransportAllowance],
-                        ["بدل الطعام", salaryProfile?.salaryFoodAllowance],
-                        ["بدل الاتصالات", salaryProfile?.salaryCommunicationAllowance],
-                        ["بدلات أخرى", salaryProfile?.salaryOtherAllowances],
-                      ].filter(([, v]) => Number(v) > 0).map(([label, value]) => (
-                        <div key={label as string} className="flex justify-between text-sm border-b pb-1"><span>{label}</span><span className="font-medium">{Number(value).toLocaleString("ar-SA")}</span></div>
-                      ))}
-                      {[salaryProfile?.salaryHousingAllowance, salaryProfile?.salaryTransportAllowance, salaryProfile?.salaryFoodAllowance, salaryProfile?.salaryCommunicationAllowance, salaryProfile?.salaryOtherAllowances].every((v) => !v) && <p className="text-xs text-muted-foreground">لا توجد بدلات مسجلة</p>}
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-xs font-bold text-rose-700">الاستقطاعات</p>
-                      <div className="flex justify-between text-sm border-b pb-1"><span>التأمينات الاجتماعية</span><span className="font-medium">{Number(salaryProfile?.salaryInsuranceDeduction ?? 0).toLocaleString("ar-SA")}</span></div>
-                      {Number(salaryProfile?.salaryDeductions ?? 0) > 0 && <div className="flex justify-between text-sm border-b pb-1"><span>استقطاعات أخرى</span><span className="font-medium">{Number(salaryProfile?.salaryDeductions).toLocaleString("ar-SA")}</span></div>}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="rounded-2xl">
-                  <CardHeader><CardTitle>المكافآت والعمولات</CardTitle></CardHeader>
-                  <CardContent>
-                    {bonuses.length === 0 ? (
-                      <p className="text-center text-muted-foreground py-6">لا توجد مكافآت مسجلة</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {bonuses.map((b: any) => (
-                          <div key={b.id} className="flex items-center justify-between border rounded-xl p-3 text-sm">
-                            <div><p className="font-bold">{bonusTypeLabel[b.type] ?? b.type} · {Number(b.amount).toLocaleString("ar-SA")} {b.currency}</p><p className="text-xs text-muted-foreground">{b.reason}</p></div>
-                            <Badge variant={b.status === "APPROVED" ? "default" : "outline"}>{b.status}</Badge>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card className="rounded-2xl">
-                  <CardHeader><CardTitle>السلف والقروض</CardTitle></CardHeader>
-                  <CardContent className="space-y-3">
-                    {loans.map((loan: any) => (
-                      <div key={loan.id} className="flex items-center justify-between border rounded-xl p-3 text-sm">
-                        <div><p className="font-bold">قرض {loan.loanNumber}</p><p className="text-xs text-muted-foreground">المتبقي {Number(loan.outstandingAmount).toLocaleString("ar-SA")} من {Number(loan.principalAmount).toLocaleString("ar-SA")} · القسط {Number(loan.installmentAmount).toLocaleString("ar-SA")}</p></div>
-                        <Badge variant={loan.status === "ACTIVE" ? "default" : "outline"}>{loan.status}</Badge>
-                      </div>
-                    ))}
-                    {salaryAdvances.map((adv: any) => (
-                      <div key={adv.id} className="flex items-center justify-between border rounded-xl p-3 text-sm">
-                        <div><p className="font-bold">سلفة {Number(adv.amount).toLocaleString("ar-SA")}</p><p className="text-xs text-muted-foreground">{adv.paidInstallments}/{adv.installments} قسط · القسط الشهري {Number(adv.monthlyDeduction).toLocaleString("ar-SA")}</p></div>
-                        <Badge variant={adv.status === "APPROVED" ? "default" : "outline"}>{adv.status}</Badge>
-                      </div>
-                    ))}
-                    {loans.length === 0 && salaryAdvances.length === 0 && <p className="text-center text-muted-foreground py-6">لا يوجد سلف أو قروض</p>}
-                  </CardContent>
-                </Card>
-
-                <Card className="rounded-2xl">
-                  <CardHeader><CardTitle>كشوف الرواتب السابقة</CardTitle></CardHeader>
-                  <CardContent>
-                    {payrollItems.length === 0 ? (
-                      <p className="text-center text-muted-foreground py-8">لا يوجد سجل رواتب بعد</p>
-                    ) : (
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead><tr className="border-b text-right text-xs text-muted-foreground"><th className="p-2">الفترة</th><th className="p-2">الإجمالي</th><th className="p-2">الاستقطاعات</th><th className="p-2">الصافي</th><th className="p-2">الحالة</th><th className="p-2">تاريخ الصرف</th><th className="p-2">كشف الراتب</th></tr></thead>
-                          <tbody>
-                            {payrollItems.map((item: any) => (
-                              <tr key={item.id} className="border-b transition-colors hover:bg-muted/40">
-                                <td className="p-2 font-medium">{item.payrollRun?.period ?? "-"}</td>
-                                <td className="p-2">{Number(item.grossPay ?? item.baseSalary).toLocaleString("ar-SA")}</td>
-                                <td className="p-2 text-rose-600">-{Number(item.deductionTotal).toLocaleString("ar-SA")}</td>
-                                <td className="p-2 font-bold">{Number(item.netPay).toLocaleString("ar-SA")} {item.currency}</td>
-                                <td className="p-2"><Badge variant={item.payrollRun?.status === "PAID" ? "default" : "outline"}>{runStatusLabel[item.payrollRun?.status] ?? item.payrollRun?.status ?? "-"}</Badge></td>
-                                <td className="p-2 text-xs text-muted-foreground">{item.payrollRun?.paidAt ? new Date(item.payrollRun.paidAt).toLocaleDateString("ar-SA") : "-"}</td>
-                                <td className="p-2"><a href={`/print-reports/payslip?itemId=${item.id}`} target="_blank" rel="noreferrer" className="text-primary underline text-xs font-bold">طباعة</a></td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </>
-            );
-          })()}
-        </TabsContent>
+        <TabsContent value="salary" className="mt-6"><EmployeeCompensation employeeId={employee.id} /></TabsContent>
 
         <TabsContent value="career" className="space-y-4 mt-6">
           <div className="grid gap-4 lg:grid-cols-2">

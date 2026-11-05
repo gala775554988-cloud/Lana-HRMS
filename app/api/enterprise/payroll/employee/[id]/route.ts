@@ -1,0 +1,15 @@
+import { NextResponse } from 'next/server';
+import { auth } from '@/auth';
+import { prisma } from '@/lib/prisma';
+import { canViewPayroll } from '@/lib/enterprise/payroll-permissions';
+import { getEmployeeSalaryProfile } from '@/lib/employee/salary-profile-store';
+import { applyScopedWhere,getAccessProfile } from '@/lib/enterprise/hierarchy';
+export async function GET(_request:Request,{params}:{params:Promise<{id:string}>}){
+ const session=await auth();if(!session?.user?.id)return NextResponse.json({success:false},{status:401});if(!canViewPayroll(session))return NextResponse.json({success:false},{status:403});const {id}=await params;
+ const scope=await applyScopedWhere('employees',{},await getAccessProfile(session.user.id,session.user.roles??[]));const employee=await prisma.employee.findFirst({where:{AND:[scope,{id}]},select:{id:true}});if(!employee)return NextResponse.json({success:false},{status:404});
+ const [source,profile,contracts,banks,loans,advances]=await Promise.all([prisma.appSetting.findUnique({where:{key:`odoo.compensation.${id}`},select:{value:true}}),getEmployeeSalaryProfile(id),prisma.employeeContract.findMany({where:{employeeId:id},orderBy:{startDate:'desc'},take:20}),prisma.employeeBankAccount.findMany({where:{employeeId:id,isPrimary:true},select:{bank:true,iban:true}}),prisma.loan.findMany({where:{employeeId:id,status:{in:['ACTIVE','PENDING']}},select:{id:true,loanNumber:true,outstandingAmount:true,installmentAmount:true,currency:true,status:true}}),prisma.employeeSalaryAdvance.findMany({where:{employeeId:id,status:'APPROVED'},select:{id:true,amount:true,monthlyDeduction:true,paidInstallments:true}})]);
+ const odoo=source?.value as {currency?:string;profile?:Record<string,number>;contractId?:number;syncedAt?:string;fields?:{name:string;label:string;value:unknown}[]}|null;const contract=contracts.find(c=>c.status==='ACTIVE')??contracts[0]??null;
+ const salary=odoo?.profile??profile;const base=salary.salaryBase??(contract?Number(contract.salaryAmount):null);const fields=[['salaryHousingAllowance','بدل السكن'],['salaryTransportAllowance','بدل الانتقال'],['salaryFoodAllowance','بدل الطعام'],['salaryCommunicationAllowance','بدل الاتصال'],['salaryOtherAllowances','بدلات أخرى']].map(([key,name])=>({key,name,value:salary[key as keyof typeof salary]??null}));
+ const known=fields.filter(row=>row.value!==null);const gross=base===null?null:base+known.reduce((sum,row)=>sum+Number(row.value),0);
+ return NextResponse.json({success:true,compensation:{base,gross,net:salary.salaryNet??null,currency:odoo?.currency??contract?.currency??null,verified:!!odoo,source:odoo?'ODOO':'LOCAL',syncedAt:odoo?.syncedAt??null,contract:contract?{number:contract.contractNumber,status:contract.status,startDate:contract.startDate,endDate:contract.endDate}:null,allowances:fields,sourceFields:odoo?.fields??[]},banks,loans,advances},{headers:{'Cache-Control':'private, no-store'}});
+}

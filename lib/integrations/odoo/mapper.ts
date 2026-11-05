@@ -388,7 +388,7 @@ export function mapOdooContractToLana(record: OdooRecord, employeeId?: string): 
     startDate: asDate(record.date_start) || new Date(),
     endDate: asDate(record.date_end),
     salaryAmount: decimalNumber(record.wage) ?? 0,
-    currency: "USD",
+    currency: /^[A-Z]{3}$/.test(many2oneName(record.currency_id) || "") ? many2oneName(record.currency_id) : undefined,
     status: mapContractStateToLana(record.state),
     odooStructureType: many2oneName(record.structure_type_id) || many2oneName(record.struct_id) || textValue(record.structure_type_id) || textValue(record.struct_id),
     salaryDetails: {

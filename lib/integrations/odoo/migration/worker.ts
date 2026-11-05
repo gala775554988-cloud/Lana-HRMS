@@ -6,7 +6,11 @@ import { migrationConfigSchema, nextMonth, MigrationRecordError, type MigrationC
 import { employeeBatch, managersBatch, loanBatch, payrollBatch, type ImportContext, type Outcome } from "./importers";
 import { requiredFields } from "./reader";
 import type { OdooDomain, OdooRecord } from "../types";
+import { discoverSalaryRules } from "@/lib/payroll/source-rules";
+import { contractBatch } from "@/lib/payroll/contract-sync";
+import { discoverContractFields } from "@/lib/integrations/odoo/contract-salary";
 export const phases=["EMPLOYEES","MANAGERS","LOANS","PAYROLL"] as const;
+const phasesFor=(config:MigrationConfig):readonly string[]=>config.scope==="PAYROLL"?["CONTRACTS","PAYROLL"]:phases;
 const active=["PENDING","RUNNING","PAUSED"];
 export async function createMigration(config:MigrationConfig,actorUserId:string) {
   config={...config,toMonth:config.toMonth??new Date().toISOString().slice(0,7)};
@@ -16,11 +20,13 @@ export async function createMigration(config:MigrationConfig,actorUserId:string)
     if(binding&&binding.value!==source)throw new MigrationRecordError("SOURCE_CONFLICT","مصدر الموظفين مربوط باتصال آخر؛ يلزم مراجعة المطابقة قبل تغيير المصدر");
     if(!binding)await tx.appSetting.create({data:{key:"odoo.migration.employeeSource",value:source}});
     if(await tx.odooMigrationJob.findFirst({where:{source,status:{in:active}}}))throw new MigrationRecordError("JOB_ACTIVE","يوجد تشغيل نشط أو متوقف مؤقتاً لهذا المصدر؛ استأنفه أو ألغِه أولاً");
-    const job=await tx.odooMigrationJob.create({data:{source,connectionId:config.connectionId,actorUserId,config:JSON.parse(JSON.stringify(config))}});
+    const job=await tx.odooMigrationJob.create({data:{source,connectionId:config.connectionId,actorUserId,phase:config.scope==="PAYROLL"?"CONTRACTS":"EMPLOYEES",config:JSON.parse(JSON.stringify(config))}});
     await tx.auditLog.create({data:{actorUserId,action:"odoo-migration:start",entity:"odooMigrationJob",entityId:job.id,metadata:{source}}});return job;
   },{isolationLevel:"Serializable"});
 }
 async function phaseReader(context:ImportContext,phase:string) {
+  if(phase==="CONTRACTS") {const metadata=await context.client.fieldsGet("hr.contract");for(const field of ["id","employee_id","wage","date_start","state","write_date"])if(!metadata[field])throw new MigrationRecordError("CONTRACT_CONFIGURATION","حقول عقد الرواتب غير متاحة");return {model:"hr.contract",fields:discoverContractFields(metadata)};}
+
   if(phase==="EMPLOYEES"||phase==="MANAGERS") {
     const configured=[context.config.employeeNumberField,context.config.nationalIdField,context.config.hireDateField,...(context.config.employeeStatusField?[context.config.employeeStatusField]:[])];
     const info=await requiredFields(context.client,"hr.employee",["id","name","active","write_date",...configured],["work_email","work_phone","mobile_phone","department_id","job_id","company_id","country_id","marital","parent_id","departure_date","departure_reason_id"]);
@@ -35,6 +41,7 @@ function phaseDomain(config:MigrationConfig,phase:string,month?:string|null):Odo
   return [...(from?[["date_from",">=",`${from}-01`]]:[]),...(through?[["date_from","<",`${through}-01`]]:[])] as OdooDomain;
 }
 async function prepare(context:ImportContext,phase:string,rows:OdooRecord[]) {
+  if(phase==="CONTRACTS")return contractBatch(context,rows);
   if(phase==="EMPLOYEES")return employeeBatch(context,rows);
   if(phase==="MANAGERS")return managersBatch(context,rows);
   if(phase==="LOANS")return loanBatch(context,rows);
@@ -65,6 +72,7 @@ export async function processMigrationStep(jobId:string) {
     const read=await phaseReader(context,job.phase);
     let upperId=job.upperId;let phaseTotal=job.phaseTotal;let month=job.month;
     if(upperId===null) {
+      if(job.phase==="PAYROLL")await discoverSalaryRules(context.client,job.actorUserId);
       const domain=phaseDomain(context.config,job.phase);
       const last=(await context.client.search_read(read.model,domain,["id"],{limit:1,order:"id desc",context:{active_test:false}}))[0];upperId=Number(last?.id??0);
       phaseTotal=await context.client.execute_kw<number>(read.model,"search_count",[[...domain,["id","<=",upperId]]],{context:{active_test:false}});
@@ -93,7 +101,7 @@ export async function processMigrationStep(jobId:string) {
         const next=nextMonth(month);const end=context.config.toMonth??new Date().toISOString().slice(0,7);
         if(next<=end&&nextProcessed<phaseTotal){nextMonthValue=next;nextCursor=0;}else status="COMPLETED";
       } else {
-        const index=phases.indexOf(job.phase as typeof phases[number]);nextPhase=phases[index+1]??"PAYROLL";nextCursor=0;nextUpper=null;nextMonthValue=null;nextPhaseTotal=0;nextProcessed=0;
+        const pipeline=phasesFor(context.config);const index=pipeline.indexOf(job.phase);nextPhase=pipeline[index+1]??"PAYROLL";nextCursor=0;nextUpper=null;nextMonthValue=null;nextPhaseTotal=0;nextProcessed=0;
       }
     }
     if(exhausted&&((job.phase!=="PAYROLL")||status==="COMPLETED")&&job.phaseProcessed+processed!==phaseTotal)throw new MigrationRecordError("SOURCE_COUNT_CHANGED","تغير عدد سجلات المصدر أثناء التشغيل؛ راجع المصدر وابدأ تشغيل تحقق جديداً لإعادة المطابقة");
@@ -135,6 +143,6 @@ export async function controlMigration(jobId:string,action:"pause"|"resume"|"can
 export async function migrationStatus(id:string) {
   const job=await prisma.odooMigrationJob.findUnique({where:{id}});if(!job)return null;
   const [errors,openErrors]=await Promise.all([prisma.odooMigrationError.findMany({where:{jobId:id,status:"OPEN"},orderBy:{updatedAt:"desc"},take:50}),prisma.odooMigrationError.count({where:{jobId:id,status:"OPEN"}})]);
-  const phaseIndex=phases.indexOf(job.phase as typeof phases[number]);const completed=job.status.startsWith("COMPLETED");
-  return {...job,leaseToken:undefined,errors,openErrors,progress:completed?100:Math.min(99,Math.floor((Math.max(0,phaseIndex)+Math.min(1,job.phaseTotal?job.phaseProcessed/job.phaseTotal:0))/phases.length*100)),successRate:job.processed?Math.max(0,Math.round((job.processed-openErrors)/job.processed*10000)/100):0};
+  const config=migrationConfigSchema.parse(job.config);const pipeline=phasesFor(config);const phaseIndex=pipeline.indexOf(job.phase);const completed=job.status.startsWith("COMPLETED");
+  return {...job,leaseToken:undefined,errors,openErrors,progress:completed?100:Math.min(99,Math.floor((Math.max(0,phaseIndex)+Math.min(1,job.phaseTotal?job.phaseProcessed/job.phaseTotal:0))/pipeline.length*100)),successRate:job.processed?Math.max(0,Math.round((job.processed-openErrors)/job.processed*10000)/100):0};
 }
