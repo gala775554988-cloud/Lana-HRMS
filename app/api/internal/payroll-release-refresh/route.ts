@@ -14,8 +14,11 @@ export async function POST(request:Request){
  const key=process.env.LANA_PAYROLL_RELEASE_KEY;if(!key||!timingSafeEqual(digest(request.headers.get('x-lana-payroll-key')??''),digest(key)))return NextResponse.json({success:false},{status:401});
  if(Date.now()>new Date(expiresAt).getTime())return NextResponse.json({success:false,expired:true},{status:410});
  if(process.env.VERCEL_ENV!=='production')return NextResponse.json({success:false},{status:403});
- const body=await request.json().catch(()=>null);if(!['inspect','start','step','status','retry-errors'].includes(body?.action))return NextResponse.json({success:false},{status:400});
+ const body=await request.json().catch(()=>null);if(!['inspect','start','step','status','retry-errors','diagnostics'].includes(body?.action))return NextResponse.json({success:false},{status:400});
  try{
+  if(body.action==='diagnostics'){
+   const {client}=await getPayrollOdooClient();const meta=await client.fieldsGet('hr.salary.rule');const fields=['id','code','category_id','sequence','amount_python_compute','appears_on_payslip','not_computed_in_net'].filter(name=>name in meta);const rules=await client.search_read('hr.salary.rule',[],fields,{limit:500,order:'id asc',context:{active_test:false}});const localRules=await prisma.salaryRule.findMany({select:{code:true,category:true,isActive:true}});return NextResponse.json({success:true,rules,localRules},{headers:{'Cache-Control':'no-store'}});
+  }
   if(body.action==='inspect'){
    const {client}=await getPayrollOdooClient();const summary:Record<string,unknown>={};
    for(const model of ['hr.contract','hr.payslip','hr.payslip.line','hr.salary.rule']){try{const fields=await client.fieldsGet(model);const count=await client.execute_kw<number>(model,'search_count',[[]],{context:{active_test:false}});summary[model]={available:true,count,fields:Object.keys(fields).filter(name=>/wage|salary|allowance|currency|amount|total|category|rate|quantity|date_from/.test(name))};}catch{summary[model]={available:false};}}
