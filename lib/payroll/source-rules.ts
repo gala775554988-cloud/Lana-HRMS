@@ -5,9 +5,11 @@ import { externalId } from '@/lib/integrations/odoo/migration/mapping';
 export function categoryFromOdoo(code:string,chain:string[],notInNet=false){
  const name=code.toUpperCase();if(['BASIC','GROSS','NET'].includes(name))return name;
  const categories=chain.map(value=>value.toUpperCase());
- if(categories.some(value=>['DED','DEDUCTION'].includes(value)))return 'DEDUCTION';
+ if(categories.some(value=>['DED','DEDUCTION','GOSI'].includes(value)))return 'DEDUCTION';
  if(categories.some(value=>['ALW','ALLOWANCE'].includes(value)))return 'ALLOWANCE';
  if(categories.some(value=>['COMP','EMPLOYER','COMPANY'].includes(value)))return 'EMPLOYER';
+ // GROSS children and NGOSI are reference subtotals, never additional pay.
+ if(categories.some(value=>['GROSS','NET','NGOSI'].includes(value)))return 'INFORMATION';
  if(notInNet)return 'INFORMATION';return null;
 }
 export async function discoverSalaryRules(client:OdooClient,actorUserId:string){
