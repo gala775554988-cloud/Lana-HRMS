@@ -57,7 +57,8 @@ export function salaryProfileFromOdooContract(contract: Record<string, unknown>)
     salaryBonuses: firstAmount(contract, ["bonus", "bonuses"], /bonus/i),
     salaryDeductions: firstAmount(contract, ["deduction", "deductions"], /deduction/i),
     salaryOvertime: firstAmount(contract, ["overtime", "overtime_amount"], /overtime/i),
-    salaryNet: firstAmount(contract, ["net_wage", "net_salary"], /net.*(wage|salary)/i),
+    salaryNet: firstAmount(contract, ["net_wage", "net_salary", "net_contract_salary"], /net.*(wage|salary)/i),
+    salaryTotal: firstAmount(contract, ["total_salary", "gross_salary", "gross_wage"]),
     salaryInsuranceDeduction: firstAmount(contract, ["insurance_deduction"], /insurance.*deduction/i),
   };
 

@@ -28,6 +28,7 @@ export async function contractBatch(context:ImportContext,rows:OdooRecord[]){
      await tx.appSetting.upsert({where:{key},create:{key,value},update:{value}});
     }
    }
+   if(status!=='ACTIVE'){const key=`odoo.compensation.${employeeId}`;const old=await tx.appSetting.findUnique({where:{key}});if((old?.value as {contractId?:number}|null)?.contractId===Number(row.id))await tx.appSetting.delete({where:{key}});}
    await tx.odooSourceRecord.update({where:staged.where,data:{status:'IMPORTED',localId:saved.id}});
   });
   return existing?'UPDATED':'IMPORTED';

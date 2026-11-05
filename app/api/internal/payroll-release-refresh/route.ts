@@ -4,7 +4,7 @@ import { createHash,timingSafeEqual,randomUUID } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
 import { getPayrollOdooClient } from '@/lib/payroll/connection';
 import { migrationConfigSchema } from '@/lib/integrations/odoo/migration/mapping';
-import { createMigration,processMigrationStep,migrationStatus } from '@/lib/integrations/odoo/migration/worker';
+import { createMigration,processMigrationStep,migrationStatus,retryMigrationRecord } from '@/lib/integrations/odoo/migration/worker';
 import { expiresAt } from './expiry';
 export const runtime='nodejs';export const maxDuration=300;
 const digest=(value:string)=>createHash('sha256').update(value).digest();
@@ -14,12 +14,12 @@ export async function POST(request:Request){
  const key=process.env.LANA_PAYROLL_RELEASE_KEY;if(!key||!timingSafeEqual(digest(request.headers.get('x-lana-payroll-key')??''),digest(key)))return NextResponse.json({success:false},{status:401});
  if(Date.now()>new Date(expiresAt).getTime())return NextResponse.json({success:false,expired:true},{status:410});
  if(process.env.VERCEL_ENV!=='production')return NextResponse.json({success:false},{status:403});
- const body=await request.json().catch(()=>null);if(!['inspect','start','step','status'].includes(body?.action))return NextResponse.json({success:false},{status:400});
+ const body=await request.json().catch(()=>null);if(!['inspect','start','step','status','retry-errors'].includes(body?.action))return NextResponse.json({success:false},{status:400});
  try{
   if(body.action==='inspect'){
    const {client}=await getPayrollOdooClient();const summary:Record<string,unknown>={};
    for(const model of ['hr.contract','hr.payslip','hr.payslip.line','hr.salary.rule']){try{const fields=await client.fieldsGet(model);const count=await client.execute_kw<number>(model,'search_count',[[]],{context:{active_test:false}});summary[model]={available:true,count,fields:Object.keys(fields).filter(name=>/wage|salary|allowance|currency|amount|total|category|rate|quantity|date_from/.test(name))};}catch{summary[model]={available:false};}}
-   return NextResponse.json({success:true,source:summary,local:{contracts:await prisma.employeeContract.count(),historicalPayslips:await prisma.historicalPayslip.count(),linkedEmployees:await prisma.employee.count({where:{odooId:{not:null}}}),contractCurrencies:await prisma.employeeContract.groupBy({by:['currency'],_count:{_all:true}})}},{headers:{'Cache-Control':'no-store'}});
+   const states=await client.execute_kw('hr.contract','read_group',[[],['state'],['state']],{context:{active_test:false}}).catch(()=>[]);const rules=await client.search_read('hr.salary.rule',[],['id','code','category_id'],{limit:500,order:'id asc',context:{active_test:false}}).catch(()=>[]);const categories=await client.search_read('hr.salary.rule.category',[],['id','code','parent_id'],{limit:500,order:'id asc',context:{active_test:false}}).catch(()=>[]);return NextResponse.json({success:true,source:summary,contractStates:states,salaryRules:rules,salaryCategories:categories,local:{contracts:await prisma.employeeContract.count(),historicalPayslips:await prisma.historicalPayslip.count(),linkedEmployees:await prisma.employee.count({where:{odooId:{not:null}}}),contractCurrencies:await prisma.employeeContract.groupBy({by:['currency'],_count:{_all:true}})}},{headers:{'Cache-Control':'no-store'}});
   }
   let saved=await prisma.appSetting.findUnique({where:{key:marker}});let jobId=typeof saved?.value==='string'?saved.value:null;
   if(body.action==='start'&&!jobId){
@@ -31,6 +31,7 @@ export async function POST(request:Request){
   }
   if(!jobId)return NextResponse.json({success:false,error:'JOB_NOT_STARTED'},{status:409});
   const job=await prisma.odooMigrationJob.findUniqueOrThrow({where:{id:jobId}});if((job.config as {scope?:string}).scope!=='PAYROLL')return NextResponse.json({success:false},{status:403});
+  if(body.action==='retry-errors'&&['COMPLETED','COMPLETED_WITH_ERRORS','FAILED','PAUSED'].includes(job.status)){const errors=await prisma.odooMigrationError.findMany({where:{jobId:job.id,status:'OPEN',entity:{in:['CONTRACTS','PAYROLL']}},orderBy:{updatedAt:'asc'},take:20});for(const error of errors){try{await retryMigrationRecord(job.id,error.id);}catch{}}}
   if(body.action==='step'&&['PENDING','RUNNING'].includes(job.status))await processMigrationStep(job.id);
   return NextResponse.json({success:true,job:await snapshot(job.id)},{headers:{'Cache-Control':'no-store'}});
  }catch{return NextResponse.json({success:false,error:'PAYROLL_IMPORT_FAILED',job:typeof (await prisma.appSetting.findUnique({where:{key:marker}}))?.value==='string'?await snapshot(String((await prisma.appSetting.findUnique({where:{key:marker}}))!.value)):null},{status:409});}

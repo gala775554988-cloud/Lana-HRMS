@@ -8,9 +8,10 @@ interface DialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   children: React.ReactNode;
+  panelClassName?: string;
 }
 
-export function Dialog({ open, onOpenChange, children }: DialogProps) {
+export function Dialog({ open, onOpenChange, children, panelClassName }: DialogProps) {
   React.useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden";
@@ -33,7 +34,7 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 animate-fade-in" onClick={() => onOpenChange(false)} role="dialog" aria-modal="true">
-      <div onClick={(e) => e.stopPropagation()} className="relative max-h-[90vh] w-full max-w-lg overflow-auto rounded-2xl border border-border bg-card shadow-2xl">
+      <div onClick={(e) => e.stopPropagation()} className={cn("relative max-h-[90vh] w-full max-w-lg overflow-auto rounded-2xl border border-border bg-card shadow-2xl", panelClassName)}>
         {children}
       </div>
     </div>

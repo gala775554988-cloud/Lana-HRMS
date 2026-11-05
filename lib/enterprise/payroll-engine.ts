@@ -99,10 +99,10 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
 
   const [allAllowances, allDeductions, overtimeRequests, bonuses, socialInsurance, loans, advances, attendance] = await Promise.all([
     prisma.allowance.findMany({
-      where: { employeeId, effectiveFrom: { lte: periodEnd }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: periodStart } }] }
+      where: { employeeId, NOT: { source: "ODOO", odooPayslipLineId: { not: null } }, effectiveFrom: { lte: periodEnd }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: periodStart } }] }
     }),
     prisma.deduction.findMany({
-      where: { employeeId, effectiveFrom: { lte: periodEnd }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: periodStart } }] }
+      where: { employeeId, NOT: { source: "ODOO", odooPayslipLineId: { not: null } }, effectiveFrom: { lte: periodEnd }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: periodStart } }] }
     }),
     prisma.overtimeRequest.findMany({
       where: { employeeId, status: "APPROVED", workDate: { gte: periodStart, lte: periodEnd }, includedInPayrollAt: null }
@@ -131,6 +131,8 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
       }
     })
   ]);
+
+  if ([...allAllowances, ...allDeductions].some(row => row.currency && row.currency !== currency)) throw new Error("تختلف عملة أحد بنود الأجر عن عملة العقد؛ راجع البند قبل احتساب المسير");
 
   const oneOffKeys = [...allAllowances.filter(row => !row.isRecurring).map(row => `payroll.once.allowance.${row.id}`), ...allDeductions.filter(row => !row.isRecurring).map(row => `payroll.once.deduction.${row.id}`)];
   const consumed = new Set((await prisma.appSetting.findMany({ where: { key: { in: oneOffKeys } }, select: { key: true } })).map(row => row.key));
