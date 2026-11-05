@@ -1,27 +1,31 @@
 import { NextResponse } from "next/server";
 import { getCurrentEmployeeCached } from "@/lib/employee/employee-cache";
-import { getPayrollSummary } from "@/lib/employee/data";
+import { prisma } from "@/lib/prisma";
 import { buildBrandedPdf } from "@/lib/pdf/branded-pdf";
 
-export async function GET() {
+export async function GET(request: Request) {
   const employee = await getCurrentEmployeeCached();
   if (!employee) return NextResponse.json({ error: "Employee not found" }, { status: 404 });
   
-  const salary = await getPayrollSummary(employee.id).catch(() => null);
-  const fullName = `${employee.firstName} ${employee.lastName}`.trim();
+  const itemId = new URL(request.url).searchParams.get("id");
+  const item = await prisma.payrollItem.findFirst({ where: { employeeId: employee.id, ...(itemId ? { id: itemId } : {}), payrollRun: { status: { in: ["PAID", "LOCKED", "ARCHIVED"] }, paidAt: { not: null } } }, include: { payrollRun: true }, orderBy: { createdAt: "desc" } });
+  if (!item) return NextResponse.json({ error: "Payslip not available" }, { status: 404 });
+  const snapshot = item.calculationSnapshot as { components?: { name: string; code: string; amount: number }[] } | null;
   const lines = [
-    `Employee: ${fullName}`,
+    `Employee: ${employee.firstName} ${employee.lastName}`,
     `Employee Number: ${employee.employeeNumber}`,
-    `Generated: ${new Date().toISOString().slice(0, 10)}`,
-    `Base Salary: ${salary?.baseSalary ?? "0"}`,
-    `Currency: ${salary?.currency ?? "SAR"}`,
-    `Net Pay: ${salary?.netPay ?? salary?.baseSalary ?? "0"}`,
-    `Last Pay Date: ${salary?.lastPayDate ?? "Not recorded"}`,
+    `Period: ${item.payrollRun.period}`,
+    `Base Salary: ${Number(item.baseSalary).toFixed(2)} ${item.currency}`,
+    ...(snapshot?.components ?? []).map(row => `${row.code}: ${Number(row.amount).toFixed(2)}`),
+    `Gross: ${Number(item.grossPay).toFixed(2)}`,
+    `Deductions: ${Number(item.deductionTotal).toFixed(2)}`,
+    `Net Paid: ${Number(item.netPay).toFixed(2)}`,
   ];
   const buffer = await buildBrandedPdf("Payslip", lines);
   return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
+      "Cache-Control": "private, no-store",
       "Content-Disposition": `attachment; filename="payslip-${employee.employeeNumber}.pdf"`,
     },
   });

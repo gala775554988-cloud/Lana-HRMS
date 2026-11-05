@@ -5,12 +5,14 @@ export const dynamic = "force-dynamic";
 
 export default async function Tracker({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const employee = await getCurrentEmployeeCached();
+  if (!employee) return <p>لم يتم العثور على بيانات الموظف</p>;
   const query = await searchParams;
   const highlight = typeof query.highlight === "string" ? query.highlight : null;
 
   const workflows = await prisma.workflowInstance.findMany({
     where: { employeeId: employee?.id },
-    include: { steps: true },
+    include: { steps: { orderBy: { step: "asc" } } },
+    take: 100,
     orderBy: { createdAt: "desc" },
   });
 
@@ -25,7 +27,7 @@ export default async function Tracker({ searchParams }: { searchParams: Promise<
           <div className="flex justify-between">
             <div>
               <div className="font-semibold">{wf.type}</div>
-              <div className="text-xs text-slate-500">المرحلة الحالية: {wf.currentStep}/3</div>
+              <div className="text-xs text-slate-500">المرحلة الحالية: {Math.min(wf.currentStep, wf.steps.length)}/{wf.steps.length}</div>
             </div>
             <div className={`text-xs px-3 py-1 rounded-full ${wf.status === "COMPLETED" ? "bg-emerald-100" : "bg-amber-100"}`}>
               {wf.status}

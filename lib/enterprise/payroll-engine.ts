@@ -1,3 +1,4 @@
+import { calculateGosi, resolveGosiCohort } from "@/lib/payroll/calculations";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeSalaryProfile } from "@/lib/employee/salary-profile-store";
 import { calculateNetSalary } from "@/lib/employee/salary-profile";
@@ -45,6 +46,11 @@ export type PayrollBreakdown = {
   currency: string;
   overtimeRequestIds: string[];
   bonusIds: string[];
+  oneOffSourceKeys: string[];
+  components: { code: string; name: string; kind: string; amount: number; sourceId?: string }[];
+  gosi: ReturnType<typeof calculateGosi>;
+  loanAllocations: { id: string; amount: number; outstanding: number; installmentIds?: string[] }[];
+  advanceAllocations: { id: string; amount: number; paidInstallments: number }[];
 };
 
 /** The single source of truth for "what does this employee earn". Reconciles
@@ -86,7 +92,7 @@ async function resolveBaseSalary(employeeId: string): Promise<{ base: number; cu
 export async function computeEmployeePayroll(employeeId: string, periodStart: Date, periodEnd: Date): Promise<PayrollBreakdown> {
   const { base: baseSalary, currency, profileAllowanceTotal } = await resolveBaseSalary(employeeId);
 
-  const [allowances, deductions, overtimeRequests, bonuses, socialInsurance, loans, advances, attendance] = await Promise.all([
+  const [allAllowances, allDeductions, overtimeRequests, bonuses, socialInsurance, loans, advances, attendance] = await Promise.all([
     prisma.allowance.findMany({
       where: { employeeId, effectiveFrom: { lte: periodEnd }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: periodStart } }] }
     }),
@@ -99,9 +105,9 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
     prisma.employeeBonus.findMany({
       where: { employeeId, status: "APPROVED", awardedDate: { gte: periodStart, lte: periodEnd }, includedInPayrollAt: null }
     }),
-    prisma.socialInsuranceRecord.findUnique({ where: { employeeId }, select: { status: true, employeeContributionAmount: true } }),
-    prisma.loan.findMany({ where: { employeeId, status: "ACTIVE" } }),
-    prisma.employeeSalaryAdvance.findMany({ where: { employeeId, status: "APPROVED" } }),
+    prisma.socialInsuranceRecord.findUnique({ where: { employeeId }, select: { status: true, employeeContributionAmount: true, coverageCohort: true, firstCoverageDate: true } }),
+    prisma.loan.findMany({ where: { employeeId, status: "ACTIVE", issuedAt: { lte: periodEnd } }, include: { repaymentSchedule: { where: { dueDate: { gte: periodStart, lte: periodEnd }, remotePaid: false, localPaidAt: null }, orderBy: { dueDate: "asc" } } } }),
+    prisma.employeeSalaryAdvance.findMany({ where: { employeeId, status: "APPROVED", startDate: { lte: periodEnd } } }),
     prisma.attendanceRecord.findMany({
       where: { employeeId, workDate: { gte: periodStart, lte: periodEnd }, status: { in: ["ABSENT", "LATE", "HALF_DAY"] } },
       select: {
@@ -121,6 +127,11 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
     })
   ]);
 
+  const oneOffKeys = [...allAllowances.filter(row => !row.isRecurring).map(row => `payroll.once.allowance.${row.id}`), ...allDeductions.filter(row => !row.isRecurring).map(row => `payroll.once.deduction.${row.id}`)];
+  const consumed = new Set((await prisma.appSetting.findMany({ where: { key: { in: oneOffKeys } }, select: { key: true } })).map(row => row.key));
+  const allowances = allAllowances.filter(row => row.isRecurring || !consumed.has(`payroll.once.allowance.${row.id}`));
+  const deductions = allDeductions.filter(row => row.isRecurring || !consumed.has(`payroll.once.deduction.${row.id}`));
+  const oneOffSourceKeys = oneOffKeys.filter(key => !consumed.has(key));
   const allowanceTotal = round2(allowances.reduce((sum, a) => sum + Number(a.amount), 0) + profileAllowanceTotal);
   const taxTotal = round2(deductions.filter((d) => d.category === "TAX").reduce((sum, d) => sum + Number(d.amount), 0));
   const penaltyDeduction = round2(deductions.filter((d) => d.category === "PENALTY").reduce((sum, d) => sum + Number(d.amount), 0));
@@ -138,12 +149,31 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
 
   const bonusTotal = round2(bonuses.reduce((sum, b) => sum + Number(b.amount), 0));
 
-  const insuranceDeduction =
-    socialInsurance && socialInsurance.status === "ACTIVE" ? round2(Number(socialInsurance.employeeContributionAmount)) : 0;
+  const [employee, policies, profile] = await Promise.all([
+    prisma.employee.findUniqueOrThrow({ where: { id: employeeId }, select: { nationality: { select: { code: true } } } }),
+    prisma.gosiSetting.findMany({ where: { effectiveFrom: { lte: periodEnd }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: periodStart } }] } }),
+    getEmployeeSalaryProfile(employeeId),
+  ]);
+  const saudi = ["SA", "SAU", "SAUDI"].includes(employee.nationality?.code.toUpperCase() ?? "");
+  const active = socialInsurance?.status === "ACTIVE";
+  if (active && !employee.nationality?.code) throw new Error("حدد جنسية الموظف قبل احتساب التأمينات");
+  const cutoffs = [...new Set(policies.map(policy => policy.newSystemCutoff?.toISOString()).filter((value): value is string => Boolean(value)))];
+  if (cutoffs.length > 1) throw new Error("تواريخ فصل نظام التأمينات متعارضة؛ راجع السياسات");
+  const cutoff = cutoffs.length ? new Date(cutoffs[0]) : null;
+  const cohort = saudi && active ? resolveGosiCohort(socialInsurance?.coverageCohort ?? null, socialInsurance?.firstCoverageDate ?? null, cutoff) : "";
+  const gosi = calculateGosi({ saudi, active, cohort, asOf: periodEnd, basic: baseSalary,
+    housing: Number(profile.salaryHousingAllowance ?? 0) + allowances.filter(row => row.category.toUpperCase() === "HOUSING").reduce((sum, row) => sum + Number(row.amount), 0),
+    policies: policies.map(policy => ({ ...policy, employeeRate: Number(policy.employeeRate), employerRate: Number(policy.employerRate), minimumWage: Number(policy.minimumWage), maximumWage: Number(policy.maximumWage) })),
+  });
+  const insuranceDeduction = gosi.employeeAmount;
 
-  const loanDeduction = round2(
-    loans.reduce((sum, loan) => sum + Math.min(Number(loan.installmentAmount), Number(loan.outstandingAmount)), 0)
-  );
+  const loanAllocations = loans.map(loan => {
+    if (loan.currency !== currency) throw new Error("عملة السلفة لا تطابق عملة الراتب؛ يلزم تحويل معتمد قبل الخصم");
+    const scheduled = loan.repaymentSchedule.reduce((sum, row) => sum + Number(row.amount), 0);
+    if (loan.odooSource && scheduled > Number(loan.outstandingAmount) + 0.005) throw new Error("جدول الأقساط المستحقة يتجاوز رصيد السلفة");
+    return { id: loan.id, amount: round2(loan.odooSource ? scheduled : Math.min(Number(loan.installmentAmount), Number(loan.outstandingAmount))), outstanding: Number(loan.outstandingAmount), ...(loan.odooSource ? { installmentIds: loan.repaymentSchedule.map(row => row.id) } : {}) };
+  }).filter(row => row.amount > 0);
+  const loanDeduction = round2(loanAllocations.reduce((sum, row) => sum + row.amount, 0));
 
   const advanceDeduction = round2(
     advances.reduce((sum, adv) => {
@@ -188,7 +218,24 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
     netPay,
     currency,
     overtimeRequestIds: overtimeRequests.map((r) => r.id),
-    bonusIds: bonuses.map((b) => b.id)
+    bonusIds: bonuses.map((b) => b.id),
+    gosi,
+    oneOffSourceKeys,
+    components: [
+      { code: "BASIC", name: "الراتب الأساسي", kind: "EARNING", amount: baseSalary },
+      ...[["HOUSING", "بدل السكن", profile.salaryHousingAllowance], ["TRANSPORT", "بدل الانتقال", profile.salaryTransportAllowance], ["FOOD", "بدل الطعام", profile.salaryFoodAllowance], ["COMMUNICATION", "بدل الاتصال", profile.salaryCommunicationAllowance], ["OTHER", "بدلات أخرى", profile.salaryOtherAllowances]].map(([code, name, amount]) => ({ code: String(code), name: String(name), kind: "EARNING", amount: Number(amount ?? 0) })),
+      ...allowances.map(row => ({ code: row.category, name: row.name, kind: "EARNING", amount: Number(row.amount), sourceId: row.id })),
+      ...deductions.map(row => ({ code: row.category, name: row.name, kind: "DEDUCTION", amount: Number(row.amount), sourceId: row.id })),
+      ...overtimeRequests.map(row => ({ code: "OVERTIME", name: row.reason ?? "عمل إضافي", kind: "EARNING", amount: Number(row.amount ?? baseSalary / 240 * Number(row.hours) * overtimeMultiplier(row.reason ?? "")), sourceId: row.id })),
+      ...bonuses.map(row => ({ code: "BONUS", name: "مكافأة", kind: "EARNING", amount: Number(row.amount), sourceId: row.id })),
+      { code: "GOSI", name: "تأمينات الموظف", kind: "DEDUCTION", amount: insuranceDeduction },
+      { code: "ABSENCE", name: "الغياب", kind: "DEDUCTION", amount: absenceDeduction },
+      { code: "LATE", name: "التأخير", kind: "DEDUCTION", amount: lateDeduction },
+      { code: "LOAN", name: "أقساط القروض", kind: "DEDUCTION", amount: loanDeduction },
+      { code: "ADVANCE", name: "أقساط السلف", kind: "DEDUCTION", amount: advanceDeduction },
+    ].filter(row => row.amount !== 0),
+    loanAllocations,
+    advanceAllocations: advances.filter(row => row.paidInstallments < row.installments).map(row => ({ id: row.id, amount: round2(Math.min(Number(row.monthlyDeduction), Number(row.amount) - Number(row.monthlyDeduction) * row.paidInstallments)), paidInstallments: row.paidInstallments })).filter(row => row.amount > 0),
   };
 }
 
@@ -207,113 +254,46 @@ export type RunEmployeeScope = {
  * times" invariant) -- never marks anything consumed, that only ever
  * happens once, at pay time (see markPayrollSourcesConsumed above). */
 export async function computeAndUpsertPayrollItems(
-  runId: string,
-  periodStartDate: Date,
-  periodEndDate: Date,
-  scope: RunEmployeeScope
+  runId: string, periodStartDate: Date, periodEndDate: Date, scope: RunEmployeeScope
 ) {
+  const run = await prisma.payrollRun.findUniqueOrThrow({ where: { id: runId } });
+  if (!["DRAFT", "PROCESSING"].includes(run.status)) throw new Error("المسير معتمد أو مقفل");
+  if (await prisma.payrollItem.count({ where: { payrollRunId: runId, odooPayslipId: { not: null } } })) throw new Error("مسير مستورد من Odoo؛ حدّثه من كشوف Odoo بدلاً من إعادة احتسابه محلياً");
   const employeeWhere: Record<string, unknown> = { status: "ACTIVE" };
   if (scope.employeeIds?.length) employeeWhere.id = { in: scope.employeeIds };
   if (scope.companyId) employeeWhere.companyId = scope.companyId;
   if (scope.branchId) employeeWhere.branchId = scope.branchId;
   if (scope.departmentId) employeeWhere.departmentId = scope.departmentId;
-
   const employees = await prisma.employee.findMany({ where: employeeWhere, select: { id: true } });
-
   const items: Array<{ employeeId: string; netPay: number; error?: string }> = [];
+  const calculated: Array<{ employeeId: string; breakdown: PayrollBreakdown }> = [];
   for (const employee of employees) {
     try {
       const breakdown = await computeEmployeePayroll(employee.id, periodStartDate, periodEndDate);
-      await prisma.payrollItem.upsert({
-        where: { payrollRunId_employeeId: { payrollRunId: runId, employeeId: employee.id } },
-        update: {
-          baseSalary: breakdown.baseSalary,
-          allowanceTotal: breakdown.allowanceTotal,
-          bonusTotal: breakdown.bonusTotal,
-          overtimeTotal: breakdown.overtimeTotal,
-          grossPay: breakdown.grossPay,
-          insuranceDeduction: breakdown.insuranceDeduction,
-          taxTotal: breakdown.taxTotal,
-          loanDeduction: breakdown.loanDeduction,
-          advanceDeduction: breakdown.advanceDeduction,
-          absenceDeduction: breakdown.absenceDeduction,
-          lateDeduction: breakdown.lateDeduction,
-          penaltyDeduction: breakdown.penaltyDeduction,
-          deductionTotal: breakdown.deductionTotal,
-          netPay: breakdown.netPay,
-          currency: breakdown.currency,
-          costCenterId: scope.costCenterId
-        },
-        create: {
-          payrollRunId: runId,
-          employeeId: employee.id,
-          baseSalary: breakdown.baseSalary,
-          allowanceTotal: breakdown.allowanceTotal,
-          bonusTotal: breakdown.bonusTotal,
-          overtimeTotal: breakdown.overtimeTotal,
-          grossPay: breakdown.grossPay,
-          insuranceDeduction: breakdown.insuranceDeduction,
-          taxTotal: breakdown.taxTotal,
-          loanDeduction: breakdown.loanDeduction,
-          advanceDeduction: breakdown.advanceDeduction,
-          absenceDeduction: breakdown.absenceDeduction,
-          lateDeduction: breakdown.lateDeduction,
-          penaltyDeduction: breakdown.penaltyDeduction,
-          deductionTotal: breakdown.deductionTotal,
-          netPay: breakdown.netPay,
-          currency: breakdown.currency,
-          costCenterId: scope.costCenterId
-        }
-      });
+      calculated.push({ employeeId: employee.id, breakdown });
       items.push({ employeeId: employee.id, netPay: breakdown.netPay });
-    } catch (error: any) {
-      items.push({ employeeId: employee.id, netPay: 0, error: error?.message || String(error) });
-    }
+    } catch (error) { items.push({ employeeId: employee.id, netPay: 0, error: error instanceof Error ? error.message : "تعذر الاحتساب" }); }
   }
-
-  return { employeeCount: employees.length, items, errorCount: items.filter((i) => i.error).length };
-}
-
-/** Called exactly once, when a PayrollRun is actually paid (never on a
- * DRAFT compute/recompute) -- marks the overtime/bonus rows this breakdown
- * consumed so a later run never double-pays them, and decrements
- * loan/advance balances by what was actually deducted this run. */
-export async function markPayrollSourcesConsumed(breakdown: PayrollBreakdown, employeeId: string) {
-  const now = new Date();
-  await Promise.all([
-    breakdown.overtimeRequestIds.length
-      ? prisma.overtimeRequest.updateMany({ where: { id: { in: breakdown.overtimeRequestIds } }, data: { includedInPayrollAt: now } })
-      : Promise.resolve(),
-    breakdown.bonusIds.length
-      ? prisma.employeeBonus.updateMany({ where: { id: { in: breakdown.bonusIds } }, data: { includedInPayrollAt: now } })
-      : Promise.resolve()
-  ]);
-
-  if (breakdown.loanDeduction > 0) {
-    const loans = await prisma.loan.findMany({ where: { employeeId, status: "ACTIVE" } });
-    for (const loan of loans) {
-      const deducted = Math.min(Number(loan.installmentAmount), Number(loan.outstandingAmount));
-      if (deducted <= 0) continue;
-      const newOutstanding = round2(Number(loan.outstandingAmount) - deducted);
-      await prisma.loan.update({
-        where: { id: loan.id },
-        data: { outstandingAmount: newOutstanding, status: newOutstanding <= 0 ? "PAID" : "ACTIVE" }
-      });
+  const errorCount = items.filter(item => item.error).length;
+  await prisma.$transaction(async tx => {
+    const editable = await tx.payrollRun.updateMany({ where: { id: runId, status: run.status, updatedAt: run.updatedAt }, data: { updatedAt: new Date() } });
+    if (editable.count !== 1) throw new Error("تغير المسير أثناء الاحتساب؛ أعد المحاولة");
+    const summary = { employeeCount: employees.length, errorCount, errors: items.filter(item => item.error).map(item => ({ employeeId: item.employeeId, error: item.error! })) };
+    await tx.appSetting.upsert({ where: { key: `payroll.compute.${runId}` }, create: { key: `payroll.compute.${runId}`, value: summary }, update: { value: summary } });
+    if (errorCount) return; // Never publish a partial calculation over a valid draft.
+    for (const { employeeId, breakdown } of calculated) {
+      const data = {
+        calculationSnapshot: JSON.parse(JSON.stringify(breakdown)), employerInsurance: breakdown.gosi.employerAmount,
+        baseSalary: breakdown.baseSalary, allowanceTotal: breakdown.allowanceTotal, bonusTotal: breakdown.bonusTotal,
+        overtimeTotal: breakdown.overtimeTotal, grossPay: breakdown.grossPay, insuranceDeduction: breakdown.insuranceDeduction,
+        taxTotal: breakdown.taxTotal, loanDeduction: breakdown.loanDeduction, advanceDeduction: breakdown.advanceDeduction,
+        absenceDeduction: breakdown.absenceDeduction, lateDeduction: breakdown.lateDeduction, penaltyDeduction: breakdown.penaltyDeduction,
+        deductionTotal: breakdown.deductionTotal, netPay: breakdown.netPay, currency: breakdown.currency, costCenterId: scope.costCenterId,
+      };
+      await tx.payrollItem.upsert({ where: { payrollRunId_employeeId: { payrollRunId: runId, employeeId } }, update: data, create: { ...data, payrollRunId: runId, employeeId } });
     }
-  }
-
-  if (breakdown.advanceDeduction > 0) {
-    const advances = await prisma.employeeSalaryAdvance.findMany({ where: { employeeId, status: "APPROVED" } });
-    for (const adv of advances) {
-      const remaining = Number(adv.amount) - Number(adv.monthlyDeduction) * adv.paidInstallments;
-      if (remaining <= 0 || adv.paidInstallments >= adv.installments) continue;
-      await prisma.employeeSalaryAdvance.update({
-        where: { id: adv.id },
-        data: {
-          paidInstallments: adv.paidInstallments + 1,
-          status: adv.paidInstallments + 1 >= adv.installments ? "PAID" : adv.status
-        }
-      });
-    }
-  }
+    // A changed employee selection must not retain stale employees in a draft.
+    await tx.payrollItem.deleteMany({ where: { payrollRunId: runId, employeeId: { notIn: calculated.map(row => row.employeeId) } } });
+  }, { timeout: 30000 });
+  return { employeeCount: employees.length, items, errorCount };
 }

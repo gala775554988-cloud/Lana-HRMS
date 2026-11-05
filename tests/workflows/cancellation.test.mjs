@@ -24,11 +24,11 @@ async function setup({ status = 'PENDING', code = 'ANNUAL', conflict = false, ow
 test('cancellation withdraws the workflow and its pending steps atomically', async () => {
   const s = await setup();assert.equal((await s.cancel()).status, 200);assert.equal(s.state().workflowStatus, 'CANCELLED');assert.equal(s.state().stepsCancelled, true);assert.equal(s.state().used, 5);assert.equal(s.state().audit, 1);
 });
-test('approved annual leave is credited once, with no duplicate cancellation', async () => {
-  const s = await setup({ status: 'APPROVED' });assert.equal((await s.cancel()).status, 200);assert.equal(s.state().used, 2);assert.equal((await s.cancel()).status, 409);assert.equal(s.state().used, 2);
+test('approved leave requires a separate approved revocation and never credits directly', async () => {
+  const s = await setup({ status: 'APPROVED' });assert.equal((await s.cancel()).status, 409);assert.equal(s.state().used, 5);assert.equal(s.state().status, 'APPROVED');
 });
 test('cancelling special or sick leave does not credit annual leave', async () => {
-  const s = await setup({ status: 'APPROVED', code: 'SICK' });assert.equal((await s.cancel()).status, 200);assert.equal(s.state().used, 5);
+  const s = await setup({ status: 'APPROVED', code: 'SICK' });assert.equal((await s.cancel()).status, 409);assert.equal(s.state().used, 5);
 });
 test('a concurrent state change rolls back every cancellation side effect', async () => {
   const s = await setup({ conflict: true });assert.equal((await s.cancel()).status, 409);assert.equal(s.state().workflowStatus, 'PENDING');assert.equal(s.state().status, 'PENDING');assert.equal(s.state().audit, 0);

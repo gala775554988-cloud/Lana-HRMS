@@ -598,6 +598,7 @@ export async function createModuleRecord(input: MutationInput) {
   if (!resource) return { success: false, message: "Unknown module." };
   if (resource.key === "audit-logs") return { success: false, message: "Audit log entries are immutable and cannot be created manually." };
   const session = await requireModulePermission(resource, mutationAction(resource, "create"));
+  if (["payrollRun", "payrollItem"].includes(resource.model)) return { success: false, message: "حسابات الرواتب وحالات المسير تُدار من شاشة مسير الرواتب المعتمد لحماية لقطة الحساب." };
   const salaryProfile = resource.key === "employees" ? extractSalaryProfile(input.values) : {};
   const parsed = buildModuleSchema(resource).safeParse(input.values);
   if (!parsed.success) return { success: false, message: parsed.error.errors[0]?.message ?? "Invalid input." };
@@ -750,8 +751,10 @@ export async function updateModuleRecord(input: MutationInput) {
   if (!resource || !input.id) return { success: false, message: "Unknown record." };
   if (resource.key === "audit-logs") return { success: false, message: "Audit log entries are immutable and cannot be edited." };
   const session = await requireModulePermission(resource, mutationAction(resource, "edit"));
+  if (["payrollRun", "payrollItem"].includes(resource.model)) return { success: false, message: "حسابات الرواتب وحالات المسير تُدار من شاشة مسير الرواتب المعتمد لحماية لقطة الحساب." };
   const existingRecord = await delegateFor(resource.model).findUnique({ where: { id: input.id } });
   await assertRecordVisible(resource, existingRecord, session);
+  if (resource.model === "loan" && existingRecord?.odooSource) return { success: false, message: "السلفة مستوردة من Odoo؛ استخدم المزامنة أو خصم القسط من مسير الرواتب، ولا تعدل أو تحذف سجلها مباشرة." };
   if (["leaveRequest", "overtimeRequest", "loan"].includes(resource.model) && Object.hasOwn(input.values, "status") && input.values.status !== existingRecord?.status) {
     const type = ({ leaveRequest: "LEAVE", overtimeRequest: "OVERTIME", loan: "LOAN" } as Record<string, string>)[resource.model];
     const workflow = await prisma.workflowInstance.findFirst({ where: { entityId: input.id, type }, select: { status: true } });
@@ -825,8 +828,10 @@ export async function deleteModuleRecord(resourceKey: string, id: string) {
   if (!resource) return { success: false, message: "Unknown module." };
   if (resource.key === "audit-logs") return { success: false, message: "Audit log entries are immutable and cannot be deleted." };
   const session = await requireModulePermission(resource, mutationAction(resource, "delete"));
+  if (["payrollRun", "payrollItem"].includes(resource.model)) return { success: false, message: "حسابات الرواتب وحالات المسير تُدار من شاشة مسير الرواتب المعتمد لحماية لقطة الحساب." };
   const existingRecord = await delegateFor(resource.model).findUnique({ where: { id } });
   await assertRecordVisible(resource, existingRecord, session);
+  if (resource.model === "loan" && existingRecord?.odooSource) return { success: false, message: "السلفة مستوردة من Odoo؛ استخدم المزامنة أو خصم القسط من مسير الرواتب، ولا تعدل أو تحذف سجلها مباشرة." };
   await delegateFor(resource.model).delete({ where: { id } });
   await writeAuditLog({ actorUserId: session.user.id, action: "delete", entity: resource.model, entityId: id, metadata: { before: serialize(existingRecord), after: null } });
   revalidatePath("/" + resource.key);

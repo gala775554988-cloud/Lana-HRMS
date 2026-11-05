@@ -25,6 +25,9 @@ export class OdooClient {
     return new OdooClient(getOdooEnvConfig(overrides));
   }
 
+  /** Financial writes must reconcile a stable external reference before retrying. */
+  forFinancialWrites() { return new OdooClient({ ...this.config, maxRetries: 0 }); }
+
   get protocol(): ActiveOdooProtocol | undefined {
     return this.auth.protocol;
   }

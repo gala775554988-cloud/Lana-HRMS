@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { load } from './helpers.mjs';
+const lifecycle = await load('lib/self-service/lifecycle.ts', { zod: await import('zod') });
 const metadata = await load('lib/enterprise/workflow-step-metadata.ts');
 class ApprovalRoutingError extends Error {}
 async function setup({ type = 'LETTER', leaveCode = 'ANNUAL', self = false, deferred = false } = {}) {
@@ -37,6 +38,7 @@ async function setup({ type = 'LETTER', leaveCode = 'ANNUAL', self = false, defe
     const task = queue.then(async () => { const draft = structuredClone(state);const result = await callback(build(() => draft));state = draft;return result; });queue = task.catch(() => {});return task;
   } };
   const api = await load('lib/enterprise/workflow.ts', {
+    '@/lib/self-service/lifecycle': lifecycle,
     '@/lib/prisma': { prisma }, './request-routing-policy': { ApprovalRoutingError }, './workflow-step-metadata': metadata,
     '@/lib/enterprise/hierarchy': { resolveApprovalChain: async () => { resolutionCalls++;return approvers; } },
     '@/lib/enterprise/notifications': { createEnterpriseNotification: async () => {}, notifyUsers: async () => {} },

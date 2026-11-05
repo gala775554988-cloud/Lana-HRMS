@@ -135,7 +135,7 @@ export async function GET(request: NextRequest) {
   for (const row of allScoped) {
     row.leave = row.type === "LEAVE" ? leaveMap.get(row.entityId) ?? null : null;
     // A manager's intermediate approval is not a final leave approval.
-    if (row.leave) row.status = row.leave.status === "APPROVED" ? "COMPLETED" : row.leave.status === "PENDING" && row.status === "RETURNED" ? "RETURNED" : row.leave.status;
+    if (row.leave && row.status !== "SUPERSEDED") row.status = row.leave.status === "APPROVED" ? "COMPLETED" : row.leave.status === "PENDING" && row.status === "RETURNED" ? "RETURNED" : row.leave.status;
   }
   const scoped = allScoped.filter((row) => requestMatchesSearch(row, search));
   const raw = scoped.filter((row) => {

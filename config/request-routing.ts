@@ -1,4 +1,7 @@
 export const REQUEST_CATEGORIES = [
+  { code: "HOUSING", label: "بدل سكن" }, { code: "TRANSPORT", label: "بدل انتقال" },
+  { code: "EXIT_PERMISSION", label: "إذن خروج" }, { code: "SETTLEMENT", label: "تصفية مستحقات" },
+  { code: "PERSONAL_UPDATE", label: "تحديث البيانات الشخصية" },
   { code: "RESUMPTION", label: "مباشرة العمل" }, { code: "RESIDENCY", label: "الإقامة" },
   { code: "OVERTIME", label: "العمل الإضافي" }, { code: "LOAN", label: "السلف" },
   { code: "LETTER", label: "الخطابات" }, { code: "LEAVE", label: "الإجازات" },

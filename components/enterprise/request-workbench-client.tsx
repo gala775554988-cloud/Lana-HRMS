@@ -15,6 +15,8 @@ import { MetricStrip } from "@/components/hrms/workspace-ui";
 
 const typeLabels: Record<string, string> = {
   ALL: "كل الأنواع",
+  REVOKE: "طلبات الاسترداد",
+  HOUSING: "بدل السكن", TRANSPORT: "بدل الانتقال", EXIT_PERMISSION: "إذن خروج", SETTLEMENT: "تصفية المستحقات", PERSONAL_UPDATE: "تحديث البيانات",
   LEAVE: "طلبات الإجازات",
   LOAN: "طلبات السلف",
   RESIDENCY: "طلبات الإقامة",

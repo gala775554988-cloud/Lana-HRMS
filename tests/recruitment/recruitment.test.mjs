@@ -8,9 +8,9 @@ import { z } from 'zod';
 async function load(path, imports = {}, env = {}) {
   const context = vm.createContext({ Buffer, Date, Number, Set, AbortSignal, File, process: { env } });
   const source = await fs.readFile(new URL(`../../${path}`, import.meta.url), 'utf8');
-  const module = new vm.SourceTextModule(ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText, { context });
-  await module.link(async key => { const values = imports[key] || (key === 'node:crypto' ? crypto : {}); return new vm.SyntheticModule(Object.keys(values), function () { for (const [key, value] of Object.entries(values)) this.setExport(key, value); }, { context }); });
-  await module.evaluate(); return module.namespace;
+  const sourceModule = new vm.SourceTextModule(ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText, { context });
+  await sourceModule.link(async key => { const values = imports[key] || (key === 'node:crypto' ? crypto : {}); return new vm.SyntheticModule(Object.keys(values), function () { for (const [key, value] of Object.entries(values)) this.setExport(key, value); }, { context }); });
+  await sourceModule.evaluate(); return sourceModule.namespace;
 }
 test('application signatures expire, reject tampering and fail closed without secret', async () => {
   const subject = await load('lib/recruitment/application-token.ts', {}, { AUTH_SECRET: 'test-secret' });

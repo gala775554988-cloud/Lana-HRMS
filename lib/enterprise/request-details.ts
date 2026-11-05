@@ -26,6 +26,12 @@ function money(value: unknown) {
 }
 
 export async function getRequestEntityDetails(type: string, entityId: string): Promise<RequestEntityDetails | null> {
+  if (type === "REVOKE") {
+    const original = await prisma.workflowInstance.findUnique({ where: { id: entityId } });
+    if (!original || original.type === "REVOKE") return null;
+    const details = await getRequestEntityDetails(original.type, original.entityId);
+    return details ? { ...details, title: `طلب استرداد: ${details.title}`, reference: original.id } : null;
+  }
   if (type === "LEAVE") {
     const row = await prisma.leaveRequest.findUnique({ where: { id: entityId }, include: { leaveType: { select: { name: true } } } });
     if (!row) return null;

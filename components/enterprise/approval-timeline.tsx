@@ -35,11 +35,12 @@ type Workflow = {
     attachments: Array<{ name: string; url: string }>;
   } | null;
   serviceLevel: { name: string; hours: number; dueAt: string; overdue: boolean; deferredUntil: string | null };
-  audit: Array<{ id: string; action: string; createdAt: string; actor: string }>;
+  audit: Array<{ id: string; action: string; createdAt: string; actor: string; metadata?: { reason?: string; comments?: string } }>;
   steps: WorkflowStep[];
 };
 
 const statusMeta: Record<string, { label: string; icon: typeof Check; className: string }> = {
+  SUPERSEDED: { label: "نسخة سابقة", icon: RotateCcw, className: "bg-muted text-muted-foreground border-transparent" },
   CANCELLED: { label: "ملغى", icon: X, className: "bg-muted text-muted-foreground border-transparent" },
   NOTIFIED: { label: "للاطلاع", icon: FileText, className: "bg-muted text-muted-foreground border-transparent" },
   COMPLETED: { label: "مكتمل", icon: Check, className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
@@ -53,7 +54,7 @@ const statusMeta: Record<string, { label: string; icon: typeof Check; className:
 
 function formatDate(value: string | null, locale: "ar" | "en") {
   if (!value) return null;
-  return new Date(value).toLocaleString(locale === "ar" ? "ar-SA" : "en-US");
+  return new Date(value).toLocaleString(locale === "ar" ? "ar-SA" : "en-US", { timeZone: "Asia/Riyadh" });
 }
 
 function formatField(field: NonNullable<Workflow["details"]>["fields"][number]) {
@@ -65,6 +66,11 @@ function formatField(field: NonNullable<Workflow["details"]>["fields"][number]) 
 }
 
 const auditLabels: Record<string, string> = {
+  "workflow:revoke-request": "طلب استرداد بعد الاعتماد",
+  "workflow:revoked": "اعتماد الاسترداد وإلغاء الطلب",
+  "workflow:edit": "تعديل وإعادة إرسال",
+  "workflow:resubmit": "إعادة إرسال بعد الإرجاع",
+  "workflow:cancel": "إلغاء الطلب",
   "workflow:approve": "اعتماد المرحلة",
   "workflow:reject": "رفض الطلب",
   "workflow:return": "إرجاع الطلب للتعديل",
@@ -236,7 +242,7 @@ export function ApprovalTimeline({ workflowId, onClose, locale = "ar" }: { workf
                   <div className="space-y-2">
                     {workflow.audit.map((item) => (
                       <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg bg-muted/45 px-3 py-2 text-xs">
-                        <div><p className="font-semibold">{auditLabels[item.action] ?? item.action}</p><p className="text-muted-foreground">{item.actor}</p></div>
+                        <div><p className="font-semibold">{auditLabels[item.action] ?? item.action}</p><p className="text-muted-foreground">{item.actor}</p>{(item.metadata?.reason || item.metadata?.comments) && <p className="mt-1 whitespace-pre-wrap">{item.metadata.reason || item.metadata.comments}</p>}</div>
                         <time className="shrink-0 text-muted-foreground">{formatDate(item.createdAt, locale)}</time>
                       </div>
                     ))}

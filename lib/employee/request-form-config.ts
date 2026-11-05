@@ -16,6 +16,11 @@ export type RequestTypeConfig = {
 };
 
 export const REQUEST_TYPE_CONFIG: RequestTypeConfig[] = [
+  ...[
+    ["HOUSING", "بدل سكن"], ["TRANSPORT", "بدل انتقال"],
+    ["EXIT_PERMISSION", "إذن خروج"], ["SETTLEMENT", "تصفية مستحقات"],
+    ["PERSONAL_UPDATE", "تحديث البيانات الشخصية"],
+  ].map(([code, label]): RequestTypeConfig => ({ code, label, fields: [{ name: "purpose", label: "تفاصيل الطلب والبيانات المقترحة", kind: "textarea", required: true }] })),
   {
     code: "RESUMPTION",
     label: "طلب المباشرة بعد الإجازة",
@@ -43,7 +48,9 @@ export const REQUEST_TYPE_CONFIG: RequestTypeConfig[] = [
         options: [
           { value: "ANNUAL", label: "سنوية" },
           { value: "SICK", label: "مرضية" },
-          { value: "EMERGENCY", label: "طارئة" },
+          { value: "EMERGENCY", label: "اضطرارية" },
+          { value: "UNPAID", label: "بدون راتب" },
+          { value: "EXIT_REENTRY", label: "خروج وعودة" },
         ],
       },
       { name: "startDate", label: "تاريخ البداية", kind: "date", required: true },

@@ -2,9 +2,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
-import { computeEmployeePayroll, computeAndUpsertPayrollItems, markPayrollSourcesConsumed } from "@/lib/enterprise/payroll-engine";
+import { computeAndUpsertPayrollItems } from "@/lib/enterprise/payroll-engine";
 import { notifyRole } from "@/lib/enterprise/notifications";
 import { canManagePayroll, canApprovePayroll } from "@/lib/enterprise/payroll-permissions";
+import { getPayrollOdooClient } from "@/lib/payroll/connection";
+import { odooPayrollSource, reconcileAccountingOutbox } from "@/lib/payroll/odoo-payroll";
+import { accountingMappingSchema, postConfiguredPayrollJournal } from "@/lib/payroll/journal";
+import { consumeApprovedPayroll } from "@/lib/payroll/settlement";
+import type { PayrollBreakdown } from "@/lib/enterprise/payroll-engine";
 import type { PayrollStatus } from "@prisma/client";
 
 const TRANSITION_NOTIFICATIONS: Record<string, { roles: string[]; title: string; body: (run: { name: string }) => string; type: "INFO" | "SUCCESS" | "WARNING" | "ERROR" }> = {
@@ -133,57 +138,51 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (action === "unlock") { data.lockedAt = null; data.lockedById = null; }
   if (action === "archive") { data.archivedAt = now; data.archivedById = session.user.id; }
 
-  // Paying is the ONE point where payroll numbers are finalized and the
-  // sources they draw from are actually consumed: overtime/bonus rows get
-  // marked included (so a later run never double-pays them) and loan/advance
-  // balances are decremented by what's genuinely being disbursed now. A
-  // DRAFT/PROCESSING/APPROVED run may have been recomputed several times
-  // before this moment (see run/route.ts) without ever touching those
-  // balances -- this recomputes fresh right before paying so what's marked
-  // consumed matches what's actually recorded as paid.
-  if (action === "pay" && run.periodStartDate && run.periodEndDate) {
-    const items = await prisma.payrollItem.findMany({ where: { payrollRunId: id }, select: { id: true, employeeId: true } });
-    for (const item of items) {
-      const breakdown = await computeEmployeePayroll(item.employeeId, run.periodStartDate, run.periodEndDate);
-      await prisma.payrollItem.update({
-        where: { id: item.id },
-        data: {
-          baseSalary: breakdown.baseSalary,
-          allowanceTotal: breakdown.allowanceTotal,
-          bonusTotal: breakdown.bonusTotal,
-          overtimeTotal: breakdown.overtimeTotal,
-          grossPay: breakdown.grossPay,
-          insuranceDeduction: breakdown.insuranceDeduction,
-          taxTotal: breakdown.taxTotal,
-          loanDeduction: breakdown.loanDeduction,
-          advanceDeduction: breakdown.advanceDeduction,
-          absenceDeduction: breakdown.absenceDeduction,
-          lateDeduction: breakdown.lateDeduction,
-          penaltyDeduction: breakdown.penaltyDeduction,
-          deductionTotal: breakdown.deductionTotal,
-          netPay: breakdown.netPay,
-          currency: breakdown.currency
+  let updated;
+  try {
+    updated = await prisma.$transaction(async (tx) => {
+      const claimed = await tx.payrollRun.updateMany({ where: { id, status: run.status, updatedAt: run.updatedAt }, data });
+      if (claimed.count !== 1) throw new Error("تغير المسير أثناء الإجراء؛ حدّث الصفحة");
+      if (action === "approve" || action === "pay") {
+        const computation = await tx.appSetting.findUnique({ where: { key: `payroll.compute.${id}` } });
+        if (Number((computation?.value as { errorCount?: number } | null)?.errorCount ?? 0) > 0) throw new Error("توجد أخطاء احتساب غير معالجة؛ أعد احتساب المسير قبل الاعتماد");
+        const items = await tx.payrollItem.findMany({ where: { payrollRunId: id } });
+        if (!items.length) throw new Error("لا يمكن اعتماد أو صرف مسير فارغ");
+        for (const item of items) {
+          const snapshot = item.calculationSnapshot as unknown as PayrollBreakdown;
+          if (!snapshot || !Number.isFinite(snapshot.netPay) || Math.abs(Number(item.netPay) - snapshot.netPay) > 0.005 || !Array.isArray(snapshot.loanAllocations)) throw new Error("أعد احتساب المسير؛ لقطة الحساب غير مكتملة");
+          for (const field of ["baseSalary", "allowanceTotal", "grossPay", "deductionTotal", "netPay"] as const) if (!Number.isFinite(snapshot[field]) || Math.abs(Number(item[field]) - snapshot[field]) > 0.005) throw new Error("تغيرت الأرقام عن لقطة الحساب؛ يلزم إعادة المراجعة");
+          if (Number(item.netPay) < 0) throw new Error("لا يمكن صرف صافي راتب سالب");
+          if (action === "pay") await consumeApprovedPayroll(tx, snapshot, item.employeeId, now);
         }
-      });
-      await markPayrollSourcesConsumed(breakdown, item.employeeId);
-    }
+        const mapping = await tx.appSetting.findUnique({ where: { key: "payroll.odooAccounting" } });
+        if (action === "approve" && (items.some(item => item.odooPayslipId !== null) || (mapping?.value as { mode?: string } | null)?.mode === "POST_JOURNAL")) {
+          await tx.payrollAccountingOutbox.upsert({ where: { payrollRunId: id }, create: { payrollRunId: id, payload: { runId: id, payslipIds: items.map(item => item.odooPayslipId).filter(Boolean), action: items.some(item => item.odooPayslipId !== null) ? "RECONCILE_APPROVED" : "POST_LOCAL" } }, update: {} });
+        }
+      }
+      if (action === "pay") await tx.payrollItem.updateMany({ where: { payrollRunId: id }, data: { payslipIssuedAt: now } });
+      await tx.auditLog.create({ data: { actorUserId: session.user.id, action: `payroll_${action}`, entity: "payrollRun", entityId: id, metadata: { from: run.status, to: transition.to, reason: body?.reason ?? null } } });
+      return tx.payrollRun.findUniqueOrThrow({ where: { id } });
+    });
+  } catch (error) {
+    return NextResponse.json({ success: false, message: error instanceof Error ? error.message : "تعذر تنفيذ العملية" }, { status: 409 });
   }
 
-  const updated = await prisma.$transaction(async (tx) => {
-    const updatedRun = await tx.payrollRun.update({ where: { id }, data });
-    if (action === "pay") {
-      await tx.payrollItem.updateMany({ where: { payrollRunId: id }, data: { payslipIssuedAt: now } });
-    }
-    return updatedRun;
-  });
 
-  await writeAuditLog({
-    actorUserId: session.user.id,
-    action: `payroll_${action}`,
-    entity: "payrollRun",
-    entityId: id,
-    metadata: { from: run.status, to: transition.to, reason: body?.reason }
-  });
+  if (action === "approve") {
+    const pending = await prisma.payrollAccountingOutbox.findUnique({ where: { payrollRunId: id } });
+    if (pending && pending.status !== "SENT") {
+      try {
+        const mapping = accountingMappingSchema.safeParse((await prisma.appSetting.findUnique({ where: { key: "payroll.odooAccounting" } }))?.value);
+        const { client } = await getPayrollOdooClient(mapping.success ? mapping.data.connectionId : undefined);
+        const config = client.getConfig();
+        if (mapping.success && mapping.data.mode === "POST_JOURNAL" && (pending.payload as { action?: string }).action === "POST_LOCAL") await postConfiguredPayrollJournal(client, pending.id, mapping.data);
+        else await reconcileAccountingOutbox(client, pending.id, odooPayrollSource(config.url, config.database));
+      } catch {
+        await prisma.payrollAccountingOutbox.updateMany({ where: { id: pending.id, status: "PENDING" }, data: { status: "FAILED", lastError: "تحتاج المطابقة إعداد اتصال Odoo أو مراجعة القيود؛ أعد المحاولة من لوحة التعويضات" } });
+      }
+    }
+  }
 
   const notification = TRANSITION_NOTIFICATIONS[action];
   if (notification) {

@@ -16,17 +16,16 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       const leave = await tx.leaveRequest.findUnique({ where: { id }, include: { leaveType: { select: { code: true } } } });
       if (!leave || leave.employeeId !== employee.id) throw Object.assign(new Error("الطلب غير موجود أو غير متاح."), { statusCode: 404 });
       if (["CANCELLED", "REJECTED"].includes(leave.status)) throw new Error("الطلب ملغى أو مرفوض بالفعل.");
-      if (leave.status === "APPROVED" && leave.startDate <= new Date()) throw new Error("لا يمكن إلغاء إجازة بدأت بالفعل؛ تواصل مع الموارد البشرية.");
-      const workflows = await tx.workflowInstance.findMany({ where: { type: "LEAVE", entityId: id }, select: { id: true, status: true } });
+      if (leave.status === "APPROVED") throw new Error("الإجازة معتمدة؛ قدّم طلب استرداد من الخدمات الذاتية ليوافق عليه المسؤول.");
+      const workflows = await tx.workflowInstance.findMany({ where: { type: "LEAVE", entityId: id, status: { in: ["PENDING", "RETURNED"] } }, select: { id: true, status: true } });
       for (const workflow of workflows) {
         const claimed = await tx.workflowInstance.updateMany({ where: { id: workflow.id, status: workflow.status }, data: { status: "CANCELLED" } });
         if (claimed.count !== 1 || workflow.status === "CANCELLED") throw new Error("تغير الطلب أثناء الإلغاء. حدّث الصفحة.");
       }
       const cancelled = await tx.leaveRequest.updateMany({ where: { id, status: leave.status }, data: { status: "CANCELLED", decidedAt: new Date(), decisionNote: "ألغاه الموظف" } });
       if (cancelled.count !== 1) throw new Error("تغير الطلب أثناء الإلغاء. حدّث الصفحة.");
-      if (leave.status === "APPROVED" && leave.leaveType.code.toUpperCase().startsWith("ANNUAL")) await tx.employeeLeaveBalance.updateMany({ where: { employeeId: employee.id }, data: { used: { decrement: Number(leave.days) } } });
       if (workflows.length) await tx.workflowStep.updateMany({ where: { workflowInstanceId: { in: workflows.map(workflow => workflow.id) }, status: { in: ["WAITING", "PENDING", "DEFERRED"] } }, data: { status: "CANCELLED" } });
-      await tx.auditLog.create({ data: { actorUserId: session.user.id, action: "leave:cancel", entity: "leaveRequest", entityId: id, metadata: { wasApproved: leave.status === "APPROVED" } } });
+      await tx.auditLog.create({ data: { actorUserId: session.user.id, action: "leave:cancel", entity: "leaveRequest", entityId: id, metadata: { wasApproved: false } } });
     });
     return NextResponse.json({ success: true, message: "تم إلغاء الطلب ومسار اعتماده." });
   } catch (error) { return NextResponse.json({ success: false, message: (error as Error).message }, { status: (error as { statusCode?: number }).statusCode ?? 409 }); }

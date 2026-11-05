@@ -1,3 +1,4 @@
+import { cancelEntity } from "@/lib/self-service/lifecycle";
 import { prisma } from "@/lib/prisma";
 import type { ResolvedApprover } from "./approval-engine";
 import { ApprovalRoutingError } from "./request-routing-policy";
@@ -59,7 +60,7 @@ export async function decideWorkflowStep({
     if ((decision === "REJECT" || decision === "RETURN") && !comments?.trim()) throw new Error(decision === "REJECT" ? "سبب الرفض مطلوب" : "سبب الإرجاع مطلوب");
     const next = decision === "APPROVE" ? instance.steps.find(step => step.step > current.step && step.status === "WAITING") : undefined;
     const workflowStatus = decision === "REJECT" ? "REJECTED" : decision === "RETURN" ? "RETURNED" : next ? "PENDING" : "COMPLETED";
-    const changed = await tx.workflowInstance.updateMany({ where: { id: instance.id, status: "PENDING", currentStep: instance.currentStep }, data: { status: workflowStatus, currentStep: next?.step ?? (decision === "APPROVE" ? current.step + 1 : current.step) } });
+    const changed = await tx.workflowInstance.updateMany({ where: { id: instance.id, status: "PENDING", currentStep: instance.currentStep, updatedAt: instance.updatedAt }, data: { status: workflowStatus, currentStep: next?.step ?? (decision === "APPROVE" ? current.step + 1 : current.step) } });
     if (changed.count !== 1) throw new Error("تغير الطلب أثناء المراجعة. أعد تحميله.");
     const decided = await tx.workflowStep.updateMany({ where: { id: current.id, status: { in: ["PENDING", "DEFERRED"] }, approverUserId: actorUserId }, data: { status: decision === "APPROVE" ? "APPROVED" : decision === "REJECT" ? "REJECTED" : "RETURNED", approvedAt: new Date(), comments: mergeWorkflowStepMetadata(current.comments, comments?.trim() ? { note: comments.trim() } : {}) } });
     if (decided.count !== 1) throw new Error("سبق اتخاذ قرار على هذه المرحلة. حدّث الصفحة.");
@@ -69,7 +70,16 @@ export async function decideWorkflowStep({
     }
     if (workflowStatus !== "PENDING") {
       const status = workflowStatus === "COMPLETED" ? "APPROVED" : workflowStatus === "REJECTED" ? "REJECTED" : "PENDING";
-      if (instance.type === "LEAVE") {
+      if (instance.type === "REVOKE") {
+        if (workflowStatus === "COMPLETED") {
+          const original = await tx.workflowInstance.findUnique({ where: { id: instance.entityId } });
+          if (!original || original.employeeId !== instance.employeeId || original.status !== "COMPLETED") throw new Error("الطلب الأصلي غير قابل للاسترداد");
+          const claimed = await tx.workflowInstance.updateMany({ where: { id: original.id, status: "COMPLETED" }, data: { status: "CANCELLED" } });
+          if (claimed.count !== 1) throw new Error("سبق استرداد الطلب");
+          await cancelEntity(tx, original, true);
+          await tx.auditLog.create({ data: { actorUserId, action: "workflow:revoked", entity: "workflowInstance", entityId: original.id, metadata: { revocationWorkflowId: instance.id, comments } } });
+        }
+      } else if (instance.type === "LEAVE") {
         const leave = await tx.leaveRequest.update({ where: { id: instance.entityId }, data: { status, decidedAt: new Date(), decisionNote: comments }, include: { leaveType: { select: { code: true } } } });
         // Statutory/special leave must not consume the annual-leave aggregate.
         if (status === "APPROVED" && leave.leaveType.code.toUpperCase().startsWith("ANNUAL")) {

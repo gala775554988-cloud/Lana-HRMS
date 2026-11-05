@@ -579,6 +579,8 @@ model SocialInsuranceRecord {
   // "الأجر الخاضع للاشتراك" -- kept in sync with the employee's live salary
   // profile (lib/employee/salary-profile.ts) whenever payroll data changes,
   // see syncSocialInsuranceFromPayroll in lib/enterprise/social-insurance.ts.
+  coverageCohort             String? // LEGACY / NEW / custom policy cohort
+  firstCoverageDate          DateTime? // First-ever GOSI coverage, not hire date
   subjectWage                Decimal                     @default(0) @db.Decimal(12, 2)
   currency                   String                      @default("SAR")
   // Contribution rates as whole percentages (e.g. 9.00 = 9%), editable per
@@ -970,6 +972,8 @@ model PayrollItem {
   payrollRun         PayrollRun         @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
   employee           Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   costCenter         PayrollCostCenter? @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
+  calculationSnapshot Json? // Immutable inputs, individual components and source consumption at approval
+  employerInsurance Decimal @default(0) @db.Decimal(12, 2)
   odooPayslipId      Int?               @unique
   odooRawData        Json?
 
@@ -992,7 +996,13 @@ model Loan {
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
   employee          Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  odooSource        String?
+  odooLoanModel     String?
+  odooLoanId        Int?
+  odooWriteDate     DateTime?
+  repaymentSchedule OdooLoanInstallment[]
 
+  @@unique([odooSource, odooLoanModel, odooLoanId])
   @@index([employeeId])
   @@index([status])
 }
@@ -1274,6 +1284,9 @@ model WorkflowInstance {
   updatedAt   DateTime       @updatedAt
   employee    Employee       @relation(fields: [employeeId], references: [id])
   steps       WorkflowStep[]
+
+  @@index([employeeId, status, createdAt])
+  @@index([type, entityId])
 }
 
 model WorkflowStep {
@@ -2652,4 +2665,179 @@ model SupervisorAssignment {
   @@index([employeeId])
   @@index([entityType, entityId])
   @@index([isActive])
+}
+
+// Effective-dated whole percentages; no automatic unverified statutory schedule.
+model GosiSetting {
+  id String @id @default(cuid())
+  cohort String
+  effectiveFrom DateTime
+  effectiveTo DateTime?
+  employeeRate Decimal @db.Decimal(5, 2)
+  employerRate Decimal @db.Decimal(5, 2)
+  minimumWage Decimal @db.Decimal(12, 2)
+  maximumWage Decimal @db.Decimal(12, 2)
+  housingIncluded Boolean @default(true)
+  newSystemCutoff DateTime?
+  createdAt DateTime @default(now())
+  @@unique([cohort, effectiveFrom])
+  @@map("gosi_settings")
+}
+
+model SalaryRule {
+  id String @id @default(cuid())
+  code String @unique
+  name String
+  category String // BASIC / ALLOWANCE / DEDUCTION / EMPLOYER / INFORMATION / NET / GROSS
+  isActive Boolean @default(true)
+  @@map("salary_rules")
+}
+
+model OdooPayrollSnapshot {
+  id String @id @default(cuid())
+  source String
+  odooPayslipId Int
+  employeeId String
+  state String
+  period String
+  currency String
+  moveId Int?
+  raw Json
+  lines Json // Full original line objects: ids, code, quantity, rate, amount, total, rule and category
+  updatedAt DateTime @updatedAt
+  @@unique([source, odooPayslipId])
+  @@index([employeeId, period])
+}
+
+model PayrollAccountingOutbox {
+  id String @id @default(cuid())
+  payrollRunId String @unique
+  status String @default("PENDING") // PENDING / PROCESSING / SENT / FAILED
+  attempts Int @default(0)
+  lastError String?
+  payload Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Durable checkpoints; workers process bounded pages without external queues.
+model OdooMigrationJob {
+  id String @id @default(cuid())
+  source String
+  connectionId String?
+  actorUserId String
+  status String @default("PENDING")
+  phase String @default("EMPLOYEES")
+  config Json
+  cursor Int @default(0)
+  upperId Int?
+  month String?
+  page Int @default(0)
+  lastWriteDate String?
+  imported Int @default(0)
+  updated Int @default(0)
+  skipped Int @default(0)
+  failed Int @default(0)
+  processed Int @default(0)
+  phaseProcessed Int @default(0)
+  phaseTotal Int @default(0)
+  leaseToken String?
+  leaseUntil DateTime?
+  lastError String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  finishedAt DateTime?
+  errors OdooMigrationError[]
+  @@index([source, status])
+}
+model OdooMigrationError {
+  id String @id @default(cuid())
+  jobId String
+  entity String
+  externalId Int
+  code String
+  message String
+  status String @default("OPEN")
+  attempts Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  job OdooMigrationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  @@unique([jobId, entity, externalId])
+  @@index([jobId, status])
+}
+model OdooSourceRecord {
+  id String @id @default(cuid())
+  source String
+  entity String
+  externalId Int
+  localId String?
+  writeDate String?
+  checksum String
+  raw Json
+  status String @default("STAGED")
+  updatedAt DateTime @updatedAt
+  @@unique([source, entity, externalId])
+  @@index([source, entity, status])
+}
+model OdooLoanInstallment {
+  id String @id @default(cuid())
+  loanId String
+  source String
+  externalId Int
+  dueDate DateTime
+  amount Decimal @db.Decimal(20, 6)
+  remotePaid Boolean
+  localPaidAt DateTime?
+  raw Json
+  loan Loan @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  @@unique([loanId, externalId])
+  @@index([loanId, dueDate, remotePaid])
+}
+model HistoricalPayrollRun {
+  id String @id @default(cuid())
+  source String
+  period String
+  companyOdooId Int
+  externalRunId Int @default(0)
+  createdAt DateTime @default(now())
+  payslips HistoricalPayslip[]
+  @@unique([source, period, companyOdooId, externalRunId])
+}
+model HistoricalPayslip {
+  id String @id @default(cuid())
+  runId String
+  source String
+  odooPayslipId Int
+  employeeId String
+  state String
+  currency String
+  fromDate DateTime
+  toDate DateTime
+  basic Decimal @db.Decimal(20, 6)
+  gross Decimal @db.Decimal(20, 6)
+  deductions Decimal @db.Decimal(20, 6)
+  net Decimal @db.Decimal(20, 6)
+  moveId Int?
+  raw Json
+  checksum String
+  updatedAt DateTime @updatedAt
+  run HistoricalPayrollRun @relation(fields: [runId], references: [id], onDelete: Restrict)
+  lines HistoricalPayslipLine[]
+  @@unique([source, odooPayslipId])
+  @@index([employeeId, fromDate])
+}
+model HistoricalPayslipLine {
+  id String @id @default(cuid())
+  payslipId String
+  externalId Int
+  code String
+  name String
+  category String
+  amount Decimal @db.Decimal(20, 6)
+  quantity Decimal @db.Decimal(20, 6)
+  rate Decimal @db.Decimal(20, 6)
+  total Decimal @db.Decimal(20, 6)
+  raw Json
+  payslip HistoricalPayslip @relation(fields: [payslipId], references: [id], onDelete: Cascade)
+  @@unique([payslipId, externalId])
 }

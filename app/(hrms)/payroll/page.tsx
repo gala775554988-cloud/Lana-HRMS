@@ -64,6 +64,7 @@ export default async function PayrollPage({
           ))}
         </nav>
       </header>
+      <Link href="/payroll-compensation" className="inline-flex rounded-xl border px-4 py-2 text-sm font-semibold text-primary">إعداد التأمينات والتعويضات وربط Odoo</Link>
       <MergedModuleTabs
         defaultValue="dashboard"
         items={[
