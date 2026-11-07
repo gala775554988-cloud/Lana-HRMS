@@ -431,6 +431,10 @@ export async function fullResyncFromOdoo(options: { wipeAndSync?: boolean; conne
 }
 
 export async function createOdooClientFromConnection(connectionId?: string) {
+  if (!connectionId) {
+    const { getDefaultOdooConnectionId } = await import("./connection-choice");
+    connectionId = await getDefaultOdooConnectionId(Boolean(process.env.ODOO_URL));
+  }
   if (!connectionId) return { client: OdooClient.fromEnv(), connection: undefined as RuntimeConnection | undefined };
   const connection = await prisma.integrationConnection.findUnique({ where: { id: connectionId } });
   if (!connection) throw new OdooConfigurationError("Odoo connection not found", { connectionId });

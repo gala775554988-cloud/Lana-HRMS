@@ -6,8 +6,5 @@ export async function getPayrollOdooClient(connectionId?: string) {
     if (!allowed) throw new Error("اتصال Odoo غير متاح");
     return createOdooClientFromConnection(allowed.id);
   }
-  if (process.env.ODOO_URL) return createOdooClientFromConnection();
-  const existing = await prisma.integrationConnection.findMany({ where: { provider: { type: "ODOO", isActive: true } }, select: { id: true }, take: 2 });
-  if (existing.length !== 1) throw new Error("حدد اتصال Odoo واحداً في إعداد القيد أو إعدادات التكامل");
-  return createOdooClientFromConnection(existing[0].id);
+  return createOdooClientFromConnection();
 }

@@ -21,7 +21,11 @@ export async function importOdooCustodies(client: Pick<OdooJsonRpcClient, "execu
   let fields: Record<string, Field>;
   try {
     fields = await client.execute(MODEL, "fields_get", [], { attributes: ["type", "relation"] });
-  } catch {
+  } catch (error) {
+    const code = error && typeof error === "object" && "code" in error ? error.code : undefined;
+    if (code === "ODOO_AUTHENTICATION_ERROR" || code === "ODOO_PROTOCOL_DETECTION_ERROR" || code === "ODOO_CONFIGURATION_ERROR") {
+      throw new Error("تعذرت مصادقة اتصال أودو المحفوظ. حدّث اتصال أودو واختبره من صفحة الاتصالات ثم أعد المزامنة.");
+    }
     throw new Error("تعذر قراءة العهد العينية من اتصال أودو المحدد. تحقق من قاعدة البيانات وصلاحية قراءة العهد العينية.");
   }
   for (const key of ["name", "state", "description", "employee_id"]) {
