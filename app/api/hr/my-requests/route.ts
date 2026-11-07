@@ -1,3 +1,4 @@
+import { canSubmitForEmployee } from "@/lib/self-service/request-submitter";
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
@@ -35,11 +36,15 @@ export async function POST(request: Request) {
     const body = isJsonRequest
       ? await request.json()
       : Object.fromEntries((await request.formData()).entries());
-    const { type: rawType, employeeId: _clientEmployeeId, ...data } = body as Record<string, any>;
+    const { type: rawType, employeeId: _clientEmployeeId, onBehalfOfEmployeeId, ...data } = body as Record<string, any>;
 
-    // Always resolve employee from session — never trust client-sent employeeId
+    if (onBehalfOfEmployeeId !== undefined &&
+        (typeof onBehalfOfEmployeeId !== "string" || !onBehalfOfEmployeeId.trim() ||
+          !await canSubmitForEmployee(session.user, onBehalfOfEmployeeId))) {
+      return NextResponse.json({ success: false, message: "لا تملك صلاحية تقديم الطلب عن هذا الموظف" }, { status: 403 });
+    }
     const employee = await prisma.employee.findFirst({
-      where: { userId: session.user.id },
+      where: onBehalfOfEmployeeId ? { id: onBehalfOfEmployeeId } : { userId: session.user.id },
     });
 
     if (!employee) {
@@ -67,7 +72,7 @@ export async function POST(request: Request) {
     }
     const submissionKey = token ? `self-service.submission.${session.user.id}.${token.toLowerCase()}` : null;
     const success = () => NextResponse.json({ success: true, message: "تم إرسال الطلب بنجاح" });
-    const fingerprint = submissionKey ? createHash("sha256").update(JSON.stringify({ rawType, data })).digest("hex") : null;
+    const fingerprint = submissionKey ? createHash("sha256").update(JSON.stringify({ employeeId, rawType, data })).digest("hex") : null;
     const replay = async () => {
       if (!submissionKey) return null;
       const receipt = await prisma.appSetting.findUnique({ where: { key: submissionKey }, select: { value: true } });
@@ -355,6 +360,11 @@ export async function POST(request: Request) {
     }
 
     const workflow = await persistEnterpriseWorkflow(tx, employeeId, normalizedType, result.id, approvers);
+    await tx.auditLog.create({ data: {
+      actorUserId: session.user.id, action: onBehalfOfEmployeeId ? "request:submit-on-behalf" : "request:submit-self",
+      entity: "workflowInstance", entityId: workflow.id,
+      metadata: { employeeId, requestType: normalizedType },
+    } });
     if (submissionKey) await tx.appSetting.create({
       data: { key: submissionKey, value: { workflowId: workflow.id, fingerprint } },
     });

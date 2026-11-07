@@ -11,7 +11,7 @@ import {
   DollarSign, Package, Megaphone, BarChart3, Settings,
   Shield, GitPullRequest, Menu, X, PlugZap, Search,
   CalendarClock, Fingerprint,
-  Umbrella
+  Umbrella, FileText, GraduationCap, UserPlus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/brand/brand-logo";
@@ -43,6 +43,10 @@ const navItems: Array<{ href: string; label: string; icon: typeof LayoutDashboar
   { href: "/employees", label: "الموظفون", icon: Users, resource: "employees" },
   { href: "/hospitals", label: "المستشفيات", icon: Building2, resource: "hospitals" },
   { href: "/request-center", label: "الطلبات", icon: GitPullRequest, resource: ["leave", "requests"] },
+  { href: "/contracts", label: "العقود", icon: FileText, resource: "contracts" },
+  { href: "/documents", label: "المستندات", icon: FileText, resource: "documents" },
+  { href: "/recruitment", label: "التوظيف والمرشحون", icon: UserPlus, resource: "recruitment" },
+  { href: "/training", label: "التدريب والتطوير", icon: GraduationCap, resource: "training" },
   { href: "/permissions", label: "الصلاحيات", icon: Shield, resource: "permissions" },
   { href: "/insurance", label: "التأمينات", icon: Umbrella, resource: ["insurance", "social-insurance"] },
   { href: "/attendance", label: "الحضور والورديات", icon: Clock, resource: ["attendance", "shifts"] },
@@ -158,7 +162,7 @@ export function AppShell({ children, dictionary }: AppShellProps) {
         )}
       >
         <div className="flex h-16 items-center justify-between border-b border-white/10 px-4">
-          <BrandLogo href="/" size="sm" showText={!sidebarCollapsed || mobileMenuOpen} textClassName="text-white" subtitleClassName="text-blue-100/60" logoClassName="bg-white text-primary border-white" />
+          <BrandLogo href="/" size="sm" showText={!sidebarCollapsed || mobileMenuOpen} textClassName="text-white" subtitleClassName="text-emerald-100/60" logoClassName="bg-white text-primary border-white" />
           <button
             onClick={() => setMobileMenuOpen(false)}
             className="rounded-lg p-2 text-white/70 hover:bg-white/10 hover:text-white transition-colors lg:hidden"
@@ -186,14 +190,14 @@ export function AppShell({ children, dictionary }: AppShellProps) {
                     sidebarCollapsed ? "lg:justify-center lg:px-2.5" : "",
                     active
                       ? "bg-white font-bold text-primary shadow-md ring-2 ring-white/40"
-                      : "text-blue-100/70 hover:bg-white/10 hover:text-white"
+                      : "text-emerald-100/70 hover:bg-white/10 hover:text-white"
                   )}
                   title={sidebarCollapsed ? item.label : undefined}
                 >
                   <span className="relative inline-flex shrink-0">
                     <Icon className={cn(
                       "h-[18px] w-[18px] shrink-0",
-                      active ? "text-primary" : "text-blue-100/65 group-hover:text-white"
+                      active ? "text-primary" : "text-emerald-100/65 group-hover:text-white"
                     )} />
                     {item.href === "/request-center" && pendingApprovalsCount ? (
                       <span

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { UserSearchSelect } from "@/components/hrms/user-search-select";
 import { ApprovalTimeline } from "@/components/enterprise/approval-timeline";
 import { REQUEST_TYPE_CONFIG, getRequestTypeConfig } from "@/lib/employee/request-form-config";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,12 @@ import { parseWorkflowStepMetadata } from "@/lib/enterprise/workflow-step-metada
 type Row = { id: string; type: string; status: string; currentStep: number; createdAt: string; steps: { step: number; comments: string | null }[] };
 const labels: Record<string, string> = { PENDING: "قيد الانتظار", COMPLETED: "معتمد", REJECTED: "مرفوض", RETURNED: "معاد للتعديل", CANCELLED: "ملغى" };
 const inputClass = "w-full rounded-xl border bg-background px-3 py-2 text-sm";
-export function SelfServiceWorkspace() {
+type LeaveType = { id: string; name: string; code: string };
+export function SelfServiceWorkspace({ administrative = false, initialLeaveTypes = [], ownEmployee = null }: {
+  administrative?: boolean; initialLeaveTypes?: LeaveType[]; ownEmployee?: { id: string; label: string } | null;
+}) {
+  const [recipient, setRecipient] = useState<{ id: string; label: string } | null>(ownEmployee);
+  const recipientMode = administrative && recipient?.id !== ownEmployee?.id ? "employee" : "self";
   const [rows, setRows] = useState<Row[]>([]);
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("");
@@ -20,7 +26,7 @@ export function SelfServiceWorkspace() {
   const [type, setType] = useState("LEAVE");
   const [editing, setEditing] = useState<Row | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
-  const [leaveTypes, setLeaveTypes] = useState<{ id: string; name: string; code: string }[]>([]);
+  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>(initialLeaveTypes);
   const [timeline, setTimeline] = useState<string | null>(null);
   const submission = useRef<{ body: string; key: string } | null>(null);
   const operationInProgress = useRef(false);
@@ -29,6 +35,7 @@ export function SelfServiceWorkspace() {
   const [message, setMessage] = useState("");
   const config = getRequestTypeConfig(type)!;
   useEffect(() => {
+    if (administrative) return;
     const controller = new AbortController();
     async function load() {
       setLoading(true);
@@ -50,7 +57,7 @@ export function SelfServiceWorkspace() {
     }
     void load();
     return () => controller.abort();
-  }, [page, statusFilter, typeFilter, refresh]);
+  }, [page, statusFilter, typeFilter, refresh, administrative]);
   async function act(row: Row, action: string, data?: Record<string, string>) {
     if (operationInProgress.current) return;
     const reason = action === "REVOKE" ? window.prompt("اكتب سبب طلب الاسترداد؛ لن يُلغى الطلب حتى موافقة المسؤول") : undefined;
@@ -95,7 +102,8 @@ export function SelfServiceWorkspace() {
     operationInProgress.current = true;
     setBusy(true); setMessage("");
     try {
-      const body = JSON.stringify({ type, ...values });
+      if (administrative && !recipient) throw new Error("اختر الموظف المستفيد أولاً");
+      const body = JSON.stringify({ type, ...values, ...(recipientMode === "employee" ? { onBehalfOfEmployeeId: recipient!.id } : {}) });
       if (submission.current?.body !== body) submission.current = { body, key: crypto.randomUUID() };
       const response = await fetch("/api/hr/my-requests", {
         method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": submission.current.key }, body,
@@ -113,19 +121,27 @@ export function SelfServiceWorkspace() {
     finally { operationInProgress.current = false; setBusy(false); }
   }
   return <div className="space-y-6" dir="rtl">
-    <header className="lana-workspace-hero rounded-3xl p-6 sm:p-9">
+    {!administrative && <header className="lana-workspace-hero rounded-3xl p-6 sm:p-9">
       <p className="text-sm font-semibold text-indigo-200">مساحتي في Lana</p>
       <h1 className="mt-2 text-3xl sm:text-4xl">الخدمات الذاتية</h1>
       <p className="mt-3 text-sm text-slate-200">قدّم طلبك وتابع مراحل المراجعة والقرارات من مكان واحد.</p>
       <nav aria-label="خدمات الموظف" className="mt-5 flex flex-wrap gap-2">
-        {[["#my-requests", "متابعة الطلبات"], ["/employee/leave", "الإجازات"], ["/employee/salary", "الرواتب"], ["/employee/documents", "المستندات"], ["/employee/attendance", "الحضور"]].map(([href, label]) => (
+        {[["#my-requests", "متابعة الطلبات"], ["/employee/leave", "الإجازات"], ["/employee/salary", "الرواتب"], ["/employee/documents", "المستندات"], ["/employee/attendance", "الحضور"], ["/employee/assets", "عهدي"], ["/employee/tasks", "مهامي"], ["/employee/training", "التدريب"], ["/employee/performance", "الأداء"], ["/employee/complaints", "الشكاوى"], ["/employee/settings", "حسابي"]].map(([href, label]) => (
           <Link key={href} href={href} className="inline-flex min-h-11 items-center rounded-xl border border-white/25 px-3 text-sm font-semibold hover:bg-white/15">{label}</Link>
         ))}
       </nav>
-    </header>
+    </header>}
     {message && <p role="status" className="rounded-2xl border bg-muted p-4 text-sm">{message}</p>}
     <form id="request-form" tabIndex={-1} onSubmit={submit} className="space-y-4 rounded-2xl border bg-card p-5 shadow-sm">
       <h2 className="font-semibold">{editing ? "تعديل الطلب وإعادة إرساله من بداية مسار الاعتماد" : "تقديم طلب جديد"}</h2>
+      {administrative && <fieldset className="space-y-3 rounded-xl border bg-muted/40 p-4">
+        <legend className="px-2 text-sm font-semibold">صاحب الطلب</legend>
+        <div className="space-y-2"><p className="text-sm">ابحث عن اسمك أو الموظف المستفيد</p>
+          {<UserSearchSelect value={recipient?.id ?? ""} initialLabel={recipient?.label ?? ""}
+            onChange={(_id, label, employee) => setRecipient(employee ? { id: employee.id, label: label ?? "" } : null)} />}
+        </div>
+        <p className="text-xs text-muted-foreground">يسجّل النظام اسم مقدّم الطلب والموظف المستفيد، ويرسل الطلب إلى مسار الاعتماد.</p>
+      </fieldset>}
       <label className="block space-y-2"><span>الخدمة</span><select className={inputClass} disabled={!!editing || busy} value={type} onChange={event => { setType(event.target.value); setValues({}); }}>{REQUEST_TYPE_CONFIG.map(item => <option key={item.code} value={item.code}>{item.label}</option>)}</select></label>
       <div className="grid gap-4 sm:grid-cols-2">{config.fields.filter(field => !editing || !["leaveType", "letterType", "resumptionType"].includes(field.name)).map(field => {
         const name = editing && type === "LOAN" && field.name === "amount" ? "principalAmount" : field.name;
@@ -134,7 +150,7 @@ export function SelfServiceWorkspace() {
       })}</div>
       <div className="flex gap-2"><Button disabled={busy}>{busy ? "جارٍ التنفيذ…" : editing ? "حفظ وإعادة إرسال" : "تقديم الطلب"}</Button>{editing && <Button type="button" variant="outline" disabled={busy} onClick={() => { setEditing(null); setValues({}); }}>تراجع</Button>}</div>
     </form>
-    <section id="my-requests" aria-labelledby="my-requests-heading" className="scroll-mt-20 space-y-3" aria-busy={loading}>
+    {!administrative && <section id="my-requests" aria-labelledby="my-requests-heading" className="scroll-mt-20 space-y-3" aria-busy={loading}>
       <h2 id="my-requests-heading" className="text-xl font-bold">طلباتي</h2>
       <div className="grid gap-3 rounded-2xl border bg-card p-4 sm:grid-cols-2">
         <label className="space-y-1 text-sm"><span>حالة الطلب</span><select className={inputClass} value={statusFilter} onChange={event => { setStatusFilter(event.target.value); setPage(1); }}><option value="">كل الحالات</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
@@ -147,7 +163,7 @@ export function SelfServiceWorkspace() {
         <div className="mt-4 flex flex-wrap gap-2"><Button variant="outline" onClick={() => setTimeline(row.id)}>أين وصل الطلب؟</Button>{row.type !== "REVOKE" && <>{["PENDING", "RETURNED"].includes(row.status) && <><Button variant="outline" disabled={busy} onClick={() => void edit(row)}>{row.status === "RETURNED" ? "تصحيح وإعادة إرسال" : "تعديل"}</Button><Button variant="outline" disabled={busy} onClick={() => void act(row, "CANCEL")}>إلغاء</Button></>}{row.status === "COMPLETED" && <Button variant="outline" disabled={busy} onClick={() => void act(row, "REVOKE")}>طلب استرداد / إلغاء بعد الاعتماد</Button>}</>}</div>
       </article>)}
       <div className="flex items-center gap-3"><Button variant="outline" disabled={page === 1 || loading} onClick={() => setPage(page - 1)}>السابق</Button><span>{page}</span><Button variant="outline" disabled={page * 20 >= total || loading || Boolean(loadError)} onClick={() => setPage(page + 1)}>التالي</Button></div>
-    </section>
+    </section>}
     <ApprovalTimeline workflowId={timeline} onClose={() => setTimeline(null)} />
   </div>;
 }

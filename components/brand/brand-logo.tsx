@@ -51,7 +51,7 @@ interface BrandLogoProps {
 export function BrandLogo({
   href = "/",
   showText = true,
-  title = "HRMS",
+  title = "Lana HR",
   subtitle = "نظام إدارة الموارد البشرية",
   src,
   size = "md",

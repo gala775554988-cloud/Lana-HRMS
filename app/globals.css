@@ -4,25 +4,25 @@
 
 @layer base {
   :root {
-    --primary: 215 62% 31%;
+    --primary: 169 88% 25%;
     --primary-foreground: 0 0% 100%;
-    --background: 216 33% 97%;
-    --foreground: 218 45% 14%;
+    --background: 150 11% 96%;
+    --foreground: 171 41% 16%;
     --card: 0 0% 100%;
     --card-foreground: 221 39% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 221 39% 11%;
-    --secondary: 214 45% 94%;
-    --secondary-foreground: 215 62% 27%;
+    --secondary: 148 15% 93%;
+    --secondary-foreground: 171 41% 20%;
     --muted: 215 25% 95%;
     --muted-foreground: 216 22% 35%;
-    --accent: 213 55% 93%;
-    --accent-foreground: 215 62% 27%;
+    --accent: 148 20% 92%;
+    --accent-foreground: 171 41% 20%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 215 24% 88%;
-    --input: 215 24% 88%;
-    --ring: 215 62% 38%;
+    --border: 147 13% 85%;
+    --input: 147 13% 85%;
+    --ring: 169 88% 25%;
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
@@ -30,10 +30,10 @@
     --info: 213 72% 46%;
     --info-foreground: 0 0% 100%;
     --radius: 0.75rem;
-    --sidebar-bg: 216 64% 20%;
-    --sidebar-foreground: 213 45% 92%;
-    --sidebar-border: 215 48% 27%;
-    --sidebar-accent: 213 70% 45%;
+    --sidebar-bg: 170 60% 12%;
+    --sidebar-foreground: 143 20% 88%;
+    --sidebar-border: 159 29% 23%;
+    --sidebar-accent: 169 88% 25%;
     --sidebar-accent-foreground: 0 0% 100%;
     --shadow-xs: 0 1px 2px 0 rgb(17 24 39 / 0.05);
     --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px -18px rgb(30 58 100 / 0.22);
@@ -285,6 +285,6 @@
 @layer components {
   .lana-workspace-hero {
     color: white;
-    background: radial-gradient(ellipse at 12% 0%, #404a8b 0, transparent 60%), #182342;
+    background: radial-gradient(ellipse at 12% 0%, #286b59 0, transparent 60%), #0c302a;
   }
 }

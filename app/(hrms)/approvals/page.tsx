@@ -1,3 +1,6 @@
+import Link from "next/link";
+import { SelfServiceWorkspace } from "@/components/self-service/workspace";
+import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import dynamicImport from "next/dynamic";
 import { Suspense } from "react";
@@ -15,6 +18,9 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
   const query = await searchParams;
   if (query.tab === "paths") redirect("/approvals?tab=routing&advanced=1");
   const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+  const ownEmployee = await prisma.employee.findFirst({ where: { userId: session.user.id }, select: { id: true, firstName: true, lastName: true, employeeNumber: true } });
+  const leaveTypes = await prisma.leaveType.findMany({ where: { isActive: true }, select: { id: true, name: true, code: true }, orderBy: { name: "asc" } });
   const canConfigure = Boolean(session?.user && canManageApprovalRouting(session.user.roles, session.user.permissions));
   return (
     <div className="space-y-5" dir="rtl">
@@ -22,10 +28,15 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
         <p className="text-sm font-semibold text-indigo-200">مساحة المسؤول في Lana</p>
         <h1 className="mt-2 text-3xl sm:text-4xl">الطلبات والموافقات</h1>
         <p className="mt-3 text-sm text-slate-200">راجع الطلبات الموكلة إليك، واتخذ القرار، وتابع سجل الموافقات.</p>
+        <Link href="/approvals?tab=new" className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-white px-5 text-sm font-bold text-primary">تقديم طلب جديد</Link>
       </header>
       <MergedModuleTabs
         defaultValue="center"
         items={[
+        {
+          value: "new", label: "تقديم طلب جديد", icon: <Send className="h-4 w-4" />,
+          content: <SelfServiceWorkspace administrative initialLeaveTypes={leaveTypes} ownEmployee={ownEmployee ? { id: ownEmployee.id, label: `${ownEmployee.firstName} ${ownEmployee.lastName} · ${ownEmployee.employeeNumber}` } : null} />
+        },
         {
           value: "center",
           label: "جميع الطلبات والكشوف",

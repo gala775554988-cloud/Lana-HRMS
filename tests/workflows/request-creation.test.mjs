@@ -9,17 +9,18 @@ class NextResponse {
   static json(data, options) { return new NextResponse(data, options); }
   static redirect() { return new NextResponse({}, { status: 303 }); }
 }
-async function setup({ routingFailure = false, persistenceFailure = false, leaveTypeExists = true } = {}) {
+async function setup({ routingFailure = false, persistenceFailure = false, leaveTypeExists = true, allowOnBehalf = false } = {}) {
   let records = [];let notifications = 0;let transactions = 0;
   const receipts = new Map();
   const prisma = {
     appSetting: { findUnique: async ({ where }) => receipts.get(where.key) },
-    employee: { findFirst: async () => ({ id: 'session-employee', userId: 'actor', gender: 'male' }) },
+    employee: { findFirst: async ({ where }) => ({ id: where.id ?? 'session-employee', userId: 'actor', gender: 'male' }) },
     auditLog: { create: async () => ({}) },
     $transaction: async callback => {
       transactions++;const draft = [...records];
       const stagedReceipts = new Map();
       const tx = {
+        auditLog: { create: async () => ({}) },
         appSetting: { create: async ({ data }) => { stagedReceipts.set(data.key, { value: data.value }); } },
         letterRequest: { create: async ({ data }) => { const row = { id: 'r', ...data };draft.push(row);return row; } },
         loan: { create: async ({ data }) => { const row = { id: 'r', ...data };draft.push(row);return row; } },
@@ -35,11 +36,12 @@ async function setup({ routingFailure = false, persistenceFailure = false, leave
     },
   };
   const route = await load('app/api/hr/my-requests/route.ts', {
+    '@/lib/self-service/request-submitter': { canSubmitForEmployee: async (_actor, id) => allowOnBehalf && id === "allowed-employee" },
     'node:crypto': { createHash }, 'next/server': { NextResponse }, '@/auth': { auth: async () => ({ user: { id: 'actor' } }) }, '@/lib/prisma': { prisma },
     '@/config/request-routing': config, '@/lib/enterprise/request-routing-policy': { ApprovalRoutingError },
     '@/lib/enterprise/approval-engine': { resolveApprovalChain: async () => { if (routingFailure) throw new ApprovalRoutingError('No active approver');return [{ userId: 'hr', isMandatory: true }]; } },
     '@/lib/enterprise/workflow': {
-      persistEnterpriseWorkflow: async (_tx, employeeId) => { assert.equal(employeeId, 'session-employee');if (persistenceFailure) throw new Error('Workflow insert failed');return { id: 'w' }; },
+      persistEnterpriseWorkflow: async (_tx, employeeId) => { assert.ok(['session-employee', 'allowed-employee'].includes(employeeId));if (persistenceFailure) throw new Error('Workflow insert failed');return { id: 'w' }; },
       notifyWorkflowSubmission: async () => { notifications++; },
     },
     '@/lib/errors': { formatApiError: error => ({ success: false, message: error.message }) },
@@ -86,4 +88,14 @@ test("simultaneous retries commit only one request and send one notification", a
   assert.equal(s.transactions(), 2);
   assert.equal(s.records().length, 1);
   assert.equal(s.notifications(), 1);
+});
+
+test("on-behalf submission requires permission and uses the selected employee", async () => {
+  const denied = await setup();
+  assert.equal((await denied.create({ type: "letter", onBehalfOfEmployeeId: "allowed-employee" })).status, 403);
+  assert.equal(denied.transactions(), 0);
+  const allowed = await setup({ allowOnBehalf: true });
+  assert.equal((await allowed.create({ type: "letter", onBehalfOfEmployeeId: "allowed-employee" })).status, 200);
+  assert.equal(allowed.records()[0].employeeId, "allowed-employee");
+  assert.equal((await allowed.create({ type: "letter", onBehalfOfEmployeeId: "outside-scope" })).status, 403);
 });
