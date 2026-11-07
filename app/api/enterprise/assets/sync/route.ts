@@ -1,3 +1,4 @@
+import { canManageIntegration } from "@/lib/integrations/access";
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -8,8 +9,7 @@ export const maxDuration = 300;
 export async function POST() {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ success: false, message: "سجل الدخول أولاً" }, { status: 401 });
-  const roles = session.user.roles ?? [];
-  if (!roles.includes("SUPER_ADMIN") && !roles.includes("HR_MANAGER")) {
+  if (!canManageIntegration(session.user)) {
     return NextResponse.json({ success: false, message: "صلاحية إدارة التكامل مطلوبة" }, { status: 403 });
   }
   const connections = await prisma.integrationConnection.findMany({

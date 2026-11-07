@@ -1,3 +1,4 @@
+import { canManageIntegration } from "@/lib/integrations/access";
 import { AssetSyncButton } from "@/components/hrms/asset-sync-button";
 import { auth } from "@/auth";
 import { notFound } from "next/navigation";
@@ -100,7 +101,7 @@ export async function ModulePageBody({
 }) {
   const resource = getHrmsModule(resourceKey);
   const session = resourceKey === "assets" ? await auth() : null;
-  const canSyncAssets = session?.user?.roles?.some(role => ["SUPER_ADMIN", "HR_MANAGER"].includes(role));
+  const canSyncAssets = Boolean(session?.user && canManageIntegration(session.user));
   if (!resource) notFound();
   const paramKey = (name: string) => (tabValue ? `${tabValue}__${name}` : name);
   const getParam = (name: string) => query[paramKey(name)];
@@ -213,7 +214,7 @@ export async function ModulePageBody({
         ) : null}
       />
 
-      {resourceKey === "assets" && canSyncAssets && <AssetSyncButton />}
+      {resourceKey === "assets" && <AssetSyncButton allowed={canSyncAssets} />}
 
       {/* Compact single-row toolbar: search + filters on one side, import/export/reports tucked into a menu */}
       <div className="flex flex-col gap-3 rounded-2xl border bg-card px-4 py-3 shadow-premium-sm sm:flex-row sm:items-center sm:justify-between">

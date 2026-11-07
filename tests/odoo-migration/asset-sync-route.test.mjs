@@ -7,6 +7,7 @@ test("assets sync rejects anonymous, unprivileged and ambiguous connections befo
   let calls = 0;
   let connections = [];
   const { POST } = await load("app/api/enterprise/assets/sync/route.ts", {
+    "@/lib/integrations/access": { canManageIntegration: user => user.roles.includes("SUPER_ADMIN") },
     "next/server": { NextResponse: { json: (_body, options) => options?.status ?? 200 } },
     "@/auth": { auth: async () => user ? { user } : null },
     "@/lib/prisma": { prisma: {

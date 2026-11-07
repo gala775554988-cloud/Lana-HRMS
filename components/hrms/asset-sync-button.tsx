@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export function AssetSyncButton() {
+export function AssetSyncButton({ allowed }: { allowed: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -31,9 +31,10 @@ export function AssetSyncButton() {
       <div>
         <h2 className="text-sm font-bold">عهد أودو</h2>
         <p className="mt-1 text-xs text-muted-foreground">استيراد المعدات وربطها بالموظفين المعيّنين لها.</p>
+        {!allowed && <p className="mt-2 text-sm text-muted-foreground">تشغيل المزامنة يتطلب صلاحية إدارة التكامل في حسابك.</p>}
         {message && <p role="status" className="mt-2 max-w-xl text-sm">{message}</p>}
       </div>
-      <Button variant="outline" disabled={busy} onClick={sync}><RefreshCw className={`me-2 h-4 w-4 ${busy ? "animate-spin" : ""}`} />{busy ? "جارٍ الاستيراد…" : "مزامنة العهد من أودو"}</Button>
+      <Button variant="outline" disabled={busy || !allowed} onClick={sync}><RefreshCw className={`me-2 h-4 w-4 ${busy ? "animate-spin" : ""}`} />{busy ? "جارٍ الاستيراد…" : "مزامنة العهد من أودو"}</Button>
     </section>
   );
 }
