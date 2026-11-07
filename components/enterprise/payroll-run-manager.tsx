@@ -59,7 +59,7 @@ const SAVED_FILTERS_KEY = "payrollRunSavedFilters";
 const CANCELLABLE = ["DRAFT", "PROCESSING", "APPROVED"];
 const ARCHIVABLE = ["LOCKED", "CANCELLED"];
 
-export function PayrollRunManager({initialRunId,initialCreate=false}:{initialRunId?:string;initialCreate?:boolean}) {
+export function PayrollRunManager({initialRunId, initialCreate = false, canManage, canApprove}: {initialRunId?: string; initialCreate?: boolean; canManage: boolean; canApprove: boolean}) {
   const [showCreate,setShowCreate]=useState(initialCreate);
   const [periods, setPeriods] = useState<PayrollPeriod[]>([]);
   const [runs, setRuns] = useState<RunListItem[]>([]);
@@ -236,8 +236,12 @@ export function PayrollRunManager({initialRunId,initialCreate=false}:{initialRun
     });
   }
 
+  function canCancel(status: string) {
+    return CANCELLABLE.includes(status) && (status === "APPROVED" ? canApprove : canManage);
+  }
+
   async function bulkCancel() {
-    const targets = filteredRuns.filter((r) => selectedIds.has(r.id) && CANCELLABLE.includes(r.status));
+    const targets = filteredRuns.filter((r) => selectedIds.has(r.id) && canCancel(r.status));
     if (targets.length === 0) return;
     setActionLoading(true);
     for (const run of targets) await transition("cancel", run.id);
@@ -246,7 +250,7 @@ export function PayrollRunManager({initialRunId,initialCreate=false}:{initialRun
   }
 
   async function bulkArchive() {
-    const targets = filteredRuns.filter((r) => selectedIds.has(r.id) && ARCHIVABLE.includes(r.status));
+    const targets = filteredRuns.filter((r) => selectedIds.has(r.id) && canApprove && ARCHIVABLE.includes(r.status));
     if (targets.length === 0) return;
     setActionLoading(true);
     for (const run of targets) await transition("archive", run.id);
@@ -289,11 +293,11 @@ export function PayrollRunManager({initialRunId,initialCreate=false}:{initialRun
     return list;
   }, [runs, search, statusFilter, sortBy]);
 
-  const selectableCount = filteredRuns.filter((r) => CANCELLABLE.includes(r.status) || ARCHIVABLE.includes(r.status)).length;
+  const selectableCount = filteredRuns.filter((r) => canCancel(r.status) || (canApprove && ARCHIVABLE.includes(r.status))).length;
 
   return (
     <div className="space-y-6" dir="rtl">
-      <div className="flex items-center justify-between"><p className="text-sm text-muted-foreground">إعداد المسودة ← مراجعة الموظفين والبنود ← الاعتماد ← تسجيل الصرف</p><Button variant="outline" onClick={()=>setShowCreate(v=>!v)}>{showCreate?"إغلاق نموذج الإنشاء":"إنشاء مسير جديد"}</Button></div>
+      <div className="flex items-center justify-between"><p className="text-sm text-muted-foreground">إعداد المسودة ← مراجعة الموظفين والبنود ← الاعتماد ← تسجيل الصرف</p>{canManage && <Button variant="outline" onClick={()=>setShowCreate(v=>!v)}>{showCreate?"إغلاق نموذج الإنشاء":"إنشاء مسير جديد"}</Button>}</div>
       {showCreate && <Card className="rounded-2xl">
         <CardHeader>
           <CardTitle>إنشاء مسير رواتب جديد</CardTitle>
@@ -416,10 +420,10 @@ export function PayrollRunManager({initialRunId,initialCreate=false}:{initialRun
             {selectableCount > 0 ? (
               <div className="flex flex-wrap items-center gap-2 pt-1 border-t">
                 <span className="text-xs text-muted-foreground">{selectedIds.size} محدد</span>
-                <Button size="sm" variant="outline" className="h-7 text-xs gap-1 text-rose-600" disabled={actionLoading || selectedIds.size === 0} onClick={bulkCancel}>
+                <Button size="sm" variant="outline" className="h-7 text-xs gap-1 text-rose-600" disabled={actionLoading || !filteredRuns.some(run => selectedIds.has(run.id) && canCancel(run.status))} onClick={bulkCancel}>
                   <XCircle className="h-3.5 w-3.5" />إلغاء المحدد
                 </Button>
-                <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={actionLoading || selectedIds.size === 0} onClick={bulkArchive}>
+                <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={actionLoading || !canApprove || !filteredRuns.some(run => selectedIds.has(run.id) && ARCHIVABLE.includes(run.status))} onClick={bulkArchive}>
                   <Archive className="h-3.5 w-3.5" />أرشفة المحدد
                 </Button>
               </div>
@@ -428,7 +432,7 @@ export function PayrollRunManager({initialRunId,initialCreate=false}:{initialRun
           <CardContent className="space-y-2 max-h-[32rem] overflow-y-auto">
             {filteredRuns.length === 0 && <p className="text-center text-muted-foreground py-6 text-sm">لا يوجد مسيرات رواتب مطابقة</p>}
             {filteredRuns.map((run) => {
-              const canBulkSelect = CANCELLABLE.includes(run.status) || ARCHIVABLE.includes(run.status);
+              const canBulkSelect = canCancel(run.status) || (canApprove && ARCHIVABLE.includes(run.status));
               return (
                 <div
                   key={run.id}
@@ -472,34 +476,34 @@ export function PayrollRunManager({initialRunId,initialCreate=false}:{initialRun
                     <Badge className={STATUS_COLOR[selectedRun.run.status]}>{STATUS_LABEL[selectedRun.run.status] ?? selectedRun.run.status}</Badge>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {selectedRun.run.status === "DRAFT" && (
+                    {canManage && selectedRun.run.status === "DRAFT" && (
                       <Button size="sm" onClick={() => transition("submit")} disabled={actionLoading} className="gap-1"><RefreshCw className="h-3.5 w-3.5" />إرسال للمراجعة</Button>
                     )}
-                    {["DRAFT", "PROCESSING"].includes(selectedRun.run.status) && (
+                    {canManage && ["DRAFT", "PROCESSING"].includes(selectedRun.run.status) && (
                       <Button size="sm" variant="outline" onClick={recalculate} disabled={actionLoading} className="gap-1"><RefreshCw className="h-3.5 w-3.5" />إعادة احتساب</Button>
                     )}
-                    {selectedRun.run.status === "PROCESSING" && (
+                    {canApprove && selectedRun.run.status === "PROCESSING" && (
                       <Button size="sm" onClick={() => transition("approve")} disabled={actionLoading} className="gap-1"><CheckCircle2 className="h-3.5 w-3.5" />اعتماد</Button>
                     )}
-                    {selectedRun.run.status === "APPROVED" && (
+                    {canApprove && selectedRun.run.status === "APPROVED" && (
                       <Button size="sm" onClick={() => transition("pay")} disabled={actionLoading} className="gap-1 bg-emerald-600 hover:bg-emerald-700"><Banknote className="h-3.5 w-3.5" />صرف الرواتب</Button>
                     )}
-                    {selectedRun.run.status === "PAID" && (
+                    {canApprove && selectedRun.run.status === "PAID" && (
                       <Button size="sm" variant="outline" onClick={() => transition("lock")} disabled={actionLoading} className="gap-1"><Lock className="h-3.5 w-3.5" />قفل نهائي</Button>
                     )}
-                    {selectedRun.run.status === "LOCKED" && (
+                    {canApprove && selectedRun.run.status === "LOCKED" && (
                       <>
                         <Button size="sm" variant="outline" onClick={() => transition("unlock")} disabled={actionLoading} className="gap-1"><Unlock className="h-3.5 w-3.5" />فتح القفل</Button>
                         <Button size="sm" variant="outline" onClick={() => transition("archive")} disabled={actionLoading} className="gap-1"><Archive className="h-3.5 w-3.5" />أرشفة</Button>
                       </>
                     )}
-                    {selectedRun.run.status === "CANCELLED" && (
+                    {canApprove && selectedRun.run.status === "CANCELLED" && (
                       <Button size="sm" variant="outline" onClick={() => transition("archive")} disabled={actionLoading} className="gap-1"><Archive className="h-3.5 w-3.5" />أرشفة</Button>
                     )}
-                    {["DRAFT", "PROCESSING", "APPROVED"].includes(selectedRun.run.status) && (
+                    {canCancel(selectedRun.run.status) && (
                       <Button size="sm" variant="outline" onClick={() => transition("cancel")} disabled={actionLoading} className="gap-1 text-rose-600"><XCircle className="h-3.5 w-3.5" />إلغاء</Button>
                     )}
-                    <Button size="sm" variant="outline" onClick={() => startDuplicate(selectedRun.run)} disabled={actionLoading} className="gap-1"><Copy className="h-3.5 w-3.5" />نسخ</Button>
+                    {canManage && <Button size="sm" variant="outline" onClick={() => startDuplicate(selectedRun.run)} disabled={actionLoading} className="gap-1"><Copy className="h-3.5 w-3.5" />نسخ</Button>}
                     <Button size="sm" variant="outline" asChild className="gap-1">
                       <a href={`/print-reports/payroll-register?runId=${selectedRun.run.id}`} target="_blank" rel="noreferrer"><Printer className="h-3.5 w-3.5" />طباعة السجل</a>
                     </Button>

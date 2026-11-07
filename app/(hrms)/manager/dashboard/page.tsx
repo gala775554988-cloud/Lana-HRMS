@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { getAccessProfile, buildEmployeeScopeWhere } from "@/lib/enterprise/hierarchy";
 import { Users, GitPullRequest, CalendarClock, BarChart3, Star, ArrowUpRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { countPendingApprovals } from "@/lib/enterprise/pending-approvals";
+import { riyadhWorkDate } from "@/lib/attendance/sites";
 
 export const dynamic = "force-dynamic";
 
@@ -12,12 +14,6 @@ export const metadata = {
   title: "لوحة تحكم المدير | HRMS",
   description: "نظرة سريعة على فريقك، الاعتمادات المعلقة، والحضور."
 };
-
-function startOfToday() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
 
 export default async function ManagerDashboardPage() {
   const session = await auth();
@@ -33,12 +29,14 @@ export default async function ManagerDashboardPage() {
     ? { AND: [teamScope, { id: { not: profile.employee.id } }] }
     : teamScope;
 
+  const today = riyadhWorkDate();
+  const tomorrow = new Date(today.getTime() + 86_400_000);
   const [teamSize, waitingApprovals, presentToday, teamMembers] = await Promise.all([
-    prisma.employee.count({ where: teamWhereExcludingSelf as any }),
-    prisma.workflowStep.count({ where: { approverUserId: session.user.id, status: "PENDING" } }),
-    prisma.attendanceRecord.count({ where: { employee: teamWhereExcludingSelf as any, workDate: { gte: startOfToday() }, status: "PRESENT" } }),
+    prisma.employee.count({ where: teamWhereExcludingSelf }),
+    countPendingApprovals(session.user.id).catch(() => null),
+    prisma.attendanceRecord.count({ where: { employee: teamWhereExcludingSelf, workDate: { gte: today, lt: tomorrow }, status: { in: ["PRESENT", "LATE", "HALF_DAY", "REMOTE"] } } }).catch(() => null),
     prisma.employee.findMany({
-      where: teamWhereExcludingSelf as any,
+      where: teamWhereExcludingSelf,
       select: { id: true, firstName: true, lastName: true, employeeNumber: true, position: { select: { title: true } } },
       take: 8,
       orderBy: { firstName: "asc" }
@@ -70,11 +68,11 @@ export default async function ManagerDashboardPage() {
         </div>
         <div className="rounded-3xl border bg-card p-5 shadow-sm">
           <p className="text-xs text-muted-foreground">طلبات بانتظار موافقتي</p>
-          <p className="mt-2 text-3xl font-black text-amber-600">{waitingApprovals}</p>
+          <p className="mt-2 text-3xl font-black text-amber-600">{waitingApprovals ?? "—"}</p>
         </div>
         <div className="rounded-3xl border bg-card p-5 shadow-sm">
-          <p className="text-xs text-muted-foreground">حاضرون اليوم</p>
-          <p className="mt-2 text-3xl font-black text-emerald-600">{presentToday}</p>
+          <p className="text-xs text-muted-foreground">حضور الفريق اليوم</p>
+          <p className="mt-2 text-3xl font-black text-emerald-600">{presentToday ?? "—"}</p>
         </div>
       </div>
 

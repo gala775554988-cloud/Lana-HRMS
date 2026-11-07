@@ -1,16 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { asNumber, requireEmployee } from '@/lib/employee/portal';
-import { writeAuditLog } from '@/lib/audit';
 
-const STAGE_STATUS = new Set(['PENDING', 'APPROVED', 'REJECTED']);
+import { z } from 'zod';
 
-function statusFromStages(managerStatus: string, hrStatus: string, financeStatus: string) {
-  if ([managerStatus, hrStatus, financeStatus].includes('REJECTED')) return 'REJECTED';
-  if (financeStatus === 'APPROVED') return 'APPROVED';
-  if (hrStatus === 'APPROVED') return 'PENDING_FINANCE';
-  if (managerStatus === 'APPROVED') return 'PENDING_HR';
-  return 'PENDING_MANAGER';
+const advanceFields = z.object({
+  amount: z.union([z.number(), z.string().regex(/^\d+(?:\.\d{1,2})?$/)]).transform(Number)
+    .pipe(z.number().min(0.01).max(9999999999.99))
+    .refine(value => Math.abs(value * 100 - Math.round(value * 100)) < 0.001),
+  reason: z.string().trim().min(3).max(1000),
+  installments: z.union([z.number(), z.string().regex(/^\d+$/)]).transform(Number)
+    .pipe(z.number().int().min(1).max(2147483647)),
+  startDate: z.union([z.literal(''), z.string().date()]).optional(),
+  notes: z.string().trim().max(2000).nullable().optional(),
+}).strict();
+
+const untouched = { status: 'PENDING_MANAGER', managerStatus: 'PENDING', hrStatus: 'PENDING', financeStatus: 'PENDING' };
+
+function pagination(raw: string | null, fallback: number, max: number) {
+  const value = Number(raw);
+  return Number.isSafeInteger(value) && value > 0 ? Math.min(value, max) : fallback;
+}
+
+function invalidRequest() {
+  return NextResponse.json({ success: false, message: 'راجع المبلغ والسبب وعدد الأقساط وتاريخ البداية' }, { status: 400 });
+}
+
+function lockedRequest() {
+  return NextResponse.json({ success: false, message: 'تغيرت حالة الطلب أو بدأ اعتماده. حدّث الصفحة.' }, { status: 409 });
 }
 
 function serializeAdvance(record: any) {
@@ -29,6 +46,7 @@ const advanceSelect = {
   amount: true,
   reason: true,
   installments: true,
+  paidInstallments: true,
   monthlyDeduction: true,
   startDate: true,
   status: true,
@@ -46,19 +64,19 @@ const advanceSelect = {
 
 export async function GET(request: NextRequest) {
   const { employee } = await requireEmployee();
-  const page = Math.max(Number(request.nextUrl.searchParams.get('page') ?? 1), 1);
-  const pageSize = Math.min(Math.max(Number(request.nextUrl.searchParams.get('pageSize') ?? 20), 5), 100);
+  const page = pagination(request.nextUrl.searchParams.get('page'), 1, 1_000_000);
+  const pageSize = pagination(request.nextUrl.searchParams.get('pageSize'), 20, 100);
   const where = { employeeId: employee.id };
 
   // Sequential queries keep production Supabase pool stable and avoid P2024 under load.
-  const records = await (prisma as any).employeeSalaryAdvance.findMany({
+  const records = await prisma.employeeSalaryAdvance.findMany({
     where,
     select: advanceSelect,
     orderBy: { createdAt: 'desc' },
     skip: (page - 1) * pageSize,
     take: pageSize,
   });
-  const total = await (prisma as any).employeeSalaryAdvance.count({ where });
+  const total = await prisma.employeeSalaryAdvance.count({ where });
 
   return NextResponse.json({
     success: true,
@@ -72,100 +90,91 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const { employee, session } = await requireEmployee();
-  const body = await request.json();
-  const amount = Number(body.amount);
-  const installments = Math.max(Number(body.installments ?? 1), 1);
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return NextResponse.json({ success: false, message: 'قيمة السلفة غير صحيحة' }, { status: 400 });
-  }
-  if (!body.reason || String(body.reason).trim().length < 3) {
-    return NextResponse.json({ success: false, message: 'سبب السلفة مطلوب' }, { status: 400 });
-  }
+  const parsed = advanceFields.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return invalidRequest();
 
-  const monthlyDeduction = amount / installments;
-  const record = await (prisma as any).employeeSalaryAdvance.create({
-    data: {
-      employeeId: employee.id,
-      amount,
-      reason: String(body.reason).trim(),
-      installments,
-      monthlyDeduction,
-      startDate: body.startDate ? new Date(body.startDate) : new Date(),
-      attachments: Array.isArray(body.attachments) ? body.attachments : [],
-      notes: body.notes ? String(body.notes) : null,
-    },
-    select: advanceSelect,
+  const { amount, installments, startDate, ...fields } = parsed.data;
+  const monthlyDeduction = Math.round(amount * 100 / installments) / 100;
+  if (monthlyDeduction <= 0) return invalidRequest();
+
+  const record = await prisma.$transaction(async tx => {
+    const advance = await tx.employeeSalaryAdvance.create({
+      data: {
+        ...fields, employeeId: employee.id, amount, installments, monthlyDeduction,
+        startDate: startDate ? new Date(startDate) : new Date(),
+      },
+      select: advanceSelect,
+    });
+    await tx.auditLog.create({ data: {
+      actorUserId: session.user.id, action: 'SALARY_ADVANCE_CREATE',
+      entity: 'EmployeeSalaryAdvance', entityId: advance.id,
+    } });
+    if (employee.managerId) {
+      const manager = await tx.employee.findUnique({
+        where: { id: employee.managerId }, select: { userId: true },
+      });
+      if (manager?.userId) {
+        await tx.notification.create({ data: {
+          userId: manager.userId, title: 'طلب سلفة جديد',
+          body: 'يوجد طلب سلفة جديد لمراجعته.', type: 'INFO',
+        } });
+      }
+    }
+    return advance;
   });
-
-  await prisma.notification
-    .createMany({
-      data: [
-        { userId: null, title: 'طلب سلفة جديد', body: `${employee.firstName} ${employee.lastName} قدم طلب سلفة بانتظار موافقة المدير`, type: 'INFO' },
-        { userId: null, title: 'مسار اعتماد السلفة', body: 'Employee → Manager Approval → HR Approval → Finance Approval', type: 'INFO' },
-      ],
-    })
-    .catch(() => undefined);
-  await writeAuditLog({
-    actorUserId: session.user.id,
-    action: 'SALARY_ADVANCE_CREATE',
-    entity: 'EmployeeSalaryAdvance',
-    entityId: record.id,
-    metadata: { employeeId: employee.id, amount, workflow: ['Employee', 'Manager Approval', 'HR Approval', 'Finance Approval'] },
-  }).catch(() => undefined);
-
   return NextResponse.json({ success: true, record: serializeAdvance(record) });
 }
 
 export async function PUT(request: NextRequest) {
   const { employee, session } = await requireEmployee();
-  const body = await request.json();
-  if (!body.id) return NextResponse.json({ success: false, message: 'id required' }, { status: 400 });
+  const parsed = advanceFields.partial().extend({ id: z.string().min(1) })
+    .safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return invalidRequest();
+  const { id, startDate, ...fields } = parsed.data;
+  if (!Object.keys(fields).length && !startDate) return invalidRequest();
 
-  const existing = await (prisma as any).employeeSalaryAdvance.findFirst({ where: { id: body.id, employeeId: employee.id } });
+  const where = { id, employeeId: employee.id };
+  const existing = await prisma.employeeSalaryAdvance.findFirst({ where });
   if (!existing) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 });
 
-  const data: any = {};
-  if (existing.status === 'PENDING_MANAGER') {
-    if (body.amount !== undefined) data.amount = Number(body.amount);
-    if (body.reason !== undefined) data.reason = String(body.reason).trim();
-    if (body.installments !== undefined) data.installments = Math.max(Number(body.installments), 1);
-    if (body.startDate !== undefined) data.startDate = new Date(body.startDate);
-    if (body.notes !== undefined) data.notes = body.notes ? String(body.notes) : null;
-    if (body.attachments !== undefined) data.attachments = Array.isArray(body.attachments) ? body.attachments : [];
-    if (data.amount !== undefined || data.installments !== undefined) {
-      data.monthlyDeduction = Number(data.amount ?? existing.amount) / Number(data.installments ?? existing.installments);
-    }
+  const data = { ...fields, ...(startDate ? { startDate: new Date(startDate) } : {}) };
+  if (fields.amount !== undefined || fields.installments !== undefined) {
+    const monthlyDeduction = Math.round(Number(fields.amount ?? existing.amount) * 100 / (fields.installments ?? existing.installments)) / 100;
+    if (monthlyDeduction <= 0) return invalidRequest();
+    Object.assign(data, { monthlyDeduction });
   }
 
-  for (const stage of ['managerStatus', 'hrStatus', 'financeStatus'] as const) {
-    if (body[stage] !== undefined && STAGE_STATUS.has(body[stage])) data[stage] = body[stage];
-  }
-  for (const comment of ['managerComment', 'hrComment', 'financeComment'] as const) {
-    if (body[comment] !== undefined) data[comment] = body[comment] ? String(body[comment]) : null;
-  }
-  if (data.managerStatus || data.hrStatus || data.financeStatus) {
-    data.status = statusFromStages(
-      data.managerStatus ?? existing.managerStatus,
-      data.hrStatus ?? existing.hrStatus,
-      data.financeStatus ?? existing.financeStatus
-    );
-  }
-
-  const record = await (prisma as any).employeeSalaryAdvance.update({ where: { id: body.id }, data, select: advanceSelect });
-  await writeAuditLog({ actorUserId: session.user.id, action: 'SALARY_ADVANCE_UPDATE', entity: 'EmployeeSalaryAdvance', entityId: record.id, metadata: data }).catch(() => undefined);
+  const record = await prisma.$transaction(async tx => {
+    const changed = await tx.employeeSalaryAdvance.updateMany({
+      where: { ...where, ...untouched, updatedAt: existing.updatedAt }, data,
+    });
+    if (changed.count !== 1) return null;
+    await tx.auditLog.create({ data: {
+      actorUserId: session.user.id, action: 'SALARY_ADVANCE_UPDATE',
+      entity: 'EmployeeSalaryAdvance', entityId: id,
+    } });
+    return tx.employeeSalaryAdvance.findUniqueOrThrow({ where: { id }, select: advanceSelect });
+  });
+  if (!record) return lockedRequest();
   return NextResponse.json({ success: true, record: serializeAdvance(record) });
 }
 
 export async function DELETE(request: NextRequest) {
   const { employee, session } = await requireEmployee();
   const id = request.nextUrl.searchParams.get('id');
-  if (!id) return NextResponse.json({ success: false, message: 'id required' }, { status: 400 });
+  if (!id) return invalidRequest();
 
-  const existing = await (prisma as any).employeeSalaryAdvance.findFirst({ where: { id, employeeId: employee.id }, select: { id: true, status: true } });
-  if (!existing) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 });
-  if (existing.status !== 'PENDING_MANAGER') return NextResponse.json({ success: false, message: 'لا يمكن حذف طلب بدأ اعتماده' }, { status: 409 });
-
-  await (prisma as any).employeeSalaryAdvance.delete({ where: { id } });
-  await writeAuditLog({ actorUserId: session.user.id, action: 'SALARY_ADVANCE_DELETE', entity: 'EmployeeSalaryAdvance', entityId: id }).catch(() => undefined);
+  const deleted = await prisma.$transaction(async tx => {
+    const result = await tx.employeeSalaryAdvance.deleteMany({
+      where: { id, employeeId: employee.id, ...untouched },
+    });
+    if (result.count !== 1) return false;
+    await tx.auditLog.create({ data: {
+      actorUserId: session.user.id, action: 'SALARY_ADVANCE_DELETE',
+      entity: 'EmployeeSalaryAdvance', entityId: id,
+    } });
+    return true;
+  });
+  if (!deleted) return lockedRequest();
   return NextResponse.json({ success: true });
 }

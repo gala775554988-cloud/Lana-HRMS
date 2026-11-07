@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 
 type NotificationItem = {
   id: string;
+  userId?: string | null;
   title: string;
   body: string;
   type: string;
@@ -51,7 +52,7 @@ export function NotificationCenterClient() {
   }
 
   function openNotification(notification: NotificationItem) {
-    if (!notification.readAt) markRead(notification.id);
+    if (notification.userId !== null && !notification.readAt) markRead(notification.id);
     if (notification.link) router.push(notification.link);
   }
 
@@ -78,7 +79,7 @@ export function NotificationCenterClient() {
                 <p className="font-semibold">{notification.title}</p>
                 <p className="mt-1 text-sm text-muted-foreground">{notification.body}</p>
               </div>
-              <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] text-slate-600 dark:bg-slate-800 dark:text-slate-300">{notification.readAt ? "Read" : "Unread"}</span>
+              <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] text-slate-600 dark:bg-slate-800 dark:text-slate-300">{notification.userId === null ? "إعلان عام" : notification.readAt ? "مقروء" : "غير مقروء"}</span>
             </div>
           </button>
         ))}

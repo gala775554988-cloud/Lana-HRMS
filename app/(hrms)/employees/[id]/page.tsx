@@ -1,3 +1,4 @@
+import { getAvailableLeaveBalance } from "@/lib/employee/leave-balance";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getRequestDictionary } from "@/lib/i18n-server";
@@ -228,7 +229,8 @@ export default async function EmployeeProfilePage({
   // component, which would still leak the real value over the network.
   const visibleEmployee = redactHiddenFields(employee as unknown as Record<string, unknown>, viewerFieldAccess);
 
-  const modifiedLeaveBalance = leaveBalance.map((balance) => ({
+  const annualBalance = await getAvailableLeaveBalance(id);
+  const otherLeaveBalances = leaveBalance.filter(balance => !balance.leaveTypeCode.toUpperCase().startsWith("ANNUAL")).map((balance) => ({
     id: balance.leaveTypeId,
     code: balance.leaveTypeCode,
     name: balance.leaveTypeName,
@@ -239,6 +241,18 @@ export default async function EmployeeProfilePage({
     remaining: balance.remaining,
     automatic: true,
   }));
+
+  const modifiedLeaveBalance = [{
+    id: "annual",
+    code: "ANNUAL",
+    name: "الإجازة السنوية",
+    annualLimit: annualBalance.accrued,
+    accrued: annualBalance.accrued,
+    used: annualBalance.used,
+    remaining: annualBalance.available,
+    reserved: annualBalance.reserved,
+    automatic: false,
+  }, ...otherLeaveBalances];
 
   return (
     <EmployeeProfileDashboard

@@ -17,6 +17,7 @@ type AdvanceRecord = {
   amount: unknown;
   reason: string;
   installments: number;
+  paidInstallments: number;
   monthlyDeduction: unknown;
   startDate: Date;
   status: string;
@@ -52,6 +53,7 @@ async function AdvancesContent() {
       amount: true,
       reason: true,
       installments: true,
+      paidInstallments: true,
       monthlyDeduction: true,
       startDate: true,
       status: true,

@@ -121,8 +121,8 @@ export function AppShell({ children, dictionary }: AppShellProps) {
 
   if (status === "loading") {
     return (
-      <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
-        <div className="hidden h-screen w-[272px] shrink-0 bg-[hsl(var(--sidebar-bg))] lg:block" />
+      <div className="flex h-dvh w-full overflow-hidden bg-background text-foreground">
+        <div className="hidden h-dvh w-[272px] shrink-0 bg-[hsl(var(--sidebar-bg))] lg:block" />
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="h-16 shrink-0 border-b border-border/80 bg-white dark:bg-slate-950" />
           <main className="min-w-0 flex-1 overflow-y-auto p-4 lg:p-8">{children}</main>
@@ -136,7 +136,7 @@ export function AppShell({ children, dictionary }: AppShellProps) {
   }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
+    <div className="flex h-dvh w-full overflow-hidden bg-background text-foreground">
       {mobileMenuOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs lg:hidden animate-in fade-in duration-200"
@@ -151,7 +151,7 @@ export function AppShell({ children, dictionary }: AppShellProps) {
           the two surfaces read as deliberately different materials. */}
       <aside
         className={cn(
-          "fixed inset-y-0 start-0 z-50 flex h-screen flex-col border-e border-white/10 bg-[hsl(var(--sidebar-bg))] text-[hsl(var(--sidebar-foreground))] shadow-xl transition-[width,transform] duration-200 lg:sticky lg:top-0 lg:z-auto lg:!translate-x-0",
+          "fixed inset-y-0 start-0 z-50 flex h-dvh flex-col border-e border-white/10 bg-[hsl(var(--sidebar-bg))] text-[hsl(var(--sidebar-foreground))] shadow-xl transition-[width,transform] duration-200 lg:sticky lg:top-0 lg:z-auto lg:!translate-x-0",
           sidebarCollapsed ? "lg:w-[72px]" : "lg:w-[248px]",
           "w-[248px]",
           mobileMenuOpen ? "translate-x-0" : "rtl:translate-x-full ltr:-translate-x-full"
@@ -226,7 +226,7 @@ export function AppShell({ children, dictionary }: AppShellProps) {
 
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col h-screen">
+      <div className="flex min-w-0 flex-1 flex-col h-dvh">
       {/* Shared application header */}
       <header className="sticky top-0 z-30 shrink-0 border-b border-border bg-card/95 backdrop-blur-sm">
         <div className="flex h-16 items-center justify-between gap-4 px-4 lg:px-6">
@@ -245,10 +245,10 @@ export function AppShell({ children, dictionary }: AppShellProps) {
             >
               {sidebarCollapsed ? <ChevronLeft className="h-4.5 w-4.5" /> : <ChevronRight className="h-4.5 w-4.5" />}
             </button>
-            <button type="button" onClick={() => setSearchOpen(true)} className="hidden h-10 min-w-[260px] items-center gap-2 rounded-xl border border-border bg-muted/45 px-3 text-sm text-muted-foreground transition-colors hover:border-primary/30 hover:bg-card lg:flex">
+            <button type="button" onClick={() => setSearchOpen(true)} aria-label="البحث في النظام" className="inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-xl border border-border bg-muted/45 px-3 text-sm text-muted-foreground transition-colors hover:border-primary/30 hover:bg-card lg:min-w-[260px] lg:justify-start">
               <Search className="h-4 w-4" />
-              <span>البحث في النظام</span>
-              <kbd className="ms-auto rounded-md border bg-card px-1.5 py-0.5 text-[10px]">⌘ K</kbd>
+              <span className="hidden lg:inline">البحث في النظام</span>
+              <kbd className="ms-auto hidden lg:inline rounded-md border bg-card px-1.5 py-0.5 text-[10px]">⌘ K</kbd>
             </button>
           </div>
 
@@ -298,8 +298,8 @@ export function AppShell({ children, dictionary }: AppShellProps) {
       </header>
 
       <main className="hrms-workspace relative min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-background p-4 lg:p-6">
-        <nav aria-label="موقعك في النظام" className="mb-5 flex items-center gap-2 rounded-xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm">
-          <span className="text-muted-foreground">أنت في</span><span className="text-muted-foreground">/</span><strong className="text-primary">{visibleNavItems.find(item => isActive(item.href))?.label || "مساحة العمل"}</strong>
+        <nav aria-label="موقعك في النظام" className="lana-workspace-hero mb-5 flex items-center gap-2 rounded-2xl px-5 py-4 text-sm">
+          <span className="text-indigo-200">أنت في</span><span aria-hidden className="text-indigo-200">/</span><strong className="text-white">{visibleNavItems.find(item => isActive(item.href))?.label || "مساحة العمل"}</strong>
         </nav>
         {children}
       </main>

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { hasAnyRole } from "@/lib/rbac";
 import { writeAuditLog } from "@/lib/audit";
-import { setEmployeeLeaveBalance, getEffectiveLeaveBalance } from "@/lib/employee/leave-balance";
+import { setEmployeeLeaveBalance, getAvailableLeaveBalance } from "@/lib/employee/leave-balance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     if (!employeeId || typeof employeeId !== "string") {
       return NextResponse.json({ success: false, message: "employeeId required" }, { status: 400 });
     }
-    if (!Number.isFinite(accruedNumber) || !Number.isFinite(usedNumber) || (monthsNumber !== undefined && (!Number.isFinite(monthsNumber) || monthsNumber < 0))) {
+    if (!Number.isFinite(accruedNumber) || accruedNumber < 0 || !Number.isFinite(usedNumber) || usedNumber < 0 || (monthsNumber !== undefined && (!Number.isFinite(monthsNumber) || monthsNumber < 0))) {
       return NextResponse.json({ success: false, message: "قيم رصيد الإجازة غير صالحة" }, { status: 400 });
     }
 
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       used: usedNumber,
       monthsAccrued: monthsNumber,
     });
-    const balance = await getEffectiveLeaveBalance(employeeId);
+    const balance = await getAvailableLeaveBalance(employeeId);
 
     await writeAuditLog({
       actorUserId: session.user.id,

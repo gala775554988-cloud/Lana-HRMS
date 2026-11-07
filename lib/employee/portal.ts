@@ -1,8 +1,9 @@
+import { latestPayslipFirst, paidPayslipRun } from "@/lib/payroll/employee-payslips";
 import { cache } from 'react';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { memoryCache } from '@/lib/cache/memory-cache';
-import { getEffectiveLeaveBalance } from '@/lib/employee/leave-balance';
+import { getAvailableLeaveBalance } from '@/lib/employee/leave-balance';
 
 function isPoolTimeout(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
@@ -112,22 +113,27 @@ async function getPortalDashboardUncached(employeeId: string, userId?: string) {
   const attendanceMonth = await dbQuery<any[]>('dashboard.attendance.month', () => prisma.attendanceRecord.findMany({ where: { employeeId, workDate: { gte: monthStart, lt: nextMonth } }, select: { status: true, checkIn: true, checkOut: true, workDate: true }, orderBy: { workDate: 'asc' } }), []);
   const leaves = await dbQuery<any[]>('dashboard.leave', () => prisma.leaveRequest.findMany({ where: { employeeId }, select: { status: true, days: true, reason: true, createdAt: true, leaveType: { select: { name: true } } }, orderBy: { createdAt: 'desc' }, take: 20 }), []);
   const permissionRequests = await dbQuery<any[]>('dashboard.permission', () => (prisma as any).employeePermissionRequest?.findMany?.({ where: { employeeId }, select: { reason: true, status: true, createdAt: true }, orderBy: { createdAt: 'desc' }, take: 20 }) ?? Promise.resolve([]), []);
-  const payroll = await dbQuery<any | null>('dashboard.payroll', () => prisma.payrollItem.findFirst({ where: { employeeId }, select: { baseSalary: true, netPay: true, currency: true, createdAt: true }, orderBy: { createdAt: 'desc' } }), null);
+  const pendingRequests = await dbQuery<number | null>('dashboard.requests.pending', () => prisma.workflowInstance.count({ where: { employeeId, status: 'PENDING' } }), null);
+  const payroll = await dbQuery('dashboard.payroll', () => prisma.payrollItem.findFirst({
+    where: { employeeId, payrollRun: paidPayslipRun },
+    select: { netPay: true, currency: true },
+    orderBy: latestPayslipFirst,
+  }), null);
   const documents = await dbQuery<number>('dashboard.documents', () => prisma.employeeDocument.count({ where: { employeeId } }), 0);
   const assets = await dbQuery<number>('dashboard.assets', () => prisma.asset.count({ where: { assignedEmployeeId: employeeId } }), 0);
-  const notifications = await dbQuery<any[]>('dashboard.notifications', () => prisma.notification.findMany({ where: { OR: [{ userId }, { userId: null }], readAt: null }, select: { title: true, type: true, createdAt: true }, take: 10, orderBy: { createdAt: 'desc' } }), []);
+  const notifications = await dbQuery<any[]>('dashboard.notifications', () => prisma.notification.findMany({ where: { userId: userId ?? "__NO_NOTIFICATION_USER__", readAt: null }, select: { title: true, type: true, createdAt: true }, take: 10, orderBy: { createdAt: 'desc' } }), []);
   const portalTaskCount = await dbQuery<number>('dashboard.tasks.count', () => (prisma as any).employeePortalTask?.count?.({ where: { employeeId, status: { not: 'COMPLETED' } } }) ?? Promise.resolve(0), 0);
 
   const empRawRecord = await dbQuery<any | null>('dashboard.employee.raw', () => prisma.employee.findUnique({ where: { id: employeeId }, select: { odooRawData: true } }), null);
   const raw = empRawRecord?.odooRawData as any || {};
   const csv = raw._csvLeaveData || {};
 
-  const leaveBalance = await dbQuery('dashboard.leaveBalance', () => getEffectiveLeaveBalance(employeeId), { accrued: 30, used: 0, remaining: 30 });
-  const leaveEntitlement = leaveBalance.accrued;
-  const leaveUsed = leaveBalance.used;
+  const leaveBalance = await dbQuery('dashboard.leaveBalance', () => getAvailableLeaveBalance(employeeId), null);
+  const leaveEntitlement = leaveBalance?.accrued ?? null;
+  const leaveUsed = leaveBalance?.used ?? null;
   // Intentionally not clamped to zero -- a real overdraft (approved past the
   // employee's balance) must render as a negative number, not silently hide.
-  const leaveRemaining = leaveBalance.remaining;
+  const leaveRemaining = leaveBalance?.available ?? null;
   const leaveMonthsAccrued = Number(csv.monthsAccrued ?? raw.leaveMonthsAccrued ?? 0);
 
   const monthHours = attendanceMonth.reduce((sum: number, r: any) => r.checkIn && r.checkOut ? sum + Math.max(0, (r.checkOut.getTime() - r.checkIn.getTime()) / 36e5) : sum, 0);
@@ -140,7 +146,7 @@ async function getPortalDashboardUncached(employeeId: string, userId?: string) {
     notifications[0] && { type: 'إشعار', title: notifications[0].title, date: notifications[0].createdAt, status: notifications[0].type },
     latestAttendance && { type: 'حضور', title: `آخر حضور: ${latestAttendance.status}`, date: latestAttendance.workDate, status: latestAttendance.checkOut ? 'مكتمل' : 'مفتوح' },
   ].filter(Boolean) as Array<{type:string;title:string;date:Date;status:string}>;
-  return { attendanceToday, attendanceMonth, leaves, permissionRequests, payroll, documents, assets, notifications, leaveUsed, leaveRemaining, leaveEntitlement, leaveMonthsAccrued, monthHours, presentDays, timeline, taskCount: portalTaskCount };
+  return { attendanceToday, attendanceMonth, leaves, permissionRequests, payroll, pendingRequests, documents, assets, notifications, leaveUsed, leaveRemaining, leaveEntitlement, leaveMonthsAccrued, monthHours, presentDays, timeline, taskCount: portalTaskCount };
 }
 
 export function profileCompletion(employee: any) {

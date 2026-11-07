@@ -11,7 +11,7 @@ import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 export const dynamic = "force-dynamic";
 
 const NON_EMPLOYEE_ROLES = [
-  "SUPER_ADMIN", "HR_MANAGER", "PAYROLL_MANAGER", "RECRUITER",
+  "SUPER_ADMIN", "HR_MANAGER", "PAYROLL_MANAGER", "PAYROLL_OFFICER", "RECRUITER",
   "MANAGER", "HR", "DEPARTMENT_MANAGER", "BRANCH_MANAGER",
   "SUPERVISOR", "PROJECT_MANAGER",
 ];

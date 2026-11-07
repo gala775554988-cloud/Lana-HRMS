@@ -171,7 +171,7 @@ export function EmployeeProfileDashboard({
       if (!res.ok || !json.success) throw new Error(json.message || "فشل التحديث");
       setLeaveBalanceState((prev) =>
         prev.map((lt: any) => lt.id === "annual"
-          ? { ...lt, annualLimit: json.data.accrued, used: json.data.used, remaining: json.data.remaining, monthsAccrued }
+          ? { ...lt, annualLimit: json.data.accrued, used: json.data.used, remaining: json.data.available, reserved: json.data.reserved, monthsAccrued }
           : lt)
       );
       setEditingBalanceId(null);
@@ -546,6 +546,7 @@ export function EmployeeProfileDashboard({
                       <p className="text-base font-extrabold text-slate-900 dark:text-slate-100">{lt.name}</p>
                       <div className="flex items-center gap-2">
                         {lt.automatic ? <Badge variant="outline" className="text-[10px]">محسوب آلياً من العقد</Badge> : null}
+                        {lt.reserved > 0 ? <Badge variant="outline">محجوز: {lt.reserved} يوم</Badge> : null}
                         {lt.monthsAccrued > 0 ? (
                           <Badge className="bg-teal-600 text-white font-bold text-[10px]">عن {lt.monthsAccrued} أشهر</Badge>
                         ) : null}
@@ -597,7 +598,7 @@ export function EmployeeProfileDashboard({
                     ) : lt.remaining !== undefined ? (
                       <div className="grid grid-cols-3 gap-2 text-center pt-1 border-t border-slate-200/60 dark:border-slate-800">
                         <div className={`rounded-xl p-2 border ${isOverdrawn ? "bg-red-50 border-red-200/60 dark:bg-red-950/40 dark:border-red-800/60" : "bg-emerald-50 border-emerald-200/60 dark:bg-emerald-950/40 dark:border-emerald-800/60"}`}>
-                          <p className={`text-[10px] font-bold ${isOverdrawn ? "text-red-700 dark:text-red-300" : "text-emerald-700 dark:text-emerald-300"}`}>المدة المتبقية</p>
+                          <p className={`text-[10px] font-bold ${isOverdrawn ? "text-red-700 dark:text-red-300" : "text-emerald-700 dark:text-emerald-300"}`}>{lt.id === "annual" ? "المتاح للطلب" : "المدة المتبقية"}</p>
                           <p className={`text-xl font-black mt-0.5 ${isOverdrawn ? "text-red-700 dark:text-red-300" : "text-emerald-800 dark:text-emerald-200"}`}>
                             {isOverdrawn ? `-${Math.abs(Number(lt.remaining))}` : lt.remaining} <span className="text-[10px]">يوم</span>
                           </p>

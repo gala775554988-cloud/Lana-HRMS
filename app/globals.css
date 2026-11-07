@@ -281,3 +281,10 @@
 }
 .lana-back-control:focus-visible { outline: 3px solid #818cf8; outline-offset: 4px; }
 @media print { .lana-back-control { display: none; } }
+
+@layer components {
+  .lana-workspace-hero {
+    color: white;
+    background: radial-gradient(ellipse at 12% 0%, #404a8b 0, transparent 60%), #182342;
+  }
+}

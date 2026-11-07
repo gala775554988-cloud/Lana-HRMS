@@ -14,20 +14,32 @@ export type LeaveBalanceSnapshot = {
  * default 30 the moment this table shipped. remaining is intentionally not
  * clamped to zero -- a real overdraft must show as a negative number.
  */
-export async function getEffectiveLeaveBalance(employeeId: string): Promise<LeaveBalanceSnapshot> {
-  const balance = await prisma.employeeLeaveBalance.findUnique({ where: { employeeId } });
+export async function getEffectiveLeaveBalance(employeeId: string, db: Pick<typeof prisma, "employeeLeaveBalance" | "employee"> = prisma): Promise<LeaveBalanceSnapshot> {
+  const balance = await db.employeeLeaveBalance.findUnique({ where: { employeeId } });
   if (balance) {
     const accrued = Number(balance.accrued);
     const used = Number(balance.used);
     return { accrued, used, remaining: accrued - used };
   }
 
-  const employee = await prisma.employee.findUnique({ where: { id: employeeId }, select: { odooRawData: true } });
+  const employee = await db.employee.findUnique({ where: { id: employeeId }, select: { odooRawData: true } });
   const raw = (employee?.odooRawData as any) || {};
   const csv = raw._csvLeaveData || {};
   const accrued = Number(csv.daysAccrued ?? raw.leaveBalance ?? 30);
   const used = typeof csv.daysUsed === "number" || typeof raw.leaveUsed === "number" ? Number(csv.daysUsed ?? raw.leaveUsed) : 0;
   return { accrued, used, remaining: accrued - used };
+}
+
+export async function getAvailableLeaveBalance(employeeId: string) {
+  return prisma.$transaction(async tx => {
+    const balance = await getEffectiveLeaveBalance(employeeId, tx);
+    const pending = await tx.leaveRequest.aggregate({
+      where: { employeeId, status: "PENDING", leaveType: { code: { startsWith: "ANNUAL", mode: "insensitive" } } },
+      _sum: { days: true },
+    });
+    const reserved = Number(pending._sum.days ?? 0);
+    return { ...balance, reserved, available: balance.remaining - reserved };
+  }, { isolationLevel: "RepeatableRead" });
 }
 
 /**

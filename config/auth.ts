@@ -6,7 +6,7 @@ export const authRoutes = ["/login", "/forgot-password", "/reset-password", "/ve
 export const publicRoutes = [...authRoutes];
 export const DEFAULT_LOGIN_REDIRECT = "/employee/dashboard";
 
-const HR_DASHBOARD_ROLES = ["HR_MANAGER", "HR", "PAYROLL_MANAGER", "RECRUITER"];
+const HR_DASHBOARD_ROLES = ["HR_MANAGER", "HR", "RECRUITER"];
 const MANAGER_DASHBOARD_ROLES = ["MANAGER", "DEPARTMENT_MANAGER", "BRANCH_MANAGER", "SUPERVISOR", "PROJECT_MANAGER"];
 
 export function resolveRoleDashboard(
@@ -18,6 +18,10 @@ export function resolveRoleDashboard(
 
   // SUPER_ADMIN is always sent to the Central Executive Dashboard.
   if (roleSet.has("SUPER_ADMIN")) return "/dashboard";
+
+  // Finance-only roles start in the payroll workspace.
+  if (!roleSet.has("HR_MANAGER") && !roleSet.has("HR") &&
+      (roleSet.has("PAYROLL_MANAGER") || roleSet.has("PAYROLL_OFFICER"))) return "/payroll";
 
   // Direct per-user grants are intentionally independent of a user's job
   // role. An EMPLOYEE who was granted access to an HR module must enter the

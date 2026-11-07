@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit";
 import { computeAndUpsertPayrollItems } from "@/lib/enterprise/payroll-engine";
 import { notifyRole } from "@/lib/enterprise/notifications";
-import { canManagePayroll, canApprovePayroll } from "@/lib/enterprise/payroll-permissions";
+import { canManagePayroll, canApprovePayroll, canViewPayroll } from "@/lib/enterprise/payroll-permissions";
 import { getPayrollOdooClient } from "@/lib/payroll/connection";
 import { odooPayrollSource, reconcileAccountingOutbox } from "@/lib/payroll/odoo-payroll";
 import { accountingMappingSchema, postConfiguredPayrollJournal } from "@/lib/payroll/journal";
@@ -28,7 +28,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
-  if (!canManagePayroll(session)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+  if (!canViewPayroll(session)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
   const run = await prisma.payrollRun.findUnique({
@@ -73,10 +73,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
 
+  const canManage = canManagePayroll(session);
+  const canApprove = canApprovePayroll(session);
+  if (!canManage && !canApprove) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+
   const { id } = await params;
   const body = await request.json().catch(() => null) as { action?: string; reason?: string } | null;
   const action = body?.action;
-  if (!action) return NextResponse.json({ success: false, message: "action is required" }, { status: 400 });
+  if (typeof action !== "string" || !action) return NextResponse.json({ success: false, message: "action is required" }, { status: 400 });
 
   const run = await prisma.payrollRun.findUnique({ where: { id } });
   if (!run) return NextResponse.json({ success: false, message: "Not found" }, { status: 404 });
@@ -121,12 +125,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   };
 
   const transition = transitions[action];
-  if (!transition) return NextResponse.json({ success: false, message: "Unknown action" }, { status: 400 });
+  if (!Object.hasOwn(transitions, action) || !transition) return NextResponse.json({ success: false, message: "Unknown action" }, { status: 400 });
   if (!transition.from.includes(run.status)) {
     return NextResponse.json({ success: false, message: `لا يمكن تنفيذ "${action}" على مسير في حالة ${run.status}` }, { status: 409 });
   }
 
-  const allowed = transition.requiresApprover ? canApprovePayroll(session) : canManagePayroll(session);
+  const needsApproval = transition.requiresApprover || (action === "cancel" && run.status === "APPROVED");
+  const allowed = needsApproval ? canApprove : canManage;
   if (!allowed) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
 
   const now = new Date();

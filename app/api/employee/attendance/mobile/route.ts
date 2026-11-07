@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       allowedRadiusMeters: siteResult.site.radiusMeters,
       assignmentType: siteResult.site.assignmentType,
       assignmentValue: siteResult.site.assignmentValue,
-      verification: body.biometric === true ? 'DEVICE_BIOMETRIC_CONFIRMED' : 'GPS_SESSION',
+      verification: 'GPS_SESSION',
       userAgent: request.headers.get('user-agent')?.slice(0, 300),
     });
 

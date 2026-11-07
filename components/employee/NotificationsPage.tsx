@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 
 type NotificationItem = {
   id: string;
+  userId?: string | null;
   title: string;
   body: string;
   type: string;
@@ -33,7 +34,7 @@ export function NotificationsPage({ notifications: initialNotifications }: { not
 
   async function open(notification: NotificationItem) {
     // Immediately mark read in local UI state so badge updates instantly
-    if (!notification.readAt) {
+    if (notification.userId !== null && !notification.readAt) {
       const now = new Date().toISOString();
       setNotifications((prev) =>
         prev.map((n) => (n.id === notification.id ? { ...n, readAt: now } : n))
@@ -66,7 +67,7 @@ export function NotificationsPage({ notifications: initialNotifications }: { not
       ) : (
         <div className="space-y-3">
           {notifications.map((n) => {
-            const isRead = Boolean(n.readAt);
+            const isRead = n.userId === null || Boolean(n.readAt);
             return (
               <button
                 key={n.id}
@@ -90,7 +91,7 @@ export function NotificationsPage({ notifications: initialNotifications }: { not
                       </span>
                     ) : (
                       <span className="shrink-0 text-[10px] font-semibold text-muted-foreground">
-                        مقروء ✓
+                        {n.userId === null ? "إعلان عام" : "مقروء ✓"}
                       </span>
                     )}
                   </div>

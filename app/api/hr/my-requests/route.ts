@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -60,6 +61,26 @@ export async function POST(request: Request) {
     }
 
     const employeeId = employee.id;
+    const token = isJsonRequest ? request.headers.get("idempotency-key") : null;
+    if (token && !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(token)) {
+      return NextResponse.json({ success: false, message: "معرّف إعادة المحاولة غير صالح" }, { status: 400 });
+    }
+    const submissionKey = token ? `self-service.submission.${session.user.id}.${token.toLowerCase()}` : null;
+    const success = () => NextResponse.json({ success: true, message: "تم إرسال الطلب بنجاح" });
+    const fingerprint = submissionKey ? createHash("sha256").update(JSON.stringify({ rawType, data })).digest("hex") : null;
+    const replay = async () => {
+      if (!submissionKey) return null;
+      const receipt = await prisma.appSetting.findUnique({ where: { key: submissionKey }, select: { value: true } });
+      if (!receipt) return null;
+      const original = receipt.value as { fingerprint?: string } | null;
+      if (original?.fingerprint && original.fingerprint !== fingerprint) {
+        return NextResponse.json({ success: false, message: "محتوى الطلب تغيّر. أعد فتح النموذج وحاول مرة أخرى." }, { status: 409 });
+      }
+      return success();
+    };
+    const previous = await replay();
+    if (previous) return previous;
+
     const normalizedType = normalizeRequestType(String(rawType || ""));
     if (!REQUEST_CATEGORIES.some(category => category.code === normalizedType)) throw new ApprovalRoutingError("نوع الطلب غير صالح.");
     const type = normalizedType.toLowerCase();
@@ -173,7 +194,7 @@ export async function POST(request: Request) {
             leaveTypeId: leaveType.id,
             startDate: requestStartDate,
             endDate: requestEndDate,
-            days: Number(data.days) || 1,
+            days: Math.floor((Date.UTC(requestEndDate.getUTCFullYear(), requestEndDate.getUTCMonth(), requestEndDate.getUTCDate()) - Date.UTC(requestStartDate.getUTCFullYear(), requestStartDate.getUTCMonth(), requestStartDate.getUTCDate())) / 86_400_000) + 1,
             reason: data.reason || "",
             status: "PENDING",
           },
@@ -334,9 +355,18 @@ export async function POST(request: Request) {
     }
 
     const workflow = await persistEnterpriseWorkflow(tx, employeeId, normalizedType, result.id, approvers);
+    if (submissionKey) await tx.appSetting.create({
+      data: { key: submissionKey, value: { workflowId: workflow.id, fingerprint } },
+    });
     return { record: result, workflow };
-    }, { timeout: 15000 });
-    if (created instanceof NextResponse) return created;
+    }, { timeout: 15000 }).catch(async error => {
+      const completed = await replay();
+      if (completed) return completed;
+      throw error;
+    });
+    if (created instanceof NextResponse) {
+      return (await replay()) ?? created;
+    }
     const result = created.record;
     await notifyWorkflowSubmission(created.workflow, approvers);
 
@@ -359,7 +389,7 @@ export async function POST(request: Request) {
       return NextResponse.redirect(new URL("/employee/requests?created=1", request.url), { status: 303 });
     }
 
-    return NextResponse.json({ success: true, message: "تم إرسال الطلب بنجاح" });
+    return success();
   } catch (error: any) {
     console.error("Request creation failed:", error);
     const apiError = formatApiError(error, { location: "api/hr/my-requests", operation: "POST" });

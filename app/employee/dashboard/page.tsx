@@ -20,10 +20,10 @@ export default async function EmployeeDashboard() {
     const completion = profileCompletion(employee);
     const fullName = `${employee.firstName} ${employee.lastName}`.trim();
     const maskedNationalId = employee.nationalId ? `•••• ${employee.nationalId.slice(-4)}` : "غير مسجلة";
-    const nextSalary = data.payroll ? `${asNumber(data.payroll.netPay || data.payroll.baseSalary).toLocaleString('ar-SA')} ${data.payroll.currency}` : 'غير مسجل';
+    const lastPaidSalary = data.payroll ? `${asNumber(data.payroll.netPay).toLocaleString('ar-SA')} ${data.payroll.currency}` : 'غير مسجل';
     return (
       <main className="space-y-6" dir="rtl">
-      <section className="overflow-hidden rounded-2xl bg-[hsl(var(--sidebar-bg))] text-white shadow-[var(--shadow-card)]">
+      <section className="lana-workspace-hero overflow-hidden rounded-3xl text-white shadow-[var(--shadow-card)]">
         <div className="grid gap-6 p-6 lg:grid-cols-[1.2fr_.8fr] lg:p-8">
           <div className="flex flex-col gap-5 md:flex-row md:items-center">
             <div className="h-24 w-24 overflow-hidden rounded-2xl bg-white/10 ring-1 ring-white/20">
@@ -58,14 +58,14 @@ export default async function EmployeeDashboard() {
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat
           title="رصيد الإجازات"
-          value={`${data.leaveRemaining < 0 ? `-${Math.abs(data.leaveRemaining)}` : data.leaveRemaining} يوم`}
+          value={data.leaveRemaining === null ? "غير متاح حاليًا" : `${data.leaveRemaining} يوم`}
           icon={Calendar}
-          tone={data.leaveRemaining < 0 ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}
+          tone={(data.leaveRemaining ?? 0) < 0 ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}
         />
-        <Stat title="الطلبات المعلقة" value={data.leaves.filter(l => l.status === 'PENDING').length} icon={Clock} tone="bg-amber-50 text-amber-700" />
+        <Stat title="الطلبات المعلقة" value={data.pendingRequests ?? "—"} icon={Clock} tone="bg-amber-50 text-amber-700" />
         <Stat title="الحضور هذا الشهر" value={`${data.presentDays} يوم`} icon={CheckCircle2} tone="bg-blue-50 text-blue-700" />
         <Stat title="ساعات العمل" value={`${Math.round(data.monthHours)} ساعة`} icon={Clock} tone="bg-violet-50 text-violet-700" />
-        <Stat title="الراتب القادم" value={nextSalary} icon={WalletCards} tone="bg-primary/8 text-primary" />
+        <Stat title="آخر راتب مصروف" value={lastPaidSalary} icon={WalletCards} tone="bg-primary/8 text-primary" />
         <Stat title="المستندات" value={data.documents} icon={FileText} tone="bg-sky-50 text-sky-700" />
         <Stat title="العهد" value={data.assets} icon={Laptop} tone="bg-slate-100 text-slate-700" />
         <Stat title="الإشعارات الجديدة" value={data.notifications.length} icon={Bell} tone="bg-rose-50 text-rose-700" />
@@ -73,7 +73,7 @@ export default async function EmployeeDashboard() {
 
       <section className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <Card className="rounded-3xl"><CardHeader><CardTitle>آخر الأحداث</CardTitle></CardHeader><CardContent className="space-y-3">{data.timeline.length ? data.timeline.map((item, i) => <div key={i} className="flex gap-3 rounded-2xl border p-4"><div className="mt-1 h-3 w-3 rounded-full bg-primary" /><div><p className="font-bold">{item.title}</p><p className="text-xs text-muted-foreground">{item.type} · {fmtDate(item.date)} · {item.status}</p></div></div>) : <div className="rounded-2xl border border-dashed p-6 text-muted-foreground">لا توجد أحداث حديثة مرتبطة بحسابك.</div>}</CardContent></Card>
-        <Card className="rounded-3xl"><CardHeader><CardTitle>إجراءات سريعة</CardTitle></CardHeader><CardContent className="grid grid-cols-2 gap-3"><Link className="flex items-center justify-center rounded-2xl bg-primary px-3 py-4 text-center text-sm font-bold text-white transition-colors hover:bg-primary/90" href="/employee/leave/new">طلب إجازة</Link><Link className="flex items-center justify-center rounded-2xl border px-3 py-4 text-center text-sm font-bold transition-colors hover:bg-muted" href="/employee/documents">مستنداتي</Link><Link className="col-span-2 flex items-center justify-center rounded-2xl border px-3 py-4 text-center text-sm font-bold transition-colors hover:bg-muted" href="/employee/salary">الرواتب</Link></CardContent></Card>
+        <Card className="rounded-3xl"><CardHeader><CardTitle>إجراءات سريعة</CardTitle></CardHeader><CardContent className="grid grid-cols-2 gap-3"><Link className="flex items-center justify-center rounded-2xl bg-primary px-3 py-4 text-center text-sm font-bold text-white transition-colors hover:bg-primary/90" href="/employee/requests">تقديم طلب</Link><Link className="flex items-center justify-center rounded-2xl border px-3 py-4 text-center text-sm font-bold transition-colors hover:bg-muted" href="/employee/documents">مستنداتي</Link><Link className="col-span-2 flex items-center justify-center rounded-2xl border px-3 py-4 text-center text-sm font-bold transition-colors hover:bg-muted" href="/employee/salary">الرواتب</Link></CardContent></Card>
       </section>
 
       <EmployeeRequestCategories />

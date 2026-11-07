@@ -1,9 +1,46 @@
-"use client";
-import { useState, useTransition } from 'react';
-import Link from 'next/link';
-import { Monitor, Moon, Shield, Smartphone } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import Link from "next/link";
+import { ArrowUpLeft, Bell, Globe, KeyRound, Monitor, UserRound, Image } from "lucide-react";
+import { getRequestDictionary } from "@/lib/i18n-server";
 
-type Props={settings:any; sessions:any[]; user:any};
-export function EmployeeSettingsPortal({settings,sessions,user}:Props){const[local,setLocal]=useState(settings||{});const[pending,startTransition]=useTransition();function save(patch:any){const next={...local,...patch};setLocal(next);startTransition(()=>{void fetch('/api/employee/portal-sections',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({section:'securitySettings',data:next})})})}return <main className="space-y-6" dir="rtl"><h1 className="text-3xl font-black">الإعدادات</h1><section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"><Card title="تغيير كلمة المرور" icon={Shield}><Link className="rounded-xl bg-primary px-4 py-2 text-white" href="/employee/settings/password">تغيير كلمة المرور</Link></Card><Card title="تغيير الصورة" icon={Smartphone}><Link className="rounded-xl border px-4 py-2" href="/employee/settings/profile-picture">تغيير الصورة</Link></Card><Card title="اللغة" icon={Monitor}><Link className="rounded-xl border px-4 py-2" href="/employee/settings/language">اللغة والمنطقة</Link></Card><Card title="الوضع الداكن" icon={Moon}><Button disabled={pending} onClick={()=>save({darkMode:!local.darkMode})}>{local.darkMode?'تعطيل':'تفعيل'}</Button></Card><Card title="2FA" icon={Shield}><Button disabled={pending} onClick={()=>save({twoFactorEnabled:!local.twoFactorEnabled})}>{local.twoFactorEnabled?'مفعل':'غير مفعل'}</Button></Card><Card title="حالة الحساب" icon={Shield}><p>{user?.isActive?'نشط':'غير نشط'}</p><p className="text-xs text-muted-foreground">{user?.mustChangePassword?'يجب تغيير كلمة المرور':'كلمة المرور محدثة'}</p></Card></section><section className="rounded-3xl border p-5"><h2 className="mb-4 text-xl font-black">الأجهزة وجلسات الدخول</h2><div className="space-y-2">{sessions.map(s=><div key={s.id} className="rounded-2xl border p-3"><p className="font-bold">جلسة دخول</p><p className="text-xs text-muted-foreground">تنتهي: {new Date(s.expires).toLocaleString('ar-SA')}</p></div>)}{!sessions.length&&<p className="text-muted-foreground">لا توجد جلسات نشطة مسجلة.</p>}</div></section></main>}
-function Card({title,icon:Icon,children}:{title:string;icon:any;children:any}){return <div className="rounded-3xl border bg-card p-5"><Icon className="mb-3 h-6 w-6 text-primary"/><h2 className="mb-3 font-black">{title}</h2>{children}</div>}
+const settings = [
+  { path: "account", icon: UserRound, ar: ["بيانات الحساب", "راجع اسم الدخول وبياناتك الوظيفية."], en: ["Account details", "Review your sign-in name and employment details."] },
+  { path: "password", icon: KeyRound, ar: ["كلمة المرور", "حدّث كلمة مرور حسابك."], en: ["Password", "Change your account password."] },
+  { path: "notifications", icon: Bell, ar: ["الإشعارات", "افتح مركز الإشعارات وتابع آخر المستجدات."], en: ["Notifications", "Open your notification center and see recent updates."] },
+  { path: "profile-picture", icon: Image, ar: ["الصورة الشخصية", "خصّص الصورة الظاهرة في حسابك."], en: ["Profile picture", "Choose the picture shown on your account."] },
+  { path: "language", icon: Globe, ar: ["اللغة", "اختر لغة الواجهة."], en: ["Language", "Choose your interface language."] },
+  { path: "theme", icon: Monitor, ar: ["المظهر", "اختر المظهر الأنسب لك."], en: ["Appearance", "Choose a theme that works for you."] },
+] as const;
+
+export async function EmployeeSettingsPortal() {
+  const { locale } = await getRequestDictionary();
+  const arabic = locale === "ar";
+
+  return (
+    <section className="space-y-6">
+      <header className="lana-workspace-hero rounded-3xl p-6 sm:p-9">
+        <p className="text-sm font-semibold text-indigo-200">{arabic ? "مساحتي في Lana" : "My Lana workspace"}</p>
+        <h1 className="mt-2 text-3xl sm:text-4xl">{arabic ? "إعدادات حسابي" : "My account settings"}</h1>
+        <p className="mt-3 max-w-lg text-sm text-slate-200">
+          {arabic ? "كل ما يخص حسابك وتفضيلاتك في مكان واحد." : "Your account and preferences, all in one place."}
+        </p>
+      </header>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {settings.map(({ path, icon: Icon, ar, en }) => {
+          const [title, description] = arabic ? ar : en;
+          return (
+            <Link key={path} href={`/employee/settings/${path}`} className="lana-card group flex flex-col items-start gap-4 p-5">
+              <div className="flex w-full items-center justify-between">
+                <span className="rounded-xl bg-primary/10 p-3 text-primary"><Icon aria-hidden className="h-5 w-5" /></span>
+                <ArrowUpLeft aria-hidden className="h-4 w-4 text-muted-foreground group-hover:text-primary ltr:rotate-90" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold">{title}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}

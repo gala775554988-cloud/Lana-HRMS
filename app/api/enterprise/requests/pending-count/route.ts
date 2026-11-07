@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import { countPendingApprovals } from "@/lib/enterprise/pending-approvals";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,9 +16,7 @@ export async function GET() {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
 
-  const count = await prisma.workflowInstance.count({
-    where: { status: "PENDING", steps: { some: { approverUserId: session.user.id, status: "PENDING" } } }
-  });
+  const count = await countPendingApprovals(session.user.id);
 
   return NextResponse.json({ success: true, count });
 }

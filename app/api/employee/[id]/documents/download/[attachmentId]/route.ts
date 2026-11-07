@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { canAccessEmployeeId, getAccessProfile } from "@/lib/enterprise/hierarchy";
+import { isEnterpriseResourceAllowed } from "@/lib/enterprise/resource-access";
+import { hasPermission } from "@/lib/rbac";
 import { OdooClient } from "@/lib/integrations/odoo/client";
 import { prisma } from "@/lib/prisma";
 
@@ -16,21 +20,34 @@ export async function GET(
 ) {
   try {
     const { id: employeeId, attachmentId } = await params;
-    const attId = parseInt(attachmentId, 10);
-    const isNumericId = !isNaN(attId) && attId > 0;
+    const session = await auth();
+    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const roles = session.user.roles ?? [];
+    const profile = await getAccessProfile(session.user.id, roles);
+    const permissions = session.user.permissions ?? [];
+    const canReadDocuments = isEnterpriseResourceAllowed(roles, "documents") &&
+      (roles.includes("HR_MANAGER") || hasPermission(permissions, { action: "read", resource: "documents" }, roles) ||
+        permissions.includes("manage:documents"));
+    if (profile.employee?.id !== employeeId &&
+      (!canReadDocuments || !await canAccessEmployeeId(employeeId, profile))) {
+      return NextResponse.json({ error: "Document not found" }, { status: 404 });
+    }
 
-    // 1. Check if document exists in our database by odooAttachmentId or id
+    const numericId = Number(attachmentId);
+    const isNumericId = /^\d+$/.test(attachmentId) && Number.isSafeInteger(numericId) && numericId > 0 && numericId <= 2147483647;
     const doc = await prisma.employeeDocument.findFirst({
-      where: isNumericId
-        ? { OR: [{ employeeId, odooAttachmentId: attId }, { id: attachmentId }] }
-        : { OR: [{ id: attachmentId }, { employeeId, fileUrl: { contains: attachmentId } }] }
-    }).catch(() => null);
+      where: { employeeId, OR: [
+        { id: attachmentId },
+        ...(isNumericId ? [{ odooAttachmentId: numericId }] : []),
+      ] },
+    });
+    if (!doc) return NextResponse.json({ error: "Document not found" }, { status: 404 });
 
-    const fileName = doc?.fileName || doc?.name || `document-${attachmentId}.pdf`;
-    const mimeType = doc?.mimeType || (fileName.endsWith(".pdf") ? "application/pdf" : fileName.endsWith(".png") ? "image/png" : fileName.endsWith(".jpg") || fileName.endsWith(".jpeg") ? "image/jpeg" : "application/octet-stream");
+    const fileName = doc.fileName || doc.name || `document-${attachmentId}.pdf`;
+    const mimeType = doc.mimeType || (fileName.endsWith(".pdf") ? "application/pdf" : fileName.endsWith(".png") ? "image/png" : fileName.endsWith(".jpg") || fileName.endsWith(".jpeg") ? "image/jpeg" : "application/octet-stream");
 
     // 2. If doc has embedded base64 data URI in fileUrl, return it directly immediately (0ms latency!)
-    if (doc?.fileUrl && doc.fileUrl.startsWith("data:")) {
+    if (doc.fileUrl && doc.fileUrl.startsWith("data:")) {
       const commaIndex = doc.fileUrl.indexOf(",");
       if (commaIndex !== -1) {
         const base64Data = doc.fileUrl.slice(commaIndex + 1);
@@ -40,19 +57,22 @@ export async function GET(
           headers: {
             "Content-Type": mimeType,
             "Content-Disposition": `inline; filename="${encodeURIComponent(fileName)}"`,
-            "Cache-Control": "public, max-age=3600"
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "sandbox"
           }
         });
       }
     }
 
     // 3. If doc has direct external URL (e.g. Supabase or CDN or /uploads/...), fetch/redirect
-    if (doc?.fileUrl && (doc.fileUrl.startsWith("http://") || doc.fileUrl.startsWith("https://"))) {
-      return NextResponse.redirect(doc.fileUrl);
+    if (doc.fileUrl && (doc.fileUrl.startsWith("http://") || doc.fileUrl.startsWith("https://"))) {
+      return NextResponse.redirect(doc.fileUrl, { headers: { "Cache-Control": "private, no-store" } });
     }
 
     // 4. Otherwise, fetch on-demand directly from Odoo ir.attachment
-    if (!isNumericId) {
+    const attId = doc.odooAttachmentId;
+    if (!attId) {
       return new NextResponse(`
         <html dir="rtl"><body style="font-family:sans-serif;text-align:center;padding:50px;background:#f8fafc;color:#334155;">
           <h2 style="color:#e11d48;">⚠️ تعذر العثور على الملف المطلوب في النظام</h2>
@@ -88,14 +108,16 @@ export async function GET(
       headers: {
         "Content-Type": finalMimeType,
         "Content-Disposition": `inline; filename="${encodeURIComponent(finalFileName)}"`,
-        "Cache-Control": "public, max-age=3600"
+        "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "sandbox"
       }
     });
-  } catch (error: any) {
+  } catch {
     return new NextResponse(`
       <html dir="rtl"><body style="font-family:sans-serif;text-align:center;padding:50px;background:#f8fafc;color:#334155;">
         <h2 style="color:#e11d48;">⚠️ حدث خطأ تقني أثناء جلب الملف من أودو</h2>
-        <p style="color:#64748b;font-size:13px;">${error?.message || String(error)}</p>
+        <p>حاول مرة أخرى لاحقاً.</p>
       </body></html>
     `, { status: 500, headers: { "Content-Type": "text/html; charset=utf-8" } });
   }

@@ -1,3 +1,4 @@
+import { paidPayslipRun } from "@/lib/payroll/employee-payslips";
 import { NextResponse } from "next/server";
 import QRCode from "qrcode";
 import { auth } from "@/auth";
@@ -8,7 +9,7 @@ export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ success: false }, { status: 401 });
   const params = new URL(request.url).searchParams;
-  const item = await prisma.payrollItem.findFirst({ where: { id: params.get("id") ?? "", employee: { userId: session.user.id }, payrollRun: { status: { in: ["PAID", "LOCKED", "ARCHIVED"] }, paidAt: { not: null } } }, include: { employee: { select: { firstName: true, lastName: true, employeeNumber: true, nationality: { select: { code: true } } } }, payrollRun: true } });
+  const item = await prisma.payrollItem.findFirst({ where: { id: params.get("id") ?? "", employee: { userId: session.user.id }, payrollRun: paidPayslipRun }, include: { employee: { select: { firstName: true, lastName: true, employeeNumber: true, nationality: { select: { code: true } } } }, payrollRun: true } });
   if (!item) return NextResponse.json({ success: false, message: "القسيمة غير متاحة" }, { status: 404 });
   const certificate = params.get("kind") === "certificate";
   const detailed = params.get("details") !== "0";

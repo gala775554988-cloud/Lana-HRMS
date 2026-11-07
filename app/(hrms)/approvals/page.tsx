@@ -5,7 +5,6 @@ import { MergedModuleTabs } from "@/components/hrms/merged-module-tabs";
 import { Inbox, Send, GitPullRequest, Workflow } from "lucide-react";
 import { auth } from "@/auth";
 import { canManageApprovalRouting } from "@/config/request-routing";
-import { WorkspaceHeader } from "@/components/hrms/workspace-ui";
 
 const RequestWorkbenchClient = dynamicImport(() => import("@/components/enterprise/request-workbench-client").then((mod) => mod.RequestWorkbenchClient));
 
@@ -19,7 +18,11 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
   const canConfigure = Boolean(session?.user && canManageApprovalRouting(session.user.roles, session.user.permissions));
   return (
     <div className="space-y-5" dir="rtl">
-      <WorkspaceHeader title="الطلبات والموافقات" description="متابعة الطلبات واتخاذ القرار من مكان واحد." />
+      <header className="lana-workspace-hero rounded-3xl p-6 sm:p-9">
+        <p className="text-sm font-semibold text-indigo-200">مساحة المسؤول في Lana</p>
+        <h1 className="mt-2 text-3xl sm:text-4xl">الطلبات والموافقات</h1>
+        <p className="mt-3 text-sm text-slate-200">راجع الطلبات الموكلة إليك، واتخذ القرار، وتابع سجل الموافقات.</p>
+      </header>
       <MergedModuleTabs
         defaultValue="center"
         items={[
@@ -27,13 +30,13 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
           value: "center",
           label: "جميع الطلبات والكشوف",
           icon: <GitPullRequest className="h-4 w-4" />,
-          content: <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">Loading requests...</div>}><RequestWorkbenchClient mode="center" /></Suspense>
+          content: <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">جارٍ تحميل الطلبات…</div>}><RequestWorkbenchClient mode="center" /></Suspense>
         },
         {
           value: "inbox",
           label: "بانتظار قراري",
           icon: <Inbox className="h-4 w-4" />,
-          content: <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">Loading inbox...</div>}><RequestWorkbenchClient mode="inbox" /></Suspense>
+          content: <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">جارٍ تحميل الطلبات بانتظار قرارك…</div>}><RequestWorkbenchClient mode="inbox" /></Suspense>
         },
         {
           value: "routing", label: "إعداد الموافقات", icon: <Workflow className="h-4 w-4" />, hidden: !canConfigure,
@@ -43,7 +46,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
           value: "outbox",
           label: "طلباتي",
           icon: <Send className="h-4 w-4" />,
-          content: <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">Loading outbox...</div>}><RequestWorkbenchClient mode="outbox" /></Suspense>
+          content: <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">جارٍ تحميل طلباتك…</div>}><RequestWorkbenchClient mode="outbox" /></Suspense>
         }
         ]}
       />

@@ -1,44 +1,18 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { getCurrentEmployeeCached } from "@/lib/employee/employee-cache";
-
-export const dynamic = "force-dynamic";
-
-const settingsLinks = [
-  { href: "/employee/settings/account", label: "الحساب" },
-  { href: "/employee/settings/profile-picture", label: "الصورة الشخصية" },
-  { href: "/employee/settings/password", label: "كلمة المرور" },
-  { href: "/employee/settings/theme", label: "الثيم" },
-  { href: "/employee/settings/language", label: "اللغة" },
-  { href: "/employee/settings/notifications", label: "الإشعارات" },
-];
+import { getRequestDictionary } from "@/lib/i18n-server";
 
 export default async function SettingsLayout({ children }: { children: ReactNode }) {
-  const employee = await getCurrentEmployeeCached().catch(() => null);
+  const { locale } = await getRequestDictionary();
 
   return (
-    <div className="flex gap-8">
-      {/* Settings Sidebar */}
-      <div className="w-64 hidden md:block">
-        <div className="sticky top-20">
-          <div className="font-semibold mb-4">الإعدادات</div>
-          <nav className="space-y-1 text-sm">
-            {settingsLinks.map(link => (
-              <Link 
-                key={link.href} 
-                href={link.href} 
-                className="block px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-        </div>
-      </div>
-
-      <div className="flex-1 min-w-0">
-        {children}
-      </div>
+    <div className="space-y-4">
+      <nav aria-label={locale === "ar" ? "التنقل في الحساب" : "Account navigation"}>
+        <Link className="inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-semibold text-primary hover:bg-primary/10" href="/employee/settings">
+          {locale === "ar" ? "إعدادات حسابي" : "My account settings"}
+        </Link>
+      </nav>
+      {children}
     </div>
   );
 }

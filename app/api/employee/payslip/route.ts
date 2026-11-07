@@ -1,3 +1,4 @@
+import { latestPayslipFirst, paidPayslipRun } from "@/lib/payroll/employee-payslips";
 import { NextResponse } from "next/server";
 import { getCurrentEmployeeCached } from "@/lib/employee/employee-cache";
 import { prisma } from "@/lib/prisma";
@@ -8,7 +9,8 @@ export async function GET(request: Request) {
   if (!employee) return NextResponse.json({ error: "Employee not found" }, { status: 404 });
   
   const itemId = new URL(request.url).searchParams.get("id");
-  const item = await prisma.payrollItem.findFirst({ where: { employeeId: employee.id, ...(itemId ? { id: itemId } : {}), payrollRun: { status: { in: ["PAID", "LOCKED", "ARCHIVED"] }, paidAt: { not: null } } }, include: { payrollRun: true }, orderBy: { createdAt: "desc" } });
+  if (itemId !== null && !itemId.trim()) return NextResponse.json({ error: "Invalid payslip ID" }, { status: 400 });
+  const item = await prisma.payrollItem.findFirst({ where: { employeeId: employee.id, ...(itemId ? { id: itemId } : {}), payrollRun: paidPayslipRun }, include: { payrollRun: true }, orderBy: latestPayslipFirst });
   if (!item) return NextResponse.json({ error: "Payslip not available" }, { status: 404 });
   const snapshot = item.calculationSnapshot as { components?: { name: string; code: string; amount: number }[] } | null;
   const lines = [
@@ -26,7 +28,7 @@ export async function GET(request: Request) {
     headers: {
       "Content-Type": "application/pdf",
       "Cache-Control": "private, no-store",
-      "Content-Disposition": `attachment; filename="payslip-${employee.employeeNumber}.pdf"`,
+      "Content-Disposition": `attachment; filename="payslip-${employee.employeeNumber.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf"`,
     },
   });
 }
