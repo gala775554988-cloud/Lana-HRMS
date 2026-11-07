@@ -1,3 +1,5 @@
+import { AssetSyncButton } from "@/components/hrms/asset-sync-button";
+import { auth } from "@/auth";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { getHrmsModule } from "@/config/hrms";
@@ -97,6 +99,8 @@ export async function ModulePageBody({
   tabValue?: string;
 }) {
   const resource = getHrmsModule(resourceKey);
+  const session = resourceKey === "assets" ? await auth() : null;
+  const canSyncAssets = session?.user?.roles?.some(role => ["SUPER_ADMIN", "HR_MANAGER"].includes(role));
   if (!resource) notFound();
   const paramKey = (name: string) => (tabValue ? `${tabValue}__${name}` : name);
   const getParam = (name: string) => query[paramKey(name)];
@@ -208,6 +212,8 @@ export async function ModulePageBody({
             </ModuleFormDialog>
         ) : null}
       />
+
+      {resourceKey === "assets" && canSyncAssets && <AssetSyncButton />}
 
       {/* Compact single-row toolbar: search + filters on one side, import/export/reports tucked into a menu */}
       <div className="flex flex-col gap-3 rounded-2xl border bg-card px-4 py-3 shadow-premium-sm sm:flex-row sm:items-center sm:justify-between">
@@ -374,9 +380,19 @@ async function ModuleDataSection({
     );
   }
 
+  let tableRecords = data.records as (Record<string, unknown> & { id: string })[];
+  if (resourceKey === "assets") {
+    const employeeIds = tableRecords.map(record => record.assignedEmployeeId).filter((id): id is string => typeof id === "string" && Boolean(id));
+    const employees = employeeIds.length ? await prisma.employee.findMany({
+      where: { id: { in: employeeIds } }, select: { id: true, firstName: true, lastName: true, employeeNumber: true },
+    }) : [];
+    const names = new Map(employees.map(employee => [employee.id, `${employee.firstName} ${employee.lastName} · ${employee.employeeNumber}`]));
+    tableRecords = tableRecords.map(record => ({ ...record, _assignedEmployeeName: typeof record.assignedEmployeeId === "string" ? names.get(record.assignedEmployeeId) ?? "—" : "—" }));
+  }
+
   return (
     <div className="space-y-4">
-      <ModuleTable resource={resource} records={data.records as (Record<string, unknown> & { id: string })[]} dictionary={dictionary} locale={locale} />
+      <ModuleTable resource={resource} records={tableRecords} dictionary={dictionary} locale={locale} />
       <div className="flex flex-col gap-3 rounded-2xl border bg-card p-3 text-sm text-muted-foreground shadow-premium-sm sm:flex-row sm:items-center sm:justify-between">
         <span>{t.page} {data.page} {t.of} {data.pageCount} - {data.total} {t.records}</span>
         <div className="flex gap-2">

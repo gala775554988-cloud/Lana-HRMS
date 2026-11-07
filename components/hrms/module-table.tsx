@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useTransition, useCallback } from "react";
+import { useMemo, useState, useTransition, useCallback } from "react";
 import { Check, ExternalLink, FileSearch, MoreVertical, RotateCcw, Trash2, X } from "lucide-react";
 import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import type { HrmsModule } from "@/config/hrms";
@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 type Row = Record<string, unknown> & { id: string };
 
 const VALUE_LABELS: Record<string, string> = {
+  AVAILABLE: "متاح", ASSIGNED: "عهدة موظف", MAINTENANCE: "تحت الصيانة", RETIRED: "مستبعد",
   ACTIVE: "نشط", INACTIVE: "غير نشط", PENDING: "قيد الانتظار", APPROVED: "معتمد",
   REJECTED: "مرفوض", CANCELLED: "ملغي", DRAFT: "مسودة", COMPLETED: "مكتمل",
   PRESENT: "حاضر", ABSENT: "غائب", LATE: "متأخر", HALF_DAY: "نصف يوم", REMOTE: "عن بُعد", HOLIDAY: "إجازة",
@@ -24,6 +25,7 @@ const VALUE_LABELS: Record<string, string> = {
 };
 
 const FIELD_LABELS: Record<string, string> = {
+  assetTag: "رقم الأصل", name: "الاسم", category: "التصنيف", assignedEmployeeId: "الموظف المستلم",
   employeeName: "الموظف", employeeNumber: "الرقم الوظيفي", workDate: "تاريخ الدوام",
   scheduledShift: "الوردية", checkIn: "الحضور", checkOut: "الانصراف",
   workedHours: "ساعات العمل", lateMinutes: "دقائق التأخير", status: "الحالة",
@@ -85,6 +87,7 @@ function InsuranceExpiryBar({ endDate }: { endDate: unknown }) {
 
 export function ModuleTable({ resource, records, dictionary, locale = "en", fromHref }: { resource: HrmsModule; records: Row[]; dictionary: Dictionary; locale?: Locale; fromHref?: string }) {
   const router = useRouter();
+  const [view, setView] = useState<"cards" | "table">("cards");
   const [isPending, startTransition] = useTransition();
   const helper = createColumnHelper<Row>();
   const fieldsDict = dictionary.fields as Record<string, string>;
@@ -113,8 +116,15 @@ export function ModuleTable({ resource, records, dictionary, locale = "en", from
     ...resource.tableFields.map((field) => helper.accessor((row) => row[field], {
       id: field,
       header: formatHeader(field, fieldsDict),
-      cell: (info) => resource.key === "insurance" && field === "endDate"
+      cell: (info) => resource.key === "assets" && field === "assignedEmployeeId"
+        ? String(info.row.original._assignedEmployeeName ?? "—")
+        : resource.key === "insurance" && field === "endDate"
         ? <InsuranceExpiryBar endDate={info.getValue()} />
+        : field === "status" ? <span className={cn("inline-flex rounded-full px-2.5 py-1 text-xs font-semibold",
+            ["APPROVED", "COMPLETED", "PAID", "AVAILABLE", "ACTIVE"].includes(String(info.getValue())) ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200" :
+            ["REJECTED", "CANCELLED", "EXPIRED", "RETIRED"].includes(String(info.getValue())) ? "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200" :
+            ["PENDING", "PROCESSING", "MAINTENANCE"].includes(String(info.getValue())) ? "bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200" :
+            "bg-muted text-muted-foreground")}>{display(info.getValue(), yesLabel, noLabel, locale)}</span>
         : field === "workedHours" && typeof info.getValue() === "number"
           ? `${info.getValue()} ساعة`
           : field === "lateMinutes" && typeof info.getValue() === "number"
@@ -165,7 +175,25 @@ export function ModuleTable({ resource, records, dictionary, locale = "en", from
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]" dir={locale === "ar" ? "rtl" : "ltr"}>
+    <section className="space-y-4" dir={locale === "ar" ? "rtl" : "ltr"}>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-3">
+        <p className="text-sm text-muted-foreground">{records.length} {locale === "ar" ? "سجل في الصفحة" : "records on this page"}</p>
+        <div className="flex gap-2" role="group" aria-label={locale === "ar" ? "طريقة العرض" : "View"}>
+          <Button size="sm" variant={view === "cards" ? "default" : "outline"} aria-pressed={view === "cards"} onClick={() => setView("cards")}>{locale === "ar" ? "بطاقات" : "Cards"}</Button>
+          <Button size="sm" variant={view === "table" ? "default" : "outline"} aria-pressed={view === "table"} onClick={() => setView("table")}>{locale === "ar" ? "جدول" : "Table"}</Button>
+        </div>
+      </div>
+      {view === "cards" ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {table.getRowModel().rows.map(row => <article key={row.id} className="flex min-w-0 flex-col rounded-2xl border bg-card p-5 shadow-[var(--shadow-card)]">
+          <dl className="grid flex-1 gap-3">
+            {row.getVisibleCells().filter(cell => cell.column.id !== "actions").map((cell, index) => <div key={cell.id} className={index === 0 ? "border-b pb-3" : "flex min-w-0 items-start justify-between gap-3"}>
+              <dt className="shrink-0 text-xs text-muted-foreground">{formatHeader(cell.column.id, fieldsDict)}</dt>
+              <dd className={index === 0 ? "mt-1 break-words text-base font-bold" : "min-w-0 break-words text-sm font-medium"}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</dd>
+            </div>)}
+          </dl>
+          <div className="mt-4 border-t pt-3">{row.getVisibleCells().filter(cell => cell.column.id === "actions").map(cell => <div key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</div>)}</div>
+        </article>)}
+      </div> : <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]" dir={locale === "ar" ? "rtl" : "ltr"}>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-muted/60 text-foreground">
@@ -176,6 +204,7 @@ export function ModuleTable({ resource, records, dictionary, locale = "en", from
           </tbody>
         </table>
       </div>
-    </div>
+    </div>}
+    </section>
   );
 }
