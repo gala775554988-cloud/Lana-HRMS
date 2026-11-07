@@ -7,6 +7,8 @@ import { hasPermission } from "@/lib/rbac";
 import { decryptSecret, encryptSecret, createApiKey, hashApiKey, createOAuthClientSecret, verifyWebhookSignature } from "@/lib/integrations/security";
 import { OdooJsonRpcClient } from "@/lib/integrations/odoo";
 import { odooModuleMappings } from "@/lib/integrations/catalog";
+import { importOdooAssets } from "@/lib/integrations/odoo/assets";
+import { odooPayrollSource } from "@/lib/payroll/odoo-payroll";
 import { isOdooIntegrationEnabled } from "@/lib/settings";
 
 type Delegate = {
@@ -144,6 +146,10 @@ export async function syncMapping(connectionId: string, mappingId: string, direc
   if (!connection.uid) await testOdooConnection(connectionId);
   const mapping = await prisma.integrationMapping.findUnique({ where: { id: mappingId } });
   if (!mapping) throw new Error("Mapping not found");
+  const assetImport = mapping.hrmsModule === "assets" && mapping.hrmsModel === "asset";
+  if (assetImport && (direction !== "ODOO_TO_HRMS" || mapping.externalModel !== "maintenance.equipment" || mapping.providerId !== connection.providerId)) {
+    throw new Error("استيراد العهد يدعم النقل من أودو إلى Lana عبر خريطة المعدات الخاصة بالاتصال فقط");
+  }
   const history = await prisma.syncHistory.create({ data: { connectionId, mappingId, direction, entity: mapping.hrmsModule, status: "RUNNING" } });
   const fieldMap = mapping.fieldMap as Record<string, string>;
   let pushed = 0, pulled = 0, createdCount = 0, updatedCount = 0;
@@ -160,7 +166,12 @@ export async function syncMapping(connectionId: string, mappingId: string, direc
         createdCount += 1;
       }
     }
-    if (direction === "ODOO_TO_HRMS" || direction === "BIDIRECTIONAL") {
+    if (assetImport) {
+      const source = odooPayrollSource(connection.baseUrl, connection.database ?? "");
+      ({ createdCount, updatedCount } = await importOdooAssets(client, source, fieldMap.assignedEmployeeId));
+      pulled = createdCount + updatedCount;
+      revalidatePath("/assets");
+    } else if (direction === "ODOO_TO_HRMS" || direction === "BIDIRECTIONAL") {
       const externalFields = Array.from(new Set(["id", ...Object.values(fieldMap)]));
       const rows = await client.searchRead<Record<string, unknown>>(mapping.externalModel, [], externalFields, { limit: 50 });
       for (const row of rows) {
