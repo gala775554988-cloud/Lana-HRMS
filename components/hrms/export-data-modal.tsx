@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useCallback } from "react";
-import { Plus, Trash2, Search, GripVertical, FileSpreadsheet, FileText, Download } from "lucide-react";
+import { ArrowUp, ArrowDown, Plus, Trash2, Search, GripVertical, FileSpreadsheet, FileText, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -26,14 +26,18 @@ export function ExportDataModal({
   resourceKey,
   fields,
   search,
+  query,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   resourceKey: string;
   fields: ExportField[];
   search?: string;
+  query?: string;
 }) {
-  const [format, setFormat] = useState<"xlsx" | "csv">("xlsx");
+  const [exporting, setExporting] = useState(false);
+  const [error, setError] = useState("");
+  const [format, setFormat] = useState<"xlsx" | "pdf">("xlsx");
   const [searchTerm, setSearchTerm] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const dragIndex = useRef<number | null>(null);
@@ -86,20 +90,49 @@ export function ExportDataModal({
   };
 
   const exportUrl = useMemo(() => {
-    const params = new URLSearchParams({ format });
+    const params = new URLSearchParams(query);
+    params.set("format", format);
     if (search) params.set("search", search);
     if (selected.length > 0) params.set("fields", selected.join(","));
     return `/api/hr/${resourceKey}/export?${params.toString()}`;
-  }, [format, resourceKey, search, selected]);
+  }, [format, resourceKey, search, selected, query]);
 
-  const handleExportClick = () => {
-    window.location.href = exportUrl;
-    onOpenChange(false);
+  const moveField = (index: number, offset: number) => {
+    setSelected(current => {
+      const next = [...current];
+      const target = index + offset;
+      if (target < 0 || target >= next.length) return current;
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  };
+
+  const handleExportClick = async () => {
+    setExporting(true);
+    setError("");
+    try {
+      const response = await fetch(exportUrl);
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error ?? "تعذر تصدير البيانات");
+      }
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = response.headers.get("Content-Disposition")?.match(/filename="([^"]+)"/)?.[1] ?? `export.${format}`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      onOpenChange(false);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "تعذر تصدير البيانات");
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-3xl max-h-[90dvh] overflow-y-auto">
         <div dir="rtl" className="contents">
         <DialogHeader>
           <div>
@@ -123,13 +156,13 @@ export function ExportDataModal({
               </button>
               <button
                 type="button"
-                onClick={() => setFormat("csv")}
+                onClick={() => setFormat("pdf")}
                 className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  format === "csv" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                  format === "pdf" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
                 }`}
               >
                 <FileText className="h-3.5 w-3.5" />
-                CSV
+                PDF
               </button>
             </div>
           </div>
@@ -214,6 +247,10 @@ export function ExportDataModal({
                             {index + 1}
                           </span>
                           <span className="flex-1 truncate text-foreground/90">{f.label}</span>
+                          <div className="flex flex-col">
+                            <button type="button" disabled={index === 0} aria-label={`تقديم ${f.label}`} onClick={() => moveField(index, -1)} className="p-1 disabled:opacity-30"><ArrowUp className="h-3.5 w-3.5" /></button>
+                            <button type="button" disabled={index === selected.length - 1} aria-label={`تأخير ${f.label}`} onClick={() => moveField(index, 1)} className="p-1 disabled:opacity-30"><ArrowDown className="h-3.5 w-3.5" /></button>
+                          </div>
                           <button type="button" onClick={() => removeField(name)} className="shrink-0 text-muted-foreground hover:text-destructive" aria-label={`إزالة ${f.label}`}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -226,15 +263,16 @@ export function ExportDataModal({
             </div>
           </div>
 
-          <div className="flex items-center justify-between border-t pt-4">
+          {error && <p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
             <span className="text-xs text-muted-foreground">
               {selected.length > 0 ? `سيتم تصدير ${selected.length} حقل بصيغة ${format.toUpperCase()}` : "سيتم تصدير كل الحقول (لم يتم تخصيص أي حقل)"}
             </span>
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>إغلاق</Button>
-              <Button size="sm" onClick={handleExportClick}>
+              <Button size="sm" disabled={exporting} onClick={handleExportClick}>
                 <Download className="me-1.5 h-3.5 w-3.5" />
-                تصدير
+                {exporting ? "جارٍ تجهيز الملف…" : "تصدير"}
               </Button>
             </div>
           </div>

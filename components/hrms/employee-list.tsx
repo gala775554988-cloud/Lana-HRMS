@@ -1,4 +1,5 @@
 "use client";
+import { ExportDataModal } from "@/components/hrms/export-data-modal";
 
 import { useState, useMemo, useCallback, useTransition, useDeferredValue } from "react";
 import dynamic from "next/dynamic";
@@ -54,6 +55,9 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
   const [viewMode, setViewMode] = useState<ViewMode>("card");
   const [search, setSearch] = useState(initialSearch);
   const deferredSearch = useDeferredValue(search);
+  const [selectedFilters, setSelectedFilters] = useState<string[]>(Object.keys(filters).filter(key => filters[key]));
+  const [filterSearch, setFilterSearch] = useState("");
+  const [exportOpen, setExportOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeCardData | null>(null);
@@ -198,6 +202,7 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
       updates[name] = value || undefined;
     });
     router.push(`/employees?${buildQuery(updates)}`);
+    setFiltersOpen(false);
   }, [buildQuery, filterFields, router]);
 
   const handleResetFilters = useCallback(() => {
@@ -270,8 +275,7 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
               <Button variant={viewMode === "card" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("card")} className="rounded-none gap-1.5"><LayoutGrid className="h-4 w-4" />{isAr ? "بطاقات" : "Cards"}</Button>
               
             </div>
-            <Button asChild size="sm" variant="outline" className="gap-1.5"><a href={`/api/hr/employees/export?format=xlsx&${buildQuery({})}`}><Download className="h-4 w-4" />Excel</a></Button>
-            <Button asChild size="sm" variant="outline" className="gap-1.5"><a href={`/api/hr/employees/export?format=pdf&${buildQuery({})}`}><Download className="h-4 w-4" />PDF</a></Button>
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setExportOpen(true)}><Download className="h-4 w-4" />{isAr ? "تصدير / تصدير مخصص" : "Export / Custom export"}</Button>
             <Button size="sm" variant="outline" className="gap-1.5 border-emerald-600/40 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800" onClick={handleSyncOdooEmployeeNumbers} disabled={syncingNumbers} title={isAr ? "مصالحة الأرقام الوظيفية وربطها بأرقام أودو المعتمدة بدقة 100%" : "Reconcile employee numbers with the authoritative Odoo values"}>
               <RefreshCw className={`h-4 w-4 ${syncingNumbers ? "animate-spin" : ""}`} />
               {syncingNumbers ? (isAr ? "جاري مطابقة الأرقام الوظيفية..." : "Reconciling numbers...") : (isAr ? "⚡ مزامنة الأرقام الوظيفية من Odoo (100%)" : "⚡ Sync Employee Numbers from Odoo (100%)")}
@@ -280,19 +284,28 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
             <Button size="sm" className="gap-1.5" onClick={() => setAddEmployeeOpen(true)}><Plus className="h-4 w-4" />{isAr ? "إضافة موظف" : "Add Employee"}</Button>
           </div>
         </div>
-        {filtersOpen ? (
+        <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}><DialogContent className="max-w-3xl max-h-[90dvh] overflow-y-auto" dir={isAr ? "rtl" : "ltr"}><DialogHeader><DialogTitle>{isAr ? "تصفية الموظفين" : "Employee filters"}</DialogTitle><DialogClose onClick={() => setFiltersOpen(false)} /></DialogHeader>
           <form onSubmit={handleApplyFilters} className="mt-4 w-full rounded-2xl border border-slate-100 bg-white p-6 shadow-xl shadow-slate-200/50 dark:border-slate-800 dark:bg-slate-950 dark:shadow-slate-950/40">
             <div className="mb-6 flex items-center justify-between border-b border-slate-100 pb-4 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <SlidersHorizontal className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                 <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">{isAr ? "تصفية الموظفين المتقدمة" : "Advanced employee filters"}</h3>
               </div>
-              <Button type="button" variant="ghost" size="sm" onClick={handleResetFilters} className="text-slate-500 hover:bg-transparent hover:text-indigo-600 dark:hover:text-indigo-400">
+              <Button type="button" variant="ghost" size="sm" onClick={() => { handleResetFilters(); setSelectedFilters([]); setFiltersOpen(false); }} className="text-slate-500 hover:bg-transparent hover:text-indigo-600 dark:hover:text-indigo-400">
                 {isAr ? "إعادة تعيين الكل" : "Reset all"}
               </Button>
             </div>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-4">
-              {filterFields.map(([name, label]) => {
+            <div className="grid gap-5 sm:grid-cols-2">
+              <section className="space-y-3 border-e pe-4">
+                <div className="flex items-center justify-between"><h4 className="text-sm font-bold">الفلاتر المتاحة</h4><Button type="button" size="sm" variant="ghost" onClick={() => setSelectedFilters(filterFields.map(([name]) => name))}>إضافة الكل</Button></div>
+                <Input aria-label="بحث عن فلتر" value={filterSearch} onChange={event => setFilterSearch(event.target.value)} placeholder="ابحث عن حقل…" />
+                <div className="max-h-80 space-y-1 overflow-y-auto">{filterFields.filter(([name, label]) => !selectedFilters.includes(name) && label.includes(filterSearch)).map(([name,label]) => <button key={name} type="button" className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm hover:bg-muted" onClick={() => setSelectedFilters(current => [...current,name])}><span>{label}</span><Plus className="h-4 w-4" /></button>)}</div>
+              </section>
+              <section className="space-y-4">
+                <h4 className="text-sm font-bold">الفلاتر المحددة ({selectedFilters.length})</h4>
+                {!selectedFilters.length && <p className="py-10 text-center text-sm text-muted-foreground">أضف حقولاً من القائمة لتحديد قيم التصفية.</p>}
+              {selectedFilters.map(name => {
+                const label = filterFields.find(([key]) => key === name)?.[1] ?? name;
                 const options = filterOptions[name] ?? [];
                 const listId = `employee-filter-${name}`;
                 const isDate = name === "hireDate";
@@ -305,7 +318,7 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
                     : isDate ? "" : (isAr ? `اختر ${label}` : `Select ${label}`);
                 return (
                   <label key={name} className="block text-xs font-semibold text-slate-600 dark:text-slate-300">
-                    <span className="mb-1.5 block">{label}</span>
+                    <span className="mb-1.5 flex items-center justify-between gap-2">{label}<button type="button" aria-label={`إزالة فلتر ${label}`} onClick={() => setSelectedFilters(current => current.filter(field => field !== name))}>×</button></span>
                     {isStatus ? (
                       <select name={name} defaultValue={filters[name] ?? ""} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 transition-all focus:border-indigo-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
                         <option value="">{isAr ? "نشط / غير نشط" : "Any status"}</option>
@@ -323,15 +336,18 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
                   </label>
                 );
               })}
+              </section>
             </div>
             <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
               <Button type="button" variant="outline" onClick={() => setFiltersOpen(false)} className="rounded-xl border-slate-200 px-5 py-2.5 text-slate-600 hover:bg-slate-50">{isAr ? "إلغاء" : "Cancel"}</Button>
               <Button type="submit" className="rounded-xl bg-indigo-600 px-6 py-2.5 text-white shadow-lg shadow-indigo-600/20 hover:bg-indigo-700">{isAr ? "تطبيق الفلترة" : "Apply filters"}</Button>
             </div>
           </form>
-        ) : null}
+        </DialogContent></Dialog>
       </div>
 
+      <ExportDataModal open={exportOpen} onOpenChange={setExportOpen} resourceKey="employees" query={buildQuery({})}
+        fields={[["employeeNumber","الرقم الوظيفي"],["firstName","الاسم الأول"],["lastName","اسم العائلة"],["nationalId","الهوية / الإقامة"],["email","البريد الإلكتروني"],["phone","الجوال"],["department","الإدارة"],["position","المسمى الوظيفي"],["branch","الفرع"],["employmentType","نوع التوظيف"],["status","الحالة"],["hireDate","تاريخ التعيين"]].map(([name,label])=>({name,label}))} />
       {viewMode === "card" && (
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {records.map((employee) => (

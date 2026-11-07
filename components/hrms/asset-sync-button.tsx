@@ -1,12 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function AssetSyncButton({ allowed }: { allowed: boolean }) {
   const router = useRouter();
+  const [connections, setConnections] = useState<{ id: string; name: string }[]>([]);
+  const [connectionId, setConnectionId] = useState("");
+  useEffect(() => {
+    if (!allowed) return;
+    const controller = new AbortController();
+    fetch("/api/enterprise/assets/sync", { signal: controller.signal }).then(r => r.json()).then(data => { if (controller.signal.aborted) return; setConnections(data.connections ?? []); if (data.connections?.length === 1 && !data.configured) setConnectionId(data.connections[0].id); }).catch(() => {});
+    return () => controller.abort();
+  }, [allowed]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -14,7 +22,7 @@ export function AssetSyncButton({ allowed }: { allowed: boolean }) {
     setBusy(true);
     setMessage("جارٍ استيراد العهد ومطابقتها بالموظفين…");
     try {
-      const response = await fetch("/api/enterprise/assets/sync", { method: "POST" });
+      const response = await fetch("/api/enterprise/assets/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(connectionId ? { connectionId } : {}) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? "تعذر استيراد العهد");
       setMessage(`اكتمل الاستيراد. تمت إضافة ${result.created} أصل وتحديث ${result.updated} أصل.`);
@@ -34,7 +42,10 @@ export function AssetSyncButton({ allowed }: { allowed: boolean }) {
         {!allowed && <p className="mt-2 text-sm text-muted-foreground">تشغيل المزامنة يتطلب صلاحية إدارة التكامل في حسابك.</p>}
         {message && <p role="status" className="mt-2 max-w-xl text-sm">{message}</p>}
       </div>
+      <div className="flex flex-wrap items-center gap-2">
+      {connections.length > 1 && <select aria-label="اتصال أودو للعهد" className="h-10 rounded-xl border bg-background px-3 text-sm" disabled={busy} value={connectionId} onChange={event => setConnectionId(event.target.value)}><option value="">الاتصال الافتراضي</option>{connections.map(connection => <option key={connection.id} value={connection.id}>{connection.name}</option>)}</select>}
       <Button variant="outline" disabled={busy || !allowed} onClick={sync}><RefreshCw className={`me-2 h-4 w-4 ${busy ? "animate-spin" : ""}`} />{busy ? "جارٍ الاستيراد…" : "مزامنة العهد من أودو"}</Button>
+      </div>
     </section>
   );
 }

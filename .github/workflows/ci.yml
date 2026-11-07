@@ -48,5 +48,7 @@ jobs:
       - run: npx prisma migrate deploy
       - name: Verify application workflows with fixtures
         run: node --experimental-vm-modules --test tests/auth/*.test.mjs tests/attendance/*.test.mjs tests/payroll/*.test.mjs tests/recruitment/*.test.mjs tests/workflows/*.test.mjs
+      - name: Verify tabular export files
+        run: node --import tsx --test tests/exports/*.integration.mjs
       - run: npm run lint
       - run: npm run build

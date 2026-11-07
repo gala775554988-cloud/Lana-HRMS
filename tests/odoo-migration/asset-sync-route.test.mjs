@@ -2,35 +2,37 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "../workflows/helpers.mjs";
 
-test("assets sync rejects anonymous, unprivileged and ambiguous connections before importing", async () => {
+test("asset import uses the configured Odoo resolver and validates access before connecting", async () => {
   let user = null;
-  let calls = 0;
-  let connections = [];
+  const resolved = [];
+  let imports = 0;
   const { POST } = await load("app/api/enterprise/assets/sync/route.ts", {
-    "@/lib/integrations/access": { canManageIntegration: user => user.roles.includes("SUPER_ADMIN") },
     "next/server": { NextResponse: { json: (_body, options) => options?.status ?? 200 } },
+    "next/cache": { revalidatePath: () => {} },
     "@/auth": { auth: async () => user ? { user } : null },
-    "@/lib/prisma": { prisma: {
-      integrationConnection: { findMany: async () => connections },
-      integrationMapping: { findMany: async () => [{ id: "asset-mapping" }] },
+    "@/lib/integrations/access": { canManageIntegration: user => user.roles.includes("SUPER_ADMIN") },
+    "@/lib/prisma": { prisma: { auditLog: { create: async () => ({}) } } },
+    "@/lib/payroll/connection": { getPayrollOdooClient: async id => {
+      resolved.push(id);
+      return { client: { getConfig: () => ({ url: "https://test.example", database: "fixture" }) } };
     } },
-    "@/lib/integrations/service": { syncMapping: async (connection, mapping, direction) => {
-      assert.equal(connection, "odoo-connection");
-      assert.equal(mapping, "asset-mapping");
-      assert.equal(direction, "ODOO_TO_HRMS");
-      calls++;
-      return { createdCount: 1, updatedCount: 2, pulled: 3 };
+    "@/lib/payroll/odoo-payroll": { odooPayrollSource: () => "fixture-source" },
+    "@/lib/integrations/odoo/assets": { importOdooAssets: async (_client, source) => {
+      assert.equal(source, "fixture-source");
+      imports++;
+      return { createdCount: 1, updatedCount: 2 };
     } },
   });
-  assert.equal(await POST(), 401);
+  const post = body => POST({ json: async () => body });
+  assert.equal(await post({}), 401);
   user = { id: "employee", roles: ["EMPLOYEE"] };
-  assert.equal(await POST(), 403);
+  assert.equal(await post({}), 403);
+  assert.equal(resolved.length, 0);
   user = { id: "admin", roles: ["SUPER_ADMIN"] };
-  assert.equal(await POST(), 409);
-  connections = [{ id: "one" }, { id: "two" }];
-  assert.equal(await POST(), 409);
-  assert.equal(calls, 0);
-  connections = [{ id: "odoo-connection", providerId: "provider" }];
-  assert.equal(await POST(), 200);
-  assert.equal(calls, 1);
+  assert.equal(await post({ connectionId: { invalid: true } }), 400);
+  assert.equal(await post({}), 200);
+  assert.equal(resolved[0], undefined);
+  assert.equal(await post({ connectionId: "selected-connection" }), 200);
+  assert.equal(resolved[1], "selected-connection");
+  assert.equal(imports, 2);
 });

@@ -1,39 +1,45 @@
+import type { OdooRecord } from "@/lib/integrations/odoo/types";
 import { canManageIntegration } from "@/lib/integrations/access";
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { syncMapping } from "@/lib/integrations/service";
+import { getPayrollOdooClient } from "@/lib/payroll/connection";
+import { importOdooAssets } from "@/lib/integrations/odoo/assets";
+import { odooPayrollSource } from "@/lib/payroll/odoo-payroll";
+import { revalidatePath } from "next/cache";
 
 export const maxDuration = 300;
 
-export async function POST() {
+export async function GET() {
   const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ success: false, message: "سجل الدخول أولاً" }, { status: 401 });
-  if (!canManageIntegration(session.user)) {
-    return NextResponse.json({ success: false, message: "صلاحية إدارة التكامل مطلوبة" }, { status: 403 });
-  }
+  if (!session?.user?.id) return NextResponse.json({ success: false }, { status: 401 });
+  if (!canManageIntegration(session.user)) return NextResponse.json({ success: false }, { status: 403 });
   const connections = await prisma.integrationConnection.findMany({
     where: { provider: { type: "ODOO", isActive: true } },
-    select: { id: true, providerId: true },
-    take: 2,
+    select: { id: true, name: true }, orderBy: { name: "asc" },
   });
-  if (connections.length !== 1) return NextResponse.json({
-    success: false, message: "يلزم اتصال Odoo واحد مفعّل. راجع إعدادات التكامل وحدد اتصال العهد.",
-  }, { status: 409 });
-  const connection = connections[0];
-  const mappings = await prisma.integrationMapping.findMany({
-    where: { providerId: connection.providerId, hrmsModule: "assets", hrmsModel: "asset", externalModel: "maintenance.equipment", isActive: true },
-    select: { id: true }, take: 2,
-  });
-  if (mappings.length !== 1) return NextResponse.json({
-    success: false, message: "خريطة استيراد العهد غير جاهزة. راجع خريطة الأصول في إعدادات التكامل.",
-  }, { status: 409 });
+  return NextResponse.json({ connections, configured: Boolean(process.env.ODOO_URL) });
+}
+
+export async function POST(request: Request) {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ success: false, message: "سجل الدخول أولاً" }, { status: 401 });
+  if (!canManageIntegration(session.user)) return NextResponse.json({ success: false, message: "صلاحية إدارة التكامل مطلوبة" }, { status: 403 });
   try {
-    const result = await syncMapping(connection.id, mappings[0].id, "ODOO_TO_HRMS");
-    return NextResponse.json({ success: true, created: result.createdCount, updated: result.updatedCount, processed: result.pulled });
+    const body = await request.json().catch(() => ({}));
+    if (body.connectionId !== undefined && (typeof body.connectionId !== "string" || !body.connectionId.trim())) {
+      return NextResponse.json({ success: false, message: "اختر اتصال أودو صالحاً" }, { status: 400 });
+    }
+    const { client } = await getPayrollOdooClient(body.connectionId);
+    const config = client.getConfig();
+    const result = await importOdooAssets({
+      execute: (model, method, args, kwargs) => client.executeKw(model, method, args, kwargs),
+      searchRead: <T = Record<string, unknown>>(model: string, domain: unknown[] = [], fields: string[] = [], kwargs: Record<string, unknown> = {}) => client.searchRead<T & OdooRecord>(model, domain as never, fields, kwargs),
+    }, odooPayrollSource(config.url, config.database));
+    await prisma.auditLog.create({ data: { actorUserId: session.user.id, action: "odoo:assets-import", entity: "asset", metadata: result } });
+    revalidatePath("/assets");
+    return NextResponse.json({ success: true, created: result.createdCount, updated: result.updatedCount });
   } catch (error) {
-    return NextResponse.json({
-      success: false, message: error instanceof Error ? error.message : "تعذر استيراد العهد. راجع اتصال أودو.",
-    }, { status: 409 });
+    return NextResponse.json({ success: false, message: error instanceof Error ? error.message : "تعذر استيراد العهد من أودو" }, { status: 409 });
   }
 }

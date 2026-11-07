@@ -10,7 +10,7 @@ function relationId(value: unknown) {
   return Array.isArray(value) && Number.isSafeInteger(value[0]) && value[0] > 0 ? Number(value[0]) : null;
 }
 
-export async function importOdooAssets(client: OdooJsonRpcClient, source: string, employeeField?: string) {
+export async function importOdooAssets(client: Pick<OdooJsonRpcClient, "execute" | "searchRead">, source: string, employeeField?: string) {
   const model = "maintenance.equipment";
   const fields = await client.execute<Record<string, Field>>(model, "fields_get", [], { attributes: ["type", "relation"] });
   const relations = Object.keys(fields).filter(key => fields[key].type === "many2one" && fields[key].relation === "hr.employee");
@@ -23,7 +23,7 @@ export async function importOdooAssets(client: OdooJsonRpcClient, source: string
   let updatedCount = 0;
 
   for (;;) {
-    const rows = await client.searchRead<Equipment>(model, [["id", ">", lastId]], columns, { order: "id asc", limit: 100 });
+    const rows = await client.searchRead<Equipment>(model, [["id", ">", lastId]], columns, { order: "id asc", limit: 100, context: { active_test: false } });
     if (!rows.length) break;
     for (const row of rows) {
       if (!Number.isSafeInteger(row.id) || row.id <= lastId || typeof row.name !== "string" || !row.name.trim()) throw new Error("سجل أصل غير صالح في أودو");
