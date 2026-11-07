@@ -17,7 +17,7 @@ test("asset import uses the configured Odoo resolver and validates access before
       return { client: { getConfig: () => ({ url: "https://test.example", database: "fixture" }) } };
     } },
     "@/lib/payroll/odoo-payroll": { odooPayrollSource: () => "fixture-source" },
-    "@/lib/integrations/odoo/assets": { importOdooAssets: async (_client, source) => {
+    "@/lib/integrations/odoo/custodies": { importOdooCustodies: async (_client, source) => {
       assert.equal(source, "fixture-source");
       imports++;
       return { createdCount: 1, updatedCount: 2 };

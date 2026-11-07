@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getPayrollOdooClient } from "@/lib/payroll/connection";
-import { importOdooAssets } from "@/lib/integrations/odoo/assets";
+import { importOdooCustodies } from "@/lib/integrations/odoo/custodies";
 import { odooPayrollSource } from "@/lib/payroll/odoo-payroll";
 import { revalidatePath } from "next/cache";
 
@@ -32,13 +32,13 @@ export async function POST(request: Request) {
     }
     const { client } = await getPayrollOdooClient(body.connectionId);
     const config = client.getConfig();
-    const result = await importOdooAssets({
+    const result = await importOdooCustodies({
       execute: (model, method, args, kwargs) => client.executeKw(model, method, args, kwargs),
       searchRead: <T = Record<string, unknown>>(model: string, domain: unknown[] = [], fields: string[] = [], kwargs: Record<string, unknown> = {}) => client.searchRead<T & OdooRecord>(model, domain as never, fields, kwargs),
     }, odooPayrollSource(config.url, config.database));
     await prisma.auditLog.create({ data: { actorUserId: session.user.id, action: "odoo:assets-import", entity: "asset", metadata: result } });
     revalidatePath("/assets");
-    return NextResponse.json({ success: true, created: result.createdCount, updated: result.updatedCount });
+    return NextResponse.json({ success: true, created: result.createdCount, updated: result.updatedCount, skipped: result.skippedCount, pending: result.pendingCount, errors: result.errors });
   } catch (error) {
     return NextResponse.json({ success: false, message: error instanceof Error ? error.message : "تعذر استيراد العهد من أودو" }, { status: 409 });
   }

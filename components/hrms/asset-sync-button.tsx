@@ -25,7 +25,7 @@ export function AssetSyncButton({ allowed }: { allowed: boolean }) {
       const response = await fetch("/api/enterprise/assets/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(connectionId ? { connectionId } : {}) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? "تعذر استيراد العهد");
-      setMessage(`اكتمل الاستيراد. تمت إضافة ${result.created} أصل وتحديث ${result.updated} أصل.`);
+      setMessage(`تمت إضافة ${result.created} عهدة وتحديث ${result.updated} عهدة.${result.pending ? ` توجد ${result.pending} طلبات لم تُسند بعد أو رُفضت، لم تُسجل كعهد مسلّمة.` : ""}${result.skipped ? ` تعذّر استيراد ${result.skipped} عهدة؛ أرقام السجلات: ${(result.errors ?? []).map((item: { id: number }) => item.id).join("، ")}. راجع مطابقة الموظفين وصلاحيات الاتصال.` : ""}`);
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "تعذر الاتصال بالخادم");
@@ -38,7 +38,7 @@ export function AssetSyncButton({ allowed }: { allowed: boolean }) {
     <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4">
       <div>
         <h2 className="text-sm font-bold">عهد أودو</h2>
-        <p className="mt-1 text-xs text-muted-foreground">استيراد المعدات وربطها بالموظفين المعيّنين لها.</p>
+        <p className="mt-1 text-xs text-muted-foreground">استيراد العهد العينية المسندة للموظفين وتحديث العهد المعادة، مع حفظ تواريخ التسليم.</p>
         {!allowed && <p className="mt-2 text-sm text-muted-foreground">تشغيل المزامنة يتطلب صلاحية إدارة التكامل في حسابك.</p>}
         {message && <p role="status" className="mt-2 max-w-xl text-sm">{message}</p>}
       </div>
