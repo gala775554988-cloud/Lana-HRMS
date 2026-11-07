@@ -9,6 +9,13 @@ import { parseWorkflowStepMetadata } from "@/lib/enterprise/workflow-step-metada
 
 type Row = { id: string; type: string; status: string; currentStep: number; createdAt: string; steps: { step: number; comments: string | null }[] };
 const labels: Record<string, string> = { PENDING: "قيد الانتظار", COMPLETED: "معتمد", REJECTED: "مرفوض", RETURNED: "معاد للتعديل", CANCELLED: "ملغى" };
+const statusTone: Record<string, string> = {
+  COMPLETED: "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200 dark:bg-emerald-950 dark:text-emerald-200 dark:ring-emerald-800",
+  REJECTED: "bg-red-50 text-red-800 ring-1 ring-red-200 dark:bg-red-950 dark:text-red-200 dark:ring-red-800",
+  PENDING: "bg-amber-50 text-amber-800 ring-1 ring-amber-200 dark:bg-amber-950 dark:text-amber-200 dark:ring-amber-800",
+  RETURNED: "bg-blue-50 text-blue-800 ring-1 ring-blue-200 dark:bg-blue-950 dark:text-blue-200 dark:ring-blue-800",
+  CANCELLED: "bg-muted text-muted-foreground",
+};
 const inputClass = "w-full rounded-xl border bg-background px-3 py-2 text-sm";
 type LeaveType = { id: string; name: string; code: string };
 export function SelfServiceWorkspace({ administrative = false, initialLeaveTypes = [], ownEmployee = null }: {
@@ -158,7 +165,7 @@ export function SelfServiceWorkspace({ administrative = false, initialLeaveTypes
       </div>
       {!loading && !loadError && <p role="status" className="text-sm text-muted-foreground">الطلبات المطابقة: {total}</p>}
       {loading ? <p role="status">جارٍ التحميل…</p> : loadError ? <div className="flex flex-wrap items-center gap-3 rounded-xl border p-4"><p role="alert">{loadError}</p><Button variant="outline" onClick={() => setRefresh(current => current + 1)}>إعادة المحاولة</Button></div> : !rows.length ? <p className="text-muted-foreground">{statusFilter || typeFilter ? "ما فيه طلبات تطابق الفلاتر." : "لا توجد طلبات حتى الآن."}</p> : rows.map(row => <article key={row.id} className="rounded-2xl border bg-card p-5 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold">{row.type === "REVOKE" ? "طلب استرداد بعد الاعتماد" : getRequestTypeConfig(row.type)?.label ?? row.type}</h3><p className="mt-1 text-xs text-muted-foreground">{new Date(row.createdAt).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })} · {row.id}</p></div><span className="rounded-full bg-muted px-3 py-1 text-sm">{labels[row.status] ?? row.status}</span></div>
+        <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold">{row.type === "REVOKE" ? "طلب استرداد بعد الاعتماد" : getRequestTypeConfig(row.type)?.label ?? row.type}</h3><p className="mt-1 text-xs text-muted-foreground">{new Date(row.createdAt).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })} · {row.id}</p></div><span className={`rounded-full px-3 py-1 text-sm ${statusTone[row.status] ?? "bg-muted text-muted-foreground"}`}>{labels[row.status] ?? row.status}</span></div>
         {row.status === "PENDING" && <p className="mt-3 text-sm text-primary">عند: {parseWorkflowStepMetadata(row.steps.find(step => step.step === row.currentStep)?.comments).stageName ?? `المرحلة ${row.currentStep}`}</p>}
         <div className="mt-4 flex flex-wrap gap-2"><Button variant="outline" onClick={() => setTimeline(row.id)}>أين وصل الطلب؟</Button>{row.type !== "REVOKE" && <>{["PENDING", "RETURNED"].includes(row.status) && <><Button variant="outline" disabled={busy} onClick={() => void edit(row)}>{row.status === "RETURNED" ? "تصحيح وإعادة إرسال" : "تعديل"}</Button><Button variant="outline" disabled={busy} onClick={() => void act(row, "CANCEL")}>إلغاء</Button></>}{row.status === "COMPLETED" && <Button variant="outline" disabled={busy} onClick={() => void act(row, "REVOKE")}>طلب استرداد / إلغاء بعد الاعتماد</Button>}</>}</div>
       </article>)}

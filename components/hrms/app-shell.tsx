@@ -162,7 +162,7 @@ export function AppShell({ children, dictionary }: AppShellProps) {
         )}
       >
         <div className="flex h-16 items-center justify-between border-b border-white/10 px-4">
-          <BrandLogo href="/" size="sm" showText={!sidebarCollapsed || mobileMenuOpen} textClassName="text-white" subtitleClassName="text-emerald-100/60" logoClassName="bg-white text-primary border-white" />
+          <BrandLogo href="/" size="sm" showText={!sidebarCollapsed || mobileMenuOpen} textClassName="text-white" subtitleClassName="text-blue-100/60" logoClassName="bg-white text-primary border-white" />
           <button
             onClick={() => setMobileMenuOpen(false)}
             className="rounded-lg p-2 text-white/70 hover:bg-white/10 hover:text-white transition-colors lg:hidden"
@@ -190,14 +190,14 @@ export function AppShell({ children, dictionary }: AppShellProps) {
                     sidebarCollapsed ? "lg:justify-center lg:px-2.5" : "",
                     active
                       ? "bg-white font-bold text-primary shadow-md ring-2 ring-white/40"
-                      : "text-emerald-100/70 hover:bg-white/10 hover:text-white"
+                      : "text-blue-100/70 hover:bg-white/10 hover:text-white"
                   )}
                   title={sidebarCollapsed ? item.label : undefined}
                 >
                   <span className="relative inline-flex shrink-0">
                     <Icon className={cn(
                       "h-[18px] w-[18px] shrink-0",
-                      active ? "text-primary" : "text-emerald-100/65 group-hover:text-white"
+                      active ? "text-primary" : "text-blue-100/65 group-hover:text-white"
                     )} />
                     {item.href === "/request-center" && pendingApprovalsCount ? (
                       <span
