@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isOdooIntegrationEnabled } from "@/lib/settings";
-import { OdooClient } from "@/lib/integrations/odoo/client";
+import { createOdooClientFromConnection } from "@/lib/integrations/odoo/sync";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -22,7 +22,8 @@ async function checkOdoo(): Promise<CheckResult> {
   const started = Date.now();
   try {
     if (!(await isOdooIntegrationEnabled())) return { status: "DISABLED" };
-    await OdooClient.fromEnv().version();
+    const { client } = await createOdooClientFromConnection();
+    await client.version();
     return { status: "OK", ms: Date.now() - started };
   } catch (error) {
     return { status: "DOWN", ms: Date.now() - started, message: error instanceof Error ? error.message.split("\n")[0] : String(error) };
