@@ -131,21 +131,7 @@ export async function reconcileEmployeeNumbersAndIds(options: EmployeeNumberReco
   let client: OdooClient;
   let connection: RuntimeConnectionLike | undefined;
   try {
-    if (options.connectionId) {
-      ({ client, connection } = await createOdooClientFromConnection(options.connectionId));
-    } else {
-      // Prefer the primary active Odoo connection stored in the integration
-      // settings; fall back to explicit env configuration.
-      const dbConn = await prisma.integrationConnection.findFirst({
-        where: { provider: { type: "ODOO" } },
-        orderBy: [{ status: "desc" }, { updatedAt: "desc" }]
-      }).catch(() => null);
-      if (dbConn) {
-        ({ client, connection } = await createOdooClientFromConnection(dbConn.id));
-      } else {
-        ({ client, connection } = await createOdooClientFromConnection());
-      }
-    }
+    ({ client, connection } = await createOdooClientFromConnection(options.connectionId));
     await client.connect();
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

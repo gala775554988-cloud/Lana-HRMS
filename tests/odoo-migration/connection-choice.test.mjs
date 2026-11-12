@@ -13,7 +13,10 @@ test('verified saved Odoo connection takes priority over legacy environment with
   assert.equal(calls[0].where.provider.type, 'ODOO'); assert.equal(calls[0].where.provider.isActive, true);
   tested = []; assert.equal(await getDefaultOdooConnectionId(true), undefined);
   saved = [{ id: 'only-saved' }]; assert.equal(await getDefaultOdooConnectionId(false), 'only-saved');
-  saved.push({ id: 'other' }); await assert.rejects(() => getDefaultOdooConnectionId(false), /حدد اتصالاً واحداً/);
+  assert.equal(await getDefaultOdooConnectionId(true), 'only-saved');
+  saved.push({ id: 'other' });
+  await assert.rejects(() => getDefaultOdooConnectionId(true), /حدد اتصالاً واحداً/);
+  await assert.rejects(() => getDefaultOdooConnectionId(false), /حدد اتصالاً واحداً/);
   tested = [{ id: 'one' }, { id: 'two' }];
   await assert.rejects(() => getDefaultOdooConnectionId(true), /عدة اتصالات/);
 });
