@@ -14,6 +14,7 @@
     "prisma:seed": "tsx prisma/seed.ts",
     "verify": "node scripts/verify-project.mjs",
     "test:smoke": "playwright test -c tests/smoke/playwright.config.ts",
+    "test:payroll-responsive": "node tests/responsive/payroll.mjs",
     "vercel-build": "prisma generate && npm run build",
     "db:hospitals": "node scripts/seed-odoo-hospitals-master.mjs",
     "prisma:deploy": "prisma migrate deploy",

@@ -21,7 +21,7 @@ type PayslipData = {
 function row(label: string, value: number, currency: string, positive = true) {
   if (!value) return null;
   return (
-    <div className="flex justify-between border-b border-slate-200 py-1.5 text-sm">
+    <div className="flex flex-wrap justify-between gap-2 border-b border-slate-200 py-1.5 text-sm">
       <span>{label}</span>
       <span className={`font-bold ${positive ? "text-emerald-700" : "text-rose-700"}`}>{positive ? "" : "-"}{value.toLocaleString("ar-SA")} {currency}</span>
     </div>
@@ -50,20 +50,20 @@ function PayslipContent() {
   const { item, employee } = data;
 
   return (
-    <div className="mx-auto max-w-3xl p-8 print:p-0" dir="rtl">
+    <div className="payroll-workspace mx-auto min-w-0 max-w-3xl p-4 sm:p-8 print:p-0" dir="rtl">
       <style dangerouslySetInnerHTML={{
         __html: `@media print { @page { size: A4; margin: 14mm; } .no-print { display: none !important; } body { background: white; } }`
       }} />
 
-      <div className="no-print mb-6 flex items-center justify-between">
+      <div className="no-print mb-6 flex flex-wrap items-center justify-between gap-4">
         <p className="text-sm text-muted-foreground">معاينة قبل الطباعة -- استخدم "طباعة" ثم اختر "حفظ كـ PDF" من نافذة الطباعة.</p>
         <button type="button" onClick={() => window.print()} className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-primary/90">
           <Printer className="h-4 w-4" /> طباعة / حفظ PDF
         </button>
       </div>
 
-      <div className="rounded-2xl border-2 border-slate-800 p-8">
-        <div className="flex items-start justify-between border-b-2 border-slate-800 pb-4 mb-4">
+      <div className="rounded-2xl border-2 border-slate-800 p-4 sm:p-8 print:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b-2 border-slate-800 pb-4 mb-4">
           <div className="flex items-center gap-3">
             {data.companyLogo && <img src={data.companyLogo} alt="" className="h-14 w-14 object-contain" />}
             <div>
@@ -74,24 +74,24 @@ function PayslipContent() {
           {data.qrDataUrl && <img src={data.qrDataUrl} alt="QR" className="h-20 w-20" />}
         </div>
 
-        <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
+        <div className="grid grid-cols-1 gap-4 mb-6 text-sm sm:grid-cols-2 print:grid-cols-2">
           <div><p className="text-xs text-slate-500">اسم الموظف</p><p className="font-bold">{employee.name}</p></div>
           <div><p className="text-xs text-slate-500">الرقم الوظيفي</p><p className="font-bold">{employee.employeeNumber}</p></div>
           <div><p className="text-xs text-slate-500">القسم</p><p className="font-bold">{employee.department ?? "-"}</p></div>
           <div><p className="text-xs text-slate-500">الفرع</p><p className="font-bold">{employee.branch ?? "-"}</p></div>
           <div><p className="text-xs text-slate-500">المسمى الوظيفي</p><p className="font-bold">{employee.position ?? "-"}</p></div>
           <div><p className="text-xs text-slate-500">مركز التكلفة</p><p className="font-bold">{item.costCenter ?? "-"}</p></div>
-          {employee.iban && <div className="col-span-2"><p className="text-xs text-slate-500">الحساب البنكي</p><p className="font-bold font-mono">{employee.bank} -- {employee.iban}</p></div>}
+          {employee.iban && <div className="sm:col-span-2 print:col-span-2"><p className="text-xs text-slate-500">الحساب البنكي</p><p className="break-all font-bold font-mono">{employee.bank} -- {employee.iban}</p></div>}
         </div>
 
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 print:grid-cols-2">
           <div>
             <p className="text-xs font-bold text-emerald-700 mb-2">الإضافات</p>
             {row("الراتب الأساسي", item.baseSalary, item.currency)}
             {row("البدلات", item.allowanceTotal, item.currency)}
             {row("الإضافي", item.overtimeTotal, item.currency)}
             {row("المكافآت والعمولات", item.bonusTotal, item.currency)}
-            <div className="flex justify-between pt-2 text-sm font-black"><span>الإجمالي</span><span>{item.grossPay.toLocaleString("ar-SA")} {item.currency}</span></div>
+            <div className="flex flex-wrap justify-between gap-2 pt-2 text-sm font-black"><span>الإجمالي</span><span>{item.grossPay.toLocaleString("ar-SA")} {item.currency}</span></div>
           </div>
           <div>
             <p className="text-xs font-bold text-rose-700 mb-2">الاستقطاعات</p>
@@ -102,7 +102,7 @@ function PayslipContent() {
             {row("الغياب", item.absenceDeduction, item.currency, false)}
             {row("التأخير", item.lateDeduction, item.currency, false)}
             {row("الجزاءات", item.penaltyDeduction, item.currency, false)}
-            <div className="flex justify-between pt-2 text-sm font-black"><span>إجمالي الاستقطاعات</span><span>-{item.deductionTotal.toLocaleString("ar-SA")} {item.currency}</span></div>
+            <div className="flex flex-wrap justify-between gap-2 pt-2 text-sm font-black"><span>إجمالي الاستقطاعات</span><span>-{item.deductionTotal.toLocaleString("ar-SA")} {item.currency}</span></div>
           </div>
         </div>
 
@@ -111,7 +111,7 @@ function PayslipContent() {
           <p className="text-2xl font-black">{item.netPay.toLocaleString("ar-SA")} {item.currency}</p>
         </div>
 
-        <p className="mt-6 text-center text-xs text-slate-400">تم إصدار هذا الكشف إلكترونياً من نظام HRMS بتاريخ {new Date().toLocaleDateString("ar-SA")}</p>
+        <p className="mt-6 text-center text-xs text-slate-400">تم إصدار هذا الكشف إلكترونياً من نظام HRMS بتاريخ {new Date().toLocaleDateString("ar-SA", { timeZone: "Asia/Riyadh" })}</p>
       </div>
     </div>
   );

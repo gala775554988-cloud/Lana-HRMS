@@ -296,14 +296,14 @@ export function PayrollRunManager({initialRunId, initialCreate = false, canManag
   const selectableCount = filteredRuns.filter((r) => canCancel(r.status) || (canApprove && ARCHIVABLE.includes(r.status))).length;
 
   return (
-    <div className="space-y-6" dir="rtl">
-      <div className="flex items-center justify-between"><p className="text-sm text-muted-foreground">إعداد المسودة ← مراجعة الموظفين والبنود ← الاعتماد ← تسجيل الصرف</p>{canManage && <Button variant="outline" onClick={()=>setShowCreate(v=>!v)}>{showCreate?"إغلاق نموذج الإنشاء":"إنشاء مسير جديد"}</Button>}</div>
+    <div className="payroll-workspace min-w-0 space-y-6" dir="rtl">
+      <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-muted-foreground">إعداد المسودة ← مراجعة الموظفين والبنود ← الاعتماد ← تسجيل الصرف</p>{canManage && <Button variant="outline" onClick={()=>setShowCreate(v=>!v)}>{showCreate?"إغلاق نموذج الإنشاء":"إنشاء مسير جديد"}</Button>}</div>
       {showCreate && <Card className="rounded-2xl">
         <CardHeader>
           <CardTitle>إنشاء مسير رواتب جديد</CardTitle>
           <CardDescription>اختر الفترة والنطاق، ثم احسب رواتب جميع الموظفين المطابقين تلقائياً عبر محرك الرواتب.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-4">
+        <CardContent className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <div className="space-y-1.5">
             <Label>شهر المسير</Label>
             <Input type="month" value={periodName} onChange={(e) => {setPeriodName(e.target.value);try{const dates=payrollMonthRange(e.target.value);setStartDate(dates.start);setEndDate(dates.end);}catch{setStartDate("");setEndDate("");}}} />
@@ -323,14 +323,14 @@ export function PayrollRunManager({initialRunId, initialCreate = false, canManag
               {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
             </select>
           </div>
-          <div className="space-y-1.5 md:col-span-2">
+          <div className="space-y-1.5 sm:col-span-2">
             <Label>القسم</Label>
             <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-sm">
               <option value="">كل الأقسام</option>
               {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
             </select>
           </div>
-          <div className="md:col-span-2 flex items-end">
+          <div className="sm:col-span-2 flex items-end">
             <Button onClick={createRun} disabled={actionLoading} className="gap-2 w-full">
               {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
               احتساب مسير الرواتب
@@ -347,7 +347,7 @@ export function PayrollRunManager({initialRunId, initialCreate = false, canManag
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Copy className="h-4.5 w-4.5" />نسخ "{duplicating.name}" إلى فترة جديدة</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-4">
+          <CardContent className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <div className="space-y-1.5">
               <Label>اسم الفترة الجديدة</Label>
               <Input value={dupPeriod} onChange={(e) => setDupPeriod(e.target.value)} placeholder="2026-08" />
@@ -371,7 +371,7 @@ export function PayrollRunManager({initialRunId, initialCreate = false, canManag
         </Card>
       ) : null}
 
-      <div className={initialRunId?"space-y-5":"grid gap-6 lg:grid-cols-3"}>
+      <div className={initialRunId?"space-y-5":"grid min-w-0 gap-6 xl:grid-cols-3"}>
         {!initialRunId && <Card className="rounded-2xl lg:col-span-1">
           <CardHeader className="space-y-3">
             <CardTitle>مسيرات الرواتب</CardTitle>
@@ -379,7 +379,7 @@ export function PayrollRunManager({initialRunId, initialCreate = false, canManag
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث بالاسم أو الفترة..." className="pr-9" />
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
@@ -461,7 +461,7 @@ export function PayrollRunManager({initialRunId, initialCreate = false, canManag
           </CardContent>
         </Card>}
 
-        <Card className={initialRunId?"rounded-2xl":"rounded-2xl lg:col-span-2"}>
+        <Card className={initialRunId?"rounded-2xl":"rounded-2xl xl:col-span-2"}>
           <CardHeader><CardTitle>تفاصيل المسير</CardTitle></CardHeader>
           <CardContent>
             {loading ? (

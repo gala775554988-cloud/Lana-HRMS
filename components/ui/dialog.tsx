@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 
@@ -9,9 +10,13 @@ interface DialogProps {
   onOpenChange: (open: boolean) => void;
   children: React.ReactNode;
   panelClassName?: string;
+  overlayClassName?: string;
+  portal?: boolean;
 }
 
-export function Dialog({ open, onOpenChange, children, panelClassName }: DialogProps) {
+export function Dialog({ open, onOpenChange, children, panelClassName, overlayClassName, portal = false }: DialogProps) {
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => { setMounted(true); }, []);
   React.useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden";
@@ -30,15 +35,16 @@ export function Dialog({ open, onOpenChange, children, panelClassName }: DialogP
     return () => document.removeEventListener("keydown", handler);
   }, [open, onOpenChange]);
 
-  if (!open) return null;
+  if (!open || (portal && !mounted)) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 animate-fade-in" onClick={() => onOpenChange(false)} role="dialog" aria-modal="true">
+  const content = (
+    <div className={cn("fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 animate-fade-in", overlayClassName)} onClick={() => onOpenChange(false)} role="dialog" aria-modal="true">
       <div onClick={(e) => e.stopPropagation()} className={cn("relative max-h-[90vh] w-full max-w-lg overflow-auto rounded-2xl border border-border bg-card shadow-2xl", panelClassName)}>
         {children}
       </div>
     </div>
   );
+  return portal ? createPortal(content, document.body) : content;
 }
 
 export function DialogContent({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) {

@@ -288,3 +288,39 @@
     background: radial-gradient(ellipse at 12% 0%, #404a8b 0, transparent 60%), #182342;
   }
 }
+
+/* Payroll content must shrink inside both the desktop shell and portal layouts. */
+.payroll-workspace :where(section, article, form, header, .grid > *, .flex > *) { min-width: 0; }
+.payroll-workspace :where(h1, h2, h3, p, dd, a) { overflow-wrap: anywhere; }
+.payroll-workspace :where(input, select, textarea) { max-width: 100%; }
+.payroll-line-table { table-layout: fixed; }
+.payroll-line-table :where(td, th) { overflow-wrap: anywhere; }
+@media screen and (max-width: 639px) {
+  .payroll-workspace :where(input, select, textarea) { font-size: 16px; }
+  .payroll-workspace :where(button, a.inline-flex) { min-height: 44px; height: auto; white-space: normal; padding-block: 10px; }
+  .payroll-line-table thead { display: none; }
+  .payroll-line-table tbody, .payroll-line-table tr { display: block; }
+  .payroll-line-table td {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: 12px;
+    padding: 8px 12px;
+  }
+  .payroll-line-table td::before { content: attr(data-label); color: hsl(var(--muted-foreground)); font-weight: 400; }
+  .payroll-line-table tr { padding-block: 8px; }
+}
+@media print {
+  .payroll-workspace :where(button, .no-print) { display: none !important; }
+  .payroll-workspace .overflow-x-auto { overflow: visible !important; }
+  .payroll-line-table { display: table; }
+  .payroll-line-table thead { display: table-header-group; }
+  .payroll-line-table tbody { display: table-row-group; }
+  .payroll-line-table tr { display: table-row; break-inside: avoid; }
+  .payroll-line-table td { display: table-cell; }
+  .payroll-line-table td::before { content: none; }
+}
+@media print {
+  /* Keep totals legible when the browser omits colored backgrounds. */
+  .payroll-workspace .text-white { color: #0f172a !important; background: white !important; border-color: #334155 !important; }
+  .payroll-workspace .text-indigo-100 { color: #475569 !important; }
+}
