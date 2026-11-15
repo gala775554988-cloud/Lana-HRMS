@@ -4,8 +4,9 @@ import { load } from "./helpers.mjs";
 
 async function setup(userId = "user") {
   const queries = [];
-  const config = await load("lib/employee/request-form-config.ts");
+  const config = await load("lib/employee/request-form-config.ts", {"./hr-approval-services": { EXTRA_PAYMENT_TYPES: [] }});
   const route = await load("app/api/self-service/route.ts", {
+    '@/lib/integrations/odoo/requests/store': { workflowLinks: async () => new Map() },
     "next/server": { NextResponse: { json: (body, options) => ({ body, status: options?.status ?? 200 }) } },
     "@/auth": { auth: async () => userId ? { user: { id: userId } } : null },
     "@/lib/employee/request-form-config": config,

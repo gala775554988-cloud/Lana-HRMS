@@ -1,3 +1,5 @@
+import { isHRPaymentType } from "@/lib/employee/hr-approval-services";
+import { assertLocalWorkflow } from "@/lib/integrations/odoo/requests/service";
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -15,6 +17,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const original = await prisma.workflowInstance.findUnique({ where: { id }, include: { employee: { select: { userId: true } } } });
     if (!original) throw new RequestLifecycleError("الطلب غير متاح", 404);
     requireOwner(original.employee.userId, session.user.id);
+    await assertLocalWorkflow(id);
     if (original.type === "REVOKE") throw new RequestLifecycleError("تتم مراجعة طلب الاسترداد عبر مسؤول الاعتماد");
     requireAction(original.status, action);
     const approvers = ["EDIT", "RESUBMIT", "REVOKE"].includes(action) ? await resolveApprovalChain(original.employeeId, original.type) : [];
@@ -41,7 +44,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           const model = entityDelegate(tx, original.type);
           const entity = await model.findUnique({ where: { id: original.entityId } });
           if (!entity || entity.employeeId !== original.employeeId || entity.status !== "PENDING") throw new RequestLifecycleError("تغيرت حالة الطلب");
-          if ((await model.updateMany({ where: { id: original.entityId, status: "PENDING" }, data: changes })).count !== 1) throw new RequestLifecycleError("تغيرت حالة الطلب");
+          if ((await model.updateMany({ where: { id: original.entityId, status: "PENDING" }, data: isHRPaymentType(original.type) && "purpose" in changes ? { purpose: changes.purpose } : changes })).count !== 1) throw new RequestLifecycleError("تغيرت حالة الطلب");
+          if (isHRPaymentType(original.type) && 'amount' in changes && 'requestDate' in changes) {
+            const value = { amount: Number(changes.amount), requestDate: String(changes.requestDate), reference: "reference" in changes ? String(changes.reference) : "", project: "project" in changes ? String(changes.project) : "" };
+            await tx.appSetting.upsert({ where: { key: `request.fields.${original.entityId}` }, create: { key: `request.fields.${original.entityId}`, value, isSecret: true }, update: { value, isSecret: true } });
+          }
         }
         await tx.workflowInstance.update({ where: { id }, data: { status: action === "CANCEL" ? "CANCELLED" : "SUPERSEDED" } });
         await tx.workflowStep.updateMany({ where: { workflowInstanceId: id, status: { in: ["PENDING", "WAITING", "DEFERRED"] } }, data: { status: "CANCELLED" } });
@@ -64,5 +71,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const workflow = await prisma.workflowInstance.findFirst({ where: { id, employee: { userId: session.user.id } } });
   if (!workflow || workflow.type === "REVOKE") return NextResponse.json({ success: false }, { status: 404 });
   const record = await entityDelegate(prisma, workflow.type).findUnique({ where: { id: workflow.entityId } });
-  return NextResponse.json({ success: true, record });
+  const extra = isHRPaymentType(workflow.type) ? await prisma.appSetting.findUnique({ where: { key: `request.fields.${workflow.entityId}` }, select: { value: true } }) : null;
+  return NextResponse.json({ success: true, record: { ...record, ...(extra?.value as object ?? {}) } });
 }

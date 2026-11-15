@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import dynamicImport from "next/dynamic";
 import { Suspense } from "react";
 import { MergedModuleTabs } from "@/components/hrms/merged-module-tabs";
+import { OdooRequestsWorkspace } from "@/components/enterprise/odoo-requests-workspace";
 import { Inbox, Send, GitPullRequest, Workflow } from "lucide-react";
 import { auth } from "@/auth";
 import { canManageApprovalRouting } from "@/config/request-routing";
@@ -33,6 +34,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
       <MergedModuleTabs
         defaultValue="center"
         items={[
+        { value: "odoo", label: "طلبات أودو والمزامنة", icon: <GitPullRequest className="h-4 w-4" />, content: query.tab === "odoo" ? <OdooRequestsWorkspace /> : null },
         {
           value: "new", label: "تقديم طلب جديد", icon: <Send className="h-4 w-4" />,
           content: <SelfServiceWorkspace administrative initialLeaveTypes={leaveTypes} ownEmployee={ownEmployee ? { id: ownEmployee.id, label: `${ownEmployee.firstName} ${ownEmployee.lastName} · ${ownEmployee.employeeNumber}` } : null} />

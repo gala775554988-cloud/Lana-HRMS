@@ -1,0 +1,22 @@
+import type { RequestDocument } from './documents';
+export type Bucket = 'DRAFT' | 'PENDING' | 'APPROVED' | 'COMPLETED' | 'REJECTED' | 'CANCELLED' | 'UNKNOWN';
+export type SyncState = 'PENDING' | 'SENDING' | 'SYNCED' | 'ERROR' | 'UNCERTAIN' | 'BLOCKED';
+export type Field = { type: string; string?: string; required?: boolean; readonly?: boolean; relation?: string; selection?: [string, string][]; help?: string };
+export type Mapping = { type: string; model: string; categoryId?: number; leaveTypeId?: string; defaults: Record<string, string | number | boolean> };
+export type Configuration = { enabled: boolean; connectionId?: string; models: string[]; mappings: Mapping[]; source?: string };
+export type Profile = { model: string; label: string; owner: string; ownerKind: 'employee' | 'user'; state: string; reference: string; submit?: string; writable: boolean };
+export type RequestLink = {
+  id: string; reference: string; source: string; model: string; employeeId: string | null;
+  employeeName: string; employeeNumber?: string; createdBy?: string; workflowId?: string;
+  origin: 'LANA' | 'ODOO'; privilegedRelations?: boolean; title: string; remoteId?: number; remoteReference?: string;
+  remoteState?: string; remoteWriteDate?: string; bucket: Bucket; syncState: SyncState; attempts: number;
+  values?: Record<string, unknown>; attachments?: RequestDocument[]; documents?: {id:number;name:string}[]; updatedAt: string; createdAt: string; lastSyncedAt?: string;
+  error?: string; leaseUntil?: string; remoteUrl?: string;
+  fields?: { name?: string; label: string; value: string }[];
+  approvers?: { name: string; state: string; writeDate?: string }[];
+  events: { at: string; label: string; state?: string }[];
+};
+export type Descriptor = { profile: Profile; fields: Record<string, Field>; defaults: Record<string, unknown>; formFields: string[]; missing: string[]; canCreate: boolean };
+export const CONFIG_KEY = 'odoo.requests.configuration.v1';
+export const RECORD_PREFIX = 'odoo.requests.record.';
+export const WEBHOOK_KEY = 'odoo.requests.webhook.v1';

@@ -1,3 +1,5 @@
+import { validateDocuments } from '@/lib/integrations/odoo/requests/documents';
+import { EXTRA_PAYMENT_TYPES } from "@/lib/employee/hr-approval-services";
 import { canSubmitForEmployee } from "@/lib/self-service/request-submitter";
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
@@ -359,6 +361,14 @@ export async function POST(request: Request) {
         break;
     }
 
+    if (EXTRA_PAYMENT_TYPES.some(item => item.code === normalizedType)) {
+      const amount = Number(data.amount);
+      if (!Number.isFinite(amount) || amount <= 0 || amount > 1e10 || Math.abs(amount * 100 - Math.round(amount * 100)) > .001 || !data.requestDate || !/^\d{4}-\d{2}-\d{2}$/.test(String(data.requestDate)) || !Number.isFinite(Date.parse(String(data.requestDate))) || new Date(String(data.requestDate)).toISOString().slice(0,10) !== data.requestDate || !String(data.purpose ?? '').trim()) throw new Error('تحقق من المبلغ وتاريخ الطلب والغرض من الصرف');
+      const extra = { amount, requestDate: String(data.requestDate), reference: String(data.reference ?? '').slice(0,500), project: String(data.project ?? '').slice(0,500) };
+      await tx.appSetting.create({ data: { key: `request.fields.${result.id}`, value: extra, isSecret: true } });
+    }
+    const documents = validateDocuments(data.attachments);
+    if (documents.length) await tx.appSetting.create({ data: { key: `request.documents.${result.id}`, value: JSON.parse(JSON.stringify(documents)), isSecret: true } });
     const workflow = await persistEnterpriseWorkflow(tx, employeeId, normalizedType, result.id, approvers);
     await tx.auditLog.create({ data: {
       actorUserId: session.user.id, action: onBehalfOfEmployeeId ? "request:submit-on-behalf" : "request:submit-self",

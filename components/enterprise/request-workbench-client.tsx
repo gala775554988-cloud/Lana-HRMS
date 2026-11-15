@@ -39,7 +39,8 @@ const scopeOptions = [
   ["transferred", "تم تحويلها"],
   ["deferred", "المؤجلة"],
   ["decided", "طلبات مكتملة"],
-  ["completed", "المكتملة (معتمدة فقط)"],
+  ["approved", "المعتمدة في أودو"],
+  ["completed", "المكتملة"],
   ["rejected", "المرفوضة"]
 ] as const;
 
@@ -83,6 +84,8 @@ const sortOptions = [
 
 type RequestRecord = {
   id: string;
+  reference?: string;
+  odoo?: { reference: string; syncState: string; remoteReference?: string; remoteUrl?: string; error?: string } | null;
   type: string;
   entityId: string;
   status: string;
@@ -330,7 +333,7 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
       const json = await response.json();
       if (!response.ok || !json.success) throw new Error(json.message || "تعذر إعداد الكشف");
       const rows = (json.requests as RequestRecord[]).map((row) => ({
-        "مرجع الطلب": row.entityId, "الرقم الوظيفي": row.employee?.employeeNumber ?? "",
+        "مرجع الطلب": row.reference ?? row.entityId, "رقم أودو": row.odoo?.remoteReference ?? "", "حالة المزامنة": row.odoo?.syncState ?? "مسار محلي", "الرقم الوظيفي": row.employee?.employeeNumber ?? "",
         "الموظف": `${row.employee?.firstName ?? ""} ${row.employee?.lastName ?? ""}`,
         "القسم": row.employee?.department?.name ?? "", "الفرع": row.employee?.branch?.name ?? "",
         "نوع الطلب": typeLabels[row.type] ?? row.type, "الحالة": STATUS_LABEL[row.status] ?? row.status,
@@ -501,6 +504,8 @@ export function RequestWorkbenchClient({ mode = "center" }: { mode?: "center" | 
                 {request.employee?.branch?.name ? <Badge variant="outline">{request.employee.branch.name}</Badge> : null}
               </div>
 
+              <p className="break-all font-mono text-xs text-muted-foreground" dir="ltr">{request.reference ?? `LRQ-${request.id.toUpperCase()}`}</p>
+              {request.odoo && <div className="space-y-2 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-900 dark:border-indigo-800 dark:bg-indigo-950 dark:text-indigo-100"><p>{request.odoo.syncState === 'SYNCED' ? 'متزامن مع أودو · القرار حسب المسار الأصلي' : 'محفوظ في لانا · مزامنة أودو تحتاج متابعة'}</p>{request.odoo.remoteReference && <p className="break-words">مرجع أودو: {request.odoo.remoteReference}</p>}{request.odoo.error && <p>{request.odoo.error}</p>}{request.odoo.remoteUrl && <a className="inline-flex min-h-10 items-center font-semibold underline" href={request.odoo.remoteUrl} target="_blank" rel="noreferrer">فتح مسار الموافقات في أودو</a>}</div>}
               <div className="grid grid-cols-2 gap-3 text-xs rounded-2xl bg-slate-50/80 dark:bg-slate-800/40 p-3">
                 {request.leave ? <div className="col-span-2"><p className="font-bold">{request.leave.leaveType.name} — {Number(request.leave.days)} يوم</p><p>{request.leave.startDate.slice(0, 10)} — {request.leave.endDate.slice(0, 10)}</p>{request.leave.decisionNote ? <p>ملاحظة القرار: {request.leave.decisionNote}</p> : null}</div> : null}
                 <div><p className="text-muted-foreground">تاريخ الإنشاء</p><p className="font-bold mt-0.5">{new Date(request.createdAt).toLocaleDateString("ar-SA")}</p></div>

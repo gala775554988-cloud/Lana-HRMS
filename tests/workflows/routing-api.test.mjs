@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { z } from 'zod';
 import { load } from './helpers.mjs';
-const config = await load('config/request-routing.ts');
+const config = await load('config/request-routing.ts', {'@/lib/employee/hr-approval-services': { EXTRA_PAYMENT_TYPES: [] }});
 class NextResponse {
   constructor(data, options = {}) { this.data = data;this.status = options.status || 200; }
   static json(data, options) { return new NextResponse(data, options); }

@@ -1,3 +1,4 @@
+import { assertLocalWorkflow } from "@/lib/integrations/odoo/requests/service";
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { canManageApprovalRouting } from "@/config/request-routing";
@@ -61,6 +62,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const currentStep = instance.steps.find((step) => step.step === instance.currentStep && ["PENDING", "DEFERRED"].includes(step.status));
     if (!currentStep) return NextResponse.json({ success: false, message: "No active workflow step" }, { status: 400 });
     if (!canManageStep(session, currentStep.approverUserId)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+    await assertLocalWorkflow(id);
 
     async function updateActiveStep(data: { data: Parameters<typeof prisma.workflowStep.update>[0]["data"] }) {
       const changed = await prisma.workflowStep.updateMany({ where: { id: currentStep!.id, status: { in: ["PENDING", "DEFERRED"] }, approverUserId: currentStep!.approverUserId, workflowInstance: { status: "PENDING", currentStep: instance!.currentStep } }, data: data.data });

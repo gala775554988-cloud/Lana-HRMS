@@ -1,9 +1,10 @@
+import { workflowLinks } from "@/lib/integrations/odoo/requests/store";
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getRequestTypeConfig } from "@/lib/employee/request-form-config";
 
-const requestStatuses = new Set(["PENDING", "COMPLETED", "REJECTED", "RETURNED", "CANCELLED"]);
+const requestStatuses = new Set(["APPROVED", "PENDING", "COMPLETED", "REJECTED", "RETURNED", "CANCELLED"]);
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -24,5 +25,7 @@ export async function GET(request: Request) {
     prisma.workflowInstance.count({ where }),
     prisma.leaveType.findMany({ where: { isActive: true }, select: { id: true, name: true, code: true }, orderBy: { name: "asc" } }),
   ]);
-  return NextResponse.json({ success: true, requests, total, page, leaveTypes });
+  const links = await workflowLinks(requests.map(row => row.id));
+  const rows = requests.map(row => ({ ...row, reference: links.get(row.id)?.reference ?? `LRQ-${row.id.toUpperCase()}`, odoo: links.get(row.id) ?? null }));
+  return NextResponse.json({ success: true, requests: rows, total, page, leaveTypes });
 }

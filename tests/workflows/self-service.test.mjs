@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { load } from './helpers.mjs';
-const lifecycle = await load('lib/self-service/lifecycle.ts', { zod: await import('zod') });
+const lifecycle = await load('lib/self-service/lifecycle.ts', { zod: await import('zod'), '@/lib/employee/hr-approval-services': { isHRPaymentType: () => false } });
 test('only the owner can change a request and final approval disables edit/cancel', () => {
   assert.throws(() => lifecycle.requireOwner('someone', 'actor'), /غير متاح/);
   for (const action of ['EDIT', 'CANCEL', 'RESUBMIT']) assert.throws(() => lifecycle.requireAction('COMPLETED', action));

@@ -7,9 +7,10 @@ import { REQUEST_TYPE_CONFIG, getRequestTypeConfig } from "@/lib/employee/reques
 import { Button } from "@/components/ui/button";
 import { parseWorkflowStepMetadata } from "@/lib/enterprise/workflow-step-metadata";
 
-type Row = { id: string; type: string; status: string; currentStep: number; createdAt: string; steps: { step: number; comments: string | null }[] };
-const labels: Record<string, string> = { PENDING: "قيد الانتظار", COMPLETED: "معتمد", REJECTED: "مرفوض", RETURNED: "معاد للتعديل", CANCELLED: "ملغى" };
+type Row = { reference?: string; odoo?: { syncState: string; remoteReference?: string; remoteUrl?: string; error?: string } | null; id: string; type: string; status: string; currentStep: number; createdAt: string; steps: { step: number; comments: string | null }[] };
+const labels: Record<string, string> = { PENDING: "قيد الانتظار", APPROVED: "معتمد", COMPLETED: "مكتمل", REJECTED: "مرفوض", RETURNED: "معاد للتعديل", CANCELLED: "ملغى" };
 const statusTone: Record<string, string> = {
+  APPROVED: "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200",
   COMPLETED: "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200 dark:bg-emerald-950 dark:text-emerald-200 dark:ring-emerald-800",
   REJECTED: "bg-red-50 text-red-800 ring-1 ring-red-200 dark:bg-red-950 dark:text-red-200 dark:ring-red-800",
   PENDING: "bg-amber-50 text-amber-800 ring-1 ring-amber-200 dark:bg-amber-950 dark:text-amber-200 dark:ring-amber-800",
@@ -33,6 +34,7 @@ export function SelfServiceWorkspace({ administrative = false, initialLeaveTypes
   const [type, setType] = useState("LEAVE");
   const [editing, setEditing] = useState<Row | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
+  const [files,setFiles] = useState<{name:string;data:string}[]>([]),[readingFiles,setReadingFiles] = useState(false);
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>(initialLeaveTypes);
   const [timeline, setTimeline] = useState<string | null>(null);
   const submission = useRef<{ body: string; key: string } | null>(null);
@@ -104,13 +106,13 @@ export function SelfServiceWorkspace({ administrative = false, initialLeaveTypes
   }
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (operationInProgress.current) return;
+    if (operationInProgress.current || readingFiles) return;
     if (editing) return act(editing, editing.status === "RETURNED" ? "RESUBMIT" : "EDIT", values);
     operationInProgress.current = true;
     setBusy(true); setMessage("");
     try {
       if (administrative && !recipient) throw new Error("اختر الموظف المستفيد أولاً");
-      const body = JSON.stringify({ type, ...values, ...(recipientMode === "employee" ? { onBehalfOfEmployeeId: recipient!.id } : {}) });
+      const body = JSON.stringify({ type, ...values, attachments: files, ...(recipientMode === "employee" ? { onBehalfOfEmployeeId: recipient!.id } : {}) });
       if (submission.current?.body !== body) submission.current = { body, key: crypto.randomUUID() };
       const response = await fetch("/api/hr/my-requests", {
         method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": submission.current.key }, body,
@@ -118,7 +120,7 @@ export function SelfServiceWorkspace({ administrative = false, initialLeaveTypes
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.message ?? data.error?.message ?? "تعذر تقديم الطلب");
       submission.current = null;
-      setValues({});
+      setValues({}); setFiles([]);
       setPage(1);
       setStatusFilter("");
       setTypeFilter("");
@@ -133,7 +135,7 @@ export function SelfServiceWorkspace({ administrative = false, initialLeaveTypes
       <h1 className="mt-2 text-3xl sm:text-4xl">الخدمات الذاتية</h1>
       <p className="mt-3 text-sm text-slate-200">قدّم طلبك وتابع مراحل المراجعة والقرارات من مكان واحد.</p>
       <nav aria-label="خدمات الموظف" className="mt-5 flex flex-wrap gap-2">
-        {[["#my-requests", "متابعة الطلبات"], ["/employee/leave", "الإجازات"], ["/employee/salary", "الرواتب"], ["/employee/documents", "المستندات"], ["/employee/attendance", "الحضور"], ["/employee/assets", "عهدي"], ["/employee/tasks", "مهامي"], ["/employee/training", "التدريب"], ["/employee/performance", "الأداء"], ["/employee/complaints", "الشكاوى"], ["/employee/settings", "حسابي"]].map(([href, label]) => (
+        {[["#my-requests", "متابعة الطلبات"], ["/employee/leave", "الإجازات"], ["/employee/requests?tab=odoo", "طلبات أودو"], ["/employee/salary", "الرواتب"], ["/employee/documents", "المستندات"], ["/employee/attendance", "الحضور"], ["/employee/assets", "عهدي"], ["/employee/tasks", "مهامي"], ["/employee/training", "التدريب"], ["/employee/performance", "الأداء"], ["/employee/complaints", "الشكاوى"], ["/employee/settings", "حسابي"]].map(([href, label]) => (
           <Link key={href} href={href} className="inline-flex min-h-11 items-center rounded-xl border border-white/25 px-3 text-sm font-semibold hover:bg-white/15">{label}</Link>
         ))}
       </nav>
@@ -149,13 +151,14 @@ export function SelfServiceWorkspace({ administrative = false, initialLeaveTypes
         </div>
         <p className="text-xs text-muted-foreground">يسجّل النظام اسم مقدّم الطلب والموظف المستفيد، ويرسل الطلب إلى مسار الاعتماد.</p>
       </fieldset>}
-      <label className="block space-y-2"><span>الخدمة</span><select className={inputClass} disabled={!!editing || busy} value={type} onChange={event => { setType(event.target.value); setValues({}); }}>{REQUEST_TYPE_CONFIG.map(item => <option key={item.code} value={item.code}>{item.label}</option>)}</select></label>
+      <label className="block space-y-2"><span>الخدمة</span><select className={inputClass} disabled={!!editing || busy} value={type} onChange={event => { setType(event.target.value); setValues({}); setFiles([]); }}>{REQUEST_TYPE_CONFIG.map(item => <option key={item.code} value={item.code}>{item.label}</option>)}</select></label>
       <div className="grid gap-4 sm:grid-cols-2">{config.fields.filter(field => !editing || !["leaveType", "letterType", "resumptionType"].includes(field.name)).map(field => {
         const name = editing && type === "LOAN" && field.name === "amount" ? "principalAmount" : field.name;
         const props = { id: `request-${name}`, name, value: values[name] ?? "", required: field.required, disabled: busy, className: inputClass, onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setValues(current => ({ ...current, [name]: event.target.value })) };
         return <label key={name} htmlFor={props.id} className="block space-y-2 text-sm"><span>{field.label}</span>{field.kind === "textarea" ? <textarea {...props} maxLength={4000} /> : field.kind === "select" ? <select {...props}><option value="">اختر</option>{(name === "leaveType" ? leaveTypes.map(item => ({ value: item.code, label: item.name })) : field.options ?? []).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select> : <input {...props} type={field.kind === "number" ? "number" : field.kind === "date" ? "date" : "text"} step={field.kind === "number" ? "0.01" : undefined} />}</label>;
       })}</div>
-      <div className="flex gap-2"><Button disabled={busy}>{busy ? "جارٍ التنفيذ…" : editing ? "حفظ وإعادة إرسال" : "تقديم الطلب"}</Button>{editing && <Button type="button" variant="outline" disabled={busy} onClick={() => { setEditing(null); setValues({}); }}>تراجع</Button>}</div>
+      {!editing && <label className="block space-y-2 text-sm"><span>المستندات الداعمة (PDF أو صورة)</span><input className={inputClass} key={type} type="file" accept="application/pdf,image/png,image/jpeg" multiple disabled={busy} onChange={async event=>{const selected=Array.from(event.target.files??[]);setFiles([]);if(selected.length>5||selected.some(file=>file.size>1500000)||selected.reduce((sum,file)=>sum+file.size,0)>2500000){setMessage('حتى خمسة ملفات، ١.٥ ميجابايت للملف و٢.٥ ميجابايت للمجموع');event.target.value='';return;}setReadingFiles(true);try{setFiles(await Promise.all(selected.map(file=>new Promise<{name:string;data:string}>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve({name:file.name,data:String(reader.result).split(',')[1]});reader.onerror=reject;reader.readAsDataURL(file);}))))}catch{setMessage('تعذر قراءة أحد المرفقات')}finally{setReadingFiles(false)}}}/><span className="block text-xs text-muted-foreground">تُحفظ مع الطلب وتُنقل إلى أودو للأنواع المربوطة قبل بدء الموافقات.</span></label>}
+      <div className="flex gap-2"><Button disabled={busy || readingFiles}>{busy ? "جارٍ التنفيذ…" : editing ? "حفظ وإعادة إرسال" : "تقديم الطلب"}</Button>{editing && <Button type="button" variant="outline" disabled={busy} onClick={() => { setEditing(null); setValues({}); }}>تراجع</Button>}</div>
     </form>
     {!administrative && <section id="my-requests" aria-labelledby="my-requests-heading" className="scroll-mt-20 space-y-3" aria-busy={loading}>
       <h2 id="my-requests-heading" className="text-xl font-bold">طلباتي</h2>
@@ -165,9 +168,10 @@ export function SelfServiceWorkspace({ administrative = false, initialLeaveTypes
       </div>
       {!loading && !loadError && <p role="status" className="text-sm text-muted-foreground">الطلبات المطابقة: {total}</p>}
       {loading ? <p role="status">جارٍ التحميل…</p> : loadError ? <div className="flex flex-wrap items-center gap-3 rounded-xl border p-4"><p role="alert">{loadError}</p><Button variant="outline" onClick={() => setRefresh(current => current + 1)}>إعادة المحاولة</Button></div> : !rows.length ? <p className="text-muted-foreground">{statusFilter || typeFilter ? "ما فيه طلبات تطابق الفلاتر." : "لا توجد طلبات حتى الآن."}</p> : rows.map(row => <article key={row.id} className="rounded-2xl border bg-card p-5 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold">{row.type === "REVOKE" ? "طلب استرداد بعد الاعتماد" : getRequestTypeConfig(row.type)?.label ?? row.type}</h3><p className="mt-1 text-xs text-muted-foreground">{new Date(row.createdAt).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })} · {row.id}</p></div><span className={`rounded-full px-3 py-1 text-sm ${statusTone[row.status] ?? "bg-muted text-muted-foreground"}`}>{labels[row.status] ?? row.status}</span></div>
-        {row.status === "PENDING" && <p className="mt-3 text-sm text-primary">عند: {parseWorkflowStepMetadata(row.steps.find(step => step.step === row.currentStep)?.comments).stageName ?? `المرحلة ${row.currentStep}`}</p>}
-        <div className="mt-4 flex flex-wrap gap-2"><Button variant="outline" onClick={() => setTimeline(row.id)}>أين وصل الطلب؟</Button>{row.type !== "REVOKE" && <>{["PENDING", "RETURNED"].includes(row.status) && <><Button variant="outline" disabled={busy} onClick={() => void edit(row)}>{row.status === "RETURNED" ? "تصحيح وإعادة إرسال" : "تعديل"}</Button><Button variant="outline" disabled={busy} onClick={() => void act(row, "CANCEL")}>إلغاء</Button></>}{row.status === "COMPLETED" && <Button variant="outline" disabled={busy} onClick={() => void act(row, "REVOKE")}>طلب استرداد / إلغاء بعد الاعتماد</Button>}</>}</div>
+        <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold">{row.type === "REVOKE" ? "طلب استرداد بعد الاعتماد" : getRequestTypeConfig(row.type)?.label ?? row.type}</h3><p className="mt-1 text-xs text-muted-foreground">{new Date(row.createdAt).toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })} · {row.reference ?? `LRQ-${row.id.toUpperCase()}`}</p></div><span className={`rounded-full px-3 py-1 text-sm ${statusTone[row.status] ?? "bg-muted text-muted-foreground"}`}>{labels[row.status] ?? row.status}</span></div>
+        {!row.odoo && row.status === "PENDING" && <p className="mt-3 text-sm text-primary">عند: {parseWorkflowStepMetadata(row.steps.find(step => step.step === row.currentStep)?.comments).stageName ?? `المرحلة ${row.currentStep}`}</p>}
+        {row.odoo && <div className="mt-3 space-y-2 rounded-xl border bg-muted/30 p-3 text-sm"><p>{row.odoo.syncState === 'SYNCED' ? 'وصل الطلب إلى أودو، وتظهر هنا حالته الموثقة.' : 'حُفظ الطلب في لانا، ومزامنته مع أودو تحتاج متابعة.'}</p>{row.odoo.remoteReference && <p className="break-all">مرجع أودو: {row.odoo.remoteReference}</p>}{row.odoo.error && <p>{row.odoo.error}</p>}<Link className="inline-flex min-h-11 items-center text-primary underline" href="/employee/requests?tab=odoo">متابعة الطلب ومسار أودو</Link></div>}
+        <div className="mt-4 flex flex-wrap gap-2"><Button variant="outline" onClick={() => setTimeline(row.id)}>أين وصل الطلب؟</Button>{!row.odoo && row.type !== "REVOKE" && <>{["PENDING", "RETURNED"].includes(row.status) && <><Button variant="outline" disabled={busy} onClick={() => void edit(row)}>{row.status === "RETURNED" ? "تصحيح وإعادة إرسال" : "تعديل"}</Button><Button variant="outline" disabled={busy} onClick={() => void act(row, "CANCEL")}>إلغاء</Button></>}{row.status === "COMPLETED" && <Button variant="outline" disabled={busy} onClick={() => void act(row, "REVOKE")}>طلب استرداد / إلغاء بعد الاعتماد</Button>}</>}</div>
       </article>)}
       <div className="flex items-center gap-3"><Button variant="outline" disabled={page === 1 || loading} onClick={() => setPage(page - 1)}>السابق</Button><span>{page}</span><Button variant="outline" disabled={page * 20 >= total || loading || Boolean(loadError)} onClick={() => setPage(page + 1)}>التالي</Button></div>
     </section>}

@@ -20,6 +20,9 @@ import { getEmployeeIdsByHospital } from "@/lib/enterprise/hospitals";
 import { withQueryTiming } from "@/lib/perf/query-timer";
 import { getEmployeeFieldAccess, filterEditableFields } from "@/lib/enterprise/employee-field-access";
 
+const requestSettingPrefixes = ['odoo.requests.', 'request.documents.', 'request.fields.'];
+function isPrivateRequestSetting(key: unknown) { return typeof key === 'string' && requestSettingPrefixes.some(prefix => key.startsWith(prefix)); }
+
 type QueryInput = {
   resourceKey: string;
   page?: number;
@@ -289,6 +292,7 @@ export async function listModuleRecords(input: QueryInput) {
   const page = Math.max(Number(input.page ?? 1), 1);
   const pageSize = Math.min(Math.max(Number(input.pageSize ?? 30), 5), 200);
   let baseWhere = buildWhere(resource, input.search, input.filters);
+  if (resource.model === "appSetting") baseWhere = { AND: [baseWhere, { NOT: requestSettingPrefixes.map(prefix => ({ key: { startsWith: prefix } })) }] };
 
   if (resource.key === "employees") {
     const filters = input.filters ?? {};
@@ -585,6 +589,7 @@ export async function getModuleRecord(resourceKey: string, id: string) {
     } else {
       record = await delegateFor(resource.model).findUnique({ where: { id } });
     }
+    if (resource.model === "appSetting" && isPrivateRequestSetting(record?.key)) return null;
     await assertRecordVisible(resource, record, session);
     return serialize(record) as Record<string, unknown> | null;
   } catch (error: any) {
@@ -599,6 +604,7 @@ export async function createModuleRecord(input: MutationInput) {
   if (resource.key === "audit-logs") return { success: false, message: "Audit log entries are immutable and cannot be created manually." };
   const session = await requireModulePermission(resource, mutationAction(resource, "create"));
   if (["payrollRun", "payrollItem"].includes(resource.model)) return { success: false, message: "حسابات الرواتب وحالات المسير تُدار من شاشة مسير الرواتب المعتمد لحماية لقطة الحساب." };
+  if (resource.model === "appSetting" && isPrivateRequestSetting(input.values.key)) return { success: false, message: "تُدار بيانات الطلبات والربط من مركز الطلبات فقط." };
   const salaryProfile = resource.key === "employees" ? extractSalaryProfile(input.values) : {};
   const parsed = buildModuleSchema(resource).safeParse(input.values);
   if (!parsed.success) return { success: false, message: parsed.error.errors[0]?.message ?? "Invalid input." };
@@ -753,6 +759,7 @@ export async function updateModuleRecord(input: MutationInput) {
   const session = await requireModulePermission(resource, mutationAction(resource, "edit"));
   if (["payrollRun", "payrollItem"].includes(resource.model)) return { success: false, message: "حسابات الرواتب وحالات المسير تُدار من شاشة مسير الرواتب المعتمد لحماية لقطة الحساب." };
   const existingRecord = await delegateFor(resource.model).findUnique({ where: { id: input.id } });
+  if (resource.model === "appSetting" && (isPrivateRequestSetting(existingRecord?.key) || isPrivateRequestSetting("values" in input ? input.values.key : undefined))) return { success: false, message: "تُدار بيانات الطلبات والربط من مركز الطلبات فقط." };
   await assertRecordVisible(resource, existingRecord, session);
   if (resource.model === "loan" && existingRecord?.odooSource) return { success: false, message: "السلفة مستوردة من Odoo؛ استخدم المزامنة أو خصم القسط من مسير الرواتب، ولا تعدل أو تحذف سجلها مباشرة." };
   if (["leaveRequest", "overtimeRequest", "loan"].includes(resource.model) && Object.hasOwn(input.values, "status") && input.values.status !== existingRecord?.status) {
@@ -830,6 +837,7 @@ export async function deleteModuleRecord(resourceKey: string, id: string) {
   const session = await requireModulePermission(resource, mutationAction(resource, "delete"));
   if (["payrollRun", "payrollItem"].includes(resource.model)) return { success: false, message: "حسابات الرواتب وحالات المسير تُدار من شاشة مسير الرواتب المعتمد لحماية لقطة الحساب." };
   const existingRecord = await delegateFor(resource.model).findUnique({ where: { id } });
+  if (resource.model === "appSetting" && isPrivateRequestSetting(existingRecord?.key)) return { success: false, message: "تُدار بيانات الطلبات والربط من مركز الطلبات فقط." };
   await assertRecordVisible(resource, existingRecord, session);
   if (resource.model === "loan" && existingRecord?.odooSource) return { success: false, message: "السلفة مستوردة من Odoo؛ استخدم المزامنة أو خصم القسط من مسير الرواتب، ولا تعدل أو تحذف سجلها مباشرة." };
   await delegateFor(resource.model).delete({ where: { id } });

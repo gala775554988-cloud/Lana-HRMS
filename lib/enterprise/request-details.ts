@@ -1,3 +1,4 @@
+import { HR_APPROVAL_SERVICES, isHRPaymentType } from "@/lib/employee/hr-approval-services";
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
@@ -26,6 +27,12 @@ function money(value: unknown) {
 }
 
 export async function getRequestEntityDetails(type: string, entityId: string): Promise<RequestEntityDetails | null> {
+  if (isHRPaymentType(type)) {
+    const [row, setting] = await Promise.all([prisma.letterRequest.findUnique({ where: { id: entityId } }), prisma.appSetting.findUnique({ where: { key: `request.fields.${entityId}` } })]);
+    if (!row) return null;
+    const extra = setting?.value as { amount?: number; requestDate?: string; reference?: string; project?: string } | undefined;
+    return { title: HR_APPROVAL_SERVICES.find(item => item.code === type)?.label ?? 'طلب صرف', reference: entityId, status: row.status, fields: [{ label: 'الغرض من الصرف', value: row.purpose }, { label: 'المبلغ المطلوب للمراجعة', value: extra?.amount ?? null, tone: 'money' }, { label: 'التاريخ', value: extra?.requestDate ?? null, tone: 'date' }, { label: 'المرجع المرتبط', value: extra?.reference ?? null }, { label: 'المشروع / مركز التكلفة', value: extra?.project ?? null }], attachments: [] };
+  }
   if (type === "REVOKE") {
     const original = await prisma.workflowInstance.findUnique({ where: { id: entityId } });
     if (!original || original.type === "REVOKE") return null;

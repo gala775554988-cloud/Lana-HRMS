@@ -1,3 +1,6 @@
+import { usesOdooRouting } from "@/lib/integrations/odoo/requests/routing";
+import { enqueueWorkflowRequest, dispatchWorkflowRequest, assertLocalWorkflow } from "@/lib/integrations/odoo/requests/service";
+import { getLink } from "@/lib/integrations/odoo/requests/store";
 import { cancelEntity } from "@/lib/self-service/lifecycle";
 import { prisma } from "@/lib/prisma";
 import type { ResolvedApprover } from "./approval-engine";
@@ -10,9 +13,9 @@ type WorkflowTransaction = Omit<typeof prisma, "$connect" | "$disconnect" | "$on
 
 export async function persistEnterpriseWorkflow(tx: WorkflowTransaction, employeeId: string, type: string, entityId: string, approvers: ResolvedApprover[]) {
   const firstMandatoryIndex = approvers.findIndex(approver => approver.isMandatory);
-  if (firstMandatoryIndex < 0) throw new ApprovalRoutingError("لا يوجد معتمد إلزامي صالح لهذا الطلب.");
+  if (firstMandatoryIndex < 0 && !await usesOdooRouting(type, tx)) throw new ApprovalRoutingError("لا يوجد معتمد إلزامي صالح لهذا الطلب.");
   const instance = await tx.workflowInstance.create({ data: { employeeId, type, entityId, status: "PENDING", currentStep: firstMandatoryIndex + 1 } });
-  await tx.workflowStep.createMany({ data: approvers.map((approver, index) => ({
+  if (approvers.length) await tx.workflowStep.createMany({ data: approvers.map((approver, index) => ({
     workflowInstanceId: instance.id, step: index + 1, approverUserId: approver.userId,
     status: !approver.isMandatory ? "NOTIFIED" : index === firstMandatoryIndex ? "PENDING" : "WAITING",
     capabilities: approver.capabilities,
@@ -20,9 +23,17 @@ export async function persistEnterpriseWorkflow(tx: WorkflowTransaction, employe
   })) });
   const requester = await tx.employee.findUnique({ where: { id: employeeId }, select: { userId: true } });
   await tx.auditLog.create({ data: { actorUserId: requester?.userId, action: "workflow:submit", entity: "workflowInstance", entityId: instance.id, metadata: { type, employeeId, entityId, approverCount: approvers.length, autoApproved: false } } });
+  await enqueueWorkflowRequest(tx, instance);
   return instance;
 }
 export async function notifyWorkflowSubmission(instance: { id: string; employeeId: string; type: string }, approvers: ResolvedApprover[]) {
+  await dispatchWorkflowRequest(instance.id).catch(() => undefined);
+  const external = await getLink(`wf-${instance.id}`);
+  if (external) {
+    const employee = await prisma.employee.findUnique({ where: { id: instance.employeeId }, select: { userId: true } });
+    if (employee?.userId) await createEnterpriseNotification({ userId: employee.userId, title: "متابعة طلب أودو", body: `مرجع لانا: ${external.link.reference}. ${external.link.syncState === 'SYNCED' ? 'وصل الطلب إلى أودو وتحققت حالته.' : 'حُفظ الطلب وتحتاج مزامنته متابعة من الموارد البشرية.'}`, type: "INFO", link: "/employee/requests?tab=odoo" }).catch(() => null);
+    return;
+  }
   const first = approvers.find(approver => approver.isMandatory);
   if (first) await notifyUsers([first.userId], "وصول طلب جديد", `طلب ${instance.type} بانتظار مراجعتك.`, "INFO", `/approvals?tab=inbox&highlight=${instance.id}`).catch(() => null);
   const employee = await prisma.employee.findUnique({ where: { id: instance.employeeId }, select: { userId: true } }).catch(() => null);
@@ -57,6 +68,7 @@ export async function decideWorkflowStep({
     if (!current || !current.approverUserId || current.approverUserId !== actorUserId) throw new Error("Forbidden");
     const capability = decision === "REJECT" ? "REJECT" : "APPROVE";
     if (!current.capabilities.includes(capability)) throw new Error("Forbidden");
+    await assertLocalWorkflow(workflowInstanceId, tx);
     if ((decision === "REJECT" || decision === "RETURN") && !comments?.trim()) throw new Error(decision === "REJECT" ? "سبب الرفض مطلوب" : "سبب الإرجاع مطلوب");
     const next = decision === "APPROVE" ? instance.steps.find(step => step.step > current.step && step.status === "WAITING") : undefined;
     const workflowStatus = decision === "REJECT" ? "REJECTED" : decision === "RETURN" ? "RETURNED" : next ? "PENDING" : "COMPLETED";
@@ -73,6 +85,7 @@ export async function decideWorkflowStep({
       if (instance.type === "REVOKE") {
         if (workflowStatus === "COMPLETED") {
           const original = await tx.workflowInstance.findUnique({ where: { id: instance.entityId } });
+          if (original) await assertLocalWorkflow(original.id, tx);
           if (!original || original.employeeId !== instance.employeeId || original.status !== "COMPLETED") throw new Error("الطلب الأصلي غير قابل للاسترداد");
           const claimed = await tx.workflowInstance.updateMany({ where: { id: original.id, status: "COMPLETED" }, data: { status: "CANCELLED" } });
           if (claimed.count !== 1) throw new Error("سبق استرداد الطلب");

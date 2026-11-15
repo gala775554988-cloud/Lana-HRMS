@@ -1,3 +1,4 @@
+import { usesOdooRouting } from "@/lib/integrations/odoo/requests/routing";
 import { prisma } from "@/lib/prisma";
 import type { ApprovalEntityType } from "@prisma/client";
 import { normalizeRequestType, type RoutingRule } from "@/config/request-routing";
@@ -37,6 +38,7 @@ export async function resolveApprovalChain(employeeId: string, requestType?: str
     select: { id: true, userId: true, companyId: true, hospitalId: true, departmentId: true, branchId: true, projectId: true, managerId: true }
   });
   if (!employee) throw new ApprovalRoutingError("سجل الموظف غير موجود.");
+  if (await usesOdooRouting(normalizeRequestType(requestType))) return [];
 
   const companyId = employee.companyId ?? (await getDefaultCompanyId());
 

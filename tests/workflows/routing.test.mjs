@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { z } from 'zod';
 import { load } from './helpers.mjs';
-const config = await load('config/request-routing.ts');
+const config = await load('config/request-routing.ts', {'@/lib/employee/hr-approval-services': { EXTRA_PAYMENT_TYPES: [] }});
 async function setup({ hr = true, admin = true, path = null } = {}) {
   const employees = {
     e: { id: 'e', userId: 'requester', companyId: 'company', managerId: 'm1', status: 'ACTIVE', user: { id: 'requester', isActive: true }, hospitalId: 'hospital' },
@@ -25,7 +25,8 @@ async function setup({ hr = true, admin = true, path = null } = {}) {
   };
   const policy = await load('lib/enterprise/request-routing-policy.ts', { zod: { z }, '@/lib/prisma': { prisma }, '@/config/request-routing': config });
   const dynamic = await load('lib/enterprise/dynamic-approval-routing.ts', { '@/lib/prisma': { prisma }, '@/config/request-routing': config, './request-routing-policy': policy });
-  const engine = await load('lib/enterprise/approval-engine.ts', { '@/lib/prisma': { prisma }, '@/config/request-routing': config, './request-routing-policy': policy, './dynamic-approval-routing': dynamic });
+  const engine = await load('lib/enterprise/approval-engine.ts', {
+    '@/lib/integrations/odoo/requests/routing': { usesOdooRouting: async () => false }, '@/lib/prisma': { prisma }, '@/config/request-routing': config, './request-routing-policy': policy, './dynamic-approval-routing': dynamic });
   const rule = config.defaultRoutingRule('LEAVE');
   return { employees, queries, policy, rule, resolve: patch => dynamic.resolveDynamicRouting(employees.e, { ...rule, ...patch }), engine };
 }

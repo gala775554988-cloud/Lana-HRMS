@@ -1,3 +1,4 @@
+import { isHRPaymentType } from "@/lib/employee/hr-approval-services";
 import { z } from "zod";
 import type { prisma } from "@/lib/prisma";
 type RequestTransaction = Omit<typeof prisma, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
@@ -23,6 +24,11 @@ const schemas = {
   LETTER: z.object({ purpose: text.min(1) }).strict(),
 };
 export function parseRequestEdit(type: string, input: unknown) {
+  if (isHRPaymentType(type)) {
+    const payment = z.object({ purpose: text.min(1), amount: z.coerce.number().positive().max(1e10).refine(value => Math.abs(value * 100 - Math.round(value * 100)) < .001), requestDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0,10) === value), reference: text, project: text }).strict().safeParse(input);
+    if (!payment.success) throw new RequestLifecycleError("تحقق من مبلغ الصرف وتاريخه وحقول الطلب", 400);
+    return payment.data;
+  }
   const result = (schemas[type as keyof typeof schemas] ?? schemas.LETTER).safeParse(input);
   if (!result.success) throw new RequestLifecycleError("تحقق من حقول الطلب والتواريخ والمبالغ", 400);
   const data = result.data;

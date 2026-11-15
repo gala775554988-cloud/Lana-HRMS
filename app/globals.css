@@ -324,3 +324,14 @@
   .payroll-workspace .text-white { color: #0f172a !important; background: white !important; border-color: #334155 !important; }
   .payroll-workspace .text-indigo-100 { color: #475569 !important; }
 }
+
+.request-hub :where(section, article, header, .grid > *, .flex > *),
+.request-dialog :where(section, label, .grid > *, .flex > *) { min-width: 0; }
+.request-hub :where(h1, h2, h3, p, dd),
+.request-dialog :where(h2, h3, p, dd) { overflow-wrap: anywhere; }
+.request-hub :where(button, a.inline-flex), .request-dialog :where(button, a.inline-flex) { min-height: 44px; white-space: normal; height: auto; }
+@media screen and (max-width: 639px) {
+  .request-hub :where(input, select, textarea), .request-dialog :where(input, select, textarea) { font-size: 16px; }
+}
+
+.request-dialog { animation: none; }

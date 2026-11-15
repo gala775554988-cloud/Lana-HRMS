@@ -19,6 +19,8 @@ type WorkflowStep = {
 };
 
 type Workflow = {
+  reference?: string;
+  odoo?: { reference: string; remoteReference?: string; remoteState?: string; syncState: string; remoteUrl?: string; error?: string } | null;
   id: string;
   type: string;
   entityId: string;
@@ -40,6 +42,7 @@ type Workflow = {
 };
 
 const statusMeta: Record<string, { label: string; icon: typeof Check; className: string }> = {
+  EXTERNAL: { label: "القرار في مسار أودو", icon: ExternalLink, className: "bg-indigo-50 text-indigo-700 border-indigo-200" },
   SUPERSEDED: { label: "نسخة سابقة", icon: RotateCcw, className: "bg-muted text-muted-foreground border-transparent" },
   CANCELLED: { label: "ملغى", icon: X, className: "bg-muted text-muted-foreground border-transparent" },
   NOTIFIED: { label: "للاطلاع", icon: FileText, className: "bg-muted text-muted-foreground border-transparent" },
@@ -59,7 +62,7 @@ function formatDate(value: string | null, locale: "ar" | "en") {
 
 function formatField(field: NonNullable<Workflow["details"]>["fields"][number]) {
   if (field.value === null || field.value === "") return "—";
-  if (field.tone === "date") return new Date(String(field.value)).toLocaleDateString("ar-SA");
+  if (field.tone === "date") return new Date(String(field.value)).toLocaleDateString("ar-SA", { timeZone: "Asia/Riyadh" });
   if (field.tone === "money") return `${Number(field.value).toLocaleString("ar-SA", { maximumFractionDigits: 2 })} ر.س`;
   if (field.tone === "duration") return `${field.value} ساعة/يوم`;
   return String(field.value);
@@ -156,12 +159,13 @@ export function ApprovalTimeline({ workflowId, onClose, locale = "ar" }: { workf
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="flex items-center gap-2 font-bold"><FileText className="h-4 w-4 text-primary" />{workflow.details?.title ?? workflow.type}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">رقم المرجع: {workflow.details?.reference ?? workflow.entityId}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">رقم الطلب: {workflow.reference ?? workflow.details?.reference ?? workflow.entityId}</p>
                   </div>
                   <span className={cn("rounded-full border px-2.5 py-1 text-xs font-semibold", statusMeta[workflow.status]?.className ?? "bg-muted text-muted-foreground")}>
                     {statusMeta[workflow.status]?.label ?? workflow.status}
                   </span>
                 </div>
+                {workflow.odoo && <div className="mt-4 space-y-2 rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900"><p>قرار هذا الطلب في مسار أودو الأصلي.</p><p className="break-all">مرجع لانا: {workflow.reference}</p><p className="break-words">مرجع أودو: {workflow.odoo.remoteReference ?? 'بانتظار التأكيد'}</p>{workflow.odoo.error && <p>{workflow.odoo.error}</p>}{workflow.odoo.remoteUrl && <a className="inline-flex min-h-11 items-center gap-2 underline" target="_blank" rel="noreferrer" href={workflow.odoo.remoteUrl}>فتح الموافقات في أودو<ExternalLink className="h-4 w-4"/></a>}</div>}
                 {workflow.details?.fields?.length ? (
                   <dl className="mt-4 grid gap-3 sm:grid-cols-2">
                     {workflow.details.fields.map((field, index) => (

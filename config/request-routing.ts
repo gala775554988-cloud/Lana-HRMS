@@ -1,4 +1,6 @@
+import { EXTRA_PAYMENT_TYPES } from "@/lib/employee/hr-approval-services";
 export const REQUEST_CATEGORIES = [
+  ...EXTRA_PAYMENT_TYPES.map(item => ({ code: item.code, label: item.label })),
   { code: "HOUSING", label: "بدل سكن" }, { code: "TRANSPORT", label: "بدل انتقال" },
   { code: "EXIT_PERMISSION", label: "إذن خروج" }, { code: "SETTLEMENT", label: "تصفية مستحقات" },
   { code: "PERSONAL_UPDATE", label: "تحديث البيانات الشخصية" },

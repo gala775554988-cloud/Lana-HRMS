@@ -1,3 +1,4 @@
+import { EXTRA_PAYMENT_TYPES } from "./hr-approval-services";
 export type RequestFieldKind = "text" | "textarea" | "date" | "number" | "select";
 
 export type RequestField = {
@@ -16,6 +17,13 @@ export type RequestTypeConfig = {
 };
 
 export const REQUEST_TYPE_CONFIG: RequestTypeConfig[] = [
+  ...EXTRA_PAYMENT_TYPES.map(item => ({ code: item.code, label: item.label, fields: [
+    { name: 'purpose', label: 'تفاصيل الطلب والغرض من الصرف', kind: 'textarea' as const, required: true },
+    { name: 'amount', label: 'المبلغ المطلوب للمراجعة', kind: 'number' as const, required: true },
+    { name: 'requestDate', label: 'تاريخ الطلب', kind: 'date' as const, required: true },
+    { name: 'reference', label: 'رقم المعاملة أو الفاتورة المرتبطة', kind: 'text' as const },
+    { name: 'project', label: 'المشروع أو مركز التكلفة', kind: 'text' as const },
+  ] })),
   ...[
     ["HOUSING", "بدل سكن"], ["TRANSPORT", "بدل انتقال"],
     ["EXIT_PERMISSION", "إذن خروج"], ["SETTLEMENT", "تصفية مستحقات"],

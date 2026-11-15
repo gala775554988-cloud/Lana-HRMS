@@ -1,3 +1,4 @@
+import { retryPendingRequests, syncOdooRequests } from "@/lib/integrations/odoo/requests/service";
 import { NextRequest, NextResponse } from "next/server";
 import { OdooSyncService, fullResyncFromOdoo, hasInternalSyncToken } from "@/lib/integrations/odoo/sync";
 import { reconcileEmployeeNumbersAndIds } from "@/lib/integrations/odoo/employee-number-reconcile";
@@ -20,6 +21,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    await retryPendingRequests(2).catch(() => undefined);
+    await syncOdooRequests(undefined, 1).catch(() => undefined);
     const connectionId = request.nextUrl.searchParams.get("connectionId") || undefined;
     const resyncResult = await fullResyncFromOdoo({ wipeAndSync: false, connectionId }).catch((err) => ({ error: err.message || String(err) }));
     if ("error" in resyncResult) throw new Error(`Employee pre-sync failed: ${resyncResult.error}`);

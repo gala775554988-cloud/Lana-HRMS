@@ -1,3 +1,4 @@
+import { workflowLinks } from "@/lib/integrations/odoo/requests/store";
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { canManageApprovalRouting } from "@/config/request-routing";
@@ -36,7 +37,7 @@ function requestMatchesSearch(workflow: any, search: string) {
   if (!search) return true;
   const value = search.toLowerCase();
   const haystack = [
-    workflow.type,
+    workflow.type, workflow.id, workflow.odoo?.reference, workflow.odoo?.remoteReference,
     workflow.employee?.firstName,
     workflow.employee?.lastName,
     workflow.employee?.employeeNumber,
@@ -126,6 +127,8 @@ export async function GET(request: NextRequest) {
     if (batch.length < 1000) break;
     cursor = batch[batch.length - 1].id;
   }
+  const odooLinks = await workflowLinks(allScoped.map(row => row.id));
+  for (const row of allScoped) row.odoo = odooLinks.get(row.id) ?? null;
   const leaveIds = allScoped.filter((row) => row.type === "LEAVE").map((row) => row.entityId);
   const leaves: any[] = [];
   for (let offset = 0; offset < leaveIds.length; offset += 1000) {
@@ -135,7 +138,7 @@ export async function GET(request: NextRequest) {
   for (const row of allScoped) {
     row.leave = row.type === "LEAVE" ? leaveMap.get(row.entityId) ?? null : null;
     // A manager's intermediate approval is not a final leave approval.
-    if (row.leave && row.status !== "SUPERSEDED") row.status = row.leave.status === "APPROVED" ? "COMPLETED" : row.leave.status === "PENDING" && row.status === "RETURNED" ? "RETURNED" : row.leave.status;
+    if (row.leave && !row.odoo && row.status !== "SUPERSEDED") row.status = row.leave.status === "APPROVED" ? "COMPLETED" : row.leave.status === "PENDING" && row.status === "RETURNED" ? "RETURNED" : row.leave.status;
   }
   const scoped = allScoped.filter((row) => requestMatchesSearch(row, search));
   const raw = scoped.filter((row) => {
@@ -144,7 +147,8 @@ export async function GET(request: NextRequest) {
     if (scope === "pending") return row.status === "PENDING";
     if (scope === "transferred") return row.steps.some((step: any) => step.comments?.toLowerCase().includes("transferred"));
     if (scope === "deferred") return row.steps.some((step: any) => step.status === "DEFERRED");
-    if (scope === "completed") return ["COMPLETED", "APPROVED"].includes(row.status);
+    if (scope === "approved") return row.status === "APPROVED";
+    if (scope === "completed") return row.status === "COMPLETED";
     if (scope === "rejected") return row.status === "REJECTED";
     if (scope === "cancelled") return row.status === "CANCELLED";
     if (scope === "returned") return row.status === "RETURNED";
@@ -160,6 +164,8 @@ export async function GET(request: NextRequest) {
   const elevated = canManageApprovalRouting(profile.roles, session.user.permissions);
   const requests = (report ? searched : searched.slice((page - 1) * pageSize, page * pageSize)).map((workflow) => ({
     id: workflow.id,
+    reference: workflow.odoo?.reference ?? `LRQ-${workflow.id.toUpperCase()}`,
+    odoo: workflow.odoo,
     type: workflow.type,
     entityId: workflow.entityId,
     status: workflow.status,
@@ -179,8 +185,8 @@ export async function GET(request: NextRequest) {
     steps: workflow.steps,
     priority: priorityOf(workflow),
     currentApprover: currentApprover(workflow, approverUserMap),
-    canTransfer: elevated && workflow.status === "PENDING",
-    canAct: workflow.status === "PENDING" && workflow.steps.some((step: any) =>
+    canTransfer: !workflow.odoo && elevated && workflow.status === "PENDING",
+    canAct: !workflow.odoo && workflow.status === "PENDING" && workflow.steps.some((step: any) =>
       step.step === workflow.currentStep && ["PENDING", "DEFERRED"].includes(step.status) && step.approverUserId === session.user.id
     )
   }));
@@ -194,7 +200,8 @@ export async function GET(request: NextRequest) {
     waiting: scoped.filter((workflow) => workflow.steps.some((step: any) => step.approverUserId === session.user.id && step.status === "PENDING")).length,
     highPriority: scoped.filter((workflow) => priorityOf(workflow).toLowerCase() === "high").length,
     deferred: scoped.filter((workflow) => workflow.steps.some((step: any) => step.status === "DEFERRED")).length,
-    completed: scoped.filter((workflow) => ["COMPLETED", "APPROVED"].includes(workflow.status)).length,
+    approved: scoped.filter((workflow) => workflow.status === "APPROVED").length,
+    completed: scoped.filter((workflow) => workflow.status === "COMPLETED").length,
     rejected: scoped.filter((workflow) => workflow.status === "REJECTED").length
   };
 

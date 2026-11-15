@@ -12,9 +12,10 @@ interface DialogProps {
   panelClassName?: string;
   overlayClassName?: string;
   portal?: boolean;
+  ariaLabel?: string;
 }
 
-export function Dialog({ open, onOpenChange, children, panelClassName, overlayClassName, portal = false }: DialogProps) {
+export function Dialog({ open, onOpenChange, children, panelClassName, overlayClassName, portal = false, ariaLabel }: DialogProps) {
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => { setMounted(true); }, []);
   React.useEffect(() => {
@@ -38,7 +39,7 @@ export function Dialog({ open, onOpenChange, children, panelClassName, overlayCl
   if (!open || (portal && !mounted)) return null;
 
   const content = (
-    <div className={cn("fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 animate-fade-in", overlayClassName)} onClick={() => onOpenChange(false)} role="dialog" aria-modal="true">
+    <div className={cn("fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 animate-fade-in", overlayClassName)} onClick={() => onOpenChange(false)} role="dialog" aria-modal="true" aria-label={ariaLabel}>
       <div onClick={(e) => e.stopPropagation()} className={cn("relative max-h-[90vh] w-full max-w-lg overflow-auto rounded-2xl border border-border bg-card shadow-2xl", panelClassName)}>
         {children}
       </div>

@@ -6,7 +6,7 @@ import { load } from './helpers.mjs';
 const url = new URL(process.env.SELF_SERVICE_TEST_DATABASE_URL ?? '');
 if (!['localhost', '127.0.0.1'].includes(url.hostname) || !url.pathname.endsWith('_test')) throw new Error('A disposable local *_test database is required');
 const prisma = new PrismaClient({ datasourceUrl: url.href });
-const lifecycle = await load('lib/self-service/lifecycle.ts', { zod: await import('zod') });
+const lifecycle = await load('lib/self-service/lifecycle.ts', { zod: await import('zod'), '@/lib/employee/hr-approval-services': { isHRPaymentType: () => false } });
 const metadata = await load('lib/enterprise/workflow-step-metadata.ts');
 const suffix = randomUUID();
 let employee; let leaveType; const users = [];
@@ -19,6 +19,9 @@ try {
   const approvers = users.slice(1).map((user, index) => ({ userId: user.id, isMandatory: true, capabilities: ['APPROVE', 'REJECT'], stageName: ['Direct manager', 'Department', 'HR', 'Final'][index] }));
   class ApprovalRoutingError extends Error {}
   const workflow = await load('lib/enterprise/workflow.ts', {
+    '@/lib/integrations/odoo/requests/routing': { usesOdooRouting: async () => false },
+    '@/lib/integrations/odoo/requests/service': { enqueueWorkflowRequest: async () => {}, dispatchWorkflowRequest: async () => {}, assertLocalWorkflow: async () => {} },
+    '@/lib/integrations/odoo/requests/store': { getLink: async () => null },
     '@/lib/prisma': { prisma }, '@/lib/self-service/lifecycle': lifecycle,
     './request-routing-policy': { ApprovalRoutingError }, './workflow-step-metadata': metadata,
     '@/lib/enterprise/hierarchy': { resolveApprovalChain: async () => approvers },
@@ -26,7 +29,9 @@ try {
   });
   class NextResponse { static json(data, options = {}) { return { data, status: options.status ?? 200 }; } }
   const endpoint = await load('app/api/self-service/[id]/route.ts', {
+    '@/lib/integrations/odoo/requests/service': { assertLocalWorkflow: async () => {} },
     'next/server': { NextResponse }, '@/auth': { auth: async () => ({ user: { id: actor } }) }, '@/lib/prisma': { prisma },
+    '@/lib/employee/hr-approval-services': { isHRPaymentType: () => false },
     '@/lib/enterprise/approval-engine': { resolveApprovalChain: async () => approvers },
     '@/lib/enterprise/workflow': workflow, '@/lib/self-service/lifecycle': lifecycle,
   });

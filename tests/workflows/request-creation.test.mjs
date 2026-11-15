@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { load } from './helpers.mjs';
-const config = await load('config/request-routing.ts');
+const config = await load('config/request-routing.ts', {'@/lib/employee/hr-approval-services': { EXTRA_PAYMENT_TYPES: [] }});
 class ApprovalRoutingError extends Error { statusCode = 422; }
 class NextResponse {
   constructor(data, options = {}) { this.data = data;this.status = options.status || 200; }
@@ -36,6 +36,8 @@ async function setup({ routingFailure = false, persistenceFailure = false, leave
     },
   };
   const route = await load('app/api/hr/my-requests/route.ts', {
+    '@/lib/employee/hr-approval-services': { EXTRA_PAYMENT_TYPES: [] },
+    '@/lib/integrations/odoo/requests/documents':{validateDocuments:()=>[]},
     '@/lib/self-service/request-submitter': { canSubmitForEmployee: async (_actor, id) => allowOnBehalf && id === "allowed-employee" },
     'node:crypto': { createHash }, 'next/server': { NextResponse }, '@/auth': { auth: async () => ({ user: { id: 'actor' } }) }, '@/lib/prisma': { prisma },
     '@/config/request-routing': config, '@/lib/enterprise/request-routing-policy': { ApprovalRoutingError },

@@ -1,3 +1,4 @@
+import { workflowLinks } from "@/lib/integrations/odoo/requests/store";
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -49,6 +50,9 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     prisma.workflowDefinition.findFirst({ where: { entity: instance.type, isActive: true }, orderBy: { updatedAt: "desc" }, select: { name: true, slaHours: true } }).catch(() => null),
     prisma.auditLog.findMany({ where: { entity: "workflowInstance", entityId: instance.id }, orderBy: { createdAt: "desc" }, take: 25, select: { id: true, action: true, metadata: true, createdAt: true, actor: { select: { name: true, email: true } } } })
   ]);
+  const savedDocuments = await prisma.appSetting.findUnique({ where: { key: `request.documents.${instance.entityId}` }, select: { value: true } });
+  if (details && Array.isArray(savedDocuments?.value)) details.attachments.push(...(savedDocuments.value as {name?:string;hash?:string}[]).filter(file=>file.name&&file.hash).map(file=>({name:file.name!,url:`/api/enterprise/request-documents?workflowId=${encodeURIComponent(instance.id)}&hash=${encodeURIComponent(file.hash!)}`})));
+  const odoo = (await workflowLinks([instance.id])).get(instance.id) ?? null;
   const approverById = new Map(approvers.map((approver) => [approver.id, { id: approver.id, email: approver.email, name: approver.employeeProfile ? `${approver.employeeProfile.firstName} ${approver.employeeProfile.lastName}` : approver.name }]));
   const savedMetadata = parseWorkflowStepMetadata(instance.steps[0]?.comments);
   const slaHours = savedMetadata.slaHours ?? definition?.slaHours ?? 48;
@@ -60,6 +64,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     success: true,
     workflow: {
       id: instance.id,
+      odoo,
+      reference: odoo?.reference ?? `LRQ-${instance.id.toUpperCase()}`,
       type: instance.type,
       entityId: instance.entityId,
       status: instance.status,
