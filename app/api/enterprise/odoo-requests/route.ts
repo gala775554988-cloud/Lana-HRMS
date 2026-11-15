@@ -67,6 +67,10 @@ export async function GET(request: NextRequest) {
     const employees = await prisma.employee.findMany({ where: employeeWhere, select: { id: true } });
     const visibility = employees.map(employee => ({ value: { path: ['employeeId'], equals: employee.id } }));
     const filters: object[] = [{ key: { startsWith: RECORD_PREFIX } }, { OR: visibility.length ? visibility : [{ key: '__none__' }] }];
+    const origin = params.get('origin');
+    if (origin && !['LANA', 'ODOO'].includes(origin)) throw new Error('مصدر الطلب غير صالح');
+    if (origin) filters.push({ value: { path: ['origin'], equals: origin } });
+    const sourceFilters = [...filters];
     const bucket = params.get('bucket');
     const sync = params.get('sync');
     const search = params.get('search')?.trim().slice(0, 100);
@@ -79,7 +83,7 @@ export async function GET(request: NextRequest) {
     const [rows, total, summaries, latest, webhook] = await Promise.all([
       prisma.appSetting.findMany({ where, skip: (page - 1) * 20, take: 20, orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }], select: { value: true } }),
       prisma.appSetting.count({ where }),
-      Promise.all(Object.keys(BUCKET_LABELS).map(async state => [state, await prisma.appSetting.count({ where: { AND: [filters[0], filters[1], { value: { path: ['bucket'], equals: state } }] } })] as const)),
+      Promise.all(Object.keys(BUCKET_LABELS).map(async state => [state, await prisma.appSetting.count({ where: { AND: [...sourceFilters, { value: { path: ['bucket'], equals: state } }] } })] as const)),
       prisma.appSetting.findUnique({ where: { key: 'odoo.requests.lastSync' }, select: { value: true } }),
       prisma.appSetting.findUnique({ where: { key: WEBHOOK_KEY }, select: { id: true } }),
     ]);

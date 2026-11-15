@@ -101,3 +101,12 @@ Browser fixtures use synthetic API responses and actual client components at
 320, 390, 768, 1024 and 1440 pixels. Screenshots are written to
 `/tmp/odoo-requests-preview`. They verify layout and behavior, not live Odoo rights
 or webhook installation. No real approval, payment, or employee data is created by tests.
+
+
+## فصل مساحات العمل
+
+- `/approvals?tab=center`: وارد طلبات الموظفين ومسارات مراجعتها في لانا؛ الطلب المحوّل يحتفظ بمرجعه ورابط تتبعه.
+- `/approvals?tab=odoo`: الطلبات المرفوعة من لانا إلى أودو فقط (`origin=LANA`)، بما فيها الإرسال المعلّق أو غير المؤكد، ونماذج الخدمات التسع.
+- `/approvals?tab=sync`: إدارة الربط والاستيراد للمسؤول المخوّل، وآخر دورة مزامنة والسجلات المنشأة في أودو (`origin=ODOO`). السحب الدوري أثناء فتح الصفحة محصور بهذه المساحة.
+
+مرشح المصدر يطبق على قائمة السجلات والإجمالي وجميع عدادات الحالات مع الحفاظ على نطاق صلاحيات الموظفين. تحديث قائمة الإرسال لا يشغّل استيرادًا عامًا. روابط الموظفين الحالية إلى أودو تفتح مساحة الإرسال دون أدوات ضبط الربط.

@@ -73,3 +73,15 @@ test('webhooks require their own secret and re-read Odoo instead of trusting pos
   assert.equal((await s.post({model:'approval.request',id:'123'})).status,400);
   assert.equal((await s.post({_model:'approval.approver',_id:77,request_id:99999})).status,200);assert.equal(s.calls.at(-1).model,'approval.request');assert.equal(s.calls.at(-1).id,1077);
 });
+
+test('source filters isolate list, total and every status counter while preserving employee scope',async()=>{
+  for (const origin of ['LANA','ODOO']) {
+    const s=await setup();assert.equal((await s.get({origin,bucket:'PENDING'})).status,200);
+    assert.equal(s.filters.length,9);
+    for(const query of s.filters){
+      assert.ok(query.where.AND.some(filter=>filter.value?.path?.[0]==='origin'&&filter.value.equals===origin));
+      assert.deepEqual(query.where.AND[1].OR.map(item=>item.value.equals),['own']);
+    }
+  }
+  const s=await setup();assert.equal((await s.get({origin:'OTHER'})).status,400);assert.equal(s.filters.length,0);
+});

@@ -36,33 +36,40 @@ try{
   else if(url.searchParams.get('action')==='category')data={success:true,category:{id:10,label:'خدمات الموارد البشرية',sequenced:true,minimum:2,requiredFields:[],optionalFields:[],requiresDocuments:false,unsupported:[],approvers:[{name:'المدير المباشر',sequence:1,required:true},{name:'الموارد البشرية',sequence:2,required:true}]}};
   else if(url.searchParams.get('action')==='describe')data={success:true,descriptor};
   else if(url.searchParams.get('action')==='options')data={success:true,options};
-  else{const bucket=url.searchParams.get('bucket'),attention=url.searchParams.get('sync')==='attention';const filtered=rows.filter(row=>(!bucket||row.bucket===bucket)&&(!attention||row.syncState==='UNCERTAIN'));data={success:true,rows:filtered,total:filtered.length,page:1,counts:{PENDING:1,APPROVED:0,COMPLETED:1,REJECTED:1,CANCELLED:0,DRAFT:1,UNKNOWN:0},canConfigure:!page.url().includes('employee=1'),config,realtimeEnabled:false,latestSync:{at:now,imported:3,errors:[]},requestTypes:[{code:'LETTER',label:'خطابات'},{code:'LOAN',label:'السلف'},{code:'LEAVE',label:'الإجازات'}]};}
+  else{const bucket=url.searchParams.get('bucket'),attention=url.searchParams.get('sync')==='attention';const sourceRows=rows.filter(row=>row.origin===url.searchParams.get('origin'));const filtered=sourceRows.filter(row=>(!bucket||row.bucket===bucket)&&(!attention||row.syncState==='UNCERTAIN'));data={success:true,rows:filtered,total:filtered.length,page:1,counts:Object.fromEntries(['PENDING','APPROVED','COMPLETED','REJECTED','CANCELLED','DRAFT','UNKNOWN'].map(state=>[state,sourceRows.filter(row=>row.bucket===state).length])),canConfigure:!page.url().includes('employee=1'),config,realtimeEnabled:false,latestSync:{at:now,imported:3,errors:[]},requestTypes:[{code:'LETTER',label:'خطابات'},{code:'LOAN',label:'السلف'},{code:'LEAVE',label:'الإجازات'}]};}
   await route.fulfill({json:data});
  });
  const base=`http://127.0.0.1:${server.address().port}`;
  for(const width of [320,390,768,1024,1440]){
-  await page.setViewportSize({width,height:920});await page.goto(base);await page.getByRole('heading',{name:'كل طلب، وخطوته التالية.'}).waitFor();await page.getByText(baseRow.title,{exact:true}).waitFor();
+  await page.setViewportSize({width,height:920});await page.goto(base);await page.getByRole('heading',{name:'الطلبات المرسلة لأودو'}).waitFor();await page.getByText(baseRow.title,{exact:true}).waitFor();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,`main overflow ${width}`);
   if(width<640)assert.ok((await page.getByPlaceholder('مرجع لانا، رقم أودو، الاسم…').boundingBox()).width>width-100,'mobile search remains usable');
   await page.screenshot({path:`${artifacts}/center-${width}.png`,fullPage:true});
+  assert.equal(await page.getByText('طلب إجازة تمت مراجعته',{exact:true}).count(),0);
+  assert.equal(await page.getByRole('button',{name:'ضبط الربط',exact:true}).count(),0);
+  assert.equal(await page.getByRole('button',{name:'مزامنة الآن',exact:true}).count(),0);
+  await page.goto(`${base}/?view=sync`);await page.getByText('طلب إجازة تمت مراجعته',{exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'رفع طلب لأودو',exact:true}).count(),0);
+  assert.equal(await page.getByRole('region',{name:'خدمات موافقات الموارد البشرية'}).count(),0);
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,`sync overflow ${width}`);
   await page.getByRole('button',{name:/المرفوضة|مرفوض/}).first().click();await page.getByText('طلب إجازة تمت مراجعته',{exact:true}).waitFor();
   await page.getByText(baseRow.title,{exact:true}).waitFor({state:'hidden'});
   assert.equal(await page.getByText(baseRow.title,{exact:true}).count(),0);
-  await page.getByRole('button',{name:/جميع الطلبات/}).click();await page.getByText(baseRow.title,{exact:true}).waitFor();
+  await page.goto(base);await page.getByText(baseRow.title,{exact:true}).waitFor();
   await page.getByRole('button',{name:'تفاصيل ومسار الطلب',exact:true}).first().click();await page.getByRole('dialog').getByText('المدير المباشر',{exact:true}).waitFor();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,`detail overflow ${width}`);
   await page.screenshot({path:`${artifacts}/detail-${width}.png`,fullPage:true});
   await page.getByRole('dialog').getByRole('button',{name:'إغلاق',exact:true}).click();
-  await page.getByRole('button',{name:'طلب جديد',exact:true}).click();await page.getByLabel('عنوان الطلب *',{exact:true}).fill('طلب جديد لاختبار الإرسال');await page.getByLabel('تصنيف الطلب *',{exact:true}).selectOption('10');
+  await page.getByRole('button',{name:'رفع طلب لأودو',exact:true}).click();await page.getByLabel('عنوان الطلب *',{exact:true}).fill('طلب جديد لاختبار الإرسال');await page.getByLabel('تصنيف الطلب *',{exact:true}).selectOption('10');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,`form overflow ${width}`);
   await page.screenshot({path:`${artifacts}/form-${width}.png`,fullPage:true});await page.getByRole('dialog').getByRole('button',{name:'إغلاق',exact:true}).click();
  }
  await page.getByRole('button',{name:/صرف الرواتب/}).first().click();await page.getByLabel('عنوان الطلب *',{exact:true}).waitFor();assert.equal(await page.getByLabel('عنوان الطلب *',{exact:true}).inputValue(),'صرف الرواتب');assert.equal(await page.getByLabel('تصنيف الطلب *',{exact:true}).inputValue(),'16');await page.getByRole('dialog').getByRole('button',{name:'إغلاق',exact:true}).click();
- await page.getByRole('button',{name:'طلب جديد',exact:true}).click();await page.getByLabel('عنوان الطلب *',{exact:true}).fill('طلب اختبار الإرسال الفوري');await page.getByLabel('تصنيف الطلب *',{exact:true}).selectOption('10');await page.locator('input[type=file]').setInputFiles({name:'receipt.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-1.7 synthetic browser test')});await page.getByRole('button',{name:'حفظ وإرسال إلى أودو',exact:true}).click();await page.getByRole('dialog').getByText('APP/2026/004',{exact:true}).waitFor();
+ await page.getByRole('button',{name:'رفع طلب لأودو',exact:true}).click();await page.getByLabel('عنوان الطلب *',{exact:true}).fill('طلب اختبار الإرسال الفوري');await page.getByLabel('تصنيف الطلب *',{exact:true}).selectOption('10');await page.locator('input[type=file]').setInputFiles({name:'receipt.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-1.7 synthetic browser test')});await page.getByRole('button',{name:'حفظ وإرسال إلى أودو',exact:true}).click();await page.getByRole('dialog').getByText('APP/2026/004',{exact:true}).waitFor();
  assert.match(submitted.idempotencyKey,/^[0-9a-f-]{36}$/);assert.equal(submitted.values.request_owner_id,undefined);assert.equal(submitted.attachments[0].name,'receipt.pdf');
  await page.getByRole('dialog').getByRole('button',{name:'إغلاق',exact:true}).click();
- await page.getByRole('button',{name:'ضبط الربط',exact:true}).click();await page.getByRole('button',{name:'استكشاف التطبيقات والحقول الفعلية',exact:true}).click();await page.getByRole('heading',{name:'٣. ربط خدمات لانا بتصنيفات الموافقات في أودو'}).waitFor();await page.getByLabel('السلف',{exact:true}).selectOption('10');await page.getByRole('button',{name:'حفظ الربط الموثّق'}).click();assert.ok(config.mappings.some(item=>item.type==='LOAN'&&item.categoryId===10));
- await page.goto(`${base}/?employee=1`);await page.getByRole('heading',{name:'كل طلب، وخطوته التالية.'}).waitFor();await page.getByText(baseRow.title,{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'ضبط الربط',exact:true}).count(),0);
- await page.getByRole('button',{name:'طلب جديد',exact:true}).click();await page.getByLabel('عنوان الطلب *',{exact:true}).waitFor();assert.equal(await page.getByText(/الموظف المستفيد/).count(),0);
+ await page.goto(`${base}/?view=sync`);await page.getByRole('button',{name:'ضبط الربط',exact:true}).click();await page.getByRole('button',{name:'استكشاف التطبيقات والحقول الفعلية',exact:true}).click();await page.getByRole('heading',{name:'٣. ربط خدمات لانا بتصنيفات الموافقات في أودو'}).waitFor();await page.getByLabel('السلف',{exact:true}).selectOption('10');await page.getByRole('button',{name:'حفظ الربط الموثّق'}).click();assert.ok(config.mappings.some(item=>item.type==='LOAN'&&item.categoryId===10));
+ await page.goto(`${base}/?employee=1`);await page.getByRole('heading',{name:'الطلبات المرسلة لأودو'}).waitFor();await page.getByText(baseRow.title,{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'ضبط الربط',exact:true}).count(),0);
+ await page.getByRole('button',{name:'رفع طلب لأودو',exact:true}).click();await page.getByLabel('عنوان الطلب *',{exact:true}).waitFor();assert.equal(await page.getByText(/الموظف المستفيد/).count(),0);
  assert.deepEqual(errors,[]);console.log(`PASS: five viewport sizes, cards and filters, detail/approver timeline, forms, immediate submission reference, configuration and employee view. Screenshots: ${artifacts}`);
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}

@@ -6,7 +6,7 @@ import dynamicImport from "next/dynamic";
 import { Suspense } from "react";
 import { MergedModuleTabs } from "@/components/hrms/merged-module-tabs";
 import { OdooRequestsWorkspace } from "@/components/enterprise/odoo-requests-workspace";
-import { Inbox, Send, GitPullRequest, Workflow } from "lucide-react";
+import { Inbox, Send, GitPullRequest, Workflow, RefreshCw } from "lucide-react";
 import { auth } from "@/auth";
 import { canManageApprovalRouting } from "@/config/request-routing";
 
@@ -28,22 +28,23 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
       <header className="lana-workspace-hero rounded-3xl p-6 sm:p-9">
         <p className="text-sm font-semibold text-indigo-200">مساحة المسؤول في Lana</p>
         <h1 className="mt-2 text-3xl sm:text-4xl">الطلبات والموافقات</h1>
-        <p className="mt-3 text-sm text-slate-200">راجع الطلبات الموكلة إليك، واتخذ القرار، وتابع سجل الموافقات.</p>
+        <p className="mt-3 text-sm text-slate-200">وارد الموظفين للمراجعة، والطلبات المرسلة لأودو لمتابعة التنفيذ، والمزامنة لإدارة الاتصال والاستيراد.</p>
         <Link href="/approvals?tab=new" className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-white px-5 text-sm font-bold text-primary">تقديم طلب جديد</Link>
       </header>
       <MergedModuleTabs
         defaultValue="center"
         items={[
-        { value: "odoo", label: "طلبات أودو والمزامنة", icon: <GitPullRequest className="h-4 w-4" />, content: query.tab === "odoo" ? <OdooRequestsWorkspace /> : null },
+        {
+          value: "center",
+          label: "طلبات الموظفين",
+          icon: <GitPullRequest className="h-4 w-4" />,
+          content: <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">جارٍ تحميل الطلبات…</div>}><RequestWorkbenchClient mode="center" /></Suspense>
+        },
+        { value: "odoo", label: "الطلبات المرسلة لأودو", icon: <GitPullRequest className="h-4 w-4" />, content: query.tab === "odoo" ? <OdooRequestsWorkspace view="outbound" /> : null },
+        { value: "sync", label: "مزامنة أودو", icon: <RefreshCw className="h-4 w-4" />, hidden: !canConfigure, content: canConfigure && query.tab === "sync" ? <OdooRequestsWorkspace view="sync" /> : null },
         {
           value: "new", label: "تقديم طلب جديد", icon: <Send className="h-4 w-4" />,
           content: <SelfServiceWorkspace administrative initialLeaveTypes={leaveTypes} ownEmployee={ownEmployee ? { id: ownEmployee.id, label: `${ownEmployee.firstName} ${ownEmployee.lastName} · ${ownEmployee.employeeNumber}` } : null} />
-        },
-        {
-          value: "center",
-          label: "جميع الطلبات والكشوف",
-          icon: <GitPullRequest className="h-4 w-4" />,
-          content: <Suspense fallback={<div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">جارٍ تحميل الطلبات…</div>}><RequestWorkbenchClient mode="center" /></Suspense>
         },
         {
           value: "inbox",
