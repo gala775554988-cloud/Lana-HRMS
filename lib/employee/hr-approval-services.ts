@@ -25,8 +25,8 @@ const categoryNames: Record<string, string[]> = {
  PETTY_CASH: ['صرف نثريات - قسم الموارد البشرية'],
 };
 const normalizedCategory = (value: string) => value.toLowerCase().replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/[\sـ_\-–—:]/g,'');
-// Suggestions only. An administrator reviews the actual source IDs and chain
-// before saving; ambiguous names are never matched automatically.
+// Unique exact normalized names only; automatic setup verifies source fields
+// and category requirements before enabling these mappings.
 export function suggestHRCategoryMappings(categories: {id:number;label:string}[]) {
  return HR_APPROVAL_SERVICES.flatMap(service => {
   const names = categoryNames[service.code].map(normalizedCategory);

@@ -1,3 +1,4 @@
+import { automaticallySetupRequests } from '@/lib/integrations/odoo/requests/automatic-setup';
 import { permittedPartnerIds } from '@/lib/integrations/odoo/requests/relations';
 import { categoryDetails } from '@/lib/integrations/odoo/requests/categories';
 import { NextRequest, NextResponse } from 'next/server';
@@ -100,6 +101,10 @@ export async function POST(request: NextRequest) {
     if (Number(request.headers.get('content-length')) > 4000000) throw new Error('حجم الطلب كبير');
     const body = await request.json();
     if (['discover', 'configure', 'sync', 'webhook', 'category-options', 'leave-options', 'category-detail'].includes(body.action) && !canConfigure) return NextResponse.json({ success: false }, { status: 403 });
+    if (body.action === 'auto-setup') {
+      const result = await automaticallySetupRequests(session.user.id);
+      return NextResponse.json({ success: true, configured: result.configured, enabled: result.config.enabled, issues: result.issues });
+    }
     if (body.action === 'discover') return NextResponse.json({ success: true, ...(await discoverModels(typeof body.connectionId === 'string' ? body.connectionId : undefined)) });
     if (body.action === 'category-detail') {
       const { client } = await requestConnection({ ...(await configuration()), connectionId: body.connectionId || undefined });

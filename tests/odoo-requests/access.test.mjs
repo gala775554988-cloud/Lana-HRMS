@@ -22,6 +22,7 @@ async function setup({ admin = false, anonymous = false, linkedEmployee = 'outsi
     dispatchRequest:async()=>calls.push('retry'),dispatchWorkflowRequest:async()=>calls.push('workflow'),retryPendingRequests:async()=>{},syncOdooRequests:async()=>calls.push('sync'),
   };
   const route=await load('app/api/enterprise/odoo-requests/route.ts',{
+    '@/lib/integrations/odoo/requests/automatic-setup':{automaticallySetupRequests:async()=>({config:{enabled:true},configured:false,issues:[]})},
     'next/server':{NextRequest:class {},NextResponse},zod,'node:crypto':{createHash,randomBytes},'@/auth':{auth:async()=>anonymous?null:{user:{id:'actor',roles:admin?['HR_MANAGER']:[],permissions:[]}}},
     '@/lib/prisma':{prisma},'@/config/request-routing':configModule,
     '@/lib/enterprise/hierarchy':{getAccessProfile:async()=>({}),applyScopedWhere:async()=>({id:'own'}),canAccessEmployeeId:async id=>id==='own'},
