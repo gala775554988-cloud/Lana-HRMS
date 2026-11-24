@@ -13,6 +13,6 @@ export default async function HomePage() {
     const roles = (session.user.roles as string[]) || [];
     redirect(resolveRoleDashboard(roles, Boolean(session.user.hasGrantedAdminAccess)));
   }
-  const locale = await getRequestLocale();
+  const { locale, dictionary } = await getRequestDictionary();
   return <LandingPage locale={locale} dictionary={dictionary} />;
 }
