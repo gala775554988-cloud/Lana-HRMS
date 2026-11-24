@@ -4,25 +4,25 @@
 
 @layer base {
   :root {
-    --primary: 215 62% 31%;
+    --primary: 168 34% 24%;
     --primary-foreground: 0 0% 100%;
-    --background: 216 33% 97%;
-    --foreground: 218 45% 14%;
+    --background: 75 19% 95%;
+    --foreground: 169 39% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 221 39% 11%;
+    --card-foreground: 169 39% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 221 39% 11%;
-    --secondary: 214 45% 94%;
-    --secondary-foreground: 215 62% 27%;
-    --muted: 215 25% 95%;
-    --muted-foreground: 216 22% 35%;
-    --accent: 213 55% 93%;
-    --accent-foreground: 215 62% 27%;
+    --popover-foreground: 169 39% 12%;
+    --secondary: 82 56% 80%;
+    --secondary-foreground: 169 39% 12%;
+    --muted: 90 15% 92%;
+    --muted-foreground: 155 15% 34%;
+    --accent: 82 56% 80%;
+    --accent-foreground: 169 39% 12%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 215 24% 88%;
-    --input: 215 24% 88%;
-    --ring: 215 62% 38%;
+    --border: 150 14% 85%;
+    --input: 150 14% 85%;
+    --ring: 165 34% 35%;
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
@@ -30,11 +30,11 @@
     --info: 213 72% 46%;
     --info-foreground: 0 0% 100%;
     --radius: 0.75rem;
-    --sidebar-bg: 216 64% 20%;
-    --sidebar-foreground: 213 45% 92%;
-    --sidebar-border: 215 48% 27%;
-    --sidebar-accent: 213 70% 45%;
-    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-bg: 169 39% 12%;
+    --sidebar-foreground: 75 19% 95%;
+    --sidebar-border: 160 24% 29%;
+    --sidebar-accent: 82 56% 75%;
+    --sidebar-accent-foreground: 169 39% 12%;
     --shadow-xs: 0 1px 2px 0 rgb(17 24 39 / 0.05);
     --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px -18px rgb(30 58 100 / 0.22);
     --shadow-card-hover: 0 1px 3px rgb(15 23 42 / 0.05), 0 14px 30px -18px rgb(30 58 100 / 0.24);
@@ -50,36 +50,36 @@
     --ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
   }
   .dark {
-    --primary: 212 82% 68%;
-    --primary-foreground: 218 55% 12%;
-    --background: 225 59% 11%;
-    --foreground: 220 43% 97%;
-    --card: 225 40% 18%;
-    --card-foreground: 220 43% 97%;
-    --popover: 225 40% 18%;
-    --popover-foreground: 220 43% 97%;
-    --secondary: 215 32% 25%;
-    --secondary-foreground: 225 55% 10%;
-    --muted: 225 45% 15%;
-    --muted-foreground: 220 13% 72%;
-    --accent: 215 36% 24%;
-    --accent-foreground: 225 55% 10%;
+    --primary: 82 56% 75%;
+    --primary-foreground: 169 39% 12%;
+    --background: 169 39% 12%;
+    --foreground: 75 19% 95%;
+    --card: 166 34% 17%;
+    --card-foreground: 75 19% 95%;
+    --popover: 166 34% 17%;
+    --popover-foreground: 75 19% 95%;
+    --secondary: 160 24% 25%;
+    --secondary-foreground: 75 19% 95%;
+    --muted: 160 24% 21%;
+    --muted-foreground: 150 15% 73%;
+    --accent: 160 24% 29%;
+    --accent-foreground: 75 19% 95%;
     --destructive: 0 72% 58%;
     --destructive-foreground: 0 0% 100%;
-    --border: 225 30% 22%;
-    --input: 225 30% 22%;
-    --ring: 212 82% 68%;
+    --border: 160 24% 29%;
+    --input: 160 24% 29%;
+    --ring: 82 56% 75%;
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 55%;
     --warning-foreground: 221 39% 11%;
     --info: 190 3% 72%;
     --info-foreground: 225 55% 10%;
-    --sidebar-bg: 221 58% 12%;
-    --sidebar-foreground: 220 43% 97%;
-    --sidebar-border: 225 30% 22%;
-    --sidebar-accent: 212 82% 68%;
-    --sidebar-accent-foreground: 225 55% 10%;
+    --sidebar-bg: 169 39% 12%;
+    --sidebar-foreground: 75 19% 95%;
+    --sidebar-border: 160 24% 29%;
+    --sidebar-accent: 82 56% 75%;
+    --sidebar-accent-foreground: 169 39% 12%;
     --shadow-premium-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3), 0 1px 1px -1px rgb(0 0 0 / 0.24);
     --shadow-premium-md: 0 4px 10px -4px rgb(0 0 0 / 0.4), 0 12px 24px -12px rgb(163 168 169 / 0.14);
     --shadow-premium-lg: 0 8px 16px -6px rgb(0 0 0 / 0.5), 0 24px 48px -16px rgb(163 168 169 / 0.18);
@@ -121,7 +121,7 @@
   .drawer-overlay { @apply fixed inset-0 bg-black/50 backdrop-blur-sm; z-index: 40; }
   .sidebar-link { @apply flex items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-sm font-medium transition-colors duration-150; }
   .sidebar-link:hover { @apply bg-white/10 text-white; }
-  .sidebar-link.active { @apply bg-white text-primary shadow-sm; }
+  .sidebar-link.active { @apply bg-sidebar-accent text-sidebar-accent-foreground shadow-sm; }
   .lana-card { @apply glass-surface rounded-2xl border border-border transition-colors duration-200; }
   .lana-card:hover { @apply border-primary/30; box-shadow: var(--shadow-card-hover); }
   .lana-fade-in { animation: lanaFadeIn 420ms ease both; }

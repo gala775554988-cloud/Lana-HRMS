@@ -33,11 +33,11 @@ function getSafeMetadataBase() {
 
 export const metadata: Metadata = {
   metadataBase: getSafeMetadataBase(),
-  title: { default: siteConfig.name, template: "%s | HRMS" },
+  title: { default: siteConfig.name, template: "%s | MADAR HR" },
   description: siteConfig.description,
   applicationName: siteConfig.name,
-  authors: [{ name: "HRMS" }],
-  keywords: ["HRMS", "Human Resources", "Payroll", "Attendance", "Recruitment", "Employee Management"],
+  authors: [{ name: "MADAR HR" }],
+  keywords: ["MADAR HR", "Human Resources", "Payroll", "Attendance", "Recruitment", "Employee Management"],
   openGraph: { title: siteConfig.name, description: siteConfig.description, type: "website", locale: "ar_SA" },
   robots: { index: false, follow: false },
   manifest: "/manifest.webmanifest",
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: "HRMS",
+    title: "MADAR HR",
     statusBarStyle: "default"
   },
   formatDetection: {
@@ -55,13 +55,13 @@ export const metadata: Metadata = {
   other: {
     "mobile-web-app-capable": "yes",
     "apple-mobile-web-app-capable": "yes",
-    "apple-mobile-web-app-title": "HRMS"
+    "apple-mobile-web-app-title": "MADAR HR"
   }
 };
 
 export const viewport: Viewport = {
   width: "device-width", initialScale: 1,
-  themeColor: "#18365f"
+  themeColor: "#132b28"
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

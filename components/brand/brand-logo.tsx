@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
-export const BRAND_LOGO_SRC = "/brand/lana-company-logo.jpg";
+export const BRAND_LOGO_SRC = "/favicon.svg";
 
 type BrandLogoSize = "xs" | "sm" | "md" | "lg" | "xl" | "hero";
 
@@ -51,8 +51,8 @@ interface BrandLogoProps {
 export function BrandLogo({
   href = "/",
   showText = true,
-  title = "Lana HR",
-  subtitle = "نظام إدارة الموارد البشرية",
+  title = "مدار HR",
+  subtitle = "MADAR HR",
   src,
   size = "md",
   className,
@@ -73,7 +73,7 @@ export function BrandLogo({
         )}
       >
         {logoSrc ? (
-          <Image src={logoSrc} alt="شعار شركة لانا" width={176} height={176} unoptimized className={cn("h-full w-full object-contain bg-white p-0.5", imageClassName)} />
+          <Image src={logoSrc} alt="شعار مدار HR" width={176} height={176} unoptimized className={cn("h-full w-full object-contain bg-white p-0.5", imageClassName)} />
         ) : (
           <span className="text-[0.58em] font-black tracking-[-0.06em]" aria-hidden="true">HR</span>
         )}
