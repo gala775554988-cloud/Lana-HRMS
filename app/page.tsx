@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { resolveRoleDashboard } from "@/config/auth";
-import { getRequestLocale } from "@/lib/i18n-server";
+import { getRequestDictionary } from "@/lib/i18n-server";
 import { LandingPage } from "@/components/marketing/landing-page";
 
 export const dynamic = "force-dynamic";
@@ -14,5 +14,5 @@ export default async function HomePage() {
     redirect(resolveRoleDashboard(roles, Boolean(session.user.hasGrantedAdminAccess)));
   }
   const locale = await getRequestLocale();
-  return <LandingPage locale={locale} />;
+  return <LandingPage locale={locale} dictionary={dictionary} />;
 }

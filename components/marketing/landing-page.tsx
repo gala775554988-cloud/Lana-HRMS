@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { LoginCard } from "@/components/auth/login-card";
 import { ArrowLeft, ArrowRight, BarChart3, CalendarCheck2, CheckCircle2, Fingerprint, ShieldCheck, Users, WalletCards } from "lucide-react";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { ClientLanguageToggle } from "@/components/i18n/client-language-toggle";
-import { getDirection, type Locale } from "@/lib/i18n";
+import { getDirection, type Locale, type Dictionary } from "@/lib/i18n";
 
 const content = {
   ar: {
@@ -41,7 +42,7 @@ const content = {
   }
 } as const;
 
-export function LandingPage({ locale }: { locale: Locale }) {
+export function LandingPage({ locale, dictionary }: { locale: Locale; dictionary: Dictionary }) {
   const isAr = locale === "ar";
   const t = content[isAr ? "ar" : "en"];
   const NextIcon = isAr ? ArrowLeft : ArrowRight;
@@ -53,7 +54,7 @@ export function LandingPage({ locale }: { locale: Locale }) {
           <BrandLogo size="sm" subtitle="MADAR HR" />
           <div className="flex items-center gap-2">
             <ClientLanguageToggle variant="ghost" />
-            <Link href="/login" className="inline-flex h-10 items-center rounded-lg bg-[#c6e39a] px-5 text-sm font-semibold text-[#132b28] transition-colors hover:bg-[#b5d58b]">{t.signIn}</Link>
+            <a href="#sign-in" className="inline-flex h-10 items-center rounded-lg bg-[#c6e39a] px-5 text-sm font-semibold text-[#132b28] transition-colors hover:bg-[#b5d58b]">{t.signIn}</a>
           </div>
         </div>
       </header>
@@ -64,13 +65,14 @@ export function LandingPage({ locale }: { locale: Locale }) {
           <h1 className="mt-6 max-w-3xl text-4xl font-bold leading-tight tracking-tight sm:text-5xl lg:text-6xl">{t.title}{isAr && <span className="block text-[#c6e39a]">في مدار واحد.</span>}</h1>
           <p className="mt-5 max-w-2xl text-lg leading-8 text-[#b3c6bb]">{t.subtitle}</p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link href="/login" className="inline-flex h-12 items-center gap-2 rounded-lg bg-[#c6e39a] px-6 text-sm font-semibold text-[#132b28] transition-colors hover:bg-[#b5d58b]">{t.signIn}<NextIcon className="h-4 w-4" /></Link>
+            <a href="#sign-in" className="inline-flex h-12 items-center gap-2 rounded-lg bg-[#c6e39a] px-6 text-sm font-semibold text-[#132b28] transition-colors hover:bg-[#b5d58b]">{t.signIn}<NextIcon className="h-4 w-4" /></a>
             <Link href="/careers" className="inline-flex h-12 items-center rounded-lg bg-[#1c3932] px-6 text-sm font-semibold text-[#f3f3eb]">التقديم على وظيفة</Link>
             <a href="#features" className="inline-flex h-12 items-center rounded-lg border border-[#56705d] bg-transparent px-6 text-sm font-semibold text-[#f3f3eb] transition-colors hover:border-primary/40 hover:text-primary">{t.explore}</a>
           </div>
         </div>
 
-        <div className="rounded-3xl border border-[#405b50] bg-[#1c3932] p-5 shadow-2xl shadow-slate-900/15 sm:p-8">
+        <div id="sign-in" className="scroll-mt-6 rounded-3xl bg-[#f3f3eb] p-5 text-[#132b28] sm:p-8"><div className="mx-auto max-w-md"><LoginCard dictionary={dictionary} /></div></div>
+        <div className="lg:col-span-2 rounded-3xl border border-[#405b50] bg-[#1c3932] p-5 shadow-2xl shadow-slate-900/15 sm:p-8">
           <div className="rounded-2xl bg-[#f3f3eb] p-6 text-[#132b28]">
             <div className="flex items-center justify-between border-b border-slate-100 pb-5"><BrandLogo size="sm" /><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" aria-label="online" /></div>
             <h2 className="mt-6 text-xl font-bold">{t.panelTitle}</h2>
