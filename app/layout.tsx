@@ -27,7 +27,7 @@ function getSafeMetadataBase() {
   try {
     return new URL(url.startsWith("http://") || url.startsWith("https://") ? url : `https://${url}`);
   } catch {
-    return new URL("https://lanahr.vercel.app");
+    return new URL("https://lana-hrms.vercel.app");
   }
 }
 
@@ -42,7 +42,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
   manifest: "/manifest.webmanifest",
   icons: {
-    icon: [{ url: "/favicon.svg", sizes: "any", type: "image/svg+xml" }]
+    icon: [{ url: "/brand/madar-hr-v2.svg", sizes: "any", type: "image/svg+xml" }]
   },
   appleWebApp: {
     capable: true,

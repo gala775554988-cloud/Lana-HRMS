@@ -4,13 +4,13 @@
  * - Never cache API responses or authenticated HTML pages by default.
  * - Show a safe offline page when navigation fails.
  */
-const CACHE_VERSION = "v7";
+const CACHE_VERSION = "v8";
 const STATIC_CACHE = `hrms-static-${CACHE_VERSION}`;
 const OFFLINE_URL = "/offline.html";
 
 const PRECACHE_ASSETS = [
   OFFLINE_URL,
-  "/favicon.svg"
+  "/brand/madar-hr-v2.svg"
 ];
 
 self.addEventListener("install", (event) => {

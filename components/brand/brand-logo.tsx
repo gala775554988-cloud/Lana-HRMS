@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
-export const BRAND_LOGO_SRC = "/favicon.svg";
+export const BRAND_LOGO_SRC = "/brand/madar-hr-v2.svg";
 
 type BrandLogoSize = "xs" | "sm" | "md" | "lg" | "xl" | "hero";
 
@@ -96,7 +96,7 @@ export function BrandLogo({
   }
 
   return (
-    <Link href={href} className={classes} aria-label="الصفحة الرئيسية لنظام HRMS">
+    <Link href={href} className={classes} aria-label="الصفحة الرئيسية لنظام مدار HR">
       {content}
     </Link>
   );
