@@ -42,7 +42,8 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
   manifest: "/manifest.webmanifest",
   icons: {
-    icon: [{ url: "/brand/madar-hr-v2.svg", sizes: "any", type: "image/svg+xml" }]
+    icon: [{ url: "/brand/madar-hr-v2.svg", sizes: "any", type: "image/svg+xml" }],
+    apple: [{ url: "/apple-icon?brand=madar-v3", sizes: "180x180", type: "image/png" }]
   },
   appleWebApp: {
     capable: true,

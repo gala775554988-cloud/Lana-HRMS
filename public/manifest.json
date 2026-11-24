@@ -1,19 +1,24 @@
 {
-  "name": "HRMS",
-  "short_name": "HRMS",
+  "name": "MADAR HR",
+  "short_name": "MADAR HR",
   "description": "منصة موحدة لإدارة الموارد البشرية وخدمة الموظفين",
   "start_url": "/login?source=pwa",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#030C1B",
-  "theme_color": "#00A896",
-  "categories": ["business", "productivity", "utilities", "medical"],
+  "background_color": "#f3f3eb",
+  "theme_color": "#132b28",
+  "categories": [
+    "business",
+    "productivity",
+    "utilities",
+    "medical"
+  ],
   "lang": "ar-SA",
   "dir": "rtl",
   "icons": [
     {
-      "src": "/favicon.svg",
+      "src": "/brand/madar-hr-v2.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
@@ -25,14 +30,26 @@
       "short_name": "الموظف",
       "description": "فتح لوحة الموظف مباشرة",
       "url": "/employee/dashboard",
-      "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+      "icons": [
+        {
+          "src": "/favicon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
     },
     {
       "name": "تسجيل الدخول",
       "short_name": "دخول",
       "description": "تسجيل الدخول إلى HRMS",
       "url": "/login",
-      "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+      "icons": [
+        {
+          "src": "/favicon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
     }
   ]
 }

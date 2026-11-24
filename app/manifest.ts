@@ -6,6 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "MADAR HR",
     short_name: "MADAR HR",
     description: siteConfig.description,
+    id: "/",
     start_url: "/login?source=pwa",
     scope: "/",
     display: "standalone",
@@ -15,21 +16,21 @@ export default function manifest(): MetadataRoute.Manifest {
     categories: ["business", "productivity", "utilities"],
     lang: "ar-SA",
     dir: "rtl",
-    icons: [{ src: "/favicon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" }],
+    icons: [{ src: "/brand/madar-hr-v2.svg", sizes: "any", type: "image/svg+xml", purpose: "any" }],
     shortcuts: [
       {
         name: "لوحة الموظف",
         short_name: "الموظف",
         description: "فتح لوحة الموظف مباشرة",
         url: "/employee/dashboard",
-        icons: [{ src: "/favicon.svg", sizes: "any", type: "image/svg+xml" }]
+        icons: [{ src: "/brand/madar-hr-v2.svg", sizes: "any", type: "image/svg+xml" }]
       },
       {
         name: "تسجيل الدخول",
         short_name: "دخول",
-        description: "تسجيل الدخول إلى نظام HRMS",
+        description: "تسجيل الدخول إلى نظام مدار HR",
         url: "/login",
-        icons: [{ src: "/favicon.svg", sizes: "any", type: "image/svg+xml" }]
+        icons: [{ src: "/brand/madar-hr-v2.svg", sizes: "any", type: "image/svg+xml" }]
       }
     ]
   };

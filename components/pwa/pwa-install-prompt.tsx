@@ -121,7 +121,7 @@ export function PWAInstallPrompt() {
       <div className="flex items-start gap-3">
         <BrandLogo href={null} size="sm" showText={false} />
         <div className="min-w-0 flex-1">
-          <p className="font-semibold">ثبّت HRMS كتطبيق</p>
+          <p className="font-semibold">ثبّت MADAR HR كتطبيق</p>
           <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
             {showIOSHelp
               ? "على الآيفون/الآيباد: اضغط زر المشاركة ثم اختر \"إضافة إلى الشاشة الرئيسية\"."
