@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { TokenRegister } from "./token-register";
 
-const SW_CACHE_VERSION = "v7";
+const SW_CACHE_VERSION = "v9";
 const SW_CACHE_STORAGE_KEY = "lana.hrms.sw-cache-version";
 
 async function clearLegacyPwaCaches() {
@@ -39,7 +39,7 @@ export function PWARegister() {
         navigator.serviceWorker.addEventListener("controllerchange", () => {
           if (!hadController || controllerReloaded) return;
           controllerReloaded = true;
-          window.location.reload();
+          window.dispatchEvent(new CustomEvent("lana-pwa-update-ready"));
         });
 
         registration.addEventListener("updatefound", () => {

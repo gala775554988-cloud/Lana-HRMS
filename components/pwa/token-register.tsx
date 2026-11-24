@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { getOrCreateMobileDeviceUUID } from "@/lib/employee/device-uuid";
 
 const TOKEN_CACHE_KEY = "lana.hrms.registered-fcm-token";
@@ -13,13 +14,14 @@ const TOKEN_CACHE_KEY = "lana.hrms.registered-fcm-token";
  * 3. Securely registers token with `/api/enterprise/register-device` in Neon PostgreSQL.
  */
 export function TokenRegister() {
+  const { status } = useSession();
   useEffect(() => {
-    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (status !== "authenticated" || typeof window === "undefined" || !("Notification" in window)) return;
 
     async function requestPermissionAndRegister() {
       try {
         if (Notification.permission === "default") {
-          await Notification.requestPermission();
+          return; // Permission must be requested through an explicit user gesture.
         }
 
         if (Notification.permission !== "granted") return;
@@ -59,7 +61,7 @@ export function TokenRegister() {
     }
 
     requestPermissionAndRegister();
-  }, []);
+  }, [status]);
 
   async function registerDeviceToken(token: string) {
     try {

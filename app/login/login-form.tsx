@@ -77,7 +77,6 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
             maxLength={64}
             disabled={isPending}
             autoComplete="username"
-            autoFocus
             placeholder=" "
             className="peer h-9 rounded-none border-0 bg-transparent px-0 pe-12 pt-1 text-sm shadow-none placeholder:text-transparent focus-visible:ring-0"
             aria-invalid={identifierError}
