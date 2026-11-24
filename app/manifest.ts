@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "MADAR HR",
     description: siteConfig.description,
     id: "/",
-    start_url: "/login?source=pwa",
+    start_url: "/?source=pwa",
     scope: "/",
     display: "standalone",
     orientation: "portrait-primary",
@@ -16,7 +16,7 @@ export default function manifest(): MetadataRoute.Manifest {
     categories: ["business", "productivity", "utilities"],
     lang: "ar-SA",
     dir: "rtl",
-    icons: [{ src: "/brand/madar-hr-v2.svg", sizes: "any", type: "image/svg+xml", purpose: "any" }],
+    icons: [{ src: "/madar-icon-v4?size=192", sizes: "192x192", type: "image/png", purpose: "any" }, { src: "/madar-icon-v4?size=512", sizes: "512x512", type: "image/png", purpose: "any" }],
     shortcuts: [
       {
         name: "لوحة الموظف",

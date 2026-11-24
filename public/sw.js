@@ -4,7 +4,7 @@
  * - Never cache API responses or authenticated HTML pages by default.
  * - Show a safe offline page when navigation fails.
  */
-const CACHE_VERSION = "v9";
+const CACHE_VERSION = "v10";
 const STATIC_CACHE = `hrms-static-${CACHE_VERSION}`;
 const OFFLINE_URL = "/offline.html";
 
@@ -45,7 +45,7 @@ function isStaticAsset(url) {
   return (
     url.pathname.startsWith("/icons/") ||
     url.pathname === "/favicon.svg" ||
-    url.pathname === "/manifest.webmanifest"
+    url.pathname === "/madar-icon-v4"
   );
 }
 

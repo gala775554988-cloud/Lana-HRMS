@@ -33,9 +33,9 @@ function getSafeMetadataBase() {
 
 export const metadata: Metadata = {
   metadataBase: getSafeMetadataBase(),
-  title: { default: siteConfig.name, template: "%s | MADAR HR" },
+  title: { default: "مدار HR", template: "%s | MADAR HR" },
   description: siteConfig.description,
-  applicationName: siteConfig.name,
+  applicationName: "MADAR HR",
   authors: [{ name: "MADAR HR" }],
   keywords: ["MADAR HR", "Human Resources", "Payroll", "Attendance", "Recruitment", "Employee Management"],
   openGraph: { title: siteConfig.name, description: siteConfig.description, type: "website", locale: "ar_SA" },
@@ -43,7 +43,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [{ url: "/brand/madar-hr-v2.svg", sizes: "any", type: "image/svg+xml" }],
-    apple: [{ url: "/apple-icon?brand=madar-v3", sizes: "180x180", type: "image/png" }]
+    apple: [{ url: "/madar-icon-v4?size=180", sizes: "180x180", type: "image/png" }]
   },
   appleWebApp: {
     capable: true,
