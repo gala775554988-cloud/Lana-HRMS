@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { OdooRepairConsole } from "@/components/integrations/odoo-repair-console";
 import { canApprovePayroll } from "@/lib/enterprise/payroll-permissions";
 
 export const dynamic = "force-dynamic";
@@ -66,7 +67,8 @@ export default async function AutomationHealthPage() {
         </table></div>
         {!syncs.length && <p className="p-6 text-center text-slate-500">لم تُسجل عمليات مزامنة بعد.</p>}
       </section>
-      <p className="text-xs text-slate-500">تعمل المهام المجدولة بعد نشر الإصدار النهائي وتهيئة CRON_SECRET واتصال Odoo، وتخضع حدود التكرار لخطة الاستضافة.</p>
+      <OdooRepairConsole/>
+      <p className="text-xs text-slate-500">تعمل الجدولة الخارجية بعد نشر الإصدار النهائي وتهيئة سر المزامنة وتفعيل الجدولة. لا يعد وجود الإعداد دليلاً على التشغيل.</p>
     </main>
   );
 }

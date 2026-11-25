@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { hasPermission } from "@/lib/rbac";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getAccessProfile, applyScopedWhere } from "@/lib/enterprise/hierarchy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,9 +18,10 @@ export async function GET(request: NextRequest) {
     if (!hasPermission(session.user.permissions, { action: "read", resource: "employees" }, session.user.roles)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
 
     const searchParams = request.nextUrl.searchParams;
-    const page = Math.max(Number(searchParams.get("page") || 1), 1);
-    const pageSize = Math.min(Math.max(Number(searchParams.get("pageSize") || 30), 5), 200);
-    const search = searchParams.get("search") || "";
+    const rawPage=Number(searchParams.get("page")??1),rawSize=Number(searchParams.get("pageSize")??30);
+    const page=Number.isSafeInteger(rawPage)&&rawPage>0?Math.min(rawPage,100000):1;
+    const pageSize=Number.isSafeInteger(rawSize)?Math.min(Math.max(rawSize,5),200):30;
+    const search=(searchParams.get("search")??"").trim().slice(0,150);
     const sortBy = searchParams.get("sortBy") || "archivedAt";
     const sortOrder = searchParams.get("sortOrder") === "asc" ? "asc" : "desc";
     const department = searchParams.get("department");
@@ -31,7 +33,7 @@ export async function GET(request: NextRequest) {
         { status: "INACTIVE" },
         { status: "TERMINATED" },
         { archivedAt: { not: null } },
-        { terminationDate: { not: null } },
+        { terminationDate: { lte: new Date() } },
       ],
     };
 
@@ -61,9 +63,10 @@ export async function GET(request: NextRequest) {
     const orderByField = validSortFields.includes(sortBy) ? sortBy : "archivedAt";
     const orderBy = [{ [orderByField]: sortOrder }, { id: "asc" as const }];
 
+    const scopedWhere=await applyScopedWhere("employees",where,await getAccessProfile(session.user.id,session.user.roles??[]));
     const [records, total] = await Promise.all([
       prisma.employee.findMany({
-        where,
+        where:scopedWhere,
         skip: (page - 1) * pageSize,
         take: pageSize,
         orderBy,
@@ -90,7 +93,7 @@ export async function GET(request: NextRequest) {
           updatedAt: true,
         },
       }),
-      prisma.employee.count({ where }),
+      prisma.employee.count({ where:scopedWhere }),
     ]);
 
     // Calculate lastActiveDate if not present - try to get from attendance/leave (bulk, not per-row)
@@ -101,7 +104,7 @@ export async function GET(request: NextRequest) {
     const [lastAttendanceByEmployee, lastLeaveByEmployee] = missingIds.length
       ? await Promise.all([
           prisma.attendanceRecord.groupBy({ by: ["employeeId"], where: { employeeId: { in: missingIds } }, _max: { workDate: true } }),
-          prisma.leaveRequest.groupBy({ by: ["employeeId"], where: { employeeId: { in: missingIds } }, _max: { endDate: true } }),
+          prisma.leaveRequest.groupBy({ by: ["employeeId"], where: { employeeId: { in: missingIds },status:"APPROVED",endDate:{lte:new Date()} }, _max: { endDate: true } }),
         ])
       : [[], []];
     const lastAttendanceMap = new Map(lastAttendanceByEmployee.map((row) => [row.employeeId, row._max.workDate]));
@@ -124,7 +127,7 @@ export async function GET(request: NextRequest) {
         if (dates.length > 0) {
           dates.sort((a, b) => b.getTime() - a.getTime());
           lastActive = dates[0];
-          lastSource = lastAttendanceDate ? "ATTENDANCE" : lastLeaveDate ? "LEAVE" : "TERMINATION";
+          lastSource = lastAttendanceDate && lastAttendanceDate.getTime()===lastActive.getTime() ? "ATTENDANCE" : lastLeaveDate && lastLeaveDate.getTime()===lastActive.getTime() ? "LEAVE" : "TERMINATION";
         }
       }
 
@@ -152,7 +155,7 @@ export async function GET(request: NextRequest) {
       pageSize,
       pageCount: Math.max(Math.ceil(total / pageSize), 1),
       filters: { search, department, branch, sortBy, sortOrder },
-    });
+    },{headers:{"Cache-Control":"private, no-store"}});
   } catch (error) {
     console.error("[archived employees] error:", error);
     return NextResponse.json(

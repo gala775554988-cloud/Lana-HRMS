@@ -941,6 +941,7 @@ model PayrollRun {
   payrollPeriod  PayrollPeriod?     @relation(fields: [periodId], references: [id], onDelete: SetNull)
   costCenter     PayrollCostCenter? @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
   items          PayrollItem[]
+  bankEvidence   PayrollBankEvidence[]
 
   @@unique([period])
   @@index([status])
@@ -2910,4 +2911,18 @@ model EmployeeFinalSettlement {
 
   @@unique([employeeId, terminationDate])
   @@index([status, createdAt])
+}
+
+model PayrollBankEvidence {
+  id String @id @default(cuid())
+  payrollRunId String
+  originalName String
+  sha256 String @unique
+  originalBytes Bytes
+  extractSha256 String
+  result Json
+  uploadedById String
+  createdAt DateTime @default(now())
+  payrollRun PayrollRun @relation(fields:[payrollRunId],references:[id],onDelete:Restrict)
+  @@index([payrollRunId,createdAt])
 }

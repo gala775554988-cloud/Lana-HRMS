@@ -8,24 +8,6 @@
   "env": {
     "AUTH_TRUST_HOST": "true"
   },
-  "crons": [
-    {
-      "path": "/api/integrations/odoo/cron-sync",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/integrations/queue/process-jobs",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/integrations/odoo/cron-reconcile",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/integrations/odoo/cron-repair",
-      "schedule": "*/30 * * * *"
-    }
-  ],
   "headers": [
     {
       "source": "/(.*)",

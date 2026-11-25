@@ -26,7 +26,7 @@ async function processJobs(request: NextRequest, limit: number) {
     // check here left this route fully open whenever CRON_SECRET didn't
     // match (including when it's simply unset).
     if (!isAuthorizedCronRequest(request)) {
-      await requireOdooIntegrationAccess("manage");
+      await requireOdooIntegrationAccess("manage", request);
     }
 
     const jobs = await prisma.integrationJob.findMany({
@@ -97,7 +97,7 @@ async function processJobs(request: NextRequest, limit: number) {
       }
     }
 
-    return NextResponse.json({ success: true, processedCount: results.length, results });
+    return NextResponse.json({ success: results.every(row=>row.status==="COMPLETED"), processedCount: results.length, results },{status:results.some(row=>row.status!=="COMPLETED")?207:200});
   } catch (error) {
     return NextResponse.json({ success: false, message: error instanceof Error ? error.message : String(error) }, { status: statusFor(error) });
   }

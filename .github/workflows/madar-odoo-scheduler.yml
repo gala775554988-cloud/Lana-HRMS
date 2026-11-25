@@ -1,0 +1,45 @@
+name: MADAR Odoo scheduled jobs
+on:
+  schedule:
+    - cron: '2/5 * * * *'
+    - cron: '17,47 * * * *'
+    - cron: '23 2 * * *'
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: madar-odoo-${{ github.event.schedule || 'manual' }}
+  cancel-in-progress: false
+jobs:
+  sync:
+    if: github.ref == 'refs/heads/main' && vars.MADAR_SCHEDULER_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      SYNC_TOKEN: ${{ secrets.MADAR_SYNC_TOKEN }}
+      SCHEDULE: ${{ github.event.schedule }}
+    steps:
+      - name: Invoke authenticated production maintenance endpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SYNC_TOKEN" || { echo "MADAR_SYNC_TOKEN is missing"; exit 1; }
+          call() {
+            local path="$1" output
+            output="$(mktemp)"
+            trap 'rm -f "$output"' RETURN
+            local status
+            status="$(curl --silent --show-error --max-time 305 --output "$output" --write-out '%{http_code}' --header "Authorization: Bearer $SYNC_TOKEN" "https://madar-hr-sa.vercel.app$path")"
+            if [[ "$status" != 200 ]] || ! jq -e '.success == true' "$output" >/dev/null; then
+              echo "Maintenance endpoint $path failed (HTTP $status)"
+              return 1
+            fi
+            echo "Maintenance endpoint $path confirmed success"
+          }
+          case "$SCHEDULE" in
+            '17,47 * * * *') call /api/integrations/odoo/cron-repair ;;
+            '23 2 * * *') call /api/integrations/odoo/cron-reconcile ;;
+            *) result=0
+               call /api/integrations/odoo/cron-sync || result=1
+               call /api/integrations/queue/process-jobs || result=1
+               exit "$result" ;;
+          esac
