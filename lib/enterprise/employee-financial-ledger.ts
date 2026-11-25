@@ -91,14 +91,18 @@ export async function employeeFinancialSummary(employeeId: string) {
   const sums = await prisma.employeeFinancialEntry.groupBy({
     by: ["currency", "direction"], where: { employeeId }, _sum: { amount: true }
   });
-  const balances = new Map<string, { currency: string; credits: number; debits: number; net: number }>();
+  const balances = new Map<string, { currency: string; credits: Prisma.Decimal; debits: Prisma.Decimal }>();
   for (const row of sums) {
-    const current = balances.get(row.currency) ?? { currency: row.currency, credits: 0, debits: 0, net: 0 };
-    const amount = Number(row._sum.amount ?? 0);
-    if (row.direction === "CREDIT") current.credits += amount;
-    if (row.direction === "DEBIT") current.debits += amount;
-    current.net = Number((current.credits - current.debits).toFixed(2));
+    const current = balances.get(row.currency) ?? { currency: row.currency, credits: new Prisma.Decimal(0), debits: new Prisma.Decimal(0) };
+    const amount = new Prisma.Decimal(row._sum.amount ?? 0);
+    if (row.direction === "CREDIT") current.credits = current.credits.plus(amount);
+    if (row.direction === "DEBIT") current.debits = current.debits.plus(amount);
     balances.set(row.currency, current);
   }
-  return [...balances.values()];
+  return [...balances.values()].map(row => ({
+    currency: row.currency,
+    credits: row.credits.toFixed(2),
+    debits: row.debits.toFixed(2),
+    net: row.credits.minus(row.debits).toFixed(2)
+  }));
 }
