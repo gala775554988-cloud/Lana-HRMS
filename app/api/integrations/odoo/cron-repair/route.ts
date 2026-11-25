@@ -36,11 +36,15 @@ export async function GET(request: NextRequest) {
     }
   }
   const remaining = await prisma.odooMigrationError.count({ where: { status: "OPEN" } });
+  // A legacy job can report failed rows without any retained source IDs.
+  // Empty error details must not be interpreted as successful repair.
+  const unidentified=await prisma.odooMigrationJob.findMany({where:{failed:{gt:0},errors:{none:{}}},select:{failed:true}});
+  const unidentifiedFailures=unidentified.reduce((n,j)=>n+j.failed,0);
   await writeAuditLog({
     action: "ODOO_MIGRATION_AUTO_REPAIR",
     entity: "odooMigrationError",
-    metadata: { attempted: outcomes.length, resolved: outcomes.filter(row => row.resolved).length, remaining }
+    metadata: { attempted: outcomes.length, resolved: outcomes.filter(row => row.resolved).length, remaining,unidentifiedFailures }
   }).catch(() => undefined);
-  return NextResponse.json({ success: outcomes.every(row => row.resolved), attempted: outcomes.length,
-    resolved: outcomes.filter(row => row.resolved).length, remaining, outcomes });
+  const success=outcomes.every(row=>row.resolved)&&remaining===0&&unidentifiedFailures===0;
+  return NextResponse.json({success,attempted:outcomes.length,resolved:outcomes.filter(row=>row.resolved).length,remaining,unidentifiedFailures},{status:success?200:422});
 }

@@ -331,34 +331,10 @@ export async function syncEmployeeFromOdoo(odooRecord: any) {
   });
 }
 
-/**
- * Comprehensive Full Resync Protocol (Wipe & Sync / Smart Upsert)
- * 1. Optional Wipe (`TRUNCATE TABLE "Employee" CASCADE` or `deleteMany`).
- * 2. Fetches all records from Odoo without pagination constraints (`odoo.searchRead`).
- * 3. Formats codes with `00` prefix (`formatEmployeeCode`).
- * 4. Comprehensive mapping (`x_studio_school_name` -> Hospital/Branch, `analytic_account_id`, `department_id`, `parent_id`, `documents`).
- */
+/** Non-destructive full employee synchronization. Existing organizational
+ * records and employee data must never be removed by a synchronization run. */
 export async function fullResyncFromOdoo(options: { wipeAndSync?: boolean; connectionId?: string } = {}) {
-  // 0. تنظيف السجلات التالفة من المستشفيات والفروع (التي تحتوي على رموز % أو أسماء فارغة)
-  try {
-    await prisma.hospital.deleteMany({
-      where: { OR: [{ name: { contains: "%" } }, { name: "غير محدد" }, { name: "" }] }
-    });
-    await prisma.branch.deleteMany({
-      where: { OR: [{ name: { contains: "%" } }, { name: "غير محدد" }, { name: "" }] }
-    });
-  } catch (cleanupErr) {
-    console.error("[FullResync] Notice during dirty hospital cleanup:", cleanupErr);
-  }
-
-  if (options.wipeAndSync) {
-    try {
-      await prisma.$executeRawUnsafe(`TRUNCATE TABLE "Employee" CASCADE;`);
-    } catch {
-      await prisma.employee.deleteMany({});
-    }
-  }
-
+  if (options.wipeAndSync) throw new Error("Destructive synchronization is disabled");
   try {
     const { client } = await createOdooClientFromConnection(options.connectionId);
     let availableFields = [
@@ -381,6 +357,7 @@ export async function fullResyncFromOdoo(options: { wipeAndSync?: boolean; conne
     const allRecords = await client.searchRead("hr.employee", [], availableFields, { limit: 100000 });
 
     let syncedCount = 0;
+    let employeeFailures=0, documentFailures=0, managerFailures=0;
     for (const record of allRecords) {
       try {
         const syncedEmp = await syncEmployeeFromOdoo(record);
@@ -388,10 +365,11 @@ export async function fullResyncFromOdoo(options: { wipeAndSync?: boolean; conne
           if (syncedEmp?.id && record.id) {
             await syncEmployeeDocuments(client, Number(record.id), syncedEmp.id);
           }
-        } catch (docErr) {}
+        } catch { documentFailures++; }
         syncedCount++;
-      } catch (err) {
-        console.error(`[FullResync] Error syncing employee ${record.id}:`, err);
+      } catch {
+        employeeFailures++;
+        console.error("[FullResync] Employee synchronization failed");
       }
     }
 
@@ -409,12 +387,13 @@ export async function fullResyncFromOdoo(options: { wipeAndSync?: boolean; conne
                 data: { managerId: parentEmp.id }
               });
             }
-          } catch {}
+          } catch { managerFailures++; }
         }
       }
     }
 
-    return { success: true, count: syncedCount, wiped: Boolean(options.wipeAndSync), odooConfigured: true };
+    const failures=employeeFailures+documentFailures+managerFailures;
+    return { success: failures===0&&allRecords.length>0, count: syncedCount, fetched:allRecords.length, failures, employeeFailures, documentFailures, managerFailures, wiped: false, odooConfigured: true };
   } catch (err: any) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes("configuration") || msg.includes("credentials") || msg.includes("ENOTFOUND") || msg.includes("ECONNREFUSED") || msg.includes("url")) {
