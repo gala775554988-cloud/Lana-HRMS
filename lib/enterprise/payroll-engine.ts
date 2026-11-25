@@ -95,7 +95,9 @@ async function resolveBaseSalary(employeeId: string): Promise<{ base: number; cu
  * so this function is purely a read+sum, safe to re-run (idempotent) until
  * `markPayrollSourcesConsumed` is called for a specific run. */
 export async function computeEmployeePayroll(employeeId: string, periodStart: Date, periodEnd: Date): Promise<PayrollBreakdown> {
+  if (!Number.isFinite(periodStart.getTime()) || !Number.isFinite(periodEnd.getTime()) || periodEnd < periodStart) throw new Error("فترة المسير غير صالحة");
   const { base: baseSalary, currency, profileAllowanceTotal } = await resolveBaseSalary(employeeId);
+  if (![baseSalary, profileAllowanceTotal].every(value => Number.isFinite(value) && value >= 0)) throw new Error("بيانات الراتب غير صالحة");
 
   const [allAllowances, allDeductions, overtimeRequests, bonuses, socialInsurance, loans, advances, attendance] = await Promise.all([
     prisma.allowance.findMany({
@@ -195,9 +197,10 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
   const absenceDeduction = round2(absenceDays * dailyRate);
   const hourlyRate = baseSalary > 0 ? baseSalary / 240 : 0;
   const lateDeduction = round2(attendance.filter((row) => row.status === "LATE").reduce((sum, row) => {
-    if (!row.checkIn) return sum + dailyRate / 4;
+    if (!row.checkIn) throw new Error("سجل تأخير دون وقت حضور؛ راجع البصمة قبل اعتماد المسير");
     const assignment = row.employee.shiftAssignments.find((item) => item.effectiveFrom <= row.workDate && (!item.effectiveTo || item.effectiveTo >= row.workDate));
-    const lateMinutes = Math.max(0, riyadhMinutes(row.checkIn) - timeToMinutes(assignment?.shift.startTime));
+    if (!assignment?.shift.startTime) throw new Error("لا يوجد جدول دوام صالح لسجل التأخير؛ راجع الدوام قبل احتساب المسير");
+    const lateMinutes = Math.max(0, riyadhMinutes(row.checkIn) - timeToMinutes(assignment.shift.startTime));
     return sum + Math.min(dailyRate, hourlyRate * (lateMinutes / 60));
   }, 0));
 
