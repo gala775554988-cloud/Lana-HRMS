@@ -64,7 +64,12 @@ test.describe("MADAR isolated browser acceptance",()=>{
    expect(await installNotice.evaluate(el=>getComputedStyle(el).position)).not.toBe("fixed");
    await card.getByRole("button",{name:"بدء",exact:true}).click();
    await expect(card.getByRole("checkbox",{name:"CI checklist"})).toBeEnabled();
-   await card.getByRole("checkbox",{name:"CI checklist"}).check();
+   // Controlled checkbox remains bound to persisted server data while PATCH
+   // and refresh run. Use a real click, then wait for confirmed state rather
+   // than Playwright check()'s immediate synchronous native-state assertion.
+   await card.getByRole("checkbox",{name:"CI checklist"}).click();
+   await expect(card.getByRole("checkbox",{name:"CI checklist"})).toBeChecked();
+   await expect.poll(async()=>{const d=await taskGet(worker,"/api/enterprise/work-tasks?mine=true");const row=d.tasks.find((t:{id:string})=>t.id===task.id);return {progress:row?.progress,done:row?.checklist?.[0]?.done};}).toEqual({progress:100,done:true});
    await expect(card.getByRole("button",{name:"إرسال للمراجعة"})).toBeEnabled();
    await card.getByRole("button",{name:"إرسال للمراجعة"}).click();
    await expect.poll(async()=>{const d=await taskGet(worker,"/api/enterprise/work-tasks?mine=true");return d.tasks.find((t:{id:string})=>t.id===task.id)?.status;}).toBe("REVIEW");
