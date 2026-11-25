@@ -329,6 +329,8 @@ model Nationality {
 }
 
 model Employee {
+  financialEntries       EmployeeFinancialEntry[]
+  requestExecutions      EmployeeRequestExecution[]
   id                     String                  @id @default(cuid())
   employeeNumber         String                  @unique
   nationalId             String                  @unique
@@ -2840,4 +2842,49 @@ model HistoricalPayslipLine {
   raw Json
   payslip HistoricalPayslip @relation(fields: [payslipId], references: [id], onDelete: Cascade)
   @@unique([payslipId, externalId])
+}
+
+// MADAR employee-centric, append-only financial event ledger.
+// A unique source/effect key prevents duplicate payroll credits and deductions.
+model EmployeeFinancialEntry {
+  id String @id @default(cuid())
+  employeeId String
+  sourceType String
+  sourceId String
+  effectType String
+  direction String // CREDIT | DEBIT | INFORMATION
+  amount Decimal @db.Decimal(18, 2)
+  currency String @default("SAR")
+  state String @default("POSTED") // POSTED | REVERSED
+  reversalOfId String?
+  payrollRunId String?
+  details Json?
+  occurredAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@unique([sourceType, sourceId, effectType])
+  @@index([employeeId, occurredAt])
+  @@index([payrollRunId])
+  @@index([reversalOfId])
+}
+
+// Separate approved/processed/reversed state from the original request status.
+// This is not a bank-transfer record and does not authorize disbursement.
+model EmployeeRequestExecution {
+  id String @id @default(cuid())
+  employeeId String
+  sourceType String
+  sourceId String
+  effectType String
+  state String @default("PENDING") // PENDING | EXECUTED | REVERSED
+  executedAt DateTime?
+  metadata Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@unique([sourceType, sourceId, effectType])
+  @@index([employeeId, createdAt])
+  @@index([state])
 }
