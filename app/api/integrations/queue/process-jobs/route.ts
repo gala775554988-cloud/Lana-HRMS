@@ -29,6 +29,19 @@ async function processJobs(request: NextRequest, limit: number) {
       await requireOdooIntegrationAccess("manage");
     }
 
+    // Recover abandoned detail-sync jobs after the server's 300-second execution limit.
+    const expired = new Date(Date.now() - 15 * 60_000);
+    const abandoned = await prisma.integrationJob.findMany({
+      where: { type: "ODOO_EMPLOYEE_DETAIL_SYNC", status: "PROCESSING", startedAt: { lt: expired } },
+      take: 100
+    });
+    for (const job of abandoned) {
+      const dead = job.attempts >= job.maxAttempts;
+      await prisma.integrationJob.updateMany({
+        where: { id: job.id, status: "PROCESSING", startedAt: job.startedAt, attempts: job.attempts },
+        data: { status: dead ? "FAILED" : "RETRY", runAt: dead ? null : new Date(), finishedAt: dead ? new Date() : null, lastError: "Worker execution expired" }
+      });
+    }
     const jobs = await prisma.integrationJob.findMany({
       where: {
         type: "ODOO_EMPLOYEE_DETAIL_SYNC",
