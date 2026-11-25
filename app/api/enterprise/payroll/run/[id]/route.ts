@@ -98,8 +98,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!run.periodStartDate || !run.periodEndDate) {
       return NextResponse.json({ success: false, message: "لا يمكن إعادة الاحتساب -- الفترة الزمنية للمسير غير محددة" }, { status: 409 });
     }
-    const employeeIds = (await prisma.payrollItem.findMany({ where: { payrollRunId: id }, select: { employeeId: true } })).map(item => item.employeeId);
-    if (!employeeIds.length) return NextResponse.json({ success: false, message: "لا توجد قائمة موظفين محفوظة لإعادة الاحتساب" }, { status: 409 });
+    let employeeIds = (await prisma.payrollItem.findMany({ where: { payrollRunId: id }, select: { employeeId: true } })).map(item => item.employeeId);
+    if (!employeeIds.length) {
+      const saved = await prisma.appSetting.findUnique({ where: { key: `payroll.scope.${id}` } });
+      const scope = saved?.value as { employeeIds?: string[] } | null;
+      if (!scope || !Array.isArray(scope.employeeIds) || !scope.employeeIds.length || !scope.employeeIds.every(value => typeof value === "string" && value.trim())) return NextResponse.json({ success: false, message: "لا توجد قائمة موظفين محفوظة لإعادة الاحتساب" }, { status: 409 });
+      employeeIds = scope.employeeIds;
+    }
     const { employeeCount, items, errorCount } = await computeAndUpsertPayrollItems(id, run.periodStartDate, run.periodEndDate, {
       employeeIds,
       companyId: run.companyId ?? undefined,
