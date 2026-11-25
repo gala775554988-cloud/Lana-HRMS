@@ -27,8 +27,8 @@ export async function buildExcelTable(title: string, columns: ExportColumn[], ro
     row.eachCell({ includeEmpty: true }, cell => {
       cell.font = { name: "Arial", size: 11, bold: index === 1, color: { argb: index === 1 ? "FFFFFFFF" : "FF1E293B" } };
       cell.alignment = { vertical: "middle", horizontal: "right", wrapText: true, readingOrder: "rtl" };
-      cell.border = { bottom: { style: "thin", color: { argb: "FFDDE3EC" } } };
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: index === 1 ? "FF294776" : index % 2 === 0 ? "FFF2F5FA" : "FFFFFFFF" } };
+      cell.border = { bottom: { style: "thin", color: { argb: "FFDCECD3" } } };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: index === 1 ? "FF3D6740" : index % 2 === 0 ? "FFF7FAF5" : "FFFFFFFF" } };
     });
   });
   return Buffer.from(await book.xlsx.writeBuffer());
@@ -72,13 +72,13 @@ export async function buildPdfTable(title: string, columns: ExportColumn[], rows
       page.drawText(text, { x: x + width - 7 - font.widthOfTextAtSize(text, fontSize), y: baseline, font, size: fontSize, color });
     };
     const heading = () => {
-      page.drawText(title, { x: pageWidth - margin - font.widthOfTextAtSize(title, 14), y, font, size: 14, color: rgb(0.16, 0.28, 0.46) });
+      page.drawText(title, { x: pageWidth - margin - font.widthOfTextAtSize(title, 14), y, font, size: 14, color: rgb(0.24, 0.40, 0.25) });
       y -= 24;
       page.drawText(`Lana HR · ${rows.length} · ${new Date().toISOString().slice(0, 10)}`, { x: margin, y, font, size: 9 });
       y -= 16;
       const headerLines = group.map(column => wrap(column.label, width - 14));
       const height = Math.max(...headerLines.map(lines => lines.length)) * lineHeight + 12;
-      page.drawRectangle({ x: margin, y: y - height, width: pageWidth - margin * 2, height, color: rgb(0.16, 0.28, 0.46) });
+      page.drawRectangle({ x: margin, y: y - height, width: pageWidth - margin * 2, height, color: rgb(0.24, 0.40, 0.25) });
       headerLines.forEach((lines, index) => lines.forEach((line, lineIndex) => drawCell(line, index, y - 15 - lineIndex * lineHeight, rgb(1, 1, 1))));
       y -= height;
     };

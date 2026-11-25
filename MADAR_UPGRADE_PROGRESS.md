@@ -40,9 +40,10 @@ Baseline: c0a67b1e8957082a556f9f0df3cd4928dac6e2ba. CI: https://github.com/gala7
 | 34 | خطة التنفيذ المتواصل | In progress: this tracker |
 | 35 | الرفع والدمج والنشر النهائي مرة واحدة | Pending: merge and production deployment gated |
 | 36 | التقرير النهائي المطلوب | Pending: final report |
+| 37 | إدارة المهام والتكليفات – LANA PRO V9.5 Smart Workflow | Deferred until original 36 acceptance; reference file identified; no implementation or import claimed |
 
 ## Release gate
-Do not merge until all acceptance criteria, isolated tests, backup and preview checks pass. No real transfers or destructive operations during tests.
+Do not merge until all 37 acceptance criteria, isolated tests, backup and preview checks pass. Implement #37 after completing original 36 as requested. No real transfers or destructive operations during tests.
 
 ## Batch after 45addd6
 - #5: migration retry now counts source read failures, transactionally reconciles counters/audit, and both retry endpoints verify persisted resolution. Actual production errors remain unverified.
@@ -103,3 +104,8 @@ Do not merge until all acceptance criteria, isolated tests, backup and preview c
 - #33: added budget-control tests; new CI pending.
 
 - Follow-up compatibility fix: ES2017-safe BigInt constructors, explicit JSON warning shape, restrictive foreign keys for budget policies, and original bank filename retained on download. 4321dc1 CI had passed migration and fixtures and reached lint at check; latest build still pending.
+
+## Batch after b50c7d7
+- CI 45619713730, 45619617656, 45619410798 and 45618367402 completed successfully. This is build/unit evidence, not production acceptance.
+- #18/#21/#22/#28/#29: payroll reports partition totals by period/status/currency/group with integer cents, include employer contribution and cost-center report, expose reconciliation variance, cap oversized exports without silent truncation, direct Arabic-capable XLSX/PDF exports and audit. Employee payslip PDF uses shared Unicode export font, adds paid date and employer share. Administrative payslip requires payroll permission, masks sensitive IDs/IBAN and removes salary from QR, private no-store. Green document colors. Existing historical attribution remains current employee department/branch, not a historical snapshot. New CI pending.
+- #37: reference located as online_viewer_net (23).htm.html, title LANA PRO V9.5 | Smart Workflow. Four columns جديد / قيد التنفيذ / مراجعة / مكتمل; category and department filters, urgent tasks, search, grid and Kanban, subtasks, comments, attachments, JSON import/export. Acceptance requires central DB, individual/group and department assignment, hierarchy roles, calendar/table/Kanban, progress and review, recurring tasks, reminders/escalation, employee profile and self-service, KPIs, Excel/PDF, audited non-destructive JSON import and event-triggered tasks for expiring documents/contracts, payroll, pending requests, violations, settlements and sync failures. No LocalStorage or financial penalties. Deferred until requirements 1–36 accepted per explicit sequence.

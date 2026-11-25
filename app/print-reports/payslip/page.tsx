@@ -13,7 +13,7 @@ type PayslipData = {
     baseSalary: number; allowanceTotal: number; bonusTotal: number; overtimeTotal: number; grossPay: number;
     insuranceDeduction: number; taxTotal: number; loanDeduction: number; advanceDeduction: number;
     absenceDeduction: number; lateDeduction: number; penaltyDeduction: number; deductionTotal: number; netPay: number;
-    costCenter: string | null;
+    costCenter: string | null; employerInsurance:number;leaveDeduction:number;
   };
   employee: { employeeNumber: string; name: string; nationalId: string; department: string | null; position: string | null; branch: string | null; bank: string | null; iban: string | null };
 };
@@ -100,6 +100,7 @@ function PayslipContent() {
             {row("القروض", item.loanDeduction, item.currency, false)}
             {row("السلف", item.advanceDeduction, item.currency, false)}
             {row("الغياب", item.absenceDeduction, item.currency, false)}
+            {row("خصم الإجازات",item.leaveDeduction,item.currency,false)}
             {row("التأخير", item.lateDeduction, item.currency, false)}
             {row("الجزاءات", item.penaltyDeduction, item.currency, false)}
             <div className="flex flex-wrap justify-between gap-2 pt-2 text-sm font-black"><span>إجمالي الاستقطاعات</span><span>-{item.deductionTotal.toLocaleString("ar-SA")} {item.currency}</span></div>
@@ -111,6 +112,7 @@ function PayslipContent() {
           <p className="text-2xl font-black">{item.netPay.toLocaleString("ar-SA")} {item.currency}</p>
         </div>
 
+        <p className="mt-3 text-sm">حصة المنشأة من التأمينات (لا تخصم من الموظف): {item.employerInsurance.toFixed(2)} {item.currency}</p>
         <p className="mt-6 text-center text-xs text-slate-400">تم إصدار هذا الكشف إلكترونياً من نظام HRMS بتاريخ {new Date().toLocaleDateString("ar-SA", { timeZone: "Asia/Riyadh" })}</p>
       </div>
     </div>

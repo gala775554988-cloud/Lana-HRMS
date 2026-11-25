@@ -2,7 +2,7 @@ import { latestPayslipFirst, paidPayslipRun } from "@/lib/payroll/employee-paysl
 import { NextResponse } from "next/server";
 import { getCurrentEmployeeCached } from "@/lib/employee/employee-cache";
 import { prisma } from "@/lib/prisma";
-import { buildBrandedPdf } from "@/lib/pdf/branded-pdf";
+import { buildPdfTable } from "@/lib/exports/table-files";
 
 export async function GET(request: Request) {
   const employee = await getCurrentEmployeeCached();
@@ -13,17 +13,20 @@ export async function GET(request: Request) {
   const item = await prisma.payrollItem.findFirst({ where: { employeeId: employee.id, ...(itemId ? { id: itemId } : {}), payrollRun: paidPayslipRun }, include: { payrollRun: true }, orderBy: latestPayslipFirst });
   if (!item) return NextResponse.json({ error: "Payslip not available" }, { status: 404 });
   const snapshot = item.calculationSnapshot as { components?: { name: string; code: string; amount: number }[] } | null;
-  const lines = [
-    `Employee: ${employee.firstName} ${employee.lastName}`,
-    `Employee Number: ${employee.employeeNumber}`,
-    `Period: ${item.payrollRun.period}`,
-    `Base Salary: ${Number(item.baseSalary).toFixed(2)} ${item.currency}`,
-    ...(snapshot?.components ?? []).map(row => `${row.code}: ${Number(row.amount).toFixed(2)}`),
-    `Gross: ${Number(item.grossPay).toFixed(2)}`,
-    `Deductions: ${Number(item.deductionTotal).toFixed(2)}`,
-    `Net Paid: ${Number(item.netPay).toFixed(2)}`,
+  const rows=[
+    {label:"الموظف / Employee",value:employee.firstName+" "+employee.lastName},
+    {label:"الرقم الوظيفي / Employee No.",value:employee.employeeNumber},
+    {label:"الفترة / Period",value:item.payrollRun.period},
+    {label:"العملة / Currency",value:item.currency},
+    {label:"تاريخ تسجيل الصرف / Recorded payment",value:item.payrollRun.paidAt?.toISOString().slice(0,10)??""},
+    {label:"الأساسي / Basic",value:Number(item.baseSalary)},
+    ...(snapshot?.components??[]).filter(row=>Number.isFinite(Number(row.amount))).map(row=>({label:row.name+" / "+row.code,value:Number(row.amount)})),
+    {label:"إجمالي الأجر / Gross",value:Number(item.grossPay)},
+    {label:"إجمالي الخصومات / Deductions",value:Number(item.deductionTotal)},
+    {label:"صافي الراتب / Net",value:Number(item.netPay)},
+    {label:"حصة المنشأة (لا تخصم) / Employer insurance",value:Number(item.employerInsurance)}
   ];
-  const buffer = await buildBrandedPdf("Payslip", lines);
+  const buffer=await buildPdfTable("قسيمة الراتب / Payslip",[{key:"label",label:"البند / Item"},{key:"value",label:"القيمة / Value"}],rows);
   return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
