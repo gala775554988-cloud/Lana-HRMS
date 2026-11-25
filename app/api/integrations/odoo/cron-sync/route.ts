@@ -21,8 +21,13 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    await retryPendingRequests(2).catch(() => undefined);
-    await syncOdooRequests(undefined, 1).catch(() => undefined);
+    const requestErrors: string[] = [];
+    await retryPendingRequests(2).catch((error: unknown) => { requestErrors.push("retry: " + (error instanceof Error ? error.message : String(error))); });
+    await syncOdooRequests(undefined, 1).catch((error: unknown) => { requestErrors.push("requests: " + (error instanceof Error ? error.message : String(error))); });
+    if (requestErrors.length) {
+      await writeAuditLog({ action: "ODOO_CRON_REQUEST_SYNC_FAILED", entity: "odoo", metadata: { errors: requestErrors } });
+      return NextResponse.json({ success: false, message: "Request synchronization failed; review audit log" }, { status: 502 });
+    }
     const connectionId = request.nextUrl.searchParams.get("connectionId") || undefined;
     const resyncResult = await fullResyncFromOdoo({ wipeAndSync: false, connectionId }).catch((err) => ({ error: err.message || String(err) }));
     if ("error" in resyncResult) throw new Error(`Employee pre-sync failed: ${resyncResult.error}`);
@@ -44,6 +49,7 @@ export async function GET(request: NextRequest) {
     await writeAuditLog({ action: "ODOO_CRON_SYNC", entity: "odoo", metadata: { resyncResult, entity: result.entity, pulled: result.pulled, pushed: result.pushed, created: result.created, updated: result.updated, skipped: result.skipped, errors: result.errors.length, numbersReconcile } }).catch(() => undefined);
     return NextResponse.json({ success: true, resyncResult, result, numbersReconcile });
   } catch (error) {
-    return NextResponse.json({ success: false, message: error instanceof Error ? error.message : String(error) }, { status: 500 });
+    await writeAuditLog({ action: "ODOO_CRON_SYNC_FAILED", entity: "odoo", metadata: { error: error instanceof Error ? error.message : String(error) } }).catch(() => undefined);
+    return NextResponse.json({ success: false, message: "Odoo synchronization failed; review audit log" }, { status: 500 });
   }
 }
