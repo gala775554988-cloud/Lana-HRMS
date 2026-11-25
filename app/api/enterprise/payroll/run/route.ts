@@ -83,8 +83,13 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const existingIds = run ? (await prisma.payrollItem.findMany({ where: { payrollRunId: run.id }, select: { employeeId: true } })).map(item => item.employeeId) : undefined;
-  if (run && !existingIds?.length) return NextResponse.json({ success: false, message: "لا يمكن إعادة احتساب مسير بلا قائمة موظفين محفوظة" }, { status: 409 });
+  let existingIds = run ? (await prisma.payrollItem.findMany({ where: { payrollRunId: run.id }, select: { employeeId: true } })).map(item => item.employeeId) : undefined;
+  if (run && !existingIds?.length) {
+    const saved = await prisma.appSetting.findUnique({ where: { key: `payroll.scope.${run.id}` } });
+    const scope = saved?.value as { employeeIds?: string[] } | null;
+    if (!scope || !Array.isArray(scope.employeeIds) || !scope.employeeIds.length) return NextResponse.json({ success: false, message: "لا يمكن إعادة احتساب مسير بلا قائمة موظفين محفوظة" }, { status: 409 });
+    existingIds = scope.employeeIds;
+  }
 
   if (!run) {
     try {
@@ -93,7 +98,7 @@ export async function POST(request: NextRequest) {
         const linked = await tx.payrollPeriod.findUnique({ where: { id: body.periodId } });
         if (!linked || linked.status !== "OPEN" || linked.startDate.getTime() !== startDate.getTime() || linked.endDate.getTime() !== endDate.getTime()) return null;
       }
-      return tx.payrollRun.create({
+      const created = await tx.payrollRun.create({
       data: {
         name: body.name || `مسير رواتب ${body.period}`,
         period: body.period,
@@ -108,6 +113,8 @@ export async function POST(request: NextRequest) {
         status: "DRAFT"
       }
       });
+      if (body.employeeIds?.length) await tx.appSetting.create({ data: { key: `payroll.scope.${created.id}`, value: { employeeIds: body.employeeIds } } });
+      return created;
     }, { isolationLevel: "Serializable" });
     } catch (error) {
       if (typeof error === "object" && error !== null && "code" in error && ["P2034", "P2002"].includes(String(error.code))) return NextResponse.json({ success: false, message: "تغيرت الفترة أو تم إنشاء مسير بالتزامن؛ أعد المحاولة" }, { status: 409 });
