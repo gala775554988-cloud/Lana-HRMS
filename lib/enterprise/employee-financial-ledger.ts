@@ -46,6 +46,7 @@ async function assertSourceApproved(tx: Prisma.TransactionClient, input: Financi
 function validate(input: FinancialEffectInput): Prisma.Decimal {
   if (!input.employeeId || !input.sourceId || !input.effectType || input.effectType.length > 120) throw new Error("Invalid financial source key");
   if (!/^[A-Z]{3}$/.test(input.currency ?? "SAR")) throw new Error("Invalid currency code");
+  if (!/^(?:0|[1-9]\\d*)(?:\\.\\d{1,2})?$/.test(input.amount)) throw new Error("Invalid financial amount format");
   const amount = new Prisma.Decimal(input.amount);
   if (!amount.isFinite() || amount.isNegative() || amount.decimalPlaces() > 2 || amount.greaterThan("9999999999999999.99")) throw new Error("Invalid financial amount");
   if (input.direction === "INFORMATION" && !amount.isZero()) throw new Error("Information-only event must have zero amount");
