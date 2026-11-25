@@ -44,9 +44,37 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, message: "Invalid date range" }, { status: 400 });
   }
 
+  // Existing draft periods must never be silently recalculated for a different
+  // date range, organization or employee subset. Such a change requires an
+  // explicit review workflow; keep the original financial scope immutable here.
+  if (!/^\\d{4}-(0[1-9]|1[0-2])$/.test(body.period)) {
+    return NextResponse.json({ success: false, message: "صيغة الفترة يجب أن تكون YYYY-MM" }, { status: 400 });
+  }
+  if (body.employeeIds !== undefined && (!Array.isArray(body.employeeIds) || !body.employeeIds.every(id => typeof id === "string" && id.trim().length > 0) || new Set(body.employeeIds).size !== body.employeeIds.length)) {
+    return NextResponse.json({ success: false, message: "قائمة الموظفين غير صالحة أو تحتوي تكرارات" }, { status: 400 });
+  }
+  if (body.periodId) {
+    const period = await prisma.payrollPeriod.findUnique({ where: { id: body.periodId }, select: { status: true, startDate: true, endDate: true } });
+    if (!period || period.status !== "OPEN") {
+      return NextResponse.json({ success: false, message: "فترة الرواتب غير موجودة أو مغلقة" }, { status: 409 });
+    }
+    if (period.startDate.getTime() !== startDate.getTime() || period.endDate.getTime() !== endDate.getTime()) {
+      return NextResponse.json({ success: false, message: "تواريخ المسير لا تطابق فترة الرواتب المحددة" }, { status: 409 });
+    }
+  }
+
   let run = await prisma.payrollRun.findUnique({ where: { period: body.period } });
   if (run && run.status !== "DRAFT") {
     return NextResponse.json({ success: false, message: "هذه الفترة لها مسير رواتب سابق ليس في حالة مسودة -- لا يمكن إعادة الحساب" }, { status: 409 });
+  }
+
+  if (run && run.status === "DRAFT") {
+    const fields = ["periodId", "companyId", "branchId", "departmentId", "costCenterId"] as const;
+    const changed = run.periodStartDate?.getTime() !== startDate.getTime() || run.periodEndDate?.getTime() !== endDate.getTime() ||
+      fields.some(field => (run[field] ?? null) !== (body[field] ?? null));
+    if (changed || body.employeeIds !== undefined) {
+      return NextResponse.json({ success: false, message: "لا يمكن تغيير نطاق مسير موجود أثناء إعادة الاحتساب؛ راجع الفترة والجهة وقائمة الموظفين" }, { status: 409 });
+    }
   }
 
   if (!run) {
