@@ -47,10 +47,11 @@ async function processJobs(request: NextRequest, limit: number) {
 
     const results = [];
     for (const job of jobs) {
-      await prisma.integrationJob.update({
-        where: { id: job.id },
+      const claim = await prisma.integrationJob.updateMany({
+        where: { id: job.id, status: { in: ["PENDING", "RETRY"] }, attempts: job.attempts, OR: [{ runAt: null }, { runAt: { lte: new Date() } }] },
         data: { status: "PROCESSING", startedAt: new Date(), attempts: { increment: 1 } }
       });
+      if (claim.count !== 1) continue;
 
       try {
         const payload = job.payload as any || {};
@@ -114,6 +115,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
-  const limit = Math.min(Math.max(Number(body.limit || 15), 1), 100);
+  const requested = Number(body?.limit ?? 15);
+  const limit = Number.isFinite(requested) ? Math.min(Math.max(Math.trunc(requested), 1), 100) : 15;
   return processJobs(request, limit);
 }
