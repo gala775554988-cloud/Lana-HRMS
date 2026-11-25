@@ -3,6 +3,7 @@ import { enqueueWorkflowRequest, dispatchWorkflowRequest, assertLocalWorkflow } 
 import { getLink } from "@/lib/integrations/odoo/requests/store";
 import { cancelEntity } from "@/lib/self-service/lifecycle";
 import { prisma } from "@/lib/prisma";
+import { postApprovedEffectInTransaction } from "@/lib/enterprise/employee-financial-ledger";
 import type { ResolvedApprover } from "./approval-engine";
 import { ApprovalRoutingError } from "./request-routing-policy";
 import { mergeWorkflowStepMetadata } from "./workflow-step-metadata";
@@ -90,6 +91,17 @@ export async function decideWorkflowStep({
           const claimed = await tx.workflowInstance.updateMany({ where: { id: original.id, status: "COMPLETED" }, data: { status: "CANCELLED" } });
           if (claimed.count !== 1) throw new Error("سبق استرداد الطلب");
           await cancelEntity(tx, original, true);
+          // Revoke the informational approval event, not a salary transaction.
+          if (original.type === "LEAVE" || original.type === "OVERTIME") {
+            await tx.employeeRequestExecution.updateMany({
+              where: { sourceType: original.type, sourceId: original.entityId, effectType: "APPROVAL", state: "EXECUTED" },
+              data: { state: "REVERSED" }
+            });
+            await tx.employeeFinancialEntry.updateMany({
+              where: { sourceType: original.type, sourceId: original.entityId, effectType: "APPROVAL", direction: "INFORMATION" },
+              data: { state: "REVERSED" }
+            });
+          }
           await tx.auditLog.create({ data: { actorUserId, action: "workflow:revoked", entity: "workflowInstance", entityId: original.id, metadata: { revocationWorkflowId: instance.id, comments } } });
         }
       } else if (instance.type === "LEAVE") {
@@ -99,8 +111,24 @@ export async function decideWorkflowStep({
           const raw = (employee?.odooRawData as Record<string, unknown> | null) ?? {};
           const csv = (raw._csvLeaveData as Record<string, unknown> | undefined) ?? {};
           await tx.employeeLeaveBalance.upsert({ where: { employeeId: instance.employeeId }, update: { used: { increment: Number(leave.days) } }, create: { employeeId: instance.employeeId, accrued: Number(csv.daysAccrued ?? raw.leaveBalance ?? 30), used: Number(csv.daysUsed ?? raw.leaveUsed ?? 0) + Number(leave.days) } });
+        } 
+        if (status === "APPROVED") {
+          await postApprovedEffectInTransaction(tx, {
+            employeeId: instance.employeeId, sourceType: "LEAVE", sourceId: leave.id,
+            effectType: "APPROVAL", direction: "INFORMATION", amount: "0",
+            details: { days: Number(leave.days), leaveTypeCode: leave.leaveType.code }
+          });
         }
-      } else if (instance.type === "OVERTIME") await tx.overtimeRequest.update({ where: { id: instance.entityId }, data: { status } });
+      } else if (instance.type === "OVERTIME") {
+        const overtime = await tx.overtimeRequest.update({ where: { id: instance.entityId }, data: { status } });
+        if (status === "APPROVED") {
+          await postApprovedEffectInTransaction(tx, {
+            employeeId: instance.employeeId, sourceType: "OVERTIME", sourceId: overtime.id,
+            effectType: "APPROVAL", direction: "INFORMATION", amount: "0",
+            details: { hours: Number(overtime.hours) }
+          });
+        }
+      }
       else if (instance.type === "EXPENSE") await tx.expenseRequest.update({ where: { id: instance.entityId }, data: { status } });
       else if (instance.type === "RESUMPTION") await tx.resumptionRequest.update({ where: { id: instance.entityId }, data: { status } });
       else if (instance.type === "LOAN") await tx.loan.update({ where: { id: instance.entityId }, data: { status: status === "APPROVED" ? "ACTIVE" : status === "REJECTED" ? "CANCELLED" : "PENDING" } });
