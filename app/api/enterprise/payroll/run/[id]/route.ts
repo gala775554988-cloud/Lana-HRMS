@@ -156,6 +156,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         if (Number((computation?.value as { errorCount?: number } | null)?.errorCount ?? 0) > 0) throw new Error("توجد أخطاء احتساب غير معالجة؛ أعد احتساب المسير قبل الاعتماد");
         const items = await tx.payrollItem.findMany({ where: { payrollRunId: id } });
         if (!items.length) throw new Error("لا يمكن اعتماد أو صرف مسير فارغ");
+        if (items.every(item => item.odooPayslipId === null)) {
+          const summary = computation?.value as { employeeCount?: number; errorCount?: number } | null | undefined;
+          if (!summary || summary.errorCount !== 0 || summary.employeeCount !== items.length) throw new Error("نتائج الاحتساب غير مكتملة؛ أعد احتساب المسير قبل المتابعة");
+        }
         if (!run.periodStartDate || !run.periodEndDate) throw new Error("الفترة الزمنية للمسير غير محددة");
         const duplicate = await tx.payrollItem.findFirst({
           where: {
