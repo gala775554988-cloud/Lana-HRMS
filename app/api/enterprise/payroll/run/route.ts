@@ -81,7 +81,13 @@ export async function POST(request: NextRequest) {
   if (run && !existingIds?.length) return NextResponse.json({ success: false, message: "لا يمكن إعادة احتساب مسير بلا قائمة موظفين محفوظة" }, { status: 409 });
 
   if (!run) {
-    run = await prisma.payrollRun.create({
+    try {
+    run = await prisma.$transaction(async (tx) => {
+      if (body.periodId) {
+        const linked = await tx.payrollPeriod.findUnique({ where: { id: body.periodId } });
+        if (!linked || linked.status !== "OPEN" || linked.startDate.getTime() !== startDate.getTime() || linked.endDate.getTime() !== endDate.getTime()) return null;
+      }
+      return tx.payrollRun.create({
       data: {
         name: body.name || `مسير رواتب ${body.period}`,
         period: body.period,
@@ -92,10 +98,16 @@ export async function POST(request: NextRequest) {
         branchId: body.branchId,
         departmentId: body.departmentId,
         costCenterId: body.costCenterId,
-        createdById: session.user.id,
+        createdById: session.user.id!,
         status: "DRAFT"
       }
-    });
+      });
+    }, { isolationLevel: "Serializable" });
+    } catch (error) {
+      if (typeof error === "object" && error !== null && "code" in error && ["P2034", "P2002"].includes(String(error.code))) return NextResponse.json({ success: false, message: "تغيرت الفترة أو تم إنشاء مسير بالتزامن؛ أعد المحاولة" }, { status: 409 });
+      throw error;
+    }
+    if (!run) return NextResponse.json({ success: false, message: "الفترة مغلقة أو تغيرت تواريخها" }, { status: 409 });
   }
 
   const { employeeCount, items, errorCount } = await computeAndUpsertPayrollItems(run.id, startDate, endDate, {
