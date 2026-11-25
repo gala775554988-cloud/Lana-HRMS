@@ -4,7 +4,7 @@ import { load } from './helpers.mjs';
 const lifecycle = await load('lib/self-service/lifecycle.ts', { zod: await import('zod'), '@/lib/employee/hr-approval-services': { isHRPaymentType: () => false } });
 const metadata = await load('lib/enterprise/workflow-step-metadata.ts');
 class ApprovalRoutingError extends Error {}
-async function setup({ type = 'LETTER', leaveCode = 'ANNUAL', self = false, deferred = false } = {}) {
+async function setup({ type = 'LETTER', leaveCode = 'ANNUAL', self = false, deferred = false, accrued=30, overlap=false, paid=false, sourceOwner="e" } = {}) {
   let state = { instance: { id: 'w', employeeId: 'e', type, entityId: 'r', status: 'PENDING', currentStep: 1 }, steps: [
     { id: 's1', workflowInstanceId: 'w', step: 1, approverUserId: self ? 'requester' : 'manager', status: deferred ? 'DEFERRED' : 'PENDING', capabilities: ['APPROVE', 'REJECT'], comments: '{"stageName":"Manager","slaHours":24}' },
     { id: 's2', workflowInstanceId: 'w', step: 2, approverUserId: 'hr', status: 'WAITING', capabilities: ['APPROVE', 'REJECT'], comments: '{"stageName":"HR","slaHours":24}' },
@@ -27,13 +27,14 @@ async function setup({ type = 'LETTER', leaveCode = 'ANNUAL', self = false, defe
     },
     employeeRequestExecution: { create: async ({ data }) => { get().executions.push(data); return data; } },
     auditLog: { create: async ({ data }) => { get().audits.push(data);return data; } },
-    letterRequest: { update: async ({ data }) => { get().entityStatus = data.status;return data; } },
-    expenseRequest: { update: async ({ data }) => { get().entityStatus = data.status;return data; } },
-    resumptionRequest: { update: async ({ data }) => { get().entityStatus = data.status;return data; } },
-    overtimeRequest: { update: async ({ data }) => { get().entityStatus = data.status;return data; } },
-    loan: { update: async ({ data }) => { get().entityStatus = data.status;return data; } },
-    leaveRequest: { update: async ({ data }) => { get().entityStatus = data.status;return { ...data, days: 3, leaveType: { code: leaveCode } }; } },
-    employeeLeaveBalance: { upsert: async () => { get().used += 3;return {}; } },
+    letterRequest: { findUnique:async()=>({id:"r",employeeId:sourceOwner,status:get().entityStatus}), update: async ({ data }) => { get().entityStatus = data.status;return data; } },
+    expenseRequest: { findUnique:async()=>({id:"r",employeeId:sourceOwner,status:get().entityStatus}), update: async ({ data }) => { get().entityStatus = data.status;return data; } },
+    resumptionRequest: { findUnique:async()=>({id:"r",employeeId:sourceOwner,status:get().entityStatus}), update: async ({ data }) => { get().entityStatus = data.status;return data; } },
+    overtimeRequest: { findUnique:async()=>({id:"r",employeeId:sourceOwner,status:get().entityStatus}), update: async ({ data }) => { get().entityStatus = data.status;return data; } },
+    loan: { findUnique:async()=>({id:"r",employeeId:sourceOwner,status:get().entityStatus}), update: async ({ data }) => { get().entityStatus = data.status;return data; } },
+    leaveRequest: { findUnique:async()=>({id:"r",employeeId:sourceOwner,status:get().entityStatus}), update: async ({ data }) => { get().entityStatus = data.status;return { ...data,id:"r",startDate:new Date("2026-12-01"),endDate:new Date("2026-12-03"), days: 3, leaveType: { code: leaveCode } }; },findFirst:async()=>overlap?{id:"other"}:null },
+    payrollItem:{findFirst:async()=>paid?{id:"paid"}:null},
+    employeeLeaveBalance: { upsert: async () => ({accrued,used:get().used,updatedAt:new Date()}), updateMany:async({data})=>{get().used+=data.used.increment;return {count:1};} },
   });
   const prisma = { ...build(() => state), $transaction: callback => {
     const task = queue.then(async () => { const draft = structuredClone(state);const result = await callback(build(() => draft));state = draft;return result; });queue = task.catch(() => {});return task;
@@ -86,3 +87,5 @@ test('creation snapshots names and SLA while activating only the first mandatory
   const s = await setup();const result = await s.api.createEnterpriseWorkflow('e', 'LETTER', 'r');
   assert.equal(result.status, 'PENDING');assert.equal(s.state().steps[0].status, 'PENDING');assert.equal(metadata.parseWorkflowStepMetadata(s.state().steps[0].comments).stageName, 'New manager');
 });
+
+test("final approval rolls back for insufficient leave balance, overlap, paid periods or mismatched ownership",async()=>{for(const input of [{accrued:2},{overlap:true},{paid:true},{sourceOwner:"other"}]){const s=await setup({type:"LEAVE",...input});await s.decide("manager");await assert.rejects(s.decide("hr"));assert.equal(s.state().instance.status,"PENDING");assert.equal(s.state().entityStatus,"PENDING");assert.equal(s.state().used,0);assert.equal(s.ledgerEvents(),0);}});

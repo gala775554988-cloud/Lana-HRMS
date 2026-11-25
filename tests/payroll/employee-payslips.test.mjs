@@ -10,7 +10,7 @@ test("legacy payslip download uses the employee's latest paid period and rejects
     "@/lib/employee/employee-cache": { getCurrentEmployeeCached: async () => ({ id: "own-employee" }) },
     "@/lib/payroll/employee-payslips": rules,
     "@/lib/prisma": { prisma: { payrollItem: { findFirst: async args => { queries.push(args); return null; } } } },
-    "@/lib/pdf/branded-pdf": { buildBrandedPdf: async () => assert.fail("No matching payslip") },
+    "@/lib/exports/table-files": { buildPdfTable: async () => assert.fail("No matching payslip") },
   });
   const get = suffix => route.GET({ url: `https://example.test/api/employee/payslip${suffix}` });
   assert.equal((await get("?id=")).status, 400);

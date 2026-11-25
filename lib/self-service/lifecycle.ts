@@ -52,12 +52,22 @@ export async function cancelEntity(tx: RequestTransaction, workflow: { id: strin
   const entity = await model.findUnique({ where: { id: workflow.entityId } });
   if (!entity || entity.employeeId !== workflow.employeeId) throw new RequestLifecycleError("الطلب غير متاح", 404);
   if (entity.includedInPayrollAt) throw new RequestLifecycleError("أُدرج الطلب في الرواتب؛ يلزم إجراء تصحيح مالي");
+  if(approved&&workflow.type==="LEAVE"){
+    const leave=await tx.leaveRequest.findUniqueOrThrow({where:{id:entity.id},select:{startDate:true,endDate:true}});
+    const paid=await tx.payrollItem.findFirst({where:{employeeId:workflow.employeeId,payrollRun:{paidAt:{not:null},periodStartDate:{lte:leave.endDate},periodEndDate:{gte:leave.startDate}}},select:{id:true}});
+    if(paid)throw new RequestLifecycleError("الإجازة ضمن مسير مصروف؛ يلزم إجراء تصحيح مالي");
+    const final=await tx.employeeFinalSettlement.findFirst({where:{employeeId:workflow.employeeId,status:"PAID"},select:{id:true}});
+    if(final)throw new RequestLifecycleError("توجد مخالصة نهائية مصروفة؛ يلزم تسوية معتمدة");
+  }
   if (approved && workflow.type === "LOAN") throw new RequestLifecycleError("القرض المعتمد يتطلب تسوية مالية من الموارد البشرية");
   const expected = approved ? "APPROVED" : "PENDING";
   if (entity.status !== expected) throw new RequestLifecycleError("تغيرت حالة الطلب؛ حدّث الصفحة");
   if ((await model.updateMany({ where: { id: entity.id, status: expected }, data: { status: "CANCELLED" } })).count !== 1) throw new RequestLifecycleError("تغيرت حالة الطلب");
   if (approved && workflow.type === "LEAVE") {
     const leave = await tx.leaveRequest.findUniqueOrThrow({ where: { id: entity.id }, include: { leaveType: true } });
-    if (leave.leaveType.code.toUpperCase().startsWith("ANNUAL")) await tx.employeeLeaveBalance.updateMany({ where: { employeeId: workflow.employeeId }, data: { used: { decrement: Number(leave.days) } } });
+    if (leave.leaveType.code.toUpperCase().startsWith("ANNUAL")) {
+      const changed=await tx.employeeLeaveBalance.updateMany({where:{employeeId:workflow.employeeId,used:{gte:leave.days}},data:{used:{decrement:Number(leave.days)}}});
+      if(changed.count!==1)throw new RequestLifecycleError("رصيد الإجازة لا يطابق سجل الاعتماد؛ يلزم مراجعته");
+    }
   }
 }

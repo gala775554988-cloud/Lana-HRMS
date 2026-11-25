@@ -1,7 +1,7 @@
 import { usesOdooRouting } from "@/lib/integrations/odoo/requests/routing";
 import { enqueueWorkflowRequest, dispatchWorkflowRequest, assertLocalWorkflow } from "@/lib/integrations/odoo/requests/service";
 import { getLink } from "@/lib/integrations/odoo/requests/store";
-import { cancelEntity } from "@/lib/self-service/lifecycle";
+import { cancelEntity, entityDelegate } from "@/lib/self-service/lifecycle";
 import { prisma } from "@/lib/prisma";
 import { postApprovedEffectInTransaction } from "@/lib/enterprise/employee-financial-ledger";
 import type { ResolvedApprover } from "./approval-engine";
@@ -83,6 +83,10 @@ export async function decideWorkflowStep({
     }
     if (workflowStatus !== "PENDING") {
       const status = workflowStatus === "COMPLETED" ? "APPROVED" : workflowStatus === "REJECTED" ? "REJECTED" : "PENDING";
+      if(instance.type!=="REVOKE"){
+        const source=await entityDelegate(tx,instance.type).findUnique({where:{id:instance.entityId}});
+        if(!source||source.employeeId!==instance.employeeId||source.status!=="PENDING")throw Error("مصدر الطلب غير مطابق أو تغيرت حالته");
+      }
       if (instance.type === "REVOKE") {
         if (workflowStatus === "COMPLETED") {
           const original = await tx.workflowInstance.findUnique({ where: { id: instance.entityId } });
@@ -107,11 +111,23 @@ export async function decideWorkflowStep({
         }
       } else if (instance.type === "LEAVE") {
         const leave = await tx.leaveRequest.update({ where: { id: instance.entityId }, data: { status, decidedAt: new Date(), decisionNote: comments }, include: { leaveType: { select: { code: true } } } });
+        if(status==="APPROVED"){
+          const overlap=await tx.leaveRequest.findFirst({where:{id:{not:leave.id},employeeId:instance.employeeId,status:"APPROVED",startDate:{lte:leave.endDate},endDate:{gte:leave.startDate}},select:{id:true}});
+          if(overlap)throw Error("توجد إجازة معتمدة متداخلة؛ يلزم مراجعة التواريخ");
+          const paid=await tx.payrollItem.findFirst({where:{employeeId:instance.employeeId,payrollRun:{paidAt:{not:null},periodStartDate:{lte:leave.endDate},periodEndDate:{gte:leave.startDate}}},select:{id:true}});
+          if(paid)throw Error("تتداخل الإجازة مع مسير مصروف؛ يلزم تسوية مالية معتمدة");
+        }
         // Statutory/special leave must not consume the annual-leave aggregate.
         if (status === "APPROVED" && leave.leaveType.code.toUpperCase().startsWith("ANNUAL")) {
           const raw = (employee?.odooRawData as Record<string, unknown> | null) ?? {};
           const csv = (raw._csvLeaveData as Record<string, unknown> | undefined) ?? {};
-          await tx.employeeLeaveBalance.upsert({ where: { employeeId: instance.employeeId }, update: { used: { increment: Number(leave.days) } }, create: { employeeId: instance.employeeId, accrued: Number(csv.daysAccrued ?? raw.leaveBalance ?? 30), used: Number(csv.daysUsed ?? raw.leaveUsed ?? 0) + Number(leave.days) } });
+          const days=Number(leave.days);
+          const accrued=Number(csv.daysAccrued??raw.leaveBalance??30),used=Number(csv.daysUsed??raw.leaveUsed??0);
+          if(!Number.isFinite(days)||days<=0||!Number.isFinite(accrued)||!Number.isFinite(used)||accrued<0||used<0)throw Error("بيانات رصيد الإجازة غير صالحة");
+          const balance=await tx.employeeLeaveBalance.upsert({where:{employeeId:instance.employeeId},update:{},create:{employeeId:instance.employeeId,accrued,used}});
+          if(Math.round((Number(balance.accrued)-Number(balance.used))*100)<Math.round(days*100))throw Error("رصيد الإجازة غير كاف عند الاعتماد النهائي");
+          const consumed=await tx.employeeLeaveBalance.updateMany({where:{employeeId:instance.employeeId,updatedAt:balance.updatedAt,used:balance.used,accrued:balance.accrued},data:{used:{increment:days}}});
+          if(consumed.count!==1)throw Error("تغير رصيد الإجازة أثناء الاعتماد");
         } 
         if (status === "APPROVED") {
           await postApprovedEffectInTransaction(tx, {
@@ -147,7 +163,7 @@ export async function decideWorkflowStep({
     await tx.auditLog.create({ data: { actorUserId, action: `workflow:${decision.toLowerCase()}`, entity: "workflowInstance", entityId: workflowInstanceId, metadata: { decision, comments, ip, entityId: instance.entityId, type: instance.type, employeeId: instance.employeeId, step: current.step } } });
     const updated = await tx.workflowInstance.findUniqueOrThrow({ where: { id: instance.id } });
     return { updated, instance, workflowStatus };
-  });
+  },{isolationLevel:"Serializable"});
 
   const employee = await prisma.employee.findUnique({ where: { id: instance.employeeId }, select: { userId: true } }).catch(() => null);
   if (employee?.userId) {
