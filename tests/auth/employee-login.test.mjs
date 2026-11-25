@@ -414,3 +414,15 @@ test('first-device enrollment requires verification and atomically refuses exist
   assert.equal(registered, 1);
   assert.equal(await subject.verifyBiometricEnrollment('u', response), false);
 });
+
+test("authenticated legacy link refuses ambiguous, archived or already-owned employees",async()=>{
+ let rows=[],writes=0;
+ const tx={employee:{findFirst:async()=>null,findMany:async()=>rows,updateMany:async()=>{writes++;return {count:1};}},role:{upsert:async()=>({id:"role"})},userRole:{upsert:async()=>({})},auditLog:{create:async()=>({})}};
+ const prisma={employee:{findFirst:async()=>null,findMany:async()=>rows},$transaction:async fn=>fn(tx)};
+ const api=await loadModule("auth.ts",prisma,{imports:{"next-auth":{default:()=>({})},"next-auth/providers/credentials":{default:x=>x},"@auth/prisma-adapter":{PrismaAdapter:()=>({})},"@/lib/password":{hashPassword:async()=>""},"@/lib/validations/auth":{loginSchema:{}},"@/lib/enterprise/permissions":{getCachedEffectivePermissions:async()=>[],PERMISSION_TEMPLATES:{EMPLOYEE:[]}},"@/lib/auth/employee-login":{checkLoginPassword:async()=>({valid:true})}}});
+ const user={id:"u",username:"x",email:"x@example.test"},candidate={id:"e",userId:null,status:"ACTIVE",archivedAt:null,terminationDate:null};
+ rows=[candidate,{...candidate,id:"other"}];assert.equal(await api.ensureAuthenticatedEmployeeLink(user),null);
+ rows=[{...candidate,userId:"another-user"}];assert.equal(await api.ensureAuthenticatedEmployeeLink(user),null);
+ rows=[{...candidate,archivedAt:new Date()}];assert.equal(await api.ensureAuthenticatedEmployeeLink(user),null);assert.equal(writes,0);
+ rows=[candidate];assert.equal(await api.ensureAuthenticatedEmployeeLink(user),"e");assert.equal(writes,1);
+});

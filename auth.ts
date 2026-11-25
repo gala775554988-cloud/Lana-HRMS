@@ -47,7 +47,7 @@ async function getAuthorization(userId: string) {
  * the authenticated username and never reassigns an employee owned by another
  * user.
  */
-async function ensureAuthenticatedEmployeeLink(user: { id: string; username: string | null; email: string | null }) {
+export async function ensureAuthenticatedEmployeeLink(user: { id: string; username: string | null; email: string | null }) {
   const linked = await prisma.employee.findFirst({ where: { userId: user.id }, select: { id: true } });
   if (linked) return linked.id;
 
@@ -55,30 +55,34 @@ async function ensureAuthenticatedEmployeeLink(user: { id: string; username: str
   const email = user.email?.trim().toLowerCase();
   if (!identifier && !email) return null;
 
-  const employee = await prisma.employee.findFirst({
+  // Resolve all exact identifiers together, never choose the first of two
+  // different employees, never overwrite an existing account association.
+  const matches = await prisma.employee.findMany({
     where: {
-      userId: null,
       OR: [
         ...(identifier ? [{ nationalId: identifier }, { employeeNumber: identifier }] : []),
         ...(email ? [{ email: { equals: email, mode: "insensitive" as const } }] : []),
       ],
     },
-    select: { id: true },
+    take: 2,
+    select: { id: true, userId: true, status: true, archivedAt: true, terminationDate: true },
   });
-  if (!employee) return null;
-
-  await prisma.employee.update({ where: { id: employee.id }, data: { userId: user.id } });
-  const employeeRole = await prisma.role.upsert({
-    where: { name: "EMPLOYEE" },
-    update: {},
-    create: { name: "EMPLOYEE", description: "Employee", isSystem: true },
-  });
-  await prisma.userRole.upsert({
-    where: { userId_roleId: { userId: user.id, roleId: employeeRole.id } },
-    update: {},
-    create: { userId: user.id, roleId: employeeRole.id },
-  });
-  return employee.id;
+  if (matches.length !== 1) return null;
+  const employee=matches[0];
+  if(employee.userId||employee.status!=="ACTIVE"||employee.archivedAt||(employee.terminationDate&&employee.terminationDate<=new Date()))return null;
+  return prisma.$transaction(async tx=>{
+    const already=await tx.employee.findFirst({where:{userId:user.id},select:{id:true}});
+    if(already)return already.id;
+    // Recheck ambiguity in the transaction in case an import changed identity.
+    const current=await tx.employee.findMany({where:{OR:[...(identifier?[{nationalId:identifier},{employeeNumber:identifier}]:[]),...(email?[{email:{equals:email,mode:"insensitive" as const}}]:[])]},take:2,select:{id:true,userId:true}});
+    if(current.length!==1||current[0].id!==employee.id||current[0].userId)return null;
+    const changed=await tx.employee.updateMany({where:{id:employee.id,userId:null,status:"ACTIVE",archivedAt:null,OR:[{terminationDate:null},{terminationDate:{gt:new Date()}}]},data:{userId:user.id}});
+    if(changed.count!==1)return null;
+    const employeeRole=await tx.role.upsert({where:{name:"EMPLOYEE"},update:{},create:{name:"EMPLOYEE",description:"Employee",isSystem:true}});
+    await tx.userRole.upsert({where:{userId_roleId:{userId:user.id,roleId:employeeRole.id}},update:{},create:{userId:user.id,roleId:employeeRole.id}});
+    await tx.auditLog.create({data:{actorUserId:user.id,action:"auth:employee-link-repaired",entity:"employee",entityId:employee.id,metadata:{automatic:true}}});
+    return employee.id;
+  },{isolationLevel:"Serializable"});
 }
 
 async function findUserByUsernameOrEmail(value: string, lower: string) {
