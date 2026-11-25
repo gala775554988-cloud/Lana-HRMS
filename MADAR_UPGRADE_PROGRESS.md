@@ -80,3 +80,8 @@ Do not merge until all acceptance criteria, isolated tests, backup and preview c
 ## Batch after 780be44
 - #17/#7/#8/#25/#26: final settlement now computes full documented leave balance cash-out, checks pending leave and unchanged source balance and consumes days atomically upon confirmed external payment. Missing structured balance blocks cash-out; no fabricated balance. Odoo loans use exactly reconciled unpaid installment IDs and existing localPaidAt migration reconciliation mechanism; no remote paid flag mutation or external transfer. Approved unpaid settlements can return for reviewed revision, with audit. Production reconciliation still unverified.
 - #33: CI 45615826979 and 45615356147 passed. Added cash-out and Odoo installment reconciliation tests; new CI pending.
+
+## Batch after b398916
+- #12: official standard NEW GOSI schedule 2024–2028, explicit installation by authorized reviewer without overwrites, employee/employer separation, explicit non-Saudi occupational-hazard cohort, registered contribution wage and currency validation. Special GCC/coverage exceptions still require reviewed configuration. Sources https://awareness.gosi.gov.sa/businessJourney.html and https://beta.gosi.gov.sa/new-system . No production policies changed.
+- #7/#10/#13/#14: approved unpaid and sick leave payroll calculation, first sick leave anniversary and 30/60/30 tiers, suppress attendance deductions for covered dates, itemized leave deduction in settlement ledger. Partial-day/ambiguous overlaps blocked for review; no attendance edits. Source https://www.hrsd.gov.sa/media-center/media/levacation . Annual/type balance reconciliation remains pending.
+- #33: regression tests added; b398916 CI 45617471217 was running at check. New CI pending.

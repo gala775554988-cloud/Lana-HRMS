@@ -1,4 +1,4 @@
-import { calculateGosi, resolveGosiCohort, advanceSchedule, isApprovedPaidAnnualLeaveDay } from "@/lib/payroll/calculations";
+import { calculateGosi, resolveGosiCohort, advanceSchedule, calculateLeavePayroll, saudiCalendarDay } from "@/lib/payroll/calculations";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeSalaryProfile } from "@/lib/employee/salary-profile-store";
 import { calculateNetSalary } from "@/lib/employee/salary-profile";
@@ -38,6 +38,7 @@ export type PayrollBreakdown = {
   loanDeduction: number;
   advanceDeduction: number;
   absenceDeduction: number;
+  leaveDeduction?: number;
   lateDeduction: number;
   penaltyDeduction: number;
   otherDeductionTotal: number;
@@ -112,10 +113,10 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
     prisma.employeeBonus.findMany({
       where: { employeeId, status: "APPROVED", awardedDate: { gte: periodStart, lte: periodEnd }, includedInPayrollAt: null }
     }),
-    prisma.socialInsuranceRecord.findUnique({ where: { employeeId }, select: { status: true, employeeContributionAmount: true, coverageCohort: true, firstCoverageDate: true } }),
+    prisma.socialInsuranceRecord.findUnique({ where: { employeeId }, select: { status: true, employeeContributionAmount: true, subjectWage: true, currency: true, coverageCohort: true, firstCoverageDate: true } }),
     prisma.loan.findMany({ where: { employeeId, status: "ACTIVE", issuedAt: { lte: periodEnd } }, include: { repaymentSchedule: { where: { dueDate: { gte: periodStart, lte: periodEnd }, remotePaid: false, localPaidAt: null }, orderBy: { dueDate: "asc" } } } }),
     prisma.employeeSalaryAdvance.findMany({ where: { employeeId, status: "APPROVED", startDate: { lte: periodEnd } } }),
-    prisma.leaveRequest.findMany({ where: { employeeId, status: "APPROVED", startDate: { lte: periodEnd }, endDate: { gte: periodStart }, leaveType: { isPaid: true } }, select: { startDate: true, endDate: true, leaveType: { select: { code: true, isPaid: true } } } }),
+    prisma.leaveRequest.findMany({ where: { employeeId, status: "APPROVED", startDate: { lte: periodEnd }, OR: [{endDate:{gte:periodStart}},{leaveType:{code:{startsWith:"SICK",mode:"insensitive"}}}] }, select: { startDate: true, endDate: true, days:true, leaveType: { select: { code: true, isPaid: true } } } }),
     prisma.attendanceRecord.findMany({
       where: { employeeId, workDate: { gte: periodStart, lte: periodEnd }, status: { in: ["ABSENT", "LATE", "HALF_DAY"] } },
       select: {
@@ -170,8 +171,11 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
   const cutoffs = [...new Set(policies.map(policy => policy.newSystemCutoff?.toISOString()).filter((value): value is string => Boolean(value)))];
   if (cutoffs.length > 1) throw new Error("تواريخ فصل نظام التأمينات متعارضة؛ راجع السياسات");
   const cutoff = cutoffs.length ? new Date(cutoffs[0]) : null;
-  const cohort = saudi && active ? resolveGosiCohort(socialInsurance?.coverageCohort ?? null, socialInsurance?.firstCoverageDate ?? null, cutoff) : "";
+  const cohort = saudi && active ? resolveGosiCohort(socialInsurance?.coverageCohort ?? null, socialInsurance?.firstCoverageDate ?? null, cutoff) : active ? socialInsurance?.coverageCohort ?? "" : "";
+  if(active && !saudi && cohort!=="NON_SAUDI_HAZARDS")throw Error("حدد شريحة الأخطار المهنية لغير السعودي بعد التحقق من عدم خضوعه لنظام خليجي خاص");
+  if(active && socialInsurance?.currency!==currency)throw Error("عملة أجر التأمينات لا تطابق الراتب");
   const gosi = calculateGosi({ saudi, active, cohort, asOf: periodEnd, basic: baseSalary,
+    ...(active && Number(socialInsurance?.subjectWage)>0?{registeredWage:Number(socialInsurance?.subjectWage)}:{}),
     housing: Number(profile.salaryHousingAllowance ?? 0) + allowances.filter(row => row.category.toUpperCase() === "HOUSING").reduce((sum, row) => sum + Number(row.amount), 0),
     policies: policies.map(policy => ({ ...policy, employeeRate: Number(policy.employeeRate), employerRate: Number(policy.employerRate), minimumWage: Number(policy.minimumWage), maximumWage: Number(policy.maximumWage) })),
   });
@@ -192,7 +196,10 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
   const advanceDeduction = round2(advanceAllocations.reduce((sum, row) => sum + row.amount, 0));
 
   const dailyRate = baseSalary > 0 ? baseSalary / 30 : 0;
-  const chargeableAttendance = attendance.filter(row => !isApprovedPaidAnnualLeaveDay(row.workDate, approvedLeaves));
+  const leavePayroll=calculateLeavePayroll(periodStart,periodEnd,approvedLeaves.map(row=>({...row,days:Number(row.days)})),baseSalary+allowanceTotal);
+  const leaveDeduction=leavePayroll.deduction;
+  const coveredDays=new Set(leavePayroll.coveredDays);
+  const chargeableAttendance = attendance.filter(row => !coveredDays.has(saudiCalendarDay(row.workDate)));
   const absenceDays = chargeableAttendance.filter((a) => a.status === "ABSENT").length + chargeableAttendance.filter((a) => a.status === "HALF_DAY").length * 0.5;
   const absenceDeduction = round2(absenceDays * dailyRate);
   const hourlyRate = baseSalary > 0 ? baseSalary / 240 : 0;
@@ -206,7 +213,7 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
 
   const grossPay = round2(baseSalary + allowanceTotal + overtimeTotal + bonusTotal);
   const deductionTotal = round2(
-    insuranceDeduction + taxTotal + loanDeduction + advanceDeduction + absenceDeduction + lateDeduction + penaltyDeduction + otherDeductionTotal
+    insuranceDeduction + taxTotal + loanDeduction + advanceDeduction + absenceDeduction + leaveDeduction + lateDeduction + penaltyDeduction + otherDeductionTotal
   );
   const netPay = round2(grossPay - deductionTotal);
   if (![grossPay, deductionTotal, netPay].every(Number.isFinite) || grossPay < 0 || deductionTotal < 0) throw new Error("إجماليات المسير غير صالحة");
@@ -223,6 +230,7 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
     loanDeduction,
     advanceDeduction,
     absenceDeduction,
+    leaveDeduction,
     lateDeduction,
     penaltyDeduction,
     otherDeductionTotal,
@@ -242,6 +250,7 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
       ...bonuses.map(row => ({ code: "BONUS", name: "مكافأة", kind: "EARNING", amount: Number(row.amount), sourceId: row.id })),
       { code: "GOSI", name: "تأمينات الموظف", kind: "DEDUCTION", amount: insuranceDeduction },
       { code: "ABSENCE", name: "الغياب", kind: "DEDUCTION", amount: absenceDeduction },
+      { code: "LEAVE_DEDUCTION", name: "خصم الإجازات المرضية وغير المدفوعة", kind: "DEDUCTION", amount: leaveDeduction },
       { code: "LATE", name: "التأخير", kind: "DEDUCTION", amount: lateDeduction },
       { code: "LOAN", name: "أقساط القروض", kind: "DEDUCTION", amount: loanDeduction },
       { code: "ADVANCE", name: "أقساط السلف", kind: "DEDUCTION", amount: advanceDeduction },

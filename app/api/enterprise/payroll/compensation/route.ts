@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { canManagePayroll, canApprovePayroll } from "@/lib/enterprise/payroll-permissions";
-import { calculateEosb, calculateFinalSettlement } from "@/lib/payroll/calculations";
+import { calculateEosb, calculateFinalSettlement, standardSaudiGosiSchedule } from "@/lib/payroll/calculations";
 import { accountingMappingSchema } from "@/lib/payroll/journal";
 import { z } from "zod";
 const policySchema = z.object({ cohort: z.string().regex(/^[A-Z_]{2,30}$/), effectiveFrom: z.coerce.date(), effectiveTo: z.coerce.date().nullable(), employeeRate: z.number().min(0).max(100), employerRate: z.number().min(0).max(100), minimumWage: z.number().nonnegative(), maximumWage: z.number().positive(), housingIncluded: z.boolean(), newSystemCutoff: z.coerce.date().nullable() }).strict();
@@ -19,6 +19,19 @@ export async function POST(request: Request) {
   if (!canApprovePayroll(session)) return NextResponse.json({ success: false }, { status: 403 });
   try {
     const body = await request.json();
+    if(body.action==="install-new-gosi-schedule"){
+      const {minimumWage}=z.object({minimumWage:z.number().min(0).max(45000),reviewed:z.literal(true)}).strict().parse(body.data);
+      const schedule=standardSaudiGosiSchedule(minimumWage);
+      await prisma.$transaction(async tx=>{
+        for(const policy of schedule){
+          const overlap=await tx.gosiSetting.findFirst({where:{cohort:policy.cohort,effectiveFrom:{lte:policy.effectiveTo??new Date("9999-12-31")},OR:[{effectiveTo:null},{effectiveTo:{gte:policy.effectiveFrom}}]}});
+          if(overlap)throw Error("توجد سياسة NEW متداخلة؛ راجع السياسات الحالية قبل التثبيت");
+          await tx.gosiSetting.create({data:policy});
+        }
+        await tx.auditLog.create({data:{actorUserId:session.user.id,action:"payroll:gosi-install-reference",entity:"gosiSetting",metadata:{cohort:"NEW",count:schedule.length,source:"https://awareness.gosi.gov.sa/businessJourney.html",minimumWage}}});
+      },{isolationLevel:"Serializable"});
+      return NextResponse.json({success:true});
+    }
     if (body.action === "accounting") {
       const data = accountingMappingSchema.parse(body.data);
       await prisma.$transaction(async tx => {

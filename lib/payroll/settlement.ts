@@ -59,6 +59,7 @@ export function buildPayrollLedgerBreakdown(snapshot: PayrollBreakdown) {
   add("GOSI", "DEBIT", snapshot.insuranceDeduction);
   add("TAX", "DEBIT", snapshot.taxTotal);
   add("ABSENCE", "DEBIT", snapshot.absenceDeduction);
+  add("LEAVE_DEDUCTION","DEBIT",snapshot.leaveDeduction??0);
   add("LATE", "DEBIT", snapshot.lateDeduction);
   add("PENALTY", "DEBIT", snapshot.penaltyDeduction);
   add("OTHER_DEDUCTIONS", "DEBIT", snapshot.otherDeductionTotal);

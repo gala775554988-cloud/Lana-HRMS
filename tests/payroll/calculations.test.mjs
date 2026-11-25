@@ -83,3 +83,22 @@ test("approved paid annual leave excludes attendance deductions on Saudi calenda
   assert.equal(api.isApprovedPaidAnnualLeaveDay(new Date("2026-11-10T05:00:00Z"),[{...leave,leaveType:{code:"ANNUAL",isPaid:false}}]),false);
   assert.equal(api.isApprovedPaidAnnualLeaveDay(new Date("2026-11-10T05:00:00Z"),[{...leave,leaveType:{code:"SICK",isPaid:true}}]),false);
 });
+
+test("new GOSI schedule respects July 2026 increase and separates employer share",()=>{
+ const policies=api.standardSaudiGosiSchedule(1500).map((p,i)=>({...p,id:String(i)}));
+ const input={saudi:true,active:true,cohort:"NEW",basic:8000,housing:2000,policies};
+ assert.equal(api.calculateGosi({...input,asOf:new Date("2026-06-30T12:00:00Z")}).employeeAmount,1025);
+ const current=api.calculateGosi({...input,asOf:new Date("2026-07-01")});
+ assert.equal(current.employeeAmount,1075);assert.equal(current.employerAmount,1275);
+});
+test("non-Saudi hazard coverage charges employer only, with explicit policy",()=>{
+ const policy={id:"h",cohort:"NON_SAUDI_HAZARDS",effectiveFrom:new Date("2024-01-01"),employeeRate:0,employerRate:2,minimumWage:0,maximumWage:45000,housingIncluded:true};
+ const result=api.calculateGosi({saudi:false,active:true,cohort:policy.cohort,asOf:new Date("2026-11-01"),basic:3000,housing:1000,registeredWage:5000,policies:[policy]});
+ assert.equal(result.employeeAmount,0);assert.equal(result.employerAmount,100);
+});
+test("sick leave tiers carry across payroll periods and unpaid days are not duplicated",()=>{
+ const sick={startDate:new Date("2026-01-01"),endDate:new Date("2026-02-09"),days:40,leaveType:{code:"SICK",isPaid:true}};
+ const unpaid={startDate:new Date("2026-02-10"),endDate:new Date("2026-02-11"),days:2,leaveType:{code:"UNPAID",isPaid:false}};
+ const result=api.calculateLeavePayroll(new Date("2026-02-01"),new Date("2026-02-28"),[sick,unpaid],6000);
+ assert.equal(result.sickQuarterDays,9);assert.equal(result.unpaidDays,2);assert.equal(result.deduction,850);assert.equal(result.coveredDays.length,11);
+});

@@ -3,14 +3,16 @@ export function money(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 export type GosiPolicyInput = { id: string; cohort: string; effectiveFrom: Date; effectiveTo?: Date | null; employeeRate: number; employerRate: number; minimumWage: number; maximumWage: number; housingIncluded: boolean };
-export function calculateGosi(input: { saudi: boolean; active: boolean; cohort: string; asOf: Date; basic: number; housing: number; policies: GosiPolicyInput[] }) {
-  if (!input.saudi || !input.active) return { applicable: false, subjectWage: 0, employeeRate: null, employerRate: null, employeeAmount: 0, employerAmount: 0, policyId: null };
+export function calculateGosi(input: { saudi: boolean; active: boolean; cohort: string; asOf: Date; basic: number; housing: number; registeredWage?: number; policies: GosiPolicyInput[] }) {
+  if ((!input.saudi && input.cohort !== "NON_SAUDI_HAZARDS") || !input.active) return { applicable: false, subjectWage: 0, employeeRate: null, employerRate: null, employeeAmount: 0, employerAmount: 0, policyId: null };
   if (![input.basic, input.housing].every(value => Number.isFinite(value) && value >= 0)) throw new Error("أجر التأمينات غير صالح");
+  if(input.registeredWage!==undefined && (!Number.isFinite(input.registeredWage)||input.registeredWage<=0)) throw Error("الأجر المسجل في التأمينات غير صالح");
   const candidates = input.policies.filter(policy => policy.cohort === input.cohort && policy.effectiveFrom <= input.asOf && (!policy.effectiveTo || policy.effectiveTo >= input.asOf));
   if (candidates.length !== 1) throw new Error("يجب تحديد سياسة تأمينات واحدة سارية لشريحة الموظف");
   const policy = candidates[0];
   if (![policy.employeeRate, policy.employerRate, policy.minimumWage, policy.maximumWage].every(Number.isFinite) || policy.employeeRate < 0 || policy.employerRate < 0 || policy.employeeRate > 100 || policy.employerRate > 100 || policy.minimumWage < 0 || policy.maximumWage < policy.minimumWage) throw new Error("سياسة التأمينات غير صالحة");
-  const subjectWage = money(Math.min(policy.maximumWage, Math.max(policy.minimumWage, input.basic + (policy.housingIncluded ? input.housing : 0))));
+  if(input.cohort==="NON_SAUDI_HAZARDS" && (input.saudi || policy.employeeRate!==0)) throw Error("سياسة الأخطار المهنية لغير السعودي لا تخصم من الموظف");
+  const subjectWage = money(Math.min(policy.maximumWage, Math.max(policy.minimumWage, input.registeredWage ?? (input.basic + (policy.housingIncluded ? input.housing : 0)))));
   return { applicable: true, subjectWage, employeeRate: policy.employeeRate, employerRate: policy.employerRate, employeeAmount: money(subjectWage * policy.employeeRate / 100), employerAmount: money(subjectWage * policy.employerRate / 100), policyId: policy.id };
 }
 export function resolveGosiCohort(explicit: string | null, firstCoverageDate: Date | null, newSystemCutoff: Date | null) {
@@ -89,4 +91,51 @@ export function isApprovedPaidAnnualLeaveDay(workDate: Date, leaves: { startDate
   };
   const day = dayKey(workDate);
   return leaves.some(leave => leave.leaveType.isPaid && leave.leaveType.code.toUpperCase().startsWith("ANNUAL") && dayKey(leave.startDate) <= day && dayKey(leave.endDate) >= day);
+}
+
+/** Reference rates for standard full coverage; exceptional and GCC schemes
+ * require their own verified policy. No existing rate is overwritten. */
+export function standardSaudiGosiSchedule(minimumWage:number) {
+ if(!Number.isFinite(minimumWage)||minimumWage<0||minimumWage>45000)throw Error("حد الأجر غير صالح");
+ const periods=[["2024-07-03","2025-06-30",9],["2025-07-01","2026-06-30",9.5],["2026-07-01","2027-06-30",10],["2027-07-01","2028-06-30",10.5],["2028-07-01",null,11]] as const;
+ return periods.map(([from,to,pension])=>({cohort:"NEW",effectiveFrom:new Date(from+"T00:00:00.000Z"),effectiveTo:to?new Date(to+"T23:59:59.999Z"):null,employeeRate:pension+0.75,employerRate:pension+0.75+2,minimumWage,maximumWage:45000,housingIncluded:true,newSystemCutoff:new Date("2024-07-03T00:00:00Z")}));
+}
+export function saudiCalendarDay(date:Date) {
+ const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Riyadh",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(date);
+ return Date.UTC(Number(parts.find(p=>p.type==="year")?.value),Number(parts.find(p=>p.type==="month")?.value)-1,Number(parts.find(p=>p.type==="day")?.value));
+}
+export type PayrollLeave = { startDate:Date;endDate:Date;days:number;leaveType:{code:string;isPaid:boolean} };
+/** Article 117: 30 full, 60 at 75%, 30 unpaid from first sick leave
+ * in the entitlement year. Full-day records only; disputed overlaps or
+ * non-calendar day quantities require HR reconciliation, not guessed deductions. */
+export function calculateLeavePayroll(periodStart:Date,periodEnd:Date,leaves:PayrollLeave[],monthlyWage:number) {
+ if(!Number.isFinite(monthlyWage)||monthlyWage<0)throw Error("أجر الإجازة غير صالح");
+ const day=86400000,start=saudiCalendarDay(periodStart),end=saudiCalendarDay(periodEnd);
+ const occupied=new Map<number,"PAID"|"SICK"|"UNPAID">();
+ for(const leave of leaves){
+   const first=saudiCalendarDay(leave.startDate),last=saudiCalendarDay(leave.endDate);
+   const kind=leave.leaveType.code.toUpperCase().startsWith("SICK")?"SICK":leave.leaveType.isPaid?"PAID":"UNPAID";
+   if(last<first||last-first>day*3660)throw Error("فترة إجازة غير صالحة");
+   if(kind!=="PAID" && Math.abs(leave.days-((last-first)/day+1))>0.001)throw Error("راجع أيام الإجازة المرضية أو غير المدفوعة قبل احتساب الراتب");
+   for(let t=first;t<=Math.min(last,end);t+=day){
+     if(kind!=="SICK"&&t<start)continue;
+     const prior=occupied.get(t);
+     if(prior&&prior!==kind){
+       if((prior==="SICK"&&kind==="PAID")||(prior==="PAID"&&kind==="SICK")){occupied.set(t,"SICK");continue;}
+       throw Error("تداخل إجازات مدفوعة وغير مدفوعة؛ يلزم مراجعة الموارد البشرية");
+     }
+     occupied.set(t,kind);
+   }
+ }
+ let sickYearEnd=0,used=0,unpaidDays=0,sickQuarterDays=0,sickUnpaidDays=0;
+ for(const [t,kind] of [...occupied.entries()].sort((a,b)=>a[0]-b[0])){
+   if(kind==="SICK"){
+     if(!sickYearEnd||t>=sickYearEnd){const d=new Date(t);d.setUTCFullYear(d.getUTCFullYear()+1);sickYearEnd=d.getTime();used=0;}
+     used++;
+     if(t>=start){if(used>120)throw Error("الإجازة المرضية تتجاوز 120 يوماً؛ يلزم تحديد الإجراء النظامي");if(used>90)sickUnpaidDays++;else if(used>30)sickQuarterDays++;}
+   }else if(kind==="UNPAID"&&t>=start)unpaidDays++;
+ }
+ const equivalentDays=unpaidDays+sickUnpaidDays+sickQuarterDays*0.25;
+ if(equivalentDays>30)throw Error("خصم الإجازات يتجاوز أجر شهر؛ يلزم مراجعة الفترة");
+ return {unpaidDays,sickQuarterDays,sickUnpaidDays,deduction:money(monthlyWage/30*equivalentDays),coveredDays:[...occupied.keys()].filter(t=>t>=start)};
 }
