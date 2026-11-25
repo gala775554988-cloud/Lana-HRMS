@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { UserCheck, Archive, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { UserCheck, Archive, Loader2, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -10,7 +11,7 @@ interface ArchivedEmployee {
   firstName: string; lastName: string; status: string;
   profilePhotoUrl?: string | null;
   departmentName: string; positionTitle: string; branchName: string;
-  archiveReason?: string | null; archivedAt?: string | null;
+  archiveReason?: string | null; archivedAt?: string | null; terminationDate?: string | null;
 }
 
 export function ArchivedEmployees() {
@@ -83,11 +84,15 @@ export function ArchivedEmployees() {
               </div>
             </div>
             <div className="space-y-1 text-xs text-muted-foreground mb-3">
+              <p>تاريخ الأرشفة: {emp.archivedAt ? new Date(emp.archivedAt).toLocaleDateString("ar-SA", { calendar: "gregory" }) : "غير مسجل"}</p>
+              <p>تاريخ انتهاء الخدمة المسجل: {emp.terminationDate ? new Date(emp.terminationDate).toLocaleDateString("ar-SA", { calendar: "gregory" }) : "غير مسجل"}</p>
+              <p>سبب الأرشفة: {emp.archiveReason || "غير مسجل"}</p>
               <p>هوية: {emp.nationalId}</p>
               {emp.departmentName && <p>إدارة: {emp.departmentName}</p>}
               {emp.positionTitle && <p>منصب: {emp.positionTitle}</p>}
               {emp.branchName && <p>فرع: {emp.branchName}</p>}
             </div>
+            <Link href={`/employees/${encodeURIComponent(emp.id)}`} className="mb-2 flex items-center justify-center gap-2 rounded-md border p-2 text-sm font-medium"><Eye className="h-4 w-4" /> عرض الملف الكامل</Link>
             <Button size="sm" variant="outline" className="w-full gap-1 text-green-600 border-green-200 hover:bg-green-50 dark:border-green-900 dark:hover:bg-green-950" onClick={() => unarchive(emp.id)}>
               <UserCheck className="h-4 w-4" /> إلغاء الأرشفة
             </Button>
