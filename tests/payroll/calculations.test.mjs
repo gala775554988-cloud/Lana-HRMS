@@ -75,3 +75,11 @@ test("advance stops once principal is reached and rejects inconsistent counts", 
   assert.equal(api.advanceSchedule({...input,paidInstallments:2}).next,0);
   assert.throws(()=>api.advanceSchedule({...input,paidInstallments:4}));
 });
+
+test("approved paid annual leave excludes attendance deductions on Saudi calendar dates", () => {
+  const leave = {startDate:new Date("2026-11-09T21:00:00Z"),endDate:new Date("2026-11-12T20:59:00Z"),leaveType:{code:"ANNUAL",isPaid:true}};
+  assert.equal(api.isApprovedPaidAnnualLeaveDay(new Date("2026-11-10T05:00:00Z"),[leave]),true);
+  assert.equal(api.isApprovedPaidAnnualLeaveDay(new Date("2026-11-13T05:00:00Z"),[leave]),false);
+  assert.equal(api.isApprovedPaidAnnualLeaveDay(new Date("2026-11-10T05:00:00Z"),[{...leave,leaveType:{code:"ANNUAL",isPaid:false}}]),false);
+  assert.equal(api.isApprovedPaidAnnualLeaveDay(new Date("2026-11-10T05:00:00Z"),[{...leave,leaveType:{code:"SICK",isPaid:true}}]),false);
+});

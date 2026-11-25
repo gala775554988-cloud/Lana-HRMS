@@ -56,3 +56,8 @@ Do not merge until all acceptance criteria, isolated tests, backup and preview c
 ## Scheduled sync hardening
 - #4/#27: incremental cron uses a token-owned database lease, records failures and checks request-pull errors, and automation health exposes latest cron result and freshness. Five-minute cron config retained. Vercel team response did not disclose plan; production schedule and 70 historical records still unverified. No production writes performed.
 - #23/#29: employee payroll response private no-store and bounded pagination.
+
+## Batch after 9d9ff5f
+- #7/#10/#13: approved paid annual leave is excluded from absence, half-day and late deductions using Saudi calendar dates. No attendance records overwritten. Sick/unpaid leave rules remain separate and need policy acceptance.
+- #6/#9/#15/#26: local completed requests now create a transactional approval timeline record without representing approval as payment; revocation reverses that record. Other business-specific execution still pending.
+- #33: a43b2d67 CI 45611964293 passed all stages; 51cf1a7 fixtures passed but build in progress at check. Added annual leave and workflow regression assertions.

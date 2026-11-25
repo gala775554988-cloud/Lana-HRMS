@@ -8,7 +8,7 @@ async function setup({ type = 'LETTER', leaveCode = 'ANNUAL', self = false, defe
   let state = { instance: { id: 'w', employeeId: 'e', type, entityId: 'r', status: 'PENDING', currentStep: 1 }, steps: [
     { id: 's1', workflowInstanceId: 'w', step: 1, approverUserId: self ? 'requester' : 'manager', status: deferred ? 'DEFERRED' : 'PENDING', capabilities: ['APPROVE', 'REJECT'], comments: '{"stageName":"Manager","slaHours":24}' },
     { id: 's2', workflowInstanceId: 'w', step: 2, approverUserId: 'hr', status: 'WAITING', capabilities: ['APPROVE', 'REJECT'], comments: '{"stageName":"HR","slaHours":24}' },
-  ], entityStatus: 'PENDING', used: 0, audits: [], created: 0 };
+  ], entityStatus: 'PENDING', used: 0, audits: [], created: 0, executions: [] };
   let resolutionCalls = 0;let ledgerEvents = 0;let queue = Promise.resolve();
   const approvers = [{ userId: 'new-manager', isMandatory: true, capabilities: ['APPROVE', 'REJECT'], stageName: 'New manager' }];
   const build = get => ({
@@ -25,6 +25,7 @@ async function setup({ type = 'LETTER', leaveCode = 'ANNUAL', self = false, defe
       updateMany: async ({ where, data }) => { const step = get().steps.find(x => x.id === where.id && where.status.in.includes(x.status) && x.approverUserId === where.approverUserId);if (!step) return { count: 0 };Object.assign(step, data);return { count: 1 }; },
       update: async ({ where, data }) => Object.assign(get().steps.find(x => x.id === where.id), data),
     },
+    employeeRequestExecution: { create: async ({ data }) => { get().executions.push(data); return data; } },
     auditLog: { create: async ({ data }) => { get().audits.push(data);return data; } },
     letterRequest: { update: async ({ data }) => { get().entityStatus = data.status;return data; } },
     expenseRequest: { update: async ({ data }) => { get().entityStatus = data.status;return data; } },
@@ -52,7 +53,7 @@ async function setup({ type = 'LETTER', leaveCode = 'ANNUAL', self = false, defe
 test('requests move strictly from the manager to HR and only then complete', async () => {
   const s = await setup();await assert.rejects(s.decide('hr'), /Forbidden/);
   await s.decide('manager');assert.equal(s.state().instance.status, 'PENDING');assert.equal(s.state().instance.currentStep, 2);assert.equal(s.state().entityStatus, 'PENDING');
-  await s.decide('hr');assert.equal(s.state().instance.status, 'COMPLETED');assert.equal(s.state().entityStatus, 'APPROVED');assert.equal(s.calls(), 0);
+  await s.decide('hr');assert.equal(s.state().instance.status, 'COMPLETED');assert.equal(s.state().entityStatus, 'APPROVED');assert.equal(s.calls(), 0);assert.equal(s.state().executions.length, 1);assert.equal(s.state().executions[0].metadata.paymentConfirmed, false);
   assert.equal(metadata.parseWorkflowStepMetadata(s.state().steps[0].comments).stageName, 'Manager');
 });
 test('self-approval and decisions without an assigned approver are blocked', async () => {

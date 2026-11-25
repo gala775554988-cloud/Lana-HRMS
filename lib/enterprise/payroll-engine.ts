@@ -1,4 +1,4 @@
-import { calculateGosi, resolveGosiCohort, advanceSchedule } from "@/lib/payroll/calculations";
+import { calculateGosi, resolveGosiCohort, advanceSchedule, isApprovedPaidAnnualLeaveDay } from "@/lib/payroll/calculations";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeSalaryProfile } from "@/lib/employee/salary-profile-store";
 import { calculateNetSalary } from "@/lib/employee/salary-profile";
@@ -99,7 +99,7 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
   const { base: baseSalary, currency, profileAllowanceTotal } = await resolveBaseSalary(employeeId);
   if (![baseSalary, profileAllowanceTotal].every(value => Number.isFinite(value) && value >= 0)) throw new Error("بيانات الراتب غير صالحة");
 
-  const [allAllowances, allDeductions, overtimeRequests, bonuses, socialInsurance, loans, advances, attendance] = await Promise.all([
+  const [allAllowances, allDeductions, overtimeRequests, bonuses, socialInsurance, loans, advances, attendance, approvedLeaves] = await Promise.all([
     prisma.allowance.findMany({
       where: { employeeId, NOT: { source: "ODOO", odooPayslipLineId: { not: null } }, effectiveFrom: { lte: periodEnd }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: periodStart } }] }
     }),
@@ -115,6 +115,7 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
     prisma.socialInsuranceRecord.findUnique({ where: { employeeId }, select: { status: true, employeeContributionAmount: true, coverageCohort: true, firstCoverageDate: true } }),
     prisma.loan.findMany({ where: { employeeId, status: "ACTIVE", issuedAt: { lte: periodEnd } }, include: { repaymentSchedule: { where: { dueDate: { gte: periodStart, lte: periodEnd }, remotePaid: false, localPaidAt: null }, orderBy: { dueDate: "asc" } } } }),
     prisma.employeeSalaryAdvance.findMany({ where: { employeeId, status: "APPROVED", startDate: { lte: periodEnd } } }),
+    prisma.leaveRequest.findMany({ where: { employeeId, status: "APPROVED", startDate: { lte: periodEnd }, endDate: { gte: periodStart }, leaveType: { isPaid: true } }, select: { startDate: true, endDate: true, leaveType: { select: { code: true, isPaid: true } } } }),
     prisma.attendanceRecord.findMany({
       where: { employeeId, workDate: { gte: periodStart, lte: periodEnd }, status: { in: ["ABSENT", "LATE", "HALF_DAY"] } },
       select: {
@@ -191,10 +192,11 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
   const advanceDeduction = round2(advanceAllocations.reduce((sum, row) => sum + row.amount, 0));
 
   const dailyRate = baseSalary > 0 ? baseSalary / 30 : 0;
-  const absenceDays = attendance.filter((a) => a.status === "ABSENT").length + attendance.filter((a) => a.status === "HALF_DAY").length * 0.5;
+  const chargeableAttendance = attendance.filter(row => !isApprovedPaidAnnualLeaveDay(row.workDate, approvedLeaves));
+  const absenceDays = chargeableAttendance.filter((a) => a.status === "ABSENT").length + chargeableAttendance.filter((a) => a.status === "HALF_DAY").length * 0.5;
   const absenceDeduction = round2(absenceDays * dailyRate);
   const hourlyRate = baseSalary > 0 ? baseSalary / 240 : 0;
-  const lateDeduction = round2(attendance.filter((row) => row.status === "LATE").reduce((sum, row) => {
+  const lateDeduction = round2(chargeableAttendance.filter((row) => row.status === "LATE").reduce((sum, row) => {
     if (!row.checkIn) throw new Error("سجل تأخير دون وقت حضور؛ راجع البصمة قبل اعتماد المسير");
     const assignment = row.employee.shiftAssignments.find((item) => item.effectiveFrom <= row.workDate && (!item.effectiveTo || item.effectiveTo >= row.workDate));
     if (!assignment?.shift.startTime) throw new Error("لا يوجد جدول دوام صالح لسجل التأخير؛ راجع الدوام قبل احتساب المسير");

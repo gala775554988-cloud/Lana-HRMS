@@ -102,6 +102,7 @@ export async function decideWorkflowStep({
               data: { state: "REVERSED" }
             });
           }
+          await tx.employeeRequestExecution.updateMany({ where: { employeeId: original.employeeId, sourceType: "WORKFLOW", sourceId: original.id, effectType: "APPROVAL_RECORDED" }, data: { state: "REVERSED" } });
           await tx.auditLog.create({ data: { actorUserId, action: "workflow:revoked", entity: "workflowInstance", entityId: original.id, metadata: { revocationWorkflowId: instance.id, comments } } });
         }
       } else if (instance.type === "LEAVE") {
@@ -133,6 +134,15 @@ export async function decideWorkflowStep({
       else if (instance.type === "RESUMPTION") await tx.resumptionRequest.update({ where: { id: instance.entityId }, data: { status } });
       else if (instance.type === "LOAN") await tx.loan.update({ where: { id: instance.entityId }, data: { status: status === "APPROVED" ? "ACTIVE" : status === "REJECTED" ? "CANCELLED" : "PENDING" } });
       else await tx.letterRequest.update({ where: { id: instance.entityId }, data: { status } });
+      // Keep every locally finalized request visible in the employee timeline.
+      // An approval record is not a monetary posting or proof of disbursement.
+      if (workflowStatus === "COMPLETED" && !["LEAVE", "OVERTIME", "REVOKE"].includes(instance.type)) {
+        await tx.employeeRequestExecution.create({ data: {
+          employeeId: instance.employeeId, sourceType: "WORKFLOW", sourceId: instance.id,
+          effectType: "APPROVAL_RECORDED", state: "EXECUTED", executedAt: new Date(),
+          metadata: { requestType: instance.type, entityId: instance.entityId, paymentConfirmed: false }
+        } });
+      }
     }
     await tx.auditLog.create({ data: { actorUserId, action: `workflow:${decision.toLowerCase()}`, entity: "workflowInstance", entityId: workflowInstanceId, metadata: { decision, comments, ip, entityId: instance.entityId, type: instance.type, employeeId: instance.employeeId, step: current.step } } });
     const updated = await tx.workflowInstance.findUniqueOrThrow({ where: { id: instance.id } });

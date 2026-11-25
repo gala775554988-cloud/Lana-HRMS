@@ -77,3 +77,16 @@ export function advanceSchedule(input: { amount: number; monthlyDeduction: numbe
   const next = paidInstallments === installments - 1 ? remaining : Math.min(monthly, remaining);
   return { remaining: remaining / 100, next: next / 100, completeAfterNext: next === remaining };
 }
+
+/** Compare calendar dates in the company's Saudi time zone; never treat paid
+ * approved annual leave as an absence or tardiness deduction. Other leave
+ * categories retain their own reviewed statutory payroll rules. */
+export function isApprovedPaidAnnualLeaveDay(workDate: Date, leaves: { startDate: Date; endDate: Date; leaveType: { code: string; isPaid: boolean } }[]) {
+  const formatter = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh", year: "numeric", month: "2-digit", day: "2-digit" });
+  const dayKey = (date: Date) => {
+    const parts = formatter.formatToParts(date);
+    return Number(["year", "month", "day"].map(type => parts.find(part => part.type === type)?.value ?? "").join(""));
+  };
+  const day = dayKey(workDate);
+  return leaves.some(leave => leave.leaveType.isPaid && leave.leaveType.code.toUpperCase().startsWith("ANNUAL") && dayKey(leave.startDate) <= day && dayKey(leave.endDate) >= day);
+}
