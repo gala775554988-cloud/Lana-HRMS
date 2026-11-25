@@ -53,21 +53,24 @@ function validate(input: FinancialEffectInput): Prisma.Decimal {
   return amount;
 }
 
+export async function postApprovedEffectInTransaction(tx: Prisma.TransactionClient, input: FinancialEffectInput) {
+  const amount = validate(input);
+  await assertSourceApproved(tx, input);
+  await tx.employeeRequestExecution.create({
+    data: { employeeId: input.employeeId, sourceType: input.sourceType, sourceId: input.sourceId,
+      effectType: input.effectType, state: "EXECUTED", executedAt: new Date(), metadata: input.details ?? undefined }
+  });
+  return tx.employeeFinancialEntry.create({
+    data: { employeeId: input.employeeId, sourceType: input.sourceType, sourceId: input.sourceId,
+      effectType: input.effectType, direction: input.direction, amount,
+      currency: input.currency ?? "SAR", payrollRunId: input.payrollRunId, details: input.details ?? undefined }
+  });
+}
+
 export async function postApprovedFinancialEffect(input: FinancialEffectInput) {
   const amount = validate(input);
   try {
-    const record = await prisma.$transaction(async tx => {
-      await assertSourceApproved(tx, input);
-      await tx.employeeRequestExecution.create({
-        data: { employeeId: input.employeeId, sourceType: input.sourceType, sourceId: input.sourceId,
-          effectType: input.effectType, state: "EXECUTED", executedAt: new Date(), metadata: input.details ?? undefined }
-      });
-      return tx.employeeFinancialEntry.create({
-        data: { employeeId: input.employeeId, sourceType: input.sourceType, sourceId: input.sourceId,
-          effectType: input.effectType, direction: input.direction, amount,
-          currency: input.currency ?? "SAR", payrollRunId: input.payrollRunId, details: input.details ?? undefined }
-      });
-    });
+    const record = await prisma.$transaction(tx => postApprovedEffectInTransaction(tx, input));
     return { record, duplicate: false };
   } catch (error) {
     // The database unique key wins even when multiple workers process the same approval.
