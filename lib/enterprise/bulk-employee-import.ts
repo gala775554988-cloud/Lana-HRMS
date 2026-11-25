@@ -545,7 +545,9 @@ export async function importEmployees(rows: ParsedEmployeeRow[], options: BulkIm
       if (!employee) continue;
       const extraKey=`employee.extra.${employee.id}`;
       const oldExtra=await tx.appSetting.findUnique({where:{key:extraKey}});
-      const patch=Object.fromEntries(Object.entries(row.extraValues).filter(([,v])=>v!==undefined&&v!==null&&v!==""));
+      const isNew=newRows.some(r=>normalizeLookup(r.nationalId)===normalizeLookup(row.nationalId));
+      const financialKeys=new Set(["leaveBalance","leaveUsed","iban","bankName","contractType","contractEndDate","costCenter"]);
+      const patch=Object.fromEntries(Object.entries(row.extraValues).filter(([key,v])=>(isNew||!financialKeys.has(key))&&v!==undefined&&v!==null&&v!==""));
       await tx.appSetting.upsert({
         where: { key: extraKey },
         update: { value: {...(oldExtra?.value as Record<string,unknown>??{}),...patch} as any },

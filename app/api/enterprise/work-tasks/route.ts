@@ -1,7 +1,8 @@
 import {NextResponse} from "next/server";
 import {auth} from "@/auth";
 import {prisma} from "@/lib/prisma";
-import {createTaskSchema,taskActionSchema,canTransition,checklistProgress} from "@/lib/enterprise/work-task-rules";
+import {createTaskSchema,taskActionSchema,canTransition,checklistProgress,nextTaskDue} from "@/lib/enterprise/work-task-rules";
+import {buildExcelTable,buildPdfTable} from "@/lib/exports/table-files";
 import {randomUUID} from "node:crypto";
 import type {Prisma} from "@prisma/client";
 export const dynamic="force-dynamic";
@@ -9,7 +10,7 @@ const json=(body:object,status=200)=>NextResponse.json(body,{status,headers:{"Ca
 async function actor(){
  const session=await auth();if(!session?.user?.id)return null;
  const userId=session.user.id,roles=session.user.roles??[];
- const employee=await prisma.employee.findFirst({where:{userId,status:"ACTIVE",archivedAt:null},select:{id:true}});
+ const employee=await prisma.employee.findFirst({where:{userId,status:"ACTIVE",archivedAt:null,OR:[{terminationDate:null},{terminationDate:{gt:new Date()}}]},select:{id:true}});
  const global=roles.includes("SUPER_ADMIN")||roles.includes("HR_MANAGER");
  const assignments=employee?await prisma.supervisorAssignment.findMany({where:{employeeId:employee.id,isActive:true,startDate:{lte:new Date()},OR:[{endDate:null},{endDate:{gte:new Date()}}]},select:{entityType:true,entityId:true}}):[];
  const scope:Prisma.EmployeeWhereInput[]=[];
@@ -18,7 +19,7 @@ async function actor(){
 }
 type Actor=NonNullable<Awaited<ReturnType<typeof actor>>>;
 const access=(a:Actor):Prisma.MadarWorkTaskWhereInput=>({OR:[...(a.employeeId?[{employeeId:a.employeeId}]:[]),{reviewerId:a.userId},{createdById:a.userId},...(a.global?[{id:{not:""}}]:[])]});
-const include={employee:{select:{employeeNumber:true,firstName:true,lastName:true}},checklist:true,comments:{orderBy:{createdAt:"desc" as const},take:30}} as const;
+const include={employee:{select:{employeeNumber:true,firstName:true,lastName:true}},checklist:true,attachments:{select:{id:true,fileName:true,sizeBytes:true,createdAt:true}},comments:{orderBy:{createdAt:"desc" as const},take:30}} as const;
 export async function GET(request:Request){
  const a=await actor();if(!a)return json({success:false},401);
  const q=new URL(request.url).searchParams;
@@ -29,20 +30,33 @@ export async function GET(request:Request){
   return json({success:true,employees,departments});
  }
  const raw=Number(q.get("page")??1),page=Number.isSafeInteger(raw)&&raw>0?Math.min(raw,100000):1,where:Prisma.MadarWorkTaskWhereInput={AND:[access(a),...(q.get("mine")==="true"?[{employeeId:a.employeeId??"__none__"}]:[]),...(q.get("employeeId")?[{employeeId:q.get("employeeId")!}]:[])]};
+ const format=q.get("format");
+ if(format==="xlsx"||format==="pdf"){
+  const limit=format==="pdf"?500:2000;
+  const tasks=await prisma.madarWorkTask.findMany({where,orderBy:[{dueAt:"asc"},{id:"asc"}],take:limit+1,select:{title:true,status:true,priority:true,progress:true,dueAt:true,reviewedAt:true,employee:{select:{employeeNumber:true,firstName:true,lastName:true,department:{select:{name:true}}}}}});
+  if(tasks.length>limit)return json({success:false,message:"عدد التكليفات يتجاوز حد التصدير؛ حدد موظفاً"},422);
+  const rows=tasks.map(t=>({title:t.title,employee:t.employee.employeeNumber+" "+t.employee.firstName+" "+t.employee.lastName,department:t.employee.department?.name??"",status:t.status,priority:t.priority,progress:t.progress,due:t.dueAt.toISOString(),reviewed:t.reviewedAt?.toISOString()??"",late:t.status!=="COMPLETED"&&t.dueAt<new Date()}));
+  const columns=[{key:"title",label:"المهمة"},{key:"employee",label:"الموظف"},{key:"department",label:"القسم"},{key:"status",label:"الحالة"},{key:"priority",label:"الأولوية"},{key:"progress",label:"الإنجاز % "},{key:"due",label:"الاستحقاق"},{key:"reviewed",label:"الاعتماد"},{key:"late",label:"متأخرة"}];
+  const bytes=format==="pdf"?await buildPdfTable("تقرير التكليفات",columns,rows):await buildExcelTable("تقرير التكليفات",columns,rows);
+  await prisma.auditLog.create({data:{actorUserId:a.userId,action:"work-task:export",entity:"MadarWorkTask",metadata:{format,count:rows.length}}});
+  return new NextResponse(new Uint8Array(bytes),{headers:{"Cache-Control":"private, no-store","Content-Type":format==="pdf"?"application/pdf":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","Content-Disposition":'attachment; filename="madar-tasks.'+format+'"'}});
+ }
  const [tasks,total,groups,late]=await Promise.all([prisma.madarWorkTask.findMany({where,include,orderBy:[{dueAt:"asc"},{id:"asc"}],skip:(page-1)*50,take:50}),prisma.madarWorkTask.count({where}),prisma.madarWorkTask.groupBy({where,by:["status"],_count:{id:true}}),prisma.madarWorkTask.count({where:{AND:[where,{status:{not:"COMPLETED"},dueAt:{lt:new Date()}}]}})]);
  return json({success:true,tasks:tasks.map(t=>({...t,assignee:t.employeeId===a.employeeId,reviewer:t.reviewerId===a.userId&&t.employeeId!==a.employeeId})),total,page,groups,late,canAssign:a.canAssign});
 }
 export async function POST(request:Request){
  const a=await actor();if(!a)return json({success:false},401);if(!a.canAssign)return json({success:false},403);
  const parsed=createTaskSchema.safeParse(await request.json().catch(()=>null));if(!parsed.success)return json({success:false,message:"راجع بيانات المهمة والمستلمين"},400);
- const v=parsed.data,due=new Date(v.dueAt);if(due<=new Date())return json({success:false,message:"موعد الاستحقاق يجب أن يكون مستقبلياً"},400);
+ const v=parsed.data,due=new Date(v.dueAt),until=v.repeatUntil?new Date(v.repeatUntil):null;
+ if(until&&(until<=due||until.getTime()-due.getTime()>366*5*86400000))return json({success:false,message:"حدد نهاية تكرار بعد الاستحقاق وبحد أقصى خمس سنوات"},400);
+ const next=v.repeatEvery?nextTaskDue(due,v.repeatEvery,due):null;if(due<=new Date())return json({success:false,message:"موعد الاستحقاق يجب أن يكون مستقبلياً"},400);
  try{
  const count=await prisma.$transaction(async tx=>{
   const selected=await tx.employee.findMany({where:{AND:[{status:"ACTIVE",archivedAt:null,id:{not:a.employeeId??""}},a.global?{}:{OR:a.scope},v.departmentId?{departmentId:v.departmentId}:{id:{in:v.employeeIds}}]},select:{id:true,userId:true},take:101});
   if(!selected.length||selected.length>100||(!v.departmentId&&selected.length!==new Set(v.employeeIds).size))throw Error("المستلمون خارج الصلاحية أو العدد يتجاوز 100");
   const groupKey=randomUUID();
   for(const e of selected){
-   const task=await tx.madarWorkTask.create({data:{employeeId:e.id,createdById:a.userId,reviewerId:a.userId,groupKey,title:v.title,description:v.description,priority:v.priority,dueAt:due,checklist:{create:v.checklist.map(title=>({title}))}}});
+   const task=await tx.madarWorkTask.create({data:{employeeId:e.id,createdById:a.userId,reviewerId:a.userId,groupKey,title:v.title,description:v.description,priority:v.priority,dueAt:due,repeatEvery:v.repeatEvery,repeatUntil:until,nextDueAt:next&&until&&next<=until?next:null,checklist:{create:v.checklist.map(title=>({title}))}}});
    if(e.userId)await tx.notification.create({data:{userId:e.userId,title:"تكليف جديد",body:v.title,type:"INFO",link:"/employee/tasks"}});
    await tx.auditLog.create({data:{actorUserId:a.userId,action:"work-task:create",entity:"MadarWorkTask",entityId:task.id,metadata:{employeeId:e.id,groupKey}}});
   }

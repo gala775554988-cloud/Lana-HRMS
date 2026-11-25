@@ -3025,6 +3025,12 @@ model MadarWorkTask {
  updatedAt DateTime @updatedAt
  comments MadarWorkTaskComment[]
  checklist MadarWorkTaskCheck[]
+ attachments MadarWorkTaskFile[]
+ repeatEvery String?
+ repeatUntil DateTime?
+ nextDueAt DateTime?
+ occurrenceKey String? @unique
+ @@index([nextDueAt])
  @@index([employeeId,status,dueAt])
  @@index([reviewerId,status,dueAt])
  @@index([groupKey])
@@ -3045,4 +3051,17 @@ model MadarWorkTaskCheck {
  title String
  done Boolean @default(false)
  @@index([taskId])
+}
+
+model MadarWorkTaskFile {
+ id String @id @default(cuid())
+ taskId String
+ task MadarWorkTask @relation(fields:[taskId],references:[id],onDelete:Restrict)
+ authorId String
+ fileName String
+ sha256 String
+ bytes Bytes
+ sizeBytes Int
+ createdAt DateTime @default(now())
+ @@unique([taskId,sha256])
 }

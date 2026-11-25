@@ -36,11 +36,11 @@ Baseline: c0a67b1e8957082a556f9f0df3cd4928dac6e2ba. CI: https://github.com/gala7
 | 30 | تطوير التصميم والهوية البصرية | جزئي | ألوان خضراء مركزية وتقارير وأتمتة ورواتب. | فحص جميع الصفحات والأجهزة |
 | 31 | تحسين الأداء والسرعة | جزئي | بحث مؤرشفين محدود وترقيم صفحات؛ لا قياس قبول. | اختبار حمل وفهارس وخفض الاستعلامات |
 | 32 | المحافظة على جميع البيانات الحالية | جزئي | ترحيلات إضافية PostgreSQL ناجحة؛ فحص drift تشخيصي فقط. | نسخة احتياطية إنتاجية ومراجعة الفروقات دون إسقاط فهارس |
-| 33 | الاختبارات الشاملة قبل النشر | جارٍ | 206/206، تكاملان PostgreSQL، تصدير 2/2 وLint ناجحة في 45624237702؛ TypeScript فشل، Build لم يبدأ. | إعادة CI بعد إصلاح الأنواع، E2E ومعاينة |
+| 33 | الاختبارات الشاملة قبل النشر | جارٍ | fd068fe وcd93236 ناجحان بالكامل؛ CI 45625098554: 207/207، تكاملان PostgreSQL، تصدير 2/2، ترحيل وLint وTypeScript وBuild ناجحة. | دفعات الاستيراد والمهام الجديدة قيد الاختبار؛ E2E ومعاينة |
 | 34 | خطة التنفيذ المتواصل | جارٍ | جدول 37 محدّث ومراحل التنفيذ محفوظة. | استمرار إغلاق المهام |
 | 35 | الرفع والدمج والنشر النهائي مرة واحدة | مؤجل | لم يدمج أو ينشر. | نجاح كل بوابات القبول |
 | 36 | التقرير النهائي المطلوب | مؤجل | تقارير مرحلية فقط. | تقرير قبول نهائي ونشر مؤكد |
-| 37 | إدارة المهام والتكليفات – LANA PRO V9.5 Smart Workflow | جزئي | بدأت البرمجة المركزية بناء على التوجيه الأخير؛ ترحيل إضافي، تكليف فردي/جماعي حسب النطاق، كانبان وجدول وتجميع حسب التاريخ، بنود فرعية وتعليقات واعتماد مستقل وإشعارات وتدقيق، ربط مهامي وملف الموظف؛ CI جديد غير مؤكد. | مرفقات فعلية، تكرار دوري، تقويم شهري، تصعيد وأحداث HR، تقارير وتصدير، استيراد JSON، تكامل واختبار قبول |
+| 37 | إدارة المهام والتكليفات – LANA PRO V9.5 Smart Workflow | جزئي | بدأت البرمجة المركزية بناء على التوجيه الأخير؛ ترحيل إضافي، تكليف فردي/جماعي حسب النطاق، كانبان وجدول وتجميع حسب التاريخ، بنود فرعية وتعليقات واعتماد مستقل وإشعارات وتدقيق، ربط مهامي وملف الموظف؛ مرفقات ثنائية محدودة وآمنة، تكرار بأربعة أنواع وتذكير تأخير يومي، تصدير Excel/PDF مبرمج؛ CI جديد غير مؤكد. | تقويم شهري، تصعيد متدرج وأحداث HR، مؤشرات تفصيلية، إيقاف/تعديل السلاسل، استيراد JSON، تكامل واختبار قبول، تفعيل الجدولة |
 
 ## Release gate
 Do not merge until all 37 acceptance criteria, isolated tests, backup and preview checks pass. Continue #37 alongside remaining internal work per latest instruction; external blockers do not defer coding, but remain release gates. No real transfers or destructive operations during tests.
@@ -146,3 +146,7 @@ Do not merge until all 37 acceptance criteria, isolated tests, backup and previe
 
 ## Central task foundation after 08ae002
 - #37/#15/#23: added separate relational MadarWorkTask/checklist/comment models, group assignment up to 100 to selected active employees or department within supervisor assignments or HR authority; no employee self-assignment through manager endpoint; assignee progress, reviewer transition, optimistic concurrency, transactional notifications and audit. Kanban drop calls server validation; table and date grouping are not yet full calendar. Legacy personal task data unchanged and shown separately. Employee profile has scoped task view. No financial penalties, no deletes. Unit checks added; actual integration and build pending. Attachments, recurrence, HR event tasks, escalation, JSON import, full KPI/report exports and dedicated navigation remain unfinished. #37 is started but not accepted.
+
+## Task files, scheduled recurrence and reports
+- CI 45624898499 and 45625098554 completed successfully (207 unit tests, two PostgreSQL integrations, two export tests, lint, typecheck and build). #19 local journal integration verified in test DB only.
+- #37: bounded binary PDF/PNG/JPEG attachments with signature-header checks, dedupe, scoped access, audited forced download (not malware scanning); scoped Excel/PDF reports; daily/weekly/monthly/yearly recurrence with end date and unique occurrence keys; scheduled daily late reminders to assignee and reviewer; no payroll effects. Scheduler still opt-in external and unverified, recurrence backlog capped, task HR event generation, true calendar, escalation and JSON import remain. #22: existing financial/contract/leave extra fields excluded from spreadsheet update. New CI pending.
