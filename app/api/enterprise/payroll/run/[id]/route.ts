@@ -151,7 +151,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     updated = await prisma.$transaction(async (tx) => {
       const claimed = await tx.payrollRun.updateMany({ where: { id, status: run.status, updatedAt: run.updatedAt }, data });
       if (claimed.count !== 1) throw new Error("تغير المسير أثناء الإجراء؛ حدّث الصفحة");
-      if (action === "approve" || action === "pay") {
+      if (action === "submit" || action === "approve" || action === "pay") {
         const computation = await tx.appSetting.findUnique({ where: { key: `payroll.compute.${id}` } });
         if (Number((computation?.value as { errorCount?: number } | null)?.errorCount ?? 0) > 0) throw new Error("توجد أخطاء احتساب غير معالجة؛ أعد احتساب المسير قبل الاعتماد");
         const items = await tx.payrollItem.findMany({ where: { payrollRunId: id } });
