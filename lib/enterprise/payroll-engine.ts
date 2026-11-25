@@ -209,6 +209,8 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
     insuranceDeduction + taxTotal + loanDeduction + advanceDeduction + absenceDeduction + lateDeduction + penaltyDeduction + otherDeductionTotal
   );
   const netPay = round2(grossPay - deductionTotal);
+  if (![grossPay, deductionTotal, netPay].every(Number.isFinite) || grossPay < 0 || deductionTotal < 0) throw new Error("إجماليات المسير غير صالحة");
+  if (netPay < 0) throw new Error("صافي الراتب سالب؛ راجع الاستقطاعات والتسويات قبل اعتماد المسير");
 
   return {
     baseSalary: round2(baseSalary),
@@ -270,7 +272,7 @@ export async function computeAndUpsertPayrollItems(
   if (!["DRAFT", "PROCESSING"].includes(run.status)) throw new Error("المسير معتمد أو مقفل");
   if (await prisma.payrollItem.count({ where: { payrollRunId: runId, odooPayslipId: { not: null } } })) throw new Error("مسير مستورد من Odoo؛ حدّثه من كشوف Odoo بدلاً من إعادة احتسابه محلياً");
   const employeeWhere: Record<string, unknown> = { status: "ACTIVE" };
-  if (scope.employeeIds?.length) employeeWhere.id = { in: scope.employeeIds };
+  if (scope.employeeIds !== undefined) employeeWhere.id = { in: scope.employeeIds };
   if (scope.companyId) employeeWhere.companyId = scope.companyId;
   if (scope.branchId) employeeWhere.branchId = scope.branchId;
   if (scope.departmentId) employeeWhere.departmentId = scope.departmentId;
