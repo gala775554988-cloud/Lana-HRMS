@@ -114,7 +114,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       entityId: id,
       metadata: { employeeCount, errors: errorCount }
     });
-    return NextResponse.json({ success: true, computed: items.length, errors: errorCount });
+    return NextResponse.json({ success: errorCount === 0 && employeeCount > 0, computed: errorCount ? 0 : items.length, errors: errorCount, ...(errorCount || !employeeCount ? { message: "لم يكتمل إعادة الاحتساب؛ راجع أخطاء المسير" } : {}) }, { status: errorCount || !employeeCount ? 422 : 200 });
   }
 
   const transitions: Record<string, { from: PayrollStatus[]; to: PayrollStatus; requiresApprover?: boolean }> = {
