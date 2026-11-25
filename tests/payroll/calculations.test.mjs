@@ -48,3 +48,14 @@ test('final settlement includes reviewed leave encashment, unpaid wages and fina
  assert.equal(result.entitlements,13500);assert.equal(result.deductions,1000);assert.equal(result.netSettlement,12500);
  assert.throws(()=>api.calculateFinalSettlement({eosb:-1,unpaidSalary:0,leaveEncashment:0,otherEntitlements:0,deductions:0,outstandingLoans:0}));
 });
+
+test('invalid coverage dates and excessive excluded service days are rejected', () => {
+  assert.throws(() => api.resolveGosiCohort(null, new Date('invalid'), new Date('2024-07-03')));
+  assert.throws(() => api.resolveGosiCohort('UNKNOWN', null, null));
+  assert.throws(() => api.calculateEosb({ startDate: new Date('2026-01-01'), endDate: new Date('2026-01-02'), monthlyWage: 6000, reason: 'TERMINATION', excludedDays: 2 }));
+});
+test('bank review rejects duplicate employee rows and whitespace-prefixed formulas', () => {
+  const row = { employeeNumber: 'E1', iban: 'SA0380000000608010167519', net: 1000, currency: 'SAR' };
+  assert.throws(() => api.buildBankReviewCsv([row, {...row}]));
+  assert.throws(() => api.buildBankReviewCsv([{...row, employeeNumber: '  =1+1'}]));
+});
