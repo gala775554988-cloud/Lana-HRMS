@@ -20,6 +20,10 @@
     {
       "path": "/api/integrations/odoo/cron-reconcile",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/integrations/odoo/cron-repair",
+      "schedule": "*/30 * * * *"
     }
   ],
   "headers": [
