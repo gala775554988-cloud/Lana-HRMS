@@ -53,7 +53,14 @@ test('failed calculations are not reported as successful', () => {
 });
 test('local payroll requires complete calculation and preserves drafts on errors', () => {
   assert.ok(detail.includes('summary.employeeCount !== items.length'));
-  assert.ok(engine.includes('if (errorCount) return'));
+  assert.ok(engine.includes('if (errorCount || !employees.length) return'));
   assert.ok(engine.includes('!Number.isFinite(breakdown[field])'));
   assert.ok(engine.includes('!matchedIds.has(employeeId)'));
+});
+
+test('failed drafts recover the original employee scope', () => {
+  assert.ok(route.includes('payroll.scope.'));
+  assert.ok(detail.includes('payroll.scope.'));
+  assert.ok(engine.includes('scope.employeeIds ?? employees.map(employee => employee.id)'));
+  assert.ok(detail.includes('employeeIds = scope.employeeIds'));
 });
