@@ -2,19 +2,13 @@ import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getCurrentEmployeeCached } from "@/lib/employee/employee-cache";
-import { resolveRoleDashboard } from "@/config/auth";
+import { DEFAULT_LOGIN_REDIRECT, resolveRoleDashboard } from "@/config/auth";
 import { EmployeeTopBar } from "@/components/employee/EmployeeTopBar";
 import { EmployeeDesktopSidebar } from "@/components/employee/EmployeeDesktopSidebar";
 import { EmployeeMobileSidebar } from "@/components/employee/EmployeeMobileSidebar";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 export const dynamic = "force-dynamic";
-
-const NON_EMPLOYEE_ROLES = [
-  "SUPER_ADMIN", "HR_MANAGER", "PAYROLL_MANAGER", "PAYROLL_OFFICER", "RECRUITER",
-  "MANAGER", "HR", "DEPARTMENT_MANAGER", "BRANCH_MANAGER",
-  "SUPERVISOR", "PROJECT_MANAGER",
-];
 
 function NotLinkedError() {
   return (
@@ -51,18 +45,16 @@ export default async function EmployeeLayout({ children }: { children: ReactNode
 
   const roles: string[] = (session.user as any).roles ?? [];
 
-  // Non-employee role trying to access employee portal → redirect to their dashboard
-  const isEmployee = roles.includes("EMPLOYEE");
-  const hasAdminRole = roles.some((r) => NON_EMPLOYEE_ROLES.includes(r));
+  const target = resolveRoleDashboard(roles, Boolean(session.user.hasGrantedAdminAccess));
 
-  if (!isEmployee && hasAdminRole) {
-    const target = resolveRoleDashboard(roles, Boolean(session.user.hasGrantedAdminAccess));
+  // Preserve personal portal access for linked employees, including dual-role users.
+  const employee = await getCurrentEmployeeCached();
+  if (!employee && target !== DEFAULT_LOGIN_REDIRECT) {
     redirect(target);
   }
 
   try {
     // EMPLOYEE role: look up employee profile
-    const employee = await getCurrentEmployeeCached().catch(() => null);
 
     // EMPLOYEE with valid session but no linked employee record → show error, NOT redirect to /login
     if (!employee) {
