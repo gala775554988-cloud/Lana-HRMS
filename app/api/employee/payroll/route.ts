@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   const employee = await prisma.employee.findFirst({ where: { userId: session.user.id }, select: { id: true } });
   if (!employee) return NextResponse.json({ success: false }, { status: 403 });
   const pageInput = Number(new URL(request.url).searchParams.get("page") ?? 1);
-  const page = Number.isSafeInteger(pageInput) && pageInput > 0 ? pageInput : 1;
+  const page = Number.isSafeInteger(pageInput) && pageInput > 0 ? Math.min(pageInput, 1000000) : 1;
   const paid = { employeeId: employee.id, payrollRun: paidPayslipRun };
   const [items, total, loans, advances, aggregate] = await Promise.all([
     prisma.payrollItem.findMany({ where: paid, include: { payrollRun: { select: { name: true, period: true, paidAt: true, status: true } } }, orderBy: latestPayslipFirst, take: 20, skip: (page - 1) * 20 }),
@@ -17,5 +17,5 @@ export async function GET(request: Request) {
     prisma.employeeSalaryAdvance.findMany({ where: { employeeId: employee.id }, select: { id: true, amount: true, monthlyDeduction: true, paidInstallments: true, installments: true, startDate: true, status: true } }),
     prisma.payrollItem.groupBy({ by: ["currency"], where: paid, _sum: { netPay: true, deductionTotal: true, grossPay: true } }),
   ]);
-  return NextResponse.json({ success: true, items, total, page, loans, advances, totalsByCurrency: aggregate });
+  return NextResponse.json({ success: true, items, total, page, loans, advances, totalsByCurrency: aggregate }, { headers: { "Cache-Control": "private, no-store" } });
 }

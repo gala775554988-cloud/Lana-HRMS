@@ -10,7 +10,7 @@ export default async function AutomationHealthPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   if (!canApprovePayroll(session)) notFound();
-  const [failed, migration, details, queue, syncs] = await Promise.all([
+  const [failed, migration, details, queue, syncs, lastCron] = await Promise.all([
     prisma.odooMigrationError.count({ where: { status: "OPEN" } }),
     prisma.odooMigrationJob.count({ where: { status: { in: ["FAILED", "COMPLETED_WITH_ERRORS"] } } }),
     prisma.integrationJob.count({ where: { type: "ODOO_EMPLOYEE_DETAIL_SYNC", status: { in: ["PENDING", "RETRY"] } } }),
@@ -19,7 +19,8 @@ export default async function AutomationHealthPage() {
       orderBy: { startedAt: "desc" }, take: 15,
       select: { id: true, entity: true, status: true, startedAt: true, finishedAt: true,
         pulled: true, createdCount: true, updatedCount: true, error: true }
-    })
+    }),
+    prisma.auditLog.findFirst({ where: { entity: "odoo", action: { in: ["ODOO_CRON_SYNC", "ODOO_CRON_SYNC_BLOCKED", "ODOO_CRON_SYNC_FAILED"] } }, orderBy: { createdAt: "desc" }, select: { action: true, createdAt: true } })
   ]);
   const cards = [
     { label: "أخطاء Odoo المفتوحة", value: failed },
@@ -36,6 +37,11 @@ export default async function AutomationHealthPage() {
           إدارة الترحيل
         </Link>
       </header>
+      <section className="rounded-xl border bg-card p-4">
+        <h2 className="font-semibold">المزامنة المجدولة (كل 5 دقائق)</h2>
+        <p className="mt-2 text-sm">{!lastCron ? "لا توجد عملية مجدولة موثقة بعد." : lastCron.action !== "ODOO_CRON_SYNC" ? "آخر محاولة لم تكتمل بنجاح." : Date.now() - lastCron.createdAt.getTime() > 600000 ? "تنبيه: مضى أكثر من عشر دقائق على آخر نجاح." : "آخر تشغيل ناجح خلال عشر دقائق."}</p>
+        {lastCron && <p className="text-sm text-muted-foreground">{lastCron.createdAt.toLocaleString("ar-SA", { timeZone: "Asia/Riyadh" })}</p>}
+      </section>
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map(card => <article key={card.label} className="rounded-2xl border border-[#DCECD3] bg-[#F7FAF5] p-5 shadow-sm">
           <p className="text-sm text-slate-600">{card.label}</p>

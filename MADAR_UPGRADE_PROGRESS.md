@@ -52,3 +52,7 @@ Do not merge until all acceptance criteria, isolated tests, backup and preview c
 ## Batch after a43b2d67
 - #8/#10/#11/#14: shared advanceSchedule integer-halalas calculation in payroll engine, settlement and employee salary display. Last installment absorbs rounding; paid advances stop; frozen amount changes require recomputation. Existing closed records are not reopened. Disbursement approval separation still pending.
 - #33: added final-installment regression tests. Prior CI 45611964293 passed fixture and export stages; full build not yet confirmed.
+
+## Scheduled sync hardening
+- #4/#27: incremental cron uses a token-owned database lease, records failures and checks request-pull errors, and automation health exposes latest cron result and freshness. Five-minute cron config retained. Vercel team response did not disclose plan; production schedule and 70 historical records still unverified. No production writes performed.
+- #23/#29: employee payroll response private no-store and bounded pagination.

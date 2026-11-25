@@ -11,7 +11,7 @@ export async function GET() {
   if (!session?.user?.id) return NextResponse.json({ success: false }, { status: 401 });
   if (!canApprovePayroll(session)) return NextResponse.json({ success: false }, { status: 403 });
 
-  const [migrationOpen, migrationFailed, detailPending, detailFailed, queuePending, lastSyncs, lastFailures] =
+  const [migrationOpen, migrationFailed, detailPending, detailFailed, queuePending, lastSyncs, lastCron, lastFailures] =
     await Promise.all([
       prisma.odooMigrationError.count({ where: { status: "OPEN" } }),
       prisma.odooMigrationJob.count({ where: { status: { in: ["FAILED", "COMPLETED_WITH_ERRORS"] } } }),
@@ -23,6 +23,7 @@ export async function GET() {
         select: { id: true, entity: true, status: true, startedAt: true, finishedAt: true,
           pulled: true, pushed: true, createdCount: true, updatedCount: true, error: true }
       }),
+      prisma.auditLog.findFirst({ where: { entity: "odoo", action: { in: ["ODOO_CRON_SYNC", "ODOO_CRON_SYNC_BLOCKED", "ODOO_CRON_SYNC_FAILED"] } }, orderBy: { createdAt: "desc" }, select: { action: true, createdAt: true } }),
       prisma.integrationLog.findMany({
         where: { level: { in: ["ERROR", "WARN", "WARNING"] } },
         orderBy: { createdAt: "desc" }, take: 10,
@@ -32,6 +33,6 @@ export async function GET() {
   return NextResponse.json({
     success: true, capturedAt: new Date().toISOString(),
     counters: { migrationOpen, migrationFailed, detailPending, detailFailed, queuePending },
-    lastSyncs, lastFailures
+    lastSyncs, lastFailures, lastCron, cronFresh: lastCron?.action === "ODOO_CRON_SYNC" && Date.now() - lastCron.createdAt.getTime() <= 10 * 60_000
   }, { headers: { "Cache-Control": "private, no-store" } });
 }

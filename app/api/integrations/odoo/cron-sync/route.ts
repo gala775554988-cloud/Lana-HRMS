@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { OdooSyncService, hasInternalSyncToken } from "@/lib/integrations/odoo/sync";
 import { writeAuditLog } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
+import { randomUUID } from "node:crypto";
 import type { SyncEntity, SyncResult } from "@/lib/integrations/odoo/types";
 
 export const runtime = "nodejs";
@@ -21,6 +22,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   }
 
+  const leaseKey = "odoo.cron.incremental.lease";
+  const token = randomUUID();
+  const startedAt = new Date();
+  // The function limit is 300 seconds. Lease slightly beyond that limit so
+  // an overlapping invocation never races incremental writes.
+  await prisma.appSetting.upsert({ where: { key: leaseKey }, create: { key: leaseKey, value: { until: 0 } }, update: {} });
+  const claim = await prisma.appSetting.updateMany({ where: { key: leaseKey, value: { path: ["until"], lte: Date.now() } }, data: { value: { until: Date.now() + 330000, token } } });
+  if (claim.count !== 1) return NextResponse.json({ success: false, inProgress: true }, { status: 409 });
   try {
     // Never silently discard failed request reconciliation.
     const requestRetries = await retryPendingRequests(2);
@@ -44,17 +53,20 @@ export async function GET(request: NextRequest) {
       skipped: results.reduce((sum, row) => sum + row.skipped, 0),
       errors: results.flatMap(row => row.errors)
     };
-    if (result.errors.length) {
+    if (result.errors.length || requestSync.errors.length) {
       await writeAuditLog({ action: "ODOO_CRON_SYNC_BLOCKED", entity: "odoo", metadata: {
-        errors: result.errors.slice(0, 100), pulled: result.pulled, created: result.created, updated: result.updated
+        errors: [...result.errors, ...requestSync.errors].slice(0, 100), pulled: result.pulled, created: result.created, updated: result.updated
       } }).catch(() => undefined);
       return NextResponse.json({ success: false, blocked: true,
         message: "Incremental Odoo sync completed with errors; see the sync history", result, results },
         { status: 422 });
     }
-    await writeAuditLog({ action: "ODOO_CRON_SYNC", entity: "odoo", metadata: { entity: result.entity, pulled: result.pulled, pushed: result.pushed, created: result.created, updated: result.updated, skipped: result.skipped, errors: result.errors.length, pendingDetailJobs } }).catch(() => undefined);
+    await writeAuditLog({ action: "ODOO_CRON_SYNC", entity: "odoo", metadata: { entity: result.entity, startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString(), pulled: result.pulled, pushed: result.pushed, created: result.created, updated: result.updated, skipped: result.skipped, errors: result.errors.length, pendingDetailJobs, requestSyncEnabled: requestSync.enabled } });
     return NextResponse.json({ success: true, result, results, requestRetries, requestSync, pendingDetailJobs });
   } catch (error) {
-    return NextResponse.json({ success: false, message: error instanceof Error ? error.message : String(error) }, { status: 500 });
+    await writeAuditLog({ action: "ODOO_CRON_SYNC_FAILED", entity: "odoo", metadata: { startedAt: startedAt.toISOString() } }).catch(() => undefined);
+    return NextResponse.json({ success: false, message: "Odoo sync failed; review server logs and integration history" }, { status: 500 });
+  } finally {
+    await prisma.appSetting.updateMany({ where: { key: leaseKey, value: { path: ["token"], equals: token } }, data: { value: { until: 0 } } });
   }
 }
