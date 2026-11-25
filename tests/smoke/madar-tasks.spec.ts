@@ -57,6 +57,11 @@ test.describe("MADAR isolated browser acceptance",()=>{
    await expect(worker.getByRole("heading",{name:"مهامي المركزية"})).toBeVisible({timeout:30000});
    const card=worker.locator("article").filter({has:worker.getByRole("heading",{name:title,exact:true})});
    console.log("CI: mobile task card loaded");
+   // The iOS installation notice is allowed to remain visible, but it must
+   // not be a fixed overlay over employee controls.
+   const installNotice=worker.getByRole("status").filter({hasText:"ثبّت MADAR HR كتطبيق"});
+   await expect(installNotice).toBeVisible({timeout:10000});
+   expect(await installNotice.evaluate(el=>getComputedStyle(el).position)).not.toBe("fixed");
    await card.getByRole("button",{name:"بدء",exact:true}).click();
    await expect(card.getByRole("checkbox",{name:"CI checklist"})).toBeEnabled();
    await card.getByRole("checkbox",{name:"CI checklist"}).check();

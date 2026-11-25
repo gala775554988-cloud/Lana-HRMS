@@ -84,9 +84,8 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             <ThemeProvider>
               <PWARegister />
               <I18nRuntime initialLocale={locale} />
-              {children}
-
               <PWAInstallPrompt />
+              {children}
             </ThemeProvider>
           </QueryProvider>
         </SessionProvider>

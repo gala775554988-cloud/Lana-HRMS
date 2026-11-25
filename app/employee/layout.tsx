@@ -62,7 +62,7 @@ export default async function EmployeeLayout({ children }: { children: ReactNode
     }
 
     return (
-      <div className="min-h-screen bg-background text-foreground">
+      <div className="employee-portal-shell min-h-screen bg-background text-foreground">
         <EmployeeTopBar user={session.user} employee={employee} />
 
         <div className="flex">

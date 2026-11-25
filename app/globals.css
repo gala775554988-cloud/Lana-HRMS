@@ -87,6 +87,9 @@
   }
   * { @apply border-border; }
   html { scroll-behavior: smooth; }
+  /* Work controls should scroll immediately into view rather than drift under
+     a touch target while the browser dispatches a click. */
+  html:has(.employee-portal-shell) { scroll-behavior: auto; scroll-padding-top: 5rem; scroll-padding-bottom: 6rem; }
   body {
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-ibm-plex-arabic), "Segoe UI", Tahoma, sans-serif;

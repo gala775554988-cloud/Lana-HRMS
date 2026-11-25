@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import { BrandLogo } from "@/components/brand/brand-logo";
 
 type BeforeInstallPromptEvent = Event & {
@@ -28,6 +29,12 @@ function isIOS() {
 }
 
 export function PWAInstallPrompt() {
+  const pathname = usePathname();
+  // Installation/update notices must not cover work controls. On internal
+  // screens place the notice in normal document flow, above the workspace.
+  const placement = pathname === "/" || pathname === "/login"
+    ? "fixed inset-x-3 bottom-3 z-[60] mx-auto max-w-md"
+    : "relative mx-auto my-3 w-[calc(100%_-_1.5rem)] max-w-md";
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [showIOSHelp, setShowIOSHelp] = useState(false);
@@ -84,7 +91,7 @@ export function PWAInstallPrompt() {
 
   if (updateAvailable) {
     return (
-      <div className="fixed inset-x-3 bottom-3 z-[60] mx-auto max-w-md rounded-2xl border border-primary/30 bg-white/95 p-4 text-slate-900 shadow-2xl backdrop-blur dark:border-primary/40 dark:bg-slate-950/95 dark:text-slate-50">
+      <div className={placement + " rounded-2xl border border-primary/30 bg-white/95 p-4 text-slate-900 shadow-2xl backdrop-blur dark:border-primary/40 dark:bg-slate-950/95 dark:text-slate-50"} role="status">
         <div className="flex items-start gap-3">
           <BrandLogo href={null} size="sm" showText={false} />
           <div className="min-w-0 flex-1">
@@ -117,7 +124,7 @@ export function PWAInstallPrompt() {
   if (!isVisible || isStandaloneDisplayMode()) return null;
 
   return (
-    <div className="fixed inset-x-3 bottom-3 z-[60] mx-auto max-w-md rounded-2xl border border-slate-200 bg-white/95 p-4 text-slate-900 shadow-2xl backdrop-blur dark:border-slate-700 dark:bg-slate-950/95 dark:text-slate-50">
+    <div className={placement + " rounded-2xl border border-slate-200 bg-white/95 p-4 text-slate-900 shadow-2xl backdrop-blur dark:border-slate-700 dark:bg-slate-950/95 dark:text-slate-50"} role="status">
       <div className="flex items-start gap-3">
         <BrandLogo href={null} size="sm" showText={false} />
         <div className="min-w-0 flex-1">
