@@ -44,6 +44,7 @@ const navItems: Array<{ href: string; label: string; icon: typeof LayoutDashboar
   { href: "/employees", label: "الموظفون", icon: Users, resource: "employees" },
   { href: "/hospitals", label: "المستشفيات", icon: Building2, resource: "hospitals" },
   { href: "/request-center", label: "الطلبات", icon: GitPullRequest, resource: ["leave", "requests"] },
+  { href: "/work-tasks", label: "المهام والتكليفات", icon: CalendarClock, resource: ["employees","requests"] },
   { href: "/contracts", label: "العقود", icon: FileText, resource: "contracts" },
   { href: "/documents", label: "المستندات", icon: FileText, resource: "documents" },
   { href: "/recruitment", label: "التوظيف والمرشحون", icon: UserPlus, resource: "recruitment" },

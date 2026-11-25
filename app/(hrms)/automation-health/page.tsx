@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { HrEventTaskPolicy } from "@/components/enterprise/HrEventTaskPolicy";
 import { AutomationRules } from "@/components/enterprise/automation-rules";
 import { OdooRepairConsole } from "@/components/integrations/odoo-repair-console";
 import { canApprovePayroll } from "@/lib/enterprise/payroll-permissions";
@@ -69,6 +70,7 @@ export default async function AutomationHealthPage() {
         {!syncs.length && <p className="p-6 text-center text-slate-500">لم تُسجل عمليات مزامنة بعد.</p>}
       </section>
       <AutomationRules/>
+      <HrEventTaskPolicy/>
       <OdooRepairConsole/>
       <p className="text-xs text-slate-500">تعمل الجدولة الخارجية بعد نشر الإصدار النهائي وتهيئة سر المزامنة وتفعيل الجدولة. لا يعد وجود الإعداد دليلاً على التشغيل.</p>
     </main>
