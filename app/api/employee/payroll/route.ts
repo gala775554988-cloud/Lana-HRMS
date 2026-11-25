@@ -13,8 +13,8 @@ export async function GET(request: Request) {
   const [items, total, loans, advances, aggregate] = await Promise.all([
     prisma.payrollItem.findMany({ where: paid, include: { payrollRun: { select: { name: true, period: true, paidAt: true, status: true } } }, orderBy: latestPayslipFirst, take: 20, skip: (page - 1) * 20 }),
     prisma.payrollItem.count({ where: paid }),
-    prisma.loan.findMany({ where: { employeeId: employee.id }, select: { id: true, loanNumber: true, principalAmount: true, outstandingAmount: true, installmentAmount: true, currency: true, issuedAt: true, status: true } }),
-    prisma.employeeSalaryAdvance.findMany({ where: { employeeId: employee.id }, select: { id: true, amount: true, monthlyDeduction: true, paidInstallments: true, installments: true, startDate: true, status: true } }),
+    prisma.loan.findMany({ where: { employeeId: employee.id }, select: { id: true, loanNumber: true, principalAmount: true, outstandingAmount: true, installmentAmount: true, currency: true, issuedAt: true, status: true,disbursementRequired:true,disbursedAt:true } }),
+    prisma.employeeSalaryAdvance.findMany({ where: { employeeId: employee.id }, select: { id: true, amount: true, monthlyDeduction: true, paidInstallments: true, installments: true, startDate: true, status: true,disbursementRequired:true,disbursedAt:true } }),
     prisma.payrollItem.groupBy({ by: ["currency"], where: paid, _sum: { netPay: true, deductionTotal: true, grossPay: true } }),
   ]);
   return NextResponse.json({ success: true, items, total, page, loans, advances, totalsByCurrency: aggregate }, { headers: { "Cache-Control": "private, no-store" } });

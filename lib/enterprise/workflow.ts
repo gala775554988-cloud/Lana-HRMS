@@ -148,7 +148,7 @@ export async function decideWorkflowStep({
       }
       else if (instance.type === "EXPENSE") await tx.expenseRequest.update({ where: { id: instance.entityId }, data: { status } });
       else if (instance.type === "RESUMPTION") await tx.resumptionRequest.update({ where: { id: instance.entityId }, data: { status } });
-      else if (instance.type === "LOAN") await tx.loan.update({ where: { id: instance.entityId }, data: { status: status === "APPROVED" ? "ACTIVE" : status === "REJECTED" ? "CANCELLED" : "PENDING" } });
+      else if (instance.type === "LOAN") await tx.loan.update({ where: { id: instance.entityId }, data: { status: status === "APPROVED" ? "ACTIVE" : status === "REJECTED" ? "CANCELLED" : "PENDING", ...(status==="APPROVED"?{disbursementRequired:true,disbursedAt:null}:{}) } });
       else await tx.letterRequest.update({ where: { id: instance.entityId }, data: { status } });
       // Keep every locally finalized request visible in the employee timeline.
       // An approval record is not a monetary posting or proof of disbursement.

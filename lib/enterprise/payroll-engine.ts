@@ -114,8 +114,8 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
       where: { employeeId, status: "APPROVED", awardedDate: { gte: periodStart, lte: periodEnd }, includedInPayrollAt: null }
     }),
     prisma.socialInsuranceRecord.findUnique({ where: { employeeId }, select: { status: true, employeeContributionAmount: true, subjectWage: true, currency: true, coverageCohort: true, firstCoverageDate: true } }),
-    prisma.loan.findMany({ where: { employeeId, status: "ACTIVE", issuedAt: { lte: periodEnd } }, include: { repaymentSchedule: { where: { dueDate: { gte: periodStart, lte: periodEnd }, remotePaid: false, localPaidAt: null }, orderBy: { dueDate: "asc" } } } }),
-    prisma.employeeSalaryAdvance.findMany({ where: { employeeId, status: "APPROVED", startDate: { lte: periodEnd } } }),
+    prisma.loan.findMany({ where: { employeeId, status: "ACTIVE", issuedAt: { lte: periodEnd }, OR:[{disbursementRequired:false},{disbursedAt:{lte:periodEnd}}] }, include: { repaymentSchedule: { where: { dueDate: { gte: periodStart, lte: periodEnd }, remotePaid: false, localPaidAt: null }, orderBy: { dueDate: "asc" } } } }),
+    prisma.employeeSalaryAdvance.findMany({ where: { employeeId, status: "APPROVED", startDate: { lte: periodEnd }, OR:[{disbursementRequired:false},{disbursedAt:{lte:periodEnd}}] } }),
     prisma.leaveRequest.findMany({ where: { employeeId, status: "APPROVED", startDate: { lte: periodEnd }, OR: [{endDate:{gte:periodStart}},{leaveType:{code:{startsWith:"SICK",mode:"insensitive"}}}] }, select: { startDate: true, endDate: true, days:true, leaveType: { select: { code: true, isPaid: true } } } }),
     prisma.attendanceRecord.findMany({
       where: { employeeId, workDate: { gte: periodStart, lte: periodEnd }, status: { in: ["ABSENT", "LATE", "HALF_DAY"] } },

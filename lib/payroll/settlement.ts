@@ -19,7 +19,7 @@ export async function consumeApprovedPayroll(tx: Transaction, snapshot: PayrollB
   for (const row of snapshot.loanAllocations) {
     const remaining = money(row.outstanding - row.amount);
     if (!Number.isFinite(remaining) || remaining < 0 || row.amount <= 0) throw new Error("قسط غير صالح");
-    const changed = await tx.loan.updateMany({ where: { id: row.id, employeeId, status: "ACTIVE", outstandingAmount: row.outstanding }, data: { outstandingAmount: remaining, status: remaining === 0 ? "PAID" : "ACTIVE" } });
+    const changed = await tx.loan.updateMany({ where: { id: row.id, employeeId, status: "ACTIVE", outstandingAmount: row.outstanding, OR:[{disbursementRequired:false},{disbursedAt:{not:null}}] }, data: { outstandingAmount: remaining, status: remaining === 0 ? "PAID" : "ACTIVE" } });
     if (changed.count !== 1) throw new Error("تغير رصيد القرض بعد الاعتماد؛ يلزم مراجعة المسير");
     if (row.installmentIds?.length) {
       const installments = await tx.odooLoanInstallment.findMany({ where: { id: { in: row.installmentIds }, loanId: row.id, remotePaid: false, localPaidAt: null } });
@@ -30,7 +30,7 @@ export async function consumeApprovedPayroll(tx: Transaction, snapshot: PayrollB
   }
   for (const row of snapshot.advanceAllocations) {
     const advance = await tx.employeeSalaryAdvance.findUnique({ where: { id: row.id } });
-    if (!advance || advance.employeeId !== employeeId || advance.status !== "APPROVED" || advance.paidInstallments !== row.paidInstallments || row.amount <= 0) throw new Error("تغير قسط السلفة بعد الاعتماد");
+    if (!advance || advance.employeeId !== employeeId || advance.status !== "APPROVED" || (advance.disbursementRequired&&!advance.disbursedAt) || advance.paidInstallments !== row.paidInstallments || row.amount <= 0) throw new Error("تغير قسط السلفة بعد الاعتماد");
     const schedule = advanceSchedule({ amount: Number(advance.amount), monthlyDeduction: Number(advance.monthlyDeduction), installments: advance.installments, paidInstallments: advance.paidInstallments });
     if (schedule.next !== row.amount) throw new Error("تغير قسط السلفة بعد الاعتماد؛ أعد احتساب المسير");
     const paid = advance.paidInstallments + 1;

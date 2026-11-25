@@ -12,8 +12,8 @@ const response = (body: object, status = 200) => NextResponse.json(body, { statu
 
 async function readSources(tx: Prisma.TransactionClient, employeeId:string) {
   const [loans,advances,leave,paid] = await Promise.all([
-    tx.loan.findMany({where:{employeeId,status:"ACTIVE"},orderBy:{id:"asc"},include:{repaymentSchedule:true}}),
-    tx.employeeSalaryAdvance.findMany({where:{employeeId,status:"APPROVED"},orderBy:{id:"asc"}}),
+    tx.loan.findMany({where:{employeeId,status:"ACTIVE",OR:[{disbursementRequired:false},{disbursedAt:{not:null}}]},orderBy:{id:"asc"},include:{repaymentSchedule:true}}),
+    tx.employeeSalaryAdvance.findMany({where:{employeeId,status:"APPROVED",OR:[{disbursementRequired:false},{disbursedAt:{not:null}}]},orderBy:{id:"asc"}}),
     tx.employeeLeaveBalance.findUnique({where:{employeeId},select:{accrued:true,used:true,updatedAt:true}}),
     tx.payrollItem.findFirst({where:{employeeId,payrollRun:{paidAt:{not:null}}},orderBy:[{payrollRun:{paidAt:"desc"}},{id:"desc"}],select:{id:true,payrollRun:{select:{paidAt:true}}}})
   ]);

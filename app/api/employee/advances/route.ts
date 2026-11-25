@@ -56,6 +56,8 @@ const advanceSelect = {
   managerComment: true,
   hrComment: true,
   financeComment: true,
+  disbursementRequired:true,
+  disbursedAt:true,
   attachments: true,
   notes: true,
   createdAt: true,
@@ -100,7 +102,7 @@ export async function POST(request: NextRequest) {
   const record = await prisma.$transaction(async tx => {
     const advance = await tx.employeeSalaryAdvance.create({
       data: {
-        ...fields, employeeId: employee.id, amount, installments, monthlyDeduction,
+        ...fields, employeeId: employee.id, amount, installments, monthlyDeduction, disbursementRequired:true,
         startDate: startDate ? new Date(startDate) : new Date(),
       },
       select: advanceSelect,
