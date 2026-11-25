@@ -1,5 +1,6 @@
 import { requireEmployee, getEmployeeSetting } from '@/lib/employee/portal';
 import { prisma } from '@/lib/prisma';
+import { MadarWorkTasks } from '@/components/employee/MadarWorkTasks';
 import { EmployeeTasksPortal } from '@/components/employee/EmployeeTasksPortal';
 
 export const dynamic = "force-dynamic";
@@ -17,5 +18,5 @@ export default async function Tasks() {
     ...overtime.map(o => ({ id: `overtime-${o.id}`, title: `متابعة طلب أوفر تايم ${Number(o.hours)} ساعة`, status: o.status, progress: 35, comments: [], attachments: [], dueDate: o.workDate.toISOString(), source: 'overtime-workflow' })),
   ];
   const merged = [...saved, ...generated.filter(g => !saved.some((s:any)=>s.id===g.id))];
-  return <EmployeeTasksPortal initialTasks={merged} />;
+  return <div className="space-y-8"><MadarWorkTasks mine/><details className="rounded-xl border p-3"><summary>المهام الشخصية السابقة (محفوظة منفصلة)</summary><EmployeeTasksPortal initialTasks={merged}/></details></div>;
 }

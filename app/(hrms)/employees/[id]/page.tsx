@@ -1,3 +1,4 @@
+import { MadarWorkTasks } from "@/components/employee/MadarWorkTasks";
 import { getAvailableLeaveBalance } from "@/lib/employee/leave-balance";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
@@ -260,6 +261,7 @@ export default async function EmployeeProfilePage({
   return (
     <>
     {isArchived && <section className="mb-4 rounded-xl border bg-card p-4 space-y-2"><h2 className="font-bold">سجل الأرشفة وانتهاء الخدمة</h2><p>تاريخ الأرشفة: {employee.archivedAt ? new Date(employee.archivedAt).toLocaleDateString("ar-SA", { calendar: "gregory" }) : "غير مسجل"}</p><p>سبب الأرشفة: {employee.archiveReason || "غير مسجل"}</p><p>تاريخ انتهاء الخدمة المسجل: {employee.terminationDate ? new Date(employee.terminationDate).toLocaleDateString("ar-SA", { calendar: "gregory" }) : "غير مسجل"}</p><p>من قام بالأرشفة: {auditLogs.find(log => log.action === "EMPLOYEE_ARCHIVED")?.actor?.name || "غير مسجل"}</p></section>}
+    <details className="mb-4 rounded-xl border p-4"><summary className="font-semibold">التكليفات المركزية للموظف</summary><MadarWorkTasks employeeId={id}/></details>
     <EmployeeProfileDashboard
       employee={visibleEmployee as any}
       salaryProfile={salaryProfile}

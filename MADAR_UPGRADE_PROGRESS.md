@@ -40,10 +40,10 @@ Baseline: c0a67b1e8957082a556f9f0df3cd4928dac6e2ba. CI: https://github.com/gala7
 | 34 | خطة التنفيذ المتواصل | جارٍ | جدول 37 محدّث ومراحل التنفيذ محفوظة. | استمرار إغلاق المهام |
 | 35 | الرفع والدمج والنشر النهائي مرة واحدة | مؤجل | لم يدمج أو ينشر. | نجاح كل بوابات القبول |
 | 36 | التقرير النهائي المطلوب | مؤجل | تقارير مرحلية فقط. | تقرير قبول نهائي ونشر مؤكد |
-| 37 | إدارة المهام والتكليفات – LANA PRO V9.5 Smart Workflow | مؤجل | مرجع Smart Workflow محدد؛ لم تبدأ برمجة المتطلب. | بعد إكمال الوظائف الداخلية الأصلية حسب ترتيب المستخدم |
+| 37 | إدارة المهام والتكليفات – LANA PRO V9.5 Smart Workflow | جزئي | بدأت البرمجة المركزية بناء على التوجيه الأخير؛ ترحيل إضافي، تكليف فردي/جماعي حسب النطاق، كانبان وجدول وتجميع حسب التاريخ، بنود فرعية وتعليقات واعتماد مستقل وإشعارات وتدقيق، ربط مهامي وملف الموظف؛ CI جديد غير مؤكد. | مرفقات فعلية، تكرار دوري، تقويم شهري، تصعيد وأحداث HR، تقارير وتصدير، استيراد JSON، تكامل واختبار قبول |
 
 ## Release gate
-Do not merge until all 37 acceptance criteria, isolated tests, backup and preview checks pass. Implement #37 after completing original 36 as requested. No real transfers or destructive operations during tests.
+Do not merge until all 37 acceptance criteria, isolated tests, backup and preview checks pass. Continue #37 alongside remaining internal work per latest instruction; external blockers do not defer coding, but remain release gates. No real transfers or destructive operations during tests.
 
 ## Batch after 45addd6
 - #5: migration retry now counts source read failures, transactionally reconciles counters/audit, and both retry endpoints verify persisted resolution. Actual production errors remain unverified.
@@ -143,3 +143,6 @@ Do not merge until all 37 acceptance criteria, isolated tests, backup and previe
 
 ## Import safety batch after cd93236
 - #22/#25/#29: explicit preview fingerprint and reanalysis, reject over-limit rather than truncate, reject conflicting identity keys and pre-existing synthetic login, skip strategy now excludes all secondary writes and password-change flags, existing salary profiles preserved, empty status no longer reactivates records, atomic audit and serializable transaction. Whole-organization import restricted to SUPER_ADMIN. Auto-created reference records still precede import transaction; preview is a consistency fingerprint, not a security credential. New CI pending.
+
+## Central task foundation after 08ae002
+- #37/#15/#23: added separate relational MadarWorkTask/checklist/comment models, group assignment up to 100 to selected active employees or department within supervisor assignments or HR authority; no employee self-assignment through manager endpoint; assignee progress, reviewer transition, optimistic concurrency, transactional notifications and audit. Kanban drop calls server validation; table and date grouping are not yet full calendar. Legacy personal task data unchanged and shown separately. Employee profile has scoped task view. No financial penalties, no deletes. Unit checks added; actual integration and build pending. Attachments, recurrence, HR event tasks, escalation, JSON import, full KPI/report exports and dedicated navigation remain unfinished. #37 is started but not accepted.
