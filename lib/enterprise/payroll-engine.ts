@@ -286,6 +286,10 @@ export async function computeAndUpsertPayrollItems(
   for (const employee of employees) {
     try {
       const breakdown = await computeEmployeePayroll(employee.id, periodStartDate, periodEndDate);
+      for (const field of ["baseSalary", "allowanceTotal", "grossPay", "deductionTotal", "netPay"] as const) {
+        if (!Number.isFinite(breakdown[field])) throw new Error("قيمة مالية غير صالحة: " + field);
+      }
+      if (breakdown.netPay < 0) throw new Error("صافي الراتب سالب؛ يلزم مراجعة الاستقطاعات");
       calculated.push({ employeeId: employee.id, breakdown });
       items.push({ employeeId: employee.id, netPay: breakdown.netPay });
     } catch (error) { items.push({ employeeId: employee.id, netPay: 0, error: error instanceof Error ? error.message : "تعذر الاحتساب" }); }
