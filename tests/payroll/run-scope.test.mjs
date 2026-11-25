@@ -30,3 +30,16 @@ test('both recalculation routes reuse saved employee IDs', () => {
   assert.ok(detail.includes('employeeIds,\n      companyId: run.companyId'));
   assert.ok(detail.includes('if (!employeeIds.length)'));
 });
+
+const close = await readFile(new URL('../../app/api/enterprise/payroll/periods/[id]/close/route.ts', import.meta.url), 'utf8');
+test('period creation and closure use serializable transactions', () => {
+  assert.ok(route.includes('isolationLevel: "Serializable"'));
+  assert.ok(close.includes('isolationLevel: "Serializable"'));
+  assert.ok(close.includes('tx.auditLog.create'));
+});
+test('settlement checks previously paid overlapping runs', () => {
+  assert.ok(detail.includes('paidAt: { not: null }'));
+  assert.ok(detail.includes('periodStartDate: { lte: run.periodEndDate }'));
+  assert.ok(detail.includes('periodEndDate: { gte: run.periodStartDate }'));
+  assert.ok(detail.includes('isolationLevel: "Serializable"'));
+});
