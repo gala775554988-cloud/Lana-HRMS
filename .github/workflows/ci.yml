@@ -83,4 +83,4 @@ jobs:
             sleep 2
           done
           curl -fsS http://localhost:3000/login >/dev/null
-          npm run test:smoke -- madar-tasks.spec.ts
+          npm run test:smoke -- madar-tasks.spec.ts || { tail -n 150 /tmp/madar-ci-server.log; exit 1; }
