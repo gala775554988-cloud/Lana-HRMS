@@ -2926,3 +2926,26 @@ model PayrollBankEvidence {
   payrollRun PayrollRun @relation(fields:[payrollRunId],references:[id],onDelete:Restrict)
   @@index([payrollRunId,createdAt])
 }
+
+model PayrollBudgetLimit {
+  id String @id @default(cuid())
+  periodId String
+  costCenterId String
+  currency String
+  ceiling Decimal @db.Decimal(18,2)
+  enforce Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([periodId,costCenterId,currency])
+}
+model PayrollSalaryBand {
+  id String @id @default(cuid())
+  positionId String
+  currency String
+  minimum Decimal @db.Decimal(12,2)
+  maximum Decimal @db.Decimal(12,2)
+  enforce Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([positionId,currency])
+}

@@ -97,3 +97,7 @@ Do not merge until all acceptance criteria, isolated tests, backup and preview c
 - #18/#21/#25/#29/#32: additive bank evidence table retains original bytes and SHA-256, reconciles separate attested bank report by employee, IBAN, SAR and cents, restricts access to payroll approvers, audit and deduplication, downloadable unchanged bytes. No signature verification, no Mudad submission, no transfer, and current primary account comparison not historical bank snapshot. Bank-supplied original format is intentionally opaque. Test with real sanitized bank report before acceptance.
 - #16/#29/#31: archived employee list applies hierarchy scope, bounds paging/search, excludes future-only termination from archival, fixes last-active source and ignores unapproved/future leave; no data changed.
 - #33: CI 45618367402 and 45617861918 passed; new migration and tests pending.
+
+## Budget and salary controls after 4321dc1
+- #20/#19/#28: additive budget limits per financial period, cost center and currency; salary bands by position/currency, UI and authorized policy editing with audit. Payroll approval and confirmation check opted-in blocking limits and record advisory findings. Cost includes gross plus employer insurance, committed approved or paid runs, excludes current run. No retroactive salary edits. Configurations not installed in production; full cost allocations and historical policy versions remain unverified.
+- #33: added budget-control tests; new CI pending.

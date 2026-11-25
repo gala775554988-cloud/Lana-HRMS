@@ -9,6 +9,7 @@ import { getPayrollOdooClient } from "@/lib/payroll/connection";
 import { odooPayrollSource, reconcileAccountingOutbox } from "@/lib/payroll/odoo-payroll";
 import { accountingMappingSchema, postConfiguredPayrollJournal } from "@/lib/payroll/journal";
 import { consumeApprovedPayroll, buildPayrollLedgerBreakdown } from "@/lib/payroll/settlement";
+import { inspectPayrollControls } from "@/lib/payroll/budget-control";
 import type { PayrollBreakdown } from "@/lib/enterprise/payroll-engine";
 import type { PayrollStatus } from "@prisma/client";
 
@@ -186,6 +187,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         if (duplicate) throw new Error("يوجد موظف سبق صرف راتبه في فترة متداخلة؛ راجع المسير قبل الاعتماد أو الصرف");
         const finalized = await tx.employeeFinalSettlement.findFirst({ where: { employeeId: { in: items.map(item=>item.employeeId) }, status:"PAID", terminationDate:{lte:run.periodEndDate} }, select:{id:true} });
         if(finalized)throw new Error("يوجد موظف تمت تسوية مخالصة نهائية له؛ يلزم مراجعة المسير قبل الصرف");
+        if(action==="approve"||action==="pay"){
+          const warnings=await inspectPayrollControls(tx,run,items);
+          if(warnings.some(w=>w.blocking))throw Error("تجاوز المسير ضوابط الميزانية أو سلم الرواتب الإلزامية؛ راجع إعدادات الرواتب");
+          if(warnings.length)await tx.auditLog.create({data:{actorUserId:session.user.id,action:"payroll:control-warnings",entity:"payrollRun",entityId:id,metadata:{warnings}}});
+        }
         for (const item of items) {
           const snapshot = item.calculationSnapshot as unknown as PayrollBreakdown;
           if (!snapshot || !Number.isFinite(snapshot.netPay) || Math.abs(Number(item.netPay) - snapshot.netPay) > 0.005 || !Array.isArray(snapshot.loanAllocations)) throw new Error("أعد احتساب المسير؛ لقطة الحساب غير مكتملة");

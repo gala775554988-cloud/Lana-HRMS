@@ -29,7 +29,7 @@ try {
    'next/server':{NextResponse}, '@/auth':{auth:async()=>({user:{id:user.id,roles:['SUPER_ADMIN']}})}, '@/lib/prisma':{prisma},
    '@/lib/audit':{writeAuditLog:async()=>{}}, '@/lib/enterprise/payroll-engine':{computeAndUpsertPayrollItems:async()=>{throw new Error('Must not recompute approved figures');}},
    '@/lib/enterprise/notifications':{notifyRole:async()=>{}}, '@/lib/enterprise/payroll-permissions':{canManagePayroll:()=>true,canApprovePayroll:()=>true},
-   '@/lib/payroll/settlement':settlement, '@/lib/payroll/journal':{accountingMappingSchema:{safeParse:()=>({success:false})},postConfiguredPayrollJournal:async()=>{throw new Error('No remote posting');}}, '@/lib/payroll/connection':{getPayrollOdooClient:async()=>{throw new Error('No remote operations in tests');}},
+   '@/lib/payroll/settlement':settlement, '@/lib/payroll/budget-control': await load('lib/payroll/budget-control.ts'), '@/lib/payroll/journal':{accountingMappingSchema:{safeParse:()=>({success:false})},postConfiguredPayrollJournal:async()=>{throw new Error('No remote posting');}}, '@/lib/payroll/connection':{getPayrollOdooClient:async()=>{throw new Error('No remote operations in tests');}},
    '@/lib/payroll/odoo-payroll':{odooPayrollSource:()=>'',reconcileAccountingOutbox:async()=>{throw new Error('No remote operations in tests');}},
  });
  const patch = action => route.PATCH({json:async()=>({action})},{params:Promise.resolve({id:run.id})});
