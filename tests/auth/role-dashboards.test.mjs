@@ -28,3 +28,33 @@ test("finance operators can prepare payroll but cannot approve it", () => {
   assert.equal(payroll.canViewPayroll(readOnly), true);
   assert.equal(payroll.canManagePayroll(readOnly), false);
 });
+
+test("mixed-role admin users never fall into an unlinked employee portal", () => {
+  const cases = [
+    [["SUPER_ADMIN", "EMPLOYEE"], "/dashboard"],
+    [["EMPLOYEE", "HR_MANAGER"], "/hr/dashboard"],
+    [["EMPLOYEE", "HR"], "/hr/dashboard"],
+    [["EMPLOYEE", "RECRUITER"], "/hr/dashboard"],
+    [["EMPLOYEE", "MANAGER"], "/manager/dashboard"],
+    [["EMPLOYEE", "DEPARTMENT_MANAGER"], "/manager/dashboard"],
+    [["EMPLOYEE", "BRANCH_MANAGER"], "/manager/dashboard"],
+    [["EMPLOYEE", "SUPERVISOR"], "/manager/dashboard"],
+    [["EMPLOYEE", "PROJECT_MANAGER"], "/manager/dashboard"],
+    [["EMPLOYEE", "PAYROLL_MANAGER"], "/payroll"],
+    [["EMPLOYEE", "PAYROLL_OFFICER"], "/payroll"],
+    [["employee", "super_admin"], "/dashboard"],
+  ];
+  for (const [roles, expected] of cases) {
+    assert.equal(resolveRoleDashboard(roles), expected, roles.join(","));
+  }
+});
+
+test("unlinked accounts are routed only from authoritative roles or grants", () => {
+  assert.equal(resolveRoleDashboard(["SUPER_ADMIN"]), "/dashboard");
+  assert.equal(resolveRoleDashboard(["HR_MANAGER"]), "/hr/dashboard");
+  assert.equal(resolveRoleDashboard(["EMPLOYEE"]), "/employee/dashboard");
+  assert.equal(resolveRoleDashboard(["EMPLOYEE"], true), "/dashboard");
+  assert.equal(resolveRoleDashboard(["CUSTOM_UNKNOWN_ROLE"]), "/employee/dashboard");
+  assert.equal(resolveRoleDashboard([]), "/employee/dashboard");
+  assert.equal(resolveRoleDashboard(null, true), "/employee/dashboard");
+});
