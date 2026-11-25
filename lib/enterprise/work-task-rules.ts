@@ -5,6 +5,7 @@ export const taskActionSchema=z.discriminatedUnion("action",[
  z.object({action:z.literal("progress"),progress:z.number().int().min(0).max(100),version:z.string().datetime()}).strict(),
  z.object({action:z.literal("move"),status:z.enum(taskStates),version:z.string().datetime()}).strict(),
  z.object({action:z.literal("check"),checkId:z.string().min(1),done:z.boolean(),version:z.string().datetime()}).strict(),
+ z.object({action:z.literal("recurrence"),frequency:z.enum(["DAILY","WEEKLY","MONTHLY","YEARLY"]).nullable(),until:z.string().datetime().nullable(),version:z.string().datetime()}).strict(),
  z.object({action:z.literal("comment"),body:z.string().trim().min(1).max(2000),version:z.string().datetime()}).strict()
 ]);
 export function canTransition(from:string,to:string,assignee:boolean,reviewer:boolean,progress:number){
@@ -24,3 +25,15 @@ export function nextTaskDue(previous:Date,frequency:string,anchor:Date){
 }
 export function taskOccurrenceKey(rootId:string,due:Date){return JSON.stringify([rootId,due.toISOString()]);}
 export function taskReminderKey(taskId:string,userId:string,day:string,kind:string){return JSON.stringify(["madar-task",taskId,userId,day,kind]);}
+
+export function recurrenceAfter(anchor:Date,frequency:string,now:Date,until:Date){
+ if(until<=now||until.getTime()-now.getTime()>366*5*86400000)throw Error("نهاية التكرار غير صالحة");
+ let next=nextTaskDue(anchor,frequency,anchor);
+ for(let i=0;next<=now;i++){if(i>=10000)throw Error("سلسلة قديمة جداً؛ أنشئ تكليفاً دورياً جديداً");next=nextTaskDue(next,frequency,anchor);}
+ return next<=until?next:null;
+}
+export function taskMetrics(rows:{status:string;progress:number;dueAt:Date;reviewedAt:Date|null}[],now:Date){
+ const completed=rows.filter(r=>r.status==="COMPLETED");
+ const onTime=completed.filter(r=>r.reviewedAt&&r.reviewedAt<=r.dueAt).length;
+ return {total:rows.length,completed:completed.length,late:rows.filter(r=>r.status!=="COMPLETED"&&r.dueAt<now).length,onTime,completionRate:rows.length?Math.round(completed.length/rows.length*100):0,onTimeRate:completed.length?Math.round(onTime/completed.length*100):0,averageProgress:rows.length?Math.round(rows.reduce((n,r)=>n+r.progress,0)/rows.length):0};
+}

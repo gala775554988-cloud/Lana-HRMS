@@ -8,7 +8,7 @@ const headers={"Cache-Control":"private, no-store"};
 const json=(body:object,status=200)=>NextResponse.json(body,{status,headers});
 const sha=(bytes:Uint8Array)=>createHash("sha256").update(bytes).digest("hex");
 async function access(){const session=await auth();if(!session?.user?.id)return null;const id=session.user.id,roles=session.user.roles??[],global=roles.includes("SUPER_ADMIN")||roles.includes("HR_MANAGER");
- const employee=await prisma.employee.findFirst({where:{userId:id,status:"ACTIVE",archivedAt:null},select:{id:true}});
+ const employee=await prisma.employee.findFirst({where:{userId:id,status:"ACTIVE",archivedAt:null,OR:[{terminationDate:null},{terminationDate:{gt:new Date()}}]},select:{id:true}});
  const where:Prisma.MadarWorkTaskWhereInput={OR:[{reviewerId:id},{createdById:id},...(employee?[{employeeId:employee.id}]:[]),...(global?[{id:{not:""}}]:[])]};return {id,employeeId:employee?.id,where};
 }
 export async function GET(request:Request){const a=await access();if(!a)return json({success:false},401);const id=new URL(request.url).searchParams.get("id");if(!id)return json({success:false},400);

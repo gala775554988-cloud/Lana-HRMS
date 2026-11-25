@@ -1,7 +1,7 @@
 import {NextResponse} from "next/server";
 import {auth} from "@/auth";
 import {prisma} from "@/lib/prisma";
-import {createTaskSchema,taskActionSchema,canTransition,checklistProgress,nextTaskDue} from "@/lib/enterprise/work-task-rules";
+import {createTaskSchema,taskActionSchema,canTransition,checklistProgress,nextTaskDue,recurrenceAfter,taskMetrics} from "@/lib/enterprise/work-task-rules";
 import {buildExcelTable,buildPdfTable} from "@/lib/exports/table-files";
 import {randomUUID} from "node:crypto";
 import type {Prisma} from "@prisma/client";
@@ -30,6 +30,27 @@ export async function GET(request:Request){
   return json({success:true,employees,departments});
  }
  const raw=Number(q.get("page")??1),page=Number.isSafeInteger(raw)&&raw>0?Math.min(raw,100000):1,where:Prisma.MadarWorkTaskWhereInput={AND:[access(a),...(q.get("mine")==="true"?[{employeeId:a.employeeId??"__none__"}]:[]),...(q.get("employeeId")?[{employeeId:q.get("employeeId")!}]:[])]};
+ const from=q.get("from"),to=q.get("to");
+ if(from||to){
+  if(!from||!to||!/^\d{4}-\d{2}-\d{2}$/.test(from)||!/^\d{4}-\d{2}-\d{2}$/.test(to))return json({success:false,message:"فترة غير صالحة"},400);
+  const start=new Date(from+"T00:00:00+03:00"),end=new Date(to+"T00:00:00+03:00");
+  if(!Number.isFinite(start.getTime())||!Number.isFinite(end.getTime())||end<=start||end.getTime()-start.getTime()>93*86400000)return json({success:false,message:"حدد فترة لا تتجاوز 93 يوماً"},400);
+  where.dueAt={gte:start,lt:end};
+ }
+ if(q.get("calendar")==="true"){
+  if(!from||!to)return json({success:false},400);
+  const tasks=await prisma.madarWorkTask.findMany({where,orderBy:[{dueAt:"asc"},{id:"asc"}],take:1001,select:{id:true,title:true,dueAt:true,status:true,priority:true,progress:true,employee:{select:{employeeNumber:true,firstName:true,lastName:true}}}});
+  if(tasks.length>1000)return json({success:false,message:"عدد المهام كبير؛ حدد أسبوعاً أو موظفاً"},422);
+  return json({success:true,tasks});
+ }
+ if(q.get("metrics")==="true"){
+  if(!from||!to)return json({success:false},400);
+  const rows=await prisma.madarWorkTask.findMany({where,take:10001,select:{employeeId:true,status:true,progress:true,dueAt:true,reviewedAt:true,employee:{select:{employeeNumber:true,firstName:true,lastName:true,departmentId:true,department:{select:{name:true}}}}}});
+  if(rows.length>10000)return json({success:false,message:"حدد فترة أقصر للمؤشرات"},422);
+  const now=new Date(),employees=new Map<string,typeof rows>(),departments=new Map<string,typeof rows>();
+  for(const row of rows){const a=employees.get(row.employeeId)??[];a.push(row);employees.set(row.employeeId,a);const key=row.employee.departmentId??"__none__";const b=departments.get(key)??[];b.push(row);departments.set(key,b);}
+  return json({success:true,total:taskMetrics(rows,now),employees:[...employees.entries()].map(([id,items])=>({id,label:items[0].employee.employeeNumber+" — "+items[0].employee.firstName+" "+items[0].employee.lastName,...taskMetrics(items,now)})),departments:[...departments.entries()].map(([id,items])=>({id,label:items[0].employee.department?.name??"بدون قسم",...taskMetrics(items,now)}))});
+ }
  const format=q.get("format");
  if(format==="xlsx"||format==="pdf"){
   const limit=format==="pdf"?500:2000;
@@ -52,7 +73,7 @@ export async function POST(request:Request){
  const next=v.repeatEvery?nextTaskDue(due,v.repeatEvery,due):null;if(due<=new Date())return json({success:false,message:"موعد الاستحقاق يجب أن يكون مستقبلياً"},400);
  try{
  const count=await prisma.$transaction(async tx=>{
-  const selected=await tx.employee.findMany({where:{AND:[{status:"ACTIVE",archivedAt:null,id:{not:a.employeeId??""}},a.global?{}:{OR:a.scope},v.departmentId?{departmentId:v.departmentId}:{id:{in:v.employeeIds}}]},select:{id:true,userId:true},take:101});
+  const selected=await tx.employee.findMany({where:{AND:[{status:"ACTIVE",archivedAt:null,id:{not:a.employeeId??""},OR:[{terminationDate:null},{terminationDate:{gt:new Date()}}]},a.global?{}:{OR:a.scope},v.departmentId?{departmentId:v.departmentId}:{id:{in:v.employeeIds}}]},select:{id:true,userId:true},take:101});
   if(!selected.length||selected.length>100||(!v.departmentId&&selected.length!==new Set(v.employeeIds).size))throw Error("المستلمون خارج الصلاحية أو العدد يتجاوز 100");
   const groupKey=randomUUID();
   for(const e of selected){
@@ -77,6 +98,14 @@ export async function PATCH(request:Request){
   if(t.updatedAt.toISOString()!==v.version)throw Error("تغيرت المهمة؛ حدّث الصفحة");
   const claimed=await tx.madarWorkTask.updateMany({where:{id,status:t.status,updatedAt:t.updatedAt},data:{updatedAt:new Date()}});if(claimed.count!==1)throw Error("تغيرت المهمة");
   if(v.action==="comment")await tx.madarWorkTaskComment.create({data:{taskId:id,authorId:a.userId,body:v.body}});
+  else if(v.action==="recurrence"){
+   if(!reviewer||t.occurrenceKey||!t.repeatEvery)throw Error("تعديل السلسلة متاح لمراجع المهمة الأصلية فقط");
+   if(Boolean(v.frequency)!==Boolean(v.until))throw Error("حدد التكرار ونهايته أو أوقف السلسلة");
+   const until=v.until?new Date(v.until):null;
+   const next=v.frequency&&until?recurrenceAfter(t.dueAt,v.frequency,new Date(),until):null;
+   if(next&&await tx.madarWorkTask.findUnique({where:{occurrenceKey:JSON.stringify([t.id,next.toISOString()])},select:{id:true}}))throw Error("الموعد التالي منشأ مسبقاً؛ اختر تكراراً آخر");
+   await tx.madarWorkTask.update({where:{id},data:{repeatEvery:v.frequency??t.repeatEvery,repeatUntil:until,nextDueAt:next}});
+  }
   else if(v.action==="move"){
    if(!canTransition(t.status,v.status,assignee,reviewer,t.progress))throw Error("الانتقال غير مسموح؛ اكتمال المهمة يتطلب اعتماد المراجع");
    await tx.madarWorkTask.update({where:{id},data:{status:v.status,reviewedAt:v.status==="COMPLETED"?new Date():null}});
@@ -89,7 +118,7 @@ export async function PATCH(request:Request){
     const items=await tx.madarWorkTaskCheck.findMany({where:{taskId:id}});await tx.madarWorkTask.update({where:{id},data:{progress:checklistProgress(items)}});
    }else{if(t.checklist.length)throw Error("الإنجاز محسوب من البنود الفرعية");await tx.madarWorkTask.update({where:{id},data:{progress:v.progress}});}
   }
-  await tx.auditLog.create({data:{actorUserId:a.userId,action:"work-task:"+v.action,entity:"MadarWorkTask",entityId:id,metadata:{previousStatus:t.status,...(v.action==="move"?{nextStatus:v.status}:{})}}});
+  await tx.auditLog.create({data:{actorUserId:a.userId,action:"work-task:"+v.action,entity:"MadarWorkTask",entityId:id,metadata:{previousStatus:t.status,...(v.action==="move"?{nextStatus:v.status}:v.action==="recurrence"?{previousFrequency:t.repeatEvery,previousNext:t.nextDueAt?.toISOString()??null,nextFrequency:v.frequency,until:v.until}:{})}}});
  },{isolationLevel:"Serializable"});return json({success:true});
  }catch(e){return json({success:false,message:e instanceof Error&&!("code" in e)?e.message:"تعذر التعديل"},409);}
 }
