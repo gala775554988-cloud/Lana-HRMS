@@ -28,9 +28,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     employeeFinancialSummary(id),
     prisma.employeeRequestExecution.findMany({
       where, orderBy: { createdAt: "desc" }, take: 30,
-      select: { id: true, sourceType: true, sourceId: true, effectType: true, state: true, executedAt: true, createdAt: true }
+      select: { id: true, sourceType: true, sourceId: true, effectType: true, state: true, executedAt: true, createdAt: true, metadata: true }
     })
   ]);
-  return NextResponse.json({ success: true, employeeId: id, entries, count, balances, executions, page, pageSize: size },
+  return NextResponse.json({ success: true, employeeId: id, entries, count, balances, executions: executions.map(({metadata, ...entry}) => ({...entry, requestType: metadata && typeof metadata === "object" && !Array.isArray(metadata) && typeof metadata.requestType === "string" ? metadata.requestType : undefined})), page, pageSize: size },
     { headers: { "Cache-Control": "private, no-store" } });
 }

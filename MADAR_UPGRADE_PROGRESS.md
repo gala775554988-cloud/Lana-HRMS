@@ -61,3 +61,8 @@ Do not merge until all acceptance criteria, isolated tests, backup and preview c
 - #7/#10/#13: approved paid annual leave is excluded from absence, half-day and late deductions using Saudi calendar dates. No attendance records overwritten. Sick/unpaid leave rules remain separate and need policy acceptance.
 - #6/#9/#15/#26: local completed requests now create a transactional approval timeline record without representing approval as payment; revocation reverses that record. Other business-specific execution still pending.
 - #33: a43b2d67 CI 45611964293 passed all stages; 51cf1a7 fixtures passed but build in progress at check. Added annual leave and workflow regression assertions.
+
+## Batch after 360ac13
+- #8/#10/#11/#14/#25: payroll settlement generates itemized ledger postings for basic salary, allowances, bonus, overtime, insurance, absence, late, other deductions and each loan/advance installment. Frozen snapshot reconciliation rejects mismatches before approval/payment. Existing historical aggregate postings are preserved and not duplicated. No bank transfer performed.
+- #15/#23/#29: self-service ledger displays effect type and request type; scoped admin API includes safe request-type metadata, no raw workflow metadata. Payroll detail private no-store.
+- #33: CI 45612836696, 45612503614, 45612390089 and 45611964293 completed successfully. New ledger-breakdown tests pending CI.

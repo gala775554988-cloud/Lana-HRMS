@@ -38,3 +38,43 @@ export async function consumeApprovedPayroll(tx: Transaction, snapshot: PayrollB
     if (changed.count !== 1) throw new Error("تغيرت السلفة أثناء الصرف");
   }
 }
+
+/** One set of detailed ledger postings, not additional postings on top of the
+ * gross/deduction totals. The frozen payroll snapshot is reconciled in halalas. */
+export function buildPayrollLedgerBreakdown(snapshot: PayrollBreakdown) {
+  const cents = (value: number) => {
+    const amount = Math.round(value * 100);
+    if (!Number.isFinite(value) || value < 0 || !Number.isSafeInteger(amount)) throw new Error("بند مالي غير صالح");
+    return amount;
+  };
+  const rows: { effectType: string; direction: "CREDIT" | "DEBIT"; amount: number; sourceId?: string }[] = [];
+  const add = (effectType: string, direction: "CREDIT" | "DEBIT", value: number, sourceId?: string) => {
+    const amount = cents(value);
+    if (amount) rows.push({ effectType, direction, amount: amount / 100, ...(sourceId ? { sourceId } : {}) });
+  };
+  add("BASIC", "CREDIT", snapshot.baseSalary);
+  add("ALLOWANCES", "CREDIT", snapshot.allowanceTotal);
+  add("BONUS", "CREDIT", snapshot.bonusTotal);
+  add("OVERTIME", "CREDIT", snapshot.overtimeTotal);
+  add("GOSI", "DEBIT", snapshot.insuranceDeduction);
+  add("TAX", "DEBIT", snapshot.taxTotal);
+  add("ABSENCE", "DEBIT", snapshot.absenceDeduction);
+  add("LATE", "DEBIT", snapshot.lateDeduction);
+  add("PENALTY", "DEBIT", snapshot.penaltyDeduction);
+  add("OTHER_DEDUCTIONS", "DEBIT", snapshot.otherDeductionTotal);
+  for (const [kind, allocations, total] of [
+    ["LOAN", snapshot.loanAllocations, snapshot.loanDeduction],
+    ["ADVANCE", snapshot.advanceAllocations, snapshot.advanceDeduction]
+  ] as const) {
+    if (!Array.isArray(allocations) || new Set(allocations.map(row => row.id)).size !== allocations.length ||
+        allocations.reduce((sum, row) => sum + cents(row.amount), 0) !== cents(total)) throw new Error("أقساط المسير لا تتطابق مع اللقطة المعتمدة");
+    for (const row of allocations) {
+      if (!row.id) throw new Error("مرجع قسط غير صالح");
+      add(kind + ":" + row.id, "DEBIT", row.amount, row.id);
+    }
+  }
+  const total = (direction: "CREDIT" | "DEBIT") => rows.filter(row => row.direction === direction).reduce((sum,row) => sum + cents(row.amount), 0);
+  if (total("CREDIT") !== cents(snapshot.grossPay) || total("DEBIT") !== cents(snapshot.deductionTotal) ||
+      total("CREDIT") - total("DEBIT") !== cents(snapshot.netPay)) throw new Error("تفاصيل القيود لا تتطابق مع صافي المسير المعتمد");
+  return rows;
+}

@@ -8,7 +8,7 @@ import { canManagePayroll, canApprovePayroll, canViewPayroll } from "@/lib/enter
 import { getPayrollOdooClient } from "@/lib/payroll/connection";
 import { odooPayrollSource, reconcileAccountingOutbox } from "@/lib/payroll/odoo-payroll";
 import { accountingMappingSchema, postConfiguredPayrollJournal } from "@/lib/payroll/journal";
-import { consumeApprovedPayroll } from "@/lib/payroll/settlement";
+import { consumeApprovedPayroll, buildPayrollLedgerBreakdown } from "@/lib/payroll/settlement";
 import type { PayrollBreakdown } from "@/lib/enterprise/payroll-engine";
 import type { PayrollStatus } from "@prisma/client";
 
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     metadata: entry.metadata
   }));
 
-  return NextResponse.json({ success: true, run, totals, employeeCount: run.items.length, history });
+  return NextResponse.json({ success: true, run, totals, employeeCount: run.items.length, history }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -189,6 +189,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           if (!snapshot || !Number.isFinite(snapshot.netPay) || Math.abs(Number(item.netPay) - snapshot.netPay) > 0.005 || !Array.isArray(snapshot.loanAllocations)) throw new Error("أعد احتساب المسير؛ لقطة الحساب غير مكتملة");
           for (const field of ["baseSalary", "allowanceTotal", "grossPay", "deductionTotal", "netPay"] as const) if (!Number.isFinite(snapshot[field]) || Math.abs(Number(item[field]) - snapshot[field]) > 0.005) throw new Error("تغيرت الأرقام عن لقطة الحساب؛ يلزم إعادة المراجعة");
           if (Number(item.netPay) < 0) throw new Error("لا يمكن صرف صافي راتب سالب");
+          buildPayrollLedgerBreakdown(snapshot);
           if (action === "pay") await consumeApprovedPayroll(tx, snapshot, item.employeeId, now);
         }
         if (action === "pay") {
@@ -196,11 +197,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           // are part of the SAME transaction as loans, advances and salary items.
           // One source/effect uniqueness key prevents double pay and deductions.
           const events = items.flatMap(item => {
-            const values = [
-              { effectType: "GROSS_PAY", direction: "CREDIT", amount: item.grossPay },
-              { effectType: "DEDUCTIONS", direction: "DEBIT", amount: item.deductionTotal }
-            ] as const;
-            return values.filter(value => Number(value.amount) > 0).map(value => ({
+            const values = buildPayrollLedgerBreakdown(item.calculationSnapshot as unknown as PayrollBreakdown);
+            return values.map(value => ({
               employeeId: item.employeeId,
               sourceType: "PAYROLL",
               sourceId: item.id,
@@ -209,7 +207,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
               amount: value.amount,
               currency: item.currency,
               payrollRunId: id,
-              details: { period: run.period, markedPaidAt: now.toISOString(), kind: value.effectType }
+              details: { period: run.period, markedPaidAt: now.toISOString(), kind: value.effectType.split(":")[0], allocationId: value.sourceId ?? null }
             }));
           });
           if (events.length) {
