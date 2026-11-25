@@ -23,3 +23,10 @@ test('period keys and requested employees are validated before recomputation', (
   assert.match(route, /صيغة الفترة يجب أن تكون YYYY-MM/);
   assert.match(route, /new Set\(body\.employeeIds\)\.size !== body\.employeeIds\.length/);
 });
+
+const detail = await readFile(new URL('../../app/api/enterprise/payroll/run/[id]/route.ts', import.meta.url), 'utf8');
+test('both recalculation routes reuse saved employee IDs', () => {
+  assert.ok(route.includes('employeeIds: existingIds ?? body.employeeIds'));
+  assert.ok(detail.includes('employeeIds,\n      companyId: run.companyId'));
+  assert.ok(detail.includes('if (!employeeIds.length)'));
+});
