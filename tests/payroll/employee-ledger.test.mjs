@@ -90,7 +90,7 @@ test("financial summaries preserve cents beyond safe JavaScript integer range", 
     { currency: "USD", direction: "CREDIT", _sum: { amount: new Prisma.Decimal("12.30") } }
   ];
   const api = await service(db);
-  assert.deepEqual(await api.employeeFinancialSummary("e"), [
+  assert.deepEqual(JSON.parse(JSON.stringify(await api.employeeFinancialSummary("e"))), [
     { currency: "SAR", credits: "9007199254740993.25", debits: "9007199254740993.24", net: "0.01" },
     { currency: "USD", credits: "12.30", debits: "0.00", net: "12.30" }
   ]);

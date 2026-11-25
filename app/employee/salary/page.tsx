@@ -1,2 +1,5 @@
 import { EmployeeFinance } from "@/components/payroll/employee-finance";
-export default function SalaryPage() { return <EmployeeFinance />; }
+import { EmployeeLedger } from "@/components/payroll/employee-ledger";
+export default function SalaryPage() {
+  return <div className="min-w-0 space-y-6"><EmployeeFinance /><EmployeeLedger /></div>;
+}

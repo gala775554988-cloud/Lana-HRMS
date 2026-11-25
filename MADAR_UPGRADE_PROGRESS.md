@@ -43,3 +43,8 @@ Baseline: c0a67b1e8957082a556f9f0df3cd4928dac6e2ba. CI: https://github.com/gala7
 
 ## Release gate
 Do not merge until all acceptance criteria, isolated tests, backup and preview checks pass. No real transfers or destructive operations during tests.
+
+## Batch after 45addd6
+- #5: migration retry now counts source read failures, transactionally reconciles counters/audit, and both retry endpoints verify persisted resolution. Actual production errors remain unverified.
+- #14/#23/#30: employee salary page displays session-scoped ledger, exact decimal totals, pagination and recent execution events; no payment action. API private no-store. Historical backfill not yet implemented.
+- #33: exact decimal regression normalizes VM realm values; payroll command includes all payroll unit tests. CI pending for this batch.

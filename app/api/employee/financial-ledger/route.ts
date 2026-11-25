@@ -25,5 +25,5 @@ export async function GET(request: NextRequest) {
       select: { id: true, sourceType: true, sourceId: true, effectType: true, state: true, executedAt: true, createdAt: true }
     })
   ]);
-  return NextResponse.json({ success: true, entries, total, balances, recentExecutions, page, pageSize: size });
+  return NextResponse.json({ success: true, entries, total, balances, recentExecutions, page, pageSize: size }, { headers: { "Cache-Control": "private, no-store" } });
 }

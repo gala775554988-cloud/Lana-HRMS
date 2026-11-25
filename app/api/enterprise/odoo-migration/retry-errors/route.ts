@@ -38,6 +38,8 @@ export async function POST(request: NextRequest) {
   for (const failure of errors) {
     try {
       await retryMigrationRecord(failure.jobId, failure.id);
+      const verified = await prisma.odooMigrationError.findUnique({ where: { id: failure.id }, select: { status: true } });
+      if (verified?.status !== "RESOLVED") throw new Error("Migration resolution could not be verified");
       results.push({ id: failure.id, jobId: failure.jobId, status: "RESOLVED" });
     } catch (error) {
       results.push({ id: failure.id, jobId: failure.jobId, status: "OPEN", error: error instanceof Error ? error.message : String(error) });

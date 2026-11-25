@@ -122,16 +122,21 @@ export async function retryMigrationRecord(jobId:string,errorId:string) {
   try {
     const {job,context}=await jobContext(jobId);Object.assign(context,{jobId,leaseToken:token,retry:true});
     const failure=await prisma.odooMigrationError.findFirst({where:{id:errorId,jobId,status:"OPEN"}});if(!failure)throw new MigrationRecordError("ERROR_MISSING","السجل محل المحاولة غير متاح");
-    const reader=await phaseReader(context,failure.entity);
-    const rows=await context.client.read(reader.model,[failure.externalId],reader.fields,{context:{active_test:false}});
-    if(!rows.length)throw new MigrationRecordError("SOURCE_MISSING","السجل لم يعد متاحاً في المصدر");
+    let outcome: Awaited<ReturnType<Awaited<ReturnType<typeof prepare>>>>;
     try {
-      const importer=await prepare(context,failure.entity,rows);const outcome=await importer(rows[0]);
-      await prisma.odooMigrationError.update({where:{id:errorId},data:{status:"RESOLVED",attempts:{increment:1}}});
-      const remaining=await prisma.odooMigrationError.count({where:{jobId,status:"OPEN"}});
-      await prisma.odooMigrationJob.update({where:{id:jobId},data:{failed:remaining,...(outcome!=="UNCHANGED"&&job.skipped>0?{skipped:{decrement:1}}:{}),...(outcome==="IMPORTED"?{imported:{increment:1}}:outcome==="UPDATED"?{updated:{increment:1}}:{}),status:job.status==="COMPLETED_WITH_ERRORS"&&remaining===0?"COMPLETED":job.status}});
-      await prisma.auditLog.create({data:{actorUserId:job.actorUserId,action:"odoo-migration:retry",entity:"odooMigrationJob",entityId:jobId,metadata:{entity:failure.entity,externalId:failure.externalId,outcome}}});
+      const reader=await phaseReader(context,failure.entity);
+      const rows=await context.client.read(reader.model,[failure.externalId],reader.fields,{context:{active_test:false}});
+      if(!rows.length)throw new MigrationRecordError("SOURCE_MISSING","السجل لم يعد متاحاً في المصدر");
+      const importer=await prepare(context,failure.entity,rows);outcome=await importer(rows[0]);
     } catch(error) {await recordFailure(jobId,failure.entity,failure.externalId,error);throw error;}
+    // Once the import has succeeded, bookkeeping errors must not reopen a resolved source.
+    await prisma.$transaction(async tx => {
+      await tx.odooMigrationError.update({where:{id:errorId},data:{status:"RESOLVED",attempts:{increment:1}}});
+      const remaining=await tx.odooMigrationError.count({where:{jobId,status:"OPEN"}});
+      await tx.odooMigrationJob.update({where:{id:jobId},data:{failed:remaining,...(outcome!=="UNCHANGED"&&job.skipped>0?{skipped:{decrement:1}}:{}),...(outcome==="IMPORTED"?{imported:{increment:1}}:outcome==="UPDATED"?{updated:{increment:1}}:{}),status:job.status==="COMPLETED_WITH_ERRORS"&&remaining===0?"COMPLETED":job.status}});
+      await tx.auditLog.create({data:{actorUserId:job.actorUserId,action:"odoo-migration:retry",entity:"odooMigrationJob",entityId:jobId,metadata:{entity:failure.entity,externalId:failure.externalId,outcome}}});
+    });
+    return { errorId, outcome, resolved: true };
   } finally {await prisma.odooMigrationJob.updateMany({where:{id:jobId,leaseToken:token},data:{leaseToken:null,leaseUntil:null}});}
 }
 export async function controlMigration(jobId:string,action:"pause"|"resume"|"cancel",actorUserId:string) {
