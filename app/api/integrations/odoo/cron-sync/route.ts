@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { OdooSyncService, fullResyncFromOdoo, hasInternalSyncToken } from "@/lib/integrations/odoo/sync";
 import { reconcileEmployeeNumbersAndIds } from "@/lib/integrations/odoo/employee-number-reconcile";
 import { writeAuditLog } from "@/lib/audit";
+import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,8 +22,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    await retryPendingRequests(2).catch(() => undefined);
-    await syncOdooRequests(undefined, 1).catch(() => undefined);
+    // Never silently discard failed request reconciliation.
+    const requestRetries = await retryPendingRequests(2);
+    const requestSync = await syncOdooRequests(undefined, 1);
+    const pendingDetailJobs = await prisma.integrationJob.count({ where: { type: "ODOO_EMPLOYEE_DETAIL_SYNC", status: { in: ["PENDING", "RETRY"] } } });
     const connectionId = request.nextUrl.searchParams.get("connectionId") || undefined;
     const resyncResult = await fullResyncFromOdoo({ wipeAndSync: false, connectionId }).catch((err) => ({ error: err.message || String(err) }));
     if ("error" in resyncResult) throw new Error(`Employee pre-sync failed: ${resyncResult.error}`);
@@ -42,7 +45,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, blocked: true, message: "Employee-number reconciliation failed; review logs before retrying", numbersReconcile }, { status: 422 });
     }
     await writeAuditLog({ action: "ODOO_CRON_SYNC", entity: "odoo", metadata: { resyncResult, entity: result.entity, pulled: result.pulled, pushed: result.pushed, created: result.created, updated: result.updated, skipped: result.skipped, errors: result.errors.length, numbersReconcile } }).catch(() => undefined);
-    return NextResponse.json({ success: true, resyncResult, result, numbersReconcile });
+    return NextResponse.json({ success: true, resyncResult, result, numbersReconcile, requestRetries, requestSync, pendingDetailJobs });
   } catch (error) {
     return NextResponse.json({ success: false, message: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
