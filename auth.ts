@@ -223,7 +223,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
 
   callbacks: {
-    async jwt({ token, user, trigger }) {
+    async jwt({ token, user }) {
       try {
         if (user) {
           token.sub = user.id!;
@@ -240,7 +240,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           const currentUser = await prisma.user.findUnique({ where: { id: token.sub }, select: { isActive: true, sessionVersion: true } });
           if (!currentUser?.isActive || currentUser.sessionVersion !== ((token as any).sessionVersion ?? 0)) return null;
         }
-        if (trigger === "update" && token.sub) {
+        if (token.sub && !user) {
           try {
             const authz = await getAuthorization(token.sub);
             token.roles = authz.roles;
