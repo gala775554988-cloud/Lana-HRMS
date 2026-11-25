@@ -11,9 +11,14 @@ export function getAccount(role: string): SmokeAccount | null {
 }
 
 export async function login(page: Page, account: SmokeAccount) {
-  await page.goto("/login");
-  await page.locator("#identifier").fill(account.identifier);
-  await page.locator("#password").fill(account.password);
-  await page.locator('button[type="submit"]').click();
-  await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 15_000 });
+  // /login redirects to /#sign-in before credentials are submitted.
+  // Landing on "/" is not proof of authentication.
+  await page.goto("/login",{waitUntil:"domcontentloaded",timeout:30_000});
+  const form=page.locator("form").filter({has:page.locator("#identifier")});
+  await form.locator("#identifier").fill(account.identifier,{timeout:15_000});
+  await form.locator("#password").fill(account.password,{timeout:15_000});
+  await Promise.all([
+    page.waitForURL(url=>url.pathname!=="/"&&!url.pathname.startsWith("/login"),{waitUntil:"domcontentloaded",timeout:30_000}),
+    form.locator('button[type="submit"]').click({timeout:15_000}),
+  ]);
 }
