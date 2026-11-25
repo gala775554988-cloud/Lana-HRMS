@@ -59,7 +59,9 @@ async function processJobs(request: NextRequest, limit: number) {
     });
 
     const results = [];
+    const deadline = Date.now() + 180_000;
     for (const job of jobs) {
+      if (Date.now() >= deadline) break;
       const claim = await prisma.integrationJob.updateMany({
         where: { id: job.id, status: { in: ["PENDING", "RETRY"] }, attempts: job.attempts, OR: [{ runAt: null }, { runAt: { lte: new Date() } }] },
         data: { status: "PROCESSING", startedAt: new Date(), attempts: { increment: 1 } }
@@ -83,8 +85,8 @@ async function processJobs(request: NextRequest, limit: number) {
           throw new Error(detailResult.reason || "Detail sync failed");
         }
 
-        const updated = await prisma.integrationJob.update({
-          where: { id: job.id },
+        const updated = await prisma.integrationJob.updateMany({
+          where: { id: job.id, status: "PROCESSING", attempts: job.attempts + 1 },
           data: {
             status: "COMPLETED",
             finishedAt: new Date(),
@@ -92,13 +94,13 @@ async function processJobs(request: NextRequest, limit: number) {
             lastError: null
           }
         });
-        results.push({ jobId: job.id, odooId, status: "COMPLETED" });
+        if (updated.count === 1) results.push({ jobId: job.id, odooId, status: "COMPLETED" });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         const attempts = job.attempts + 1;
         const dead = attempts >= job.maxAttempts;
-        await prisma.integrationJob.update({
-          where: { id: job.id },
+        await prisma.integrationJob.updateMany({
+          where: { id: job.id, status: "PROCESSING", attempts: job.attempts + 1 },
           data: {
             status: dead ? "FAILED" : "RETRY",
             finishedAt: dead ? new Date() : null,
