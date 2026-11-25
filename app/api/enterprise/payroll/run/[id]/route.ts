@@ -98,7 +98,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!run.periodStartDate || !run.periodEndDate) {
       return NextResponse.json({ success: false, message: "لا يمكن إعادة الاحتساب -- الفترة الزمنية للمسير غير محددة" }, { status: 409 });
     }
+    const employeeIds = (await prisma.payrollItem.findMany({ where: { payrollRunId: id }, select: { employeeId: true } })).map(item => item.employeeId);
+    if (!employeeIds.length) return NextResponse.json({ success: false, message: "لا توجد قائمة موظفين محفوظة لإعادة الاحتساب" }, { status: 409 });
     const { employeeCount, items, errorCount } = await computeAndUpsertPayrollItems(id, run.periodStartDate, run.periodEndDate, {
+      employeeIds,
       companyId: run.companyId ?? undefined,
       branchId: run.branchId ?? undefined,
       departmentId: run.departmentId ?? undefined,
