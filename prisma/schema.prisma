@@ -279,6 +279,7 @@ model Position {
   updatedAt        DateTime    @updatedAt
   department       Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   employees        Employee[]
+  salaryBands      PayrollSalaryBand[]
   odooId           Int?        @unique
   odooWriteDate    DateTime?
   odooDepartmentId Int?
@@ -897,6 +898,7 @@ model PayrollPeriod {
   createdAt  DateTime            @default(now())
   updatedAt  DateTime            @updatedAt
   runs       PayrollRun[]
+  budgetLimits PayrollBudgetLimit[]
 
   @@unique([startDate, endDate])
   @@index([status])
@@ -911,6 +913,7 @@ model PayrollCostCenter {
   updatedAt DateTime     @updatedAt
   runs      PayrollRun[]
   items     PayrollItem[]
+  budgetLimits PayrollBudgetLimit[]
 
   @@index([isActive])
 }
@@ -2936,7 +2939,10 @@ model PayrollBudgetLimit {
   enforce Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  period PayrollPeriod @relation(fields:[periodId],references:[id],onDelete:Restrict)
+  costCenter PayrollCostCenter @relation(fields:[costCenterId],references:[id],onDelete:Restrict)
   @@unique([periodId,costCenterId,currency])
+  @@index([costCenterId])
 }
 model PayrollSalaryBand {
   id String @id @default(cuid())
@@ -2947,5 +2953,6 @@ model PayrollSalaryBand {
   enforce Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  position Position @relation(fields:[positionId],references:[id],onDelete:Restrict)
   @@unique([positionId,currency])
 }

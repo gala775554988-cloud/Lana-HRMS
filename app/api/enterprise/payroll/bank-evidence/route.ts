@@ -13,11 +13,11 @@ export async function GET(request:Request){
  const session=await auth();if(!session?.user?.id)return json({success:false},401);if(!canApprovePayroll(session))return json({success:false},403);
  const q=new URL(request.url).searchParams, id=q.get("download"),runId=q.get("runId");
  if(id){
-  const file=await prisma.payrollBankEvidence.findUnique({where:{id},select:{originalBytes:true,sha256:true,payrollRunId:true}});
+  const file=await prisma.payrollBankEvidence.findUnique({where:{id},select:{originalBytes:true,sha256:true,payrollRunId:true,originalName:true}});
   if(!file)return json({success:false},404);
   if(hash(file.originalBytes)!==file.sha256)return json({success:false,message:"فشل التحقق من سلامة الملف"},409);
   await prisma.auditLog.create({data:{actorUserId:session.user.id,action:"payroll:bank-evidence-download",entity:"payrollRun",entityId:file.payrollRunId,metadata:{evidenceId:id}}});
-  return new NextResponse(new Uint8Array(file.originalBytes),{headers:{...headers,"Content-Type":"application/octet-stream","Content-Disposition":'attachment; filename="bank-original.bin"',"X-Content-Type-Options":"nosniff"}});
+  return new NextResponse(new Uint8Array(file.originalBytes),{headers:{...headers,"Content-Type":"application/octet-stream","Content-Disposition":'attachment; filename="bank-original.bin"; filename*=UTF-8\'\''+encodeURIComponent(file.originalName.replace(/[\u0000-\u001F\u007F]/g,"_")).replace(/'/g,"%27"),"X-Content-Type-Options":"nosniff"}});
  }
  if(!runId)return json({success:false},400);
  const records=await prisma.payrollBankEvidence.findMany({where:{payrollRunId:runId},orderBy:{createdAt:"desc"},take:20,select:{id:true,originalName:true,sha256:true,result:true,createdAt:true}});

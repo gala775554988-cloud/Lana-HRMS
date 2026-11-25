@@ -15,7 +15,7 @@ export const dynamic="force-dynamic";
 export async function GET(request:Request){
  const session=await auth();if(!session?.user?.id)return response({success:false},401);if(!canApprovePayroll(session))return response({success:false},403);
  const runId=new URL(request.url).searchParams.get("runId");
- if(runId){const run=await prisma.payrollRun.findUnique({where:{id:runId},include:{items:true}});if(!run)return response({success:false},404);return response({success:true,warnings:await inspectPayrollControls(prisma,run,run.items)});}
+ if(runId){const run=await prisma.payrollRun.findUnique({where:{id:runId},include:{items:true}});if(!run)return response({success:false},404);return response({success:true,warnings:await prisma.$transaction(tx=>inspectPayrollControls(tx,run,run.items),{isolationLevel:"RepeatableRead"})});}
  const [budgets,bands,periods,centers,positions]=await Promise.all([prisma.payrollBudgetLimit.findMany({orderBy:{updatedAt:"desc"},take:200}),prisma.payrollSalaryBand.findMany({orderBy:{updatedAt:"desc"},take:200}),prisma.payrollPeriod.findMany({orderBy:{startDate:"desc"},take:100,select:{id:true,name:true,status:true}}),prisma.payrollCostCenter.findMany({where:{isActive:true},orderBy:{name:"asc"},select:{id:true,name:true}}),prisma.position.findMany({where:{isActive:true},orderBy:{title:"asc"},select:{id:true,title:true}})]);
  return response({success:true,budgets,bands,periods,centers,positions});
 }

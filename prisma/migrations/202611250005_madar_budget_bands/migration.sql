@@ -12,3 +12,7 @@ CREATE TABLE "PayrollSalaryBand" (
 CONSTRAINT "PayrollSalaryBand_pkey" PRIMARY KEY ("id"),
 CONSTRAINT "PayrollSalaryBand_limits_check" CHECK ("minimum">=0 AND "maximum">="minimum"));
 CREATE UNIQUE INDEX "PayrollSalaryBand_positionId_currency_key" ON "PayrollSalaryBand"("positionId","currency");
+ALTER TABLE "PayrollBudgetLimit" ADD CONSTRAINT "PayrollBudgetLimit_periodId_fkey" FOREIGN KEY ("periodId") REFERENCES "PayrollPeriod"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "PayrollBudgetLimit" ADD CONSTRAINT "PayrollBudgetLimit_costCenterId_fkey" FOREIGN KEY ("costCenterId") REFERENCES "PayrollCostCenter"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "PayrollSalaryBand" ADD CONSTRAINT "PayrollSalaryBand_positionId_fkey" FOREIGN KEY ("positionId") REFERENCES "Position"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+CREATE INDEX "PayrollBudgetLimit_costCenterId_idx" ON "PayrollBudgetLimit"("costCenterId");

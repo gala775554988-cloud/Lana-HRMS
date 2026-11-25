@@ -101,3 +101,5 @@ Do not merge until all acceptance criteria, isolated tests, backup and preview c
 ## Budget and salary controls after 4321dc1
 - #20/#19/#28: additive budget limits per financial period, cost center and currency; salary bands by position/currency, UI and authorized policy editing with audit. Payroll approval and confirmation check opted-in blocking limits and record advisory findings. Cost includes gross plus employer insurance, committed approved or paid runs, excludes current run. No retroactive salary edits. Configurations not installed in production; full cost allocations and historical policy versions remain unverified.
 - #33: added budget-control tests; new CI pending.
+
+- Follow-up compatibility fix: ES2017-safe BigInt constructors, explicit JSON warning shape, restrictive foreign keys for budget policies, and original bank filename retained on download. 4321dc1 CI had passed migration and fixtures and reached lint at check; latest build still pending.
