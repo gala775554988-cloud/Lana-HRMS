@@ -64,3 +64,23 @@ jobs:
       - name: TypeScript validation
         run: npm run typecheck
       - run: npm run build
+      - name: Install Chromium for isolated browser acceptance
+        run: npx playwright install --with-deps chromium
+      - name: Verify actual login and MADAR task lifecycle in desktop/mobile browser
+        env:
+          SMOKE_BASE_URL: http://localhost:3000
+          MADAR_SMOKE_PASSWORD: ci-only-madar-browser-pass
+          CRON_SECRET: ci-only-madar-cron-secret
+          AUTH_TRUST_HOST: "true"
+        run: |
+          set -euo pipefail
+          node tests/smoke/madar-ci-seed.mjs
+          npm run start -- --hostname 127.0.0.1 --port 3000 > /tmp/madar-ci-server.log 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:3000/login >/dev/null; then break; fi
+            sleep 2
+          done
+          curl -fsS http://localhost:3000/login >/dev/null
+          npm run test:smoke -- madar-tasks.spec.ts

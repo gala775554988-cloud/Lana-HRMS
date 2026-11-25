@@ -30,8 +30,15 @@ const PUBLIC_API_PREFIXES = [
   "/api/integrations/oauth/token", // machine-to-machine, verified by client secret
 ];
 
+// Exact scheduled paths authenticate their own machine credentials. Do not
+// allow a whole integration subtree to bypass the session gate.
+const MACHINE_CRON_PATHS = new Set([
+  "/api/integrations/odoo/cron-repair",
+  "/api/integrations/odoo/cron-reconcile",
+  "/api/integrations/automation/cron-alerts",
+]);
 function isPublicApiRoute(pathname: string) {
-  return PUBLIC_API_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+  return MACHINE_CRON_PATHS.has(pathname) || PUBLIC_API_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
 // Static files served straight out of /public (logos, icons, the landing

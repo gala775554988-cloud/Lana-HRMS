@@ -7,7 +7,7 @@ Baseline: c0a67b1e8957082a556f9f0df3cd4928dac6e2ba. CI: https://github.com/gala7
 | 1 | بيانات المشروع الحالي | محدد | المستودع والفرع والنطاق محددة؛ CI 45624237702 على 3241561. | لا يوجد |
 | 2 | تعليمات التنفيذ الإلزامية | جارٍ | حماية البيانات، دفعات ذرية، عدم نشر الإنتاج؛ الاختبارات المعزولة فقط. | إتمام بوابة الإصدار |
 | 3 | إصلاح تسجيل الدخول والصلاحيات | جزئي | ترحيل sidebarHue وWebAuthn؛ اختبارات auth ضمن 206 ناجحة. | اختبار دخول الأدمن الفعلي وRBAC في المعاينة |
-| 4 | المزامنة التلقائية الشاملة مع Odoo | جزئي | جدولة GitHub Actions مشروطة، قفل قاعدة البيانات؛ لم يثبت التشغيل. | سر الجدولة وتفعيلها بعد النشر؛ خطة Vercel غير معلومة |
+| 4 | المزامنة التلقائية الشاملة مع Odoo | جزئي | جدولة GitHub Actions مشروطة وقفل قاعدة البيانات، إصلاح مرور مسارات Cron المحددة عبر Middleware إلى تحقق الرمز؛ اختبار آلة مجدولة محلي قيد التحقق. | سر الجدولة وتفعيلها بعد النشر؛ خطة Vercel غير معلومة |
 | 5 | إصلاح أخطاء المزامنة السابقة | عائق خارجي | تشخيص الأخطاء وإعادة المحاولة حسب السجل؛ اختبارات Odoo ضمن 206 ناجحة. | لا وصول موثق لسجلات الإنتاج الـ70 ولا إثبات إصلاح |
 | 6 | إنشاء محرك مركزي لجميع طلبات الموظفين | جزئي | محرك الاعتماد المحلي والمعاملات؛ تكامل PostgreSQL ناجح. | توحيد باقي الطلبات والتكامل الخارجي |
 | 7 | الربط التلقائي للإجازات | جزئي | رصيد سنوي وإلغاء مرة واحدة وشرائح مرضية وغير مدفوعة؛ تكامل ناجح. | مطابقة الأرصدة الفعلية وجميع الأنواع والحضور |
@@ -159,3 +159,7 @@ Do not merge until all 37 acceptance criteria, isolated tests, backup and previe
 
 ## HR event tasks
 - #37/#24/#27: configurable, default-off central policy for eight event sources (verified documents incl. residency/work permits if recorded, active contracts, medical insurance, open payroll period, pending approval step, existing PENALTY deduction review, unfinished final settlement and open Odoo migration error). Explicit active HR employee and independent HR reviewer, unique occurrence keys by source/version, no financial effect. Bounded creation and backlog reporting; no actual policy enabled. No separate violation model exists; only existing recorded penalties are covered. Automatic event tasks are review assignments, not closure of source events. Navigation link added. New CI pending.
+
+## Isolated browser acceptance and scheduler routing correction
+- #4/#24/#29: middleware exact-path exceptions for cron-repair, cron-reconcile, cron-alerts; each route retains machine-secret validation. Previously unauthenticated scheduler was rejected before route guard. No production token read or changed.
+- #3/#23/#33/#37: CI-only disposable localhost *_test seed, real Next.js production build served locally, Playwright Chromium desktop admin and mobile employee workflow, checklist/review, denial of unrelated user and self-approval, calendar rendering, machine-auth rejection and recurrence dedupe. Tests newly configured, results pending; not all roles, physical devices, or all feature flows covered. Test credentials are synthetic and isolated, no production mutations.
