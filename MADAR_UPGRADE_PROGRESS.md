@@ -71,3 +71,8 @@ Do not merge until all acceptance criteria, isolated tests, backup and preview c
 - #17/#29/#32: additive EmployeeFinalSettlement model and migration; HR-only draft and independent approval, persisted calculation snapshot, outstanding active loan/advance calculation, transactional audit and approval timeline. UI at /final-settlements linked from payroll settings. No actual payment, contract closure or debt writeoff. ACT/365 estimate requires HR review; official reference https://www.hrsd.gov.sa/media-center/media/lerightseocontract . Existing records preserved. Cancellation/revision and payment reconciliation need further implementation.
 - #30: payroll page navigation and primary actions changed to green.
 - #33: added final settlement validation and calculation tests; CI pending. 5a576e3 CI was still running at last check.
+
+## Batch after b9f338a
+- #17/#14/#8/#25/#26/#29: additive payment-confirmation columns and unique reference; external payment attestation by another approver, frozen source identities, changed-source check, local debt closure and itemized ledger posting in serializable transaction. No bank call. Odoo-origin debt blocks confirmation until reconciled; legacy snapshots need review; manual leave encashment and unpaid wage amounts remain reviewed inputs (no automatic leave balance write-off). Revised/cancelled drafts retain previous snapshots in audit. Payroll blocks settlement after confirmed final settlement; pending payroll blocks final settlement.
+- #23/#30: employee ledger labels and settlement confirmation form.
+- #33: CI 45614957546 passed; new tests and migration pending CI.

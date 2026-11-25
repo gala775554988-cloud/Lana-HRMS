@@ -19,3 +19,21 @@ export function makeFinalSettlementSnapshot(input: z.infer<typeof finalSettlemen
   const totals = calculateFinalSettlement({ eosb: eosb.eosb, unpaidSalary: input.unpaidSalary, leaveEncashment: input.leaveEncashment, otherEntitlements: input.otherEntitlements, deductions: input.deductions, outstandingLoans: money(outstandingLoans) });
   return { input, startDate: startDate.toISOString(), endDate: endDate.toISOString(), outstandingLoans: money(outstandingLoans), eosb, totals, policy: "SA-LABOR-84-88-ACT365-REVIEW", requiresHrReview: true };
 }
+
+export const debtSourceSchema = z.object({kind:z.enum(["LOAN","ADVANCE"]),id:z.string().min(1),amount:amount,version:z.string(),external:z.boolean()}).strict();
+export const settlementPaymentInput = z.object({id:z.string().min(1),action:z.literal("confirm-payment"),reference:z.string().trim().min(5).max(150).transform(v=>v.toUpperCase()),confirmedAmount:amount,reviewedSources:z.literal(true)}).strict();
+export const settlementDebtSnapshot = z.object({debtSources:z.array(debtSourceSchema),leaveVersion:z.string().nullable(),lastPaidVersion:z.string().nullable()});
+export function buildFinalSettlementEntries(snapshot: ReturnType<typeof makeFinalSettlementSnapshot>, sources: z.infer<typeof debtSourceSchema>[]) {
+  const rows:{effectType:string;direction:"CREDIT"|"DEBIT";amount:number}[]=[];
+  const add=(effectType:string,direction:"CREDIT"|"DEBIT",value:number)=>{if(!Number.isFinite(value)||value<0)throw Error("قيمة تسوية غير صالحة");if(money(value)>0)rows.push({effectType,direction,amount:money(value)});};
+  add("EOSB","CREDIT",snapshot.eosb.eosb);
+  add("UNPAID_SALARY","CREDIT",snapshot.input.unpaidSalary);
+  add("LEAVE_ENCASHMENT","CREDIT",snapshot.input.leaveEncashment);
+  add("OTHER_ENTITLEMENTS","CREDIT",snapshot.input.otherEntitlements);
+  add("OTHER_DEDUCTIONS","DEBIT",snapshot.input.deductions);
+  if(new Set(sources.map(row=>row.kind+":"+row.id)).size!==sources.length || money(sources.reduce((sum,row)=>sum+row.amount,0))!==snapshot.outstandingLoans)throw Error("تعارض مصادر الأقساط");
+  for(const row of sources)add(row.kind+":"+row.id,"DEBIT",row.amount);
+  const sum=(direction:"CREDIT"|"DEBIT")=>money(rows.filter(row=>row.direction===direction).reduce((s,row)=>s+row.amount,0));
+  if(sum("CREDIT")!==snapshot.totals.entitlements || sum("DEBIT")!==snapshot.totals.deductions || money(sum("CREDIT")-sum("DEBIT"))!==snapshot.totals.netSettlement || snapshot.totals.netSettlement<0)throw Error("المخالصة تحتاج مراجعة مالية قبل تأكيد الصرف");
+  return rows;
+}

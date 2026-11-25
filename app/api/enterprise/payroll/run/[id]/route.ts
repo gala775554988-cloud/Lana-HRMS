@@ -184,6 +184,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           select: { employeeId: true }
         });
         if (duplicate) throw new Error("يوجد موظف سبق صرف راتبه في فترة متداخلة؛ راجع المسير قبل الاعتماد أو الصرف");
+        const finalized = await tx.employeeFinalSettlement.findFirst({ where: { employeeId: { in: items.map(item=>item.employeeId) }, status:"PAID", terminationDate:{lte:run.periodEndDate} }, select:{id:true} });
+        if(finalized)throw new Error("يوجد موظف تمت تسوية مخالصة نهائية له؛ يلزم مراجعة المسير قبل الصرف");
         for (const item of items) {
           const snapshot = item.calculationSnapshot as unknown as PayrollBreakdown;
           if (!snapshot || !Number.isFinite(snapshot.netPay) || Math.abs(Number(item.netPay) - snapshot.netPay) > 0.005 || !Array.isArray(snapshot.loanAllocations)) throw new Error("أعد احتساب المسير؛ لقطة الحساب غير مكتملة");

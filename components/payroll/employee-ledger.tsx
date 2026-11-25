@@ -8,7 +8,7 @@ type Execution = { requestType?: string; id: string; sourceType: string; effectT
 type Ledger = { balances: Balance[]; entries: Entry[]; recentExecutions: Execution[]; total: number; pageSize: number };
 
 const labels: Record<string,string> = { LEAVE: "إجازة", OVERTIME: "عمل إضافي", BONUS: "مكافأة", ADVANCE: "سلفة", PAYROLL: "مسير راتب", CREDIT: "إضافة", DEBIT: "خصم", INFORMATION: "معلومة", EXECUTED: "منفذ", POSTED: "مسجل", REVERSED: "معكوس" };
-Object.assign(labels, { BASIC: "الراتب الأساسي", ALLOWANCES: "البدلات", GOSI: "التأمينات", TAX: "الضرائب", ABSENCE: "الغياب", LATE: "التأخير", PENALTY: "الجزاءات", OTHER_DEDUCTIONS: "خصومات أخرى", LOAN: "قسط قرض", ADVANCE: "قسط سلفة", GROSS_PAY: "إجمالي الأجر", DEDUCTIONS: "إجمالي الخصومات", WORKFLOW: "طلب موظف", APPROVAL_RECORDED: "تم تسجيل الاعتماد", APPROVAL: "اعتماد", EXPENSE: "مصروفات", RESUMPTION: "مباشرة", LETTER: "خطاب" });
+Object.assign(labels, { FINAL_SETTLEMENT:"مخالصة نهائية", EOSB:"مكافأة نهاية الخدمة", UNPAID_SALARY:"أجر غير مصروف", LEAVE_ENCASHMENT:"مقابل الإجازات", OTHER_ENTITLEMENTS:"مستحقات أخرى", PAYMENT_CONFIRMED:"تأكيد الصرف", BASIC: "الراتب الأساسي", ALLOWANCES: "البدلات", GOSI: "التأمينات", TAX: "الضرائب", ABSENCE: "الغياب", LATE: "التأخير", PENALTY: "الجزاءات", OTHER_DEDUCTIONS: "خصومات أخرى", LOAN: "قسط قرض", ADVANCE: "قسط سلفة", GROSS_PAY: "إجمالي الأجر", DEDUCTIONS: "إجمالي الخصومات", WORKFLOW: "طلب موظف", APPROVAL_RECORDED: "تم تسجيل الاعتماد", APPROVAL: "اعتماد", EXPENSE: "مصروفات", RESUMPTION: "مباشرة", LETTER: "خطاب" });
 const label = (key: string) => labels[key.split(":")[0]] ?? key;
 export function EmployeeLedger() {
   const [page, setPage] = useState(1);
