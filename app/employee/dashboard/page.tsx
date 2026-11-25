@@ -23,33 +23,33 @@ export default async function EmployeeDashboard() {
     const lastPaidSalary = data.payroll ? `${asNumber(data.payroll.netPay).toLocaleString('ar-SA')} ${data.payroll.currency}` : 'غير مسجل';
     return (
       <main className="space-y-6" dir="rtl">
-      <section className="lana-workspace-hero overflow-hidden rounded-3xl text-white shadow-[var(--shadow-card)]">
-        <div className="grid gap-6 p-6 lg:grid-cols-[1.2fr_.8fr] lg:p-8">
-          <div className="flex flex-col gap-5 md:flex-row md:items-center">
-            <div className="h-24 w-24 overflow-hidden rounded-2xl bg-white/10 ring-1 ring-white/20">
+      <section className="lana-workspace-hero employee-profile-hero overflow-hidden rounded-3xl shadow-[var(--shadow-card)]">
+        <div className="grid gap-5 p-4 sm:p-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,.8fr)] lg:p-8">
+          <div className="flex min-w-0 flex-col gap-4 md:flex-row md:items-center">
+            <div className="employee-profile-avatar h-20 w-20 shrink-0 overflow-hidden rounded-2xl ring-1 sm:h-24 sm:w-24">
               {employee.profilePhotoUrl ? <Image src={employee.profilePhotoUrl} alt={fullName} width={96} height={96} unoptimized className="h-full w-full object-cover" /> : <div className="grid h-full w-full place-items-center text-3xl font-bold">{employee.firstName?.[0]}{employee.lastName?.[0]}</div>}
             </div>
             <div className="min-w-0 space-y-3">
-              <div><p className="text-sm text-white/70">مرحباً بك</p><h1 className="text-3xl font-bold tracking-tight md:text-4xl">{fullName}</h1></div>
+              <div><p className="employee-profile-secondary text-sm font-medium">مرحباً بك</p><h1 className="employee-profile-name break-words text-2xl font-bold leading-snug sm:text-3xl md:text-4xl">{fullName}</h1></div>
               <div className="flex flex-wrap gap-2 text-sm">
-                <Badge className="bg-white/15 text-white hover:bg-white/20"><IdCard className="ml-1 h-3.5 w-3.5" />{employee.employeeNumber}</Badge>
-                <Badge className="bg-white/15 text-white hover:bg-white/20">الهوية: {maskedNationalId}</Badge>
-                <Badge className="bg-emerald-400/20 text-emerald-50 hover:bg-emerald-400/30">{employee.status}</Badge>
+                <Badge className="employee-profile-badge"><IdCard className="ml-1 h-3.5 w-3.5" />{employee.employeeNumber}</Badge>
+                <Badge className="employee-profile-badge">الهوية: {maskedNationalId}</Badge>
+                <Badge className={`employee-profile-badge ${employee.status === "ACTIVE" ? "employee-profile-active" : ""}`}>{employee.status === "ACTIVE" ? "نشط" : employee.status}</Badge>
               </div>
-              <div className="grid gap-2 text-sm text-white/80 sm:grid-cols-2">
-                <span className="flex items-center gap-2"><Briefcase className="h-4 w-4" />{employee.position?.title ?? 'غير محدد'}</span>
-                <span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4" />{employee.department?.name ?? 'لا يوجد قسم'}</span>
-                <span className="flex items-center gap-2"><MapPin className="h-4 w-4" />{employee.branch?.name ?? 'لا يوجد فرع'}</span>
-                <span className="flex items-center gap-2"><User className="h-4 w-4" />المدير: {employee.manager ? `${employee.manager.firstName} ${employee.manager.lastName}` : 'غير محدد'}</span>
+              <div className="employee-profile-secondary grid gap-3 text-sm sm:grid-cols-2">
+                <span className="flex min-w-0 items-start gap-2"><Briefcase className="mt-1 h-4 w-4 shrink-0" />{employee.position?.title ?? 'غير محدد'}</span>
+                <span className="flex min-w-0 items-start gap-2"><ShieldCheck className="mt-1 h-4 w-4 shrink-0" />{employee.department?.name ?? 'لا يوجد قسم'}</span>
+                <span className="flex min-w-0 items-start gap-2"><MapPin className="mt-1 h-4 w-4 shrink-0" />{employee.branch?.name ?? 'لا يوجد فرع'}</span>
+                <span className="flex min-w-0 items-start gap-2"><User className="mt-1 h-4 w-4 shrink-0" />المدير: {employee.manager ? `${employee.manager.firstName} ${employee.manager.lastName}` : 'غير محدد'}</span>
               </div>
             </div>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5">
+          <div className="employee-profile-panel min-w-0 rounded-2xl border p-4 sm:p-5">
             <div className="flex items-center justify-between"><span>اكتمال الملف</span><span className="text-2xl font-bold">{completion}%</span></div>
-            <div className="mt-3 h-3 rounded-full bg-white/15"><div className="h-3 rounded-full bg-emerald-300" style={{ width: `${completion}%` }} /></div>
-            <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-2xl bg-white/10 p-3"><p className="text-white/80">حالة الحساب</p><p className="font-bold">{employee.user?.isActive ? 'نشط' : 'غير نشط'}</p></div>
-              <div className="rounded-2xl bg-white/10 p-3"><p className="text-white/80">آخر دخول</p><p className="font-bold">{employee.user?.lastLoginAt ? fmtDate(employee.user.lastLoginAt) : 'لم يسجل'}</p></div>
+            <div className="employee-profile-track mt-3 h-3 overflow-hidden rounded-full"><div className="employee-profile-fill h-3 rounded-full" style={{ width: `${completion}%` }} /></div>
+            <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:gap-3">
+              <div className="employee-profile-detail min-w-0 rounded-xl border p-3"><p className="employee-profile-secondary">حالة الحساب</p><p className="font-bold">{employee.user?.isActive ? 'نشط' : 'غير نشط'}</p></div>
+              <div className="employee-profile-detail min-w-0 rounded-xl border p-3"><p className="employee-profile-secondary">آخر دخول</p><p className="font-bold">{employee.user?.lastLoginAt ? fmtDate(employee.user.lastLoginAt) : 'لم يسجل'}</p></div>
             </div>
           </div>
         </div>

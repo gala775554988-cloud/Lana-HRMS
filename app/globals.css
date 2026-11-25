@@ -346,3 +346,25 @@
 .dark .approvals-hero .approvals-hero-description { color: #d9e6d3; }
 .dark .approvals-hero .approvals-hero-action { background: #c6e2a8; border-color: #c6e2a8; color: #233d2d; }
 .dark .approvals-hero .approvals-hero-action:hover { background: #d8edc0; }
+
+/* Employee portal: high-contrast typography on the apple-green profile card. */
+.lana-workspace-hero.employee-profile-hero { background: linear-gradient(115deg,#f4f8ee,#e5efd7); border-color:#cfdfc1; color:#244536; }
+.employee-profile-hero .employee-profile-name { color:#244536; }
+.employee-profile-hero .employee-profile-secondary { color:#405647; overflow-wrap:anywhere; }
+.employee-profile-hero .employee-profile-avatar { background:#e0ebd4; --tw-ring-color:#a9c39b; color:#315640; }
+.employee-profile-hero .employee-profile-badge { background:#f8fbf3; border:1px solid #c9dbbb; color:#344e38; box-shadow:none; }
+.employee-profile-hero .employee-profile-badge.employee-profile-active { background:#d6ebc3; border-color:#b4d39e; color:#28522f; }
+.employee-profile-hero .employee-profile-panel { background:#f8fbf3; border-color:#cbdcba; color:#244536; }
+.employee-profile-hero .employee-profile-detail { background:#edf4e5; border-color:#d7e4cc; overflow-wrap:anywhere; }
+.employee-profile-hero .employee-profile-track { background:#d6e4cb; }
+.employee-profile-hero .employee-profile-fill { background:#56863f; }
+.dark .lana-workspace-hero.employee-profile-hero { background:#293e30; border-color:#526a48; color:#f1f6eb; }
+.dark .employee-profile-hero .employee-profile-name { color:#f1f6eb; }
+.dark .employee-profile-hero .employee-profile-secondary { color:#d9e6d3; }
+.dark .employee-profile-hero .employee-profile-avatar { background:#354d32; --tw-ring-color:#79976a; color:#e3efd8; }
+.dark .employee-profile-hero .employee-profile-badge { background:#354d32; border-color:#657e55; color:#e3efd8; }
+.dark .employee-profile-hero .employee-profile-badge.employee-profile-active { background:#3c5e36; border-color:#7c9d66; color:#e0f2cf; }
+.dark .employee-profile-hero .employee-profile-panel { background:#24372b; border-color:#526a48; color:#f1f6eb; }
+.dark .employee-profile-hero .employee-profile-detail { background:#304735; border-color:#526a48; }
+.dark .employee-profile-hero .employee-profile-track { background:#425a3a; }
+.dark .employee-profile-hero .employee-profile-fill { background:#b2d68e; }
