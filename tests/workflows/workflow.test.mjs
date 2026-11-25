@@ -9,7 +9,7 @@ async function setup({ type = 'LETTER', leaveCode = 'ANNUAL', self = false, defe
     { id: 's1', workflowInstanceId: 'w', step: 1, approverUserId: self ? 'requester' : 'manager', status: deferred ? 'DEFERRED' : 'PENDING', capabilities: ['APPROVE', 'REJECT'], comments: '{"stageName":"Manager","slaHours":24}' },
     { id: 's2', workflowInstanceId: 'w', step: 2, approverUserId: 'hr', status: 'WAITING', capabilities: ['APPROVE', 'REJECT'], comments: '{"stageName":"HR","slaHours":24}' },
   ], entityStatus: 'PENDING', used: 0, audits: [], created: 0 };
-  let resolutionCalls = 0;let queue = Promise.resolve();
+  let resolutionCalls = 0;let ledgerEvents = 0;let queue = Promise.resolve();
   const approvers = [{ userId: 'new-manager', isMandatory: true, capabilities: ['APPROVE', 'REJECT'], stageName: 'New manager' }];
   const build = get => ({
     employee: { findUnique: async () => ({ userId: 'requester', odooRawData: {} }) },
@@ -42,11 +42,12 @@ async function setup({ type = 'LETTER', leaveCode = 'ANNUAL', self = false, defe
     '@/lib/integrations/odoo/requests/service': { enqueueWorkflowRequest: async () => {}, dispatchWorkflowRequest: async () => {}, assertLocalWorkflow: async () => {} },
     '@/lib/integrations/odoo/requests/store': { getLink: async () => null },
     '@/lib/self-service/lifecycle': lifecycle,
+    '@/lib/enterprise/employee-financial-ledger': { postApprovedEffectInTransaction: async () => { ledgerEvents++; } },
     '@/lib/prisma': { prisma }, './request-routing-policy': { ApprovalRoutingError }, './workflow-step-metadata': metadata,
     '@/lib/enterprise/hierarchy': { resolveApprovalChain: async () => { resolutionCalls++;return approvers; } },
     '@/lib/enterprise/notifications': { createEnterpriseNotification: async () => {}, notifyUsers: async () => {} },
   });
-  return { api, prisma, state: () => state, calls: () => resolutionCalls, decide: (actorUserId, decision = 'APPROVE', comments) => api.decideWorkflowStep({ workflowInstanceId: 'w', actorUserId, decision, comments }) };
+  return { api, prisma, state: () => state, calls: () => resolutionCalls, ledgerEvents: () => ledgerEvents, decide: (actorUserId, decision = 'APPROVE', comments) => api.decideWorkflowStep({ workflowInstanceId: 'w', actorUserId, decision, comments }) };
 }
 test('requests move strictly from the manager to HR and only then complete', async () => {
   const s = await setup();await assert.rejects(s.decide('hr'), /Forbidden/);
@@ -68,7 +69,7 @@ test('deferred requests can be explicitly decided by their assigned approver', a
 test('concurrent double clicks cannot approve twice or debit leave twice', async () => {
   const s = await setup({ type: 'LEAVE' });await s.decide('manager');
   const decisions = await Promise.allSettled([s.decide('hr'), s.decide('hr')]);
-  assert.equal(decisions.filter(x => x.status === 'fulfilled').length, 1);assert.equal(s.state().used, 3);assert.equal(s.state().audits.length, 2);
+  assert.equal(decisions.filter(x => x.status === 'fulfilled').length, 1);assert.equal(s.state().used, 3);assert.equal(s.state().audits.length, 2);assert.equal(s.ledgerEvents(), 1);
 });
 test('medical leave never reduces the annual leave aggregate', async () => {
   const s = await setup({ type: 'LEAVE', leaveCode: 'SICK' });await s.decide('manager');await s.decide('hr');assert.equal(s.state().used, 0);assert.equal(s.state().entityStatus, 'APPROVED');
