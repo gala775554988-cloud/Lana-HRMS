@@ -9,7 +9,7 @@ import { getPayrollOdooClient } from "@/lib/payroll/connection";
 import { odooPayrollSource, reconcileAccountingOutbox } from "@/lib/payroll/odoo-payroll";
 import { accountingMappingSchema, postConfiguredPayrollJournal } from "@/lib/payroll/journal";
 import { consumeApprovedPayroll, buildPayrollLedgerBreakdown } from "@/lib/payroll/settlement";
-import { buildLocalPayrollJournal } from "@/lib/payroll/local-journal";
+import { buildLocalPayrollJournal, reverseLocalPayrollJournal } from "@/lib/payroll/local-journal";
 import { inspectPayrollControls } from "@/lib/payroll/budget-control";
 import type { PayrollBreakdown } from "@/lib/enterprise/payroll-engine";
 import type { PayrollStatus } from "@prisma/client";
@@ -162,7 +162,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       if(action==="cancel"&&run.status==="APPROVED"){
         const outbox=await tx.payrollAccountingOutbox.findUnique({where:{payrollRunId:id}});
         if(outbox)throw Error("توجد مهمة محاسبية للمسير؛ يلزم مطابقة القيد أو إجراء عكس محاسبي معتمد قبل الإلغاء");
-        await tx.payrollLocalJournal.updateMany({where:{payrollRunId:id,status:"ACCRUED"},data:{status:"VOID",voidedAt:now}});
+        if(run.paidAt)throw Error("لا يمكن عكس مسير مصروف بهذه العملية");
+        const journal=await tx.payrollLocalJournal.findUnique({where:{payrollRunId:id}});
+        if(!journal||journal.status!=="ACCRUED")throw Error("القيد المحلي التاريخي يحتاج مطابقة قبل الإلغاء");
+        const reversal=reverseLocalPayrollJournal(journal.lines);
+        const saved=await tx.payrollLocalJournalReversal.create({data:{journalId:journal.id,lines:reversal.lines,totals:reversal.totals,reason:body?.reason?.trim()||"إلغاء مسير معتمد قبل الصرف",createdById:session.user.id}});
+        const changed=await tx.payrollLocalJournal.updateMany({where:{id:journal.id,status:"ACCRUED"},data:{status:"VOID",voidedAt:now}});
+        if(changed.count!==1)throw Error("تغيرت حالة القيد أثناء العكس");
+        await tx.auditLog.create({data:{actorUserId:session.user.id,action:"payroll:local-journal-reversal",entity:"payrollRun",entityId:id,metadata:{journalId:journal.id,reversalId:saved.id,externalPosting:false}}});
       }
       if (action === "submit" || action === "approve" || action === "pay") {
         if (run.periodId) {

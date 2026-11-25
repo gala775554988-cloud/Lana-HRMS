@@ -12,3 +12,14 @@ test("local accounting classification balances employer expenses and receivables
  assert.equal(result.lines.find(r=>r.accountRole==="EMPLOYEE_RECEIVABLE").credit,"100.00");assert.equal(result.lines[0].costCenterId,"c1");
  assert.throws(()=>api.buildLocalPayrollJournal([item,item],null));assert.throws(()=>api.buildLocalPayrollJournal([{...item,employerInsurance:121}],null));
 });
+
+test("unpaid local journal reversal swaps debit and credit exactly without changing original",()=>{
+ const original=api.buildLocalPayrollJournal([item],"c1"),snapshot=JSON.stringify(original);
+ const reversed=api.reverseLocalPayrollJournal(original.lines);
+ assert.equal(JSON.stringify(original),snapshot);
+ assert.equal(reversed.lines.length,original.lines.length);
+ for(let i=0;i<reversed.lines.length;i++){assert.equal(reversed.lines[i].debit,original.lines[i].credit);assert.equal(reversed.lines[i].credit,original.lines[i].debit);assert.equal(reversed.lines[i].costCenterId,"c1");}
+ assert.equal(reversed.totals[0].debit,reversed.totals[0].credit);
+ assert.throws(()=>api.reverseLocalPayrollJournal(original.lines.slice(1)));
+ assert.throws(()=>api.reverseLocalPayrollJournal([{...original.lines[0],credit:"1.00"}]));
+});

@@ -11,11 +11,14 @@ type Line={itemId:string;employeeId:string;currency:string;costCenterId:string|n
 export async function GET(request:Request){
  const session=await auth();if(!session?.user?.id)return json({success:false},401);if(!canViewPayroll(session))return json({success:false},403);
  const q=new URL(request.url).searchParams,runId=q.get("runId");if(!runId||runId.length>128)return json({success:false},400);
- const journal=await prisma.payrollLocalJournal.findUnique({where:{payrollRunId:runId}});if(!journal)return json({success:false,message:"لا يوجد قيد محلي محفوظ؛ المسيرات التاريخية والمستوردة ليست معاد ترحيلها"},404);
- if(q.get("format")!=="xlsx")return json({success:true,status:journal.status,totals:journal.totals,createdAt:journal.createdAt,lineCount:Array.isArray(journal.lines)?journal.lines.length:0});
- const lines=journal.lines as unknown as Line[];
+ const journal=await prisma.payrollLocalJournal.findUnique({where:{payrollRunId:runId},include:{reversal:true}});if(!journal)return json({success:false,message:"لا يوجد قيد محلي محفوظ؛ المسيرات التاريخية والمستوردة ليست معاد ترحيلها"},404);
+ if(q.get("format")!=="xlsx")return json({success:true,status:journal.status,totals:journal.totals,createdAt:journal.createdAt,lineCount:Array.isArray(journal.lines)?journal.lines.length:0,reversal:journal.reversal?{id:journal.reversal.id,totals:journal.reversal.totals,reason:journal.reversal.reason,createdAt:journal.reversal.createdAt}:null});
+ const original=journal.lines as unknown as Line[];
+ const reverse=journal.reversal?.lines as unknown as Line[]|undefined;
+ if(!Array.isArray(original)||(journal.reversal&&!Array.isArray(reverse)))return json({success:false,message:"صيغة القيد غير صالحة"},422);
+ const lines=[...original.map(l=>({...l,entry:"أصلي"})),...(reverse??[]).map(l=>({...l,entry:"عكسي"}))];
  if(!Array.isArray(lines)||lines.length>50000)return json({success:false,message:"حجم القيد يتجاوز حد التصدير"},422);
- const bytes=await buildExcelTable("مسودة تصنيف محاسبي محلي - "+journal.status,[{key:"employeeId",label:"مرجع الموظف"},{key:"currency",label:"العملة"},{key:"costCenterId",label:"مركز التكلفة"},{key:"accountRole",label:"تصنيف الحساب"},{key:"source",label:"المصدر"},{key:"debit",label:"مدين"},{key:"credit",label:"دائن"}],lines.map(l=>({...l})));
+ const bytes=await buildExcelTable("مسودة تصنيف محاسبي محلي - "+journal.status,[{key:"entry",label:"نوع القيد"},{key:"employeeId",label:"مرجع الموظف"},{key:"currency",label:"العملة"},{key:"costCenterId",label:"مركز التكلفة"},{key:"accountRole",label:"تصنيف الحساب"},{key:"source",label:"المصدر"},{key:"debit",label:"مدين"},{key:"credit",label:"دائن"}],lines.map(l=>({...l})));
  await prisma.auditLog.create({data:{actorUserId:session.user.id,action:"payroll:local-journal-export",entity:"payrollRun",entityId:runId,metadata:{status:journal.status,lines:lines.length}}});
  return new NextResponse(new Uint8Array(bytes),{headers:{...headers,"Content-Type":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","Content-Disposition":'attachment; filename="local-payroll-journal.xlsx"'}});
 }

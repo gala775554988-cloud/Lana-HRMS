@@ -29,3 +29,18 @@ export function buildLocalPayrollJournal(items:Input[],defaultCenter:string|null
  const summary=[...totals.entries()].map(([currency,t])=>{if(t.debit!==t.credit)throw Error("القيد غير متوازن حسب العملة");return {currency,debit:fixed(t.debit),credit:fixed(t.credit)};});
  return {lines,totals:summary};
 }
+
+/** Reverse the immutable original lines, rather than recalculate from live payroll. */
+export function reverseLocalPayrollJournal(raw:unknown){
+ if(!Array.isArray(raw)||!raw.length||raw.length>50000)throw Error("القيد الأصلي غير صالح للعكس");
+ const parse=(v:unknown)=>{if(typeof v!=="string"||!/^\d+\.\d{2}$/.test(v))throw Error("قيمة قيد غير صالحة");const [a,b]=v.split(".");return BigInt(a)*BigInt(100)+BigInt(b);};
+ const totals=new Map<string,{debit:bigint;credit:bigint}>();
+ const lines:Line[]=raw.map(value=>{
+  const l=value as Line;
+  if(!l||typeof l!=="object"||typeof l.currency!=="string"||!/^[A-Z]{3}$/.test(l.currency)||typeof l.itemId!=="string"||typeof l.employeeId!=="string"||typeof l.accountRole!=="string"||typeof l.source!=="string"||!(l.costCenterId===null||typeof l.costCenterId==="string"))throw Error("سطر قيد غير صالح");
+  const debit=parse(l.debit),credit=parse(l.credit);if((debit===BigInt(0))===(credit===BigInt(0)))throw Error("سطر قيد غير متوازن");
+  const sum=totals.get(l.currency)??{debit:BigInt(0),credit:BigInt(0)};sum.debit+=credit;sum.credit+=debit;totals.set(l.currency,sum);
+  return {itemId:l.itemId,employeeId:l.employeeId,currency:l.currency,costCenterId:l.costCenterId,accountRole:l.accountRole,source:l.source,debit:l.credit,credit:l.debit};
+ });
+ return {lines,totals:[...totals].map(([currency,sum])=>{if(sum.debit!==sum.credit)throw Error("القيد الأصلي غير متوازن حسب العملة");return {currency,debit:fixed(sum.debit),credit:fixed(sum.credit)};})};
+}

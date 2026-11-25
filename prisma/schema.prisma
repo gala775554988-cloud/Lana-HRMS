@@ -3004,6 +3004,7 @@ model PayrollLocalJournal {
   createdById String
   createdAt DateTime @default(now())
   voidedAt DateTime?
+  reversal PayrollLocalJournalReversal?
   payrollRun PayrollRun @relation(fields:[payrollRunId],references:[id],onDelete:Restrict)
 }
 
@@ -3075,5 +3076,16 @@ model MadarLegacyTaskImport {
  sourceHash String
  sourceJson Json
  importedById String
+ createdAt DateTime @default(now())
+}
+
+model PayrollLocalJournalReversal {
+ id String @id @default(cuid())
+ journalId String @unique
+ journal PayrollLocalJournal @relation(fields:[journalId],references:[id],onDelete:Restrict)
+ lines Json
+ totals Json
+ reason String
+ createdById String
  createdAt DateTime @default(now())
 }

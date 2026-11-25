@@ -22,7 +22,7 @@ Baseline: c0a67b1e8957082a556f9f0df3cd4928dac6e2ba. CI: https://github.com/gala7
 | 16 | الموظفون المؤرشفون والمنتهية خدماتهم | جزئي | نطاق صلاحيات المؤرشفين وتصحيح آخر نشاط. | قبول سجل التاريخ وقياس سرعة فعلي |
 | 17 | المخالصة النهائية ونهاية الخدمة | جزئي | مخالصة واعتماد وصرف موثق ومراجعة الدين؛ اختبارات الحساب ناجحة. | اختبار دورة المخالصة الفعلية كاملة |
 | 18 | قسائم الرواتب والتحويلات البنكية | جزئي | PDF ثنائي اللغة ومراجعة البنك وحفظ الملف؛ تصدير 2/2 ناجح. | ملف مصرفي حقيقي، ختم غير متحقق ومدد غير مرسل |
-| 19 | الربط المحاسبي والمالي | جزئي | قيد تصنيفي محلي متوازن محفوظ لكل مسير جديد عند الاعتماد، ومركز تكلفة وعملة، وتصدير Excel؛ اختبارات جديدة قيد التحقق. دليل ربط Odoo وoutbox قائم. | اعتماد دليل الحسابات الفعلي والقيود العكسية ومطابقة Odoo |
+| 19 | الربط المحاسبي والمالي | جزئي | قيد تصنيفي محلي متوازن محفوظ لكل مسير جديد عند الاعتماد، ومركز تكلفة وعملة، وتصدير Excel؛ اختبارات جديدة قيد التحقق. دليل ربط Odoo وoutbox قائم. | قيد عكسي محلي محفوظ عند إلغاء مسير غير مصروف؛ اختبار جديد قيد التحقق. اعتماد دليل الحسابات والقيود الخارجية ومطابقة Odoo |
 | 20 | الميزانيات وسلم الرواتب والتكاليف | جزئي | ميزانيات وسلم رواتب وضوابط إلزامية؛ اختبارات حساب ناجحة. | قبول إعدادات المراكز والسياسات الحقيقية |
 | 21 | التقارير ولوحات التحكم | جزئي | تقارير مجمعة بالعملة والفترة ومركز التكلفة، PDF/XLSX؛ تصدير ناجح. | قبول التقارير التاريخية وكامل الإدارات |
 | 22 | الاستيراد والتصدير | جزئي | إصلاح معاينة الاستيراد والتحقق من تطابق الهوية والرقم، منع تعديل السجلات المتخطاة وملفات الرواتب التاريخية، تدقيق ذري؛ الاختبارات الجديدة قيد التحقق. | قبول الاستيراد الفعلي بملفات اختبار، مطابقة المراجع والأرصدة |
@@ -163,3 +163,6 @@ Do not merge until all 37 acceptance criteria, isolated tests, backup and previe
 ## Isolated browser acceptance and scheduler routing correction
 - #4/#24/#29: middleware exact-path exceptions for cron-repair, cron-reconcile, cron-alerts; each route retains machine-secret validation. Previously unauthenticated scheduler was rejected before route guard. No production token read or changed.
 - #3/#23/#33/#37: CI-only disposable localhost *_test seed, real Next.js production build served locally, Playwright Chromium desktop admin and mobile employee workflow, checklist/review, denial of unrelated user and self-approval, calendar rendering, machine-auth rejection and recurrence dedupe. Tests newly configured, results pending; not all roles, physical devices, or all feature flows covered. Test credentials are synthetic and isolated, no production mutations.
+
+## Original requirement accounting reversal
+- #19/#26/#25: immutable local reversal table and unique original journal relation; cancellation of approved unpaid local run requires intact accrued journal, refuses any external accounting outbox, validates balanced original per currency, swaps original debit/credit, writes reversal and status/audit in same transaction. Export includes original and reversal. Paid runs and historical/missing journals require separate approved correction; no remote posting or payment. New regression and migration pending. CI 9bc7535 and 2af8398 successful; latest browser run not yet reported.
