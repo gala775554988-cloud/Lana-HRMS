@@ -191,6 +191,38 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           if (Number(item.netPay) < 0) throw new Error("لا يمكن صرف صافي راتب سالب");
           if (action === "pay") await consumeApprovedPayroll(tx, snapshot, item.employeeId, now);
         }
+        if (action === "pay") {
+          // The existing transition serializes payroll settlement. Ledger postings
+          // are part of the SAME transaction as loans, advances and salary items.
+          // One source/effect uniqueness key prevents double pay and deductions.
+          const events = items.flatMap(item => {
+            const values = [
+              { effectType: "GROSS_PAY", direction: "CREDIT", amount: item.grossPay },
+              { effectType: "DEDUCTIONS", direction: "DEBIT", amount: item.deductionTotal }
+            ] as const;
+            return values.filter(value => Number(value.amount) > 0).map(value => ({
+              employeeId: item.employeeId,
+              sourceType: "PAYROLL",
+              sourceId: item.id,
+              effectType: value.effectType,
+              direction: value.direction,
+              amount: value.amount,
+              currency: item.currency,
+              payrollRunId: id,
+              details: { period: run.period, markedPaidAt: now.toISOString(), kind: value.effectType }
+            }));
+          });
+          if (events.length) {
+            await tx.employeeRequestExecution.createMany({
+              data: events.map(event => ({ employeeId: event.employeeId, sourceType: event.sourceType,
+                sourceId: event.sourceId, effectType: event.effectType, state: "EXECUTED",
+                executedAt: now, metadata: event.details }))
+            });
+            await tx.employeeFinancialEntry.createMany({
+              data: events.map(event => ({ ...event, occurredAt: now }))
+            });
+          }
+        }
         const mapping = await tx.appSetting.findUnique({ where: { key: "payroll.odooAccounting" } });
         if (action === "approve" && (items.some(item => item.odooPayslipId !== null) || (mapping?.value as { mode?: string } | null)?.mode === "POST_JOURNAL")) {
           await tx.payrollAccountingOutbox.upsert({ where: { payrollRunId: id }, create: { payrollRunId: id, payload: { runId: id, payslipIds: items.map(item => item.odooPayslipId).filter(Boolean), action: items.some(item => item.odooPayslipId !== null) ? "RECONCILE_APPROVED" : "POST_LOCAL" } }, update: {} });
