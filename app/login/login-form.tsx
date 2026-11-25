@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { loginAction } from "@/lib/auth/actions";
+import { resolveRoleDashboard } from "@/config/auth";
 import { loginSchema, type LoginInput } from "@/lib/validations/auth";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -49,7 +50,13 @@ export function LoginForm({ dictionary, onLoginSuccess }: { dictionary: Dictiona
     const session = response.ok ? await response.json() : null;
     if (!session?.user) throw new Error("Session not established");
     if (onLoginSuccess) await onLoginSuccess();
-    window.location.replace("/");
+    // Navigate to the role-aware destination from the fresh server session,
+    // rather than adding an intermediate trip through the landing page.
+    const destination = resolveRoleDashboard(
+      Array.isArray(session.user.roles) ? session.user.roles : [],
+      Boolean(session.user.hasGrantedAdminAccess)
+    );
+    window.location.replace(destination);
   }
 
   const identifierError = Boolean(form.formState.errors.identifier) || Boolean(message);
