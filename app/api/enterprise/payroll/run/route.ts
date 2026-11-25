@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
   // Existing draft periods must never be silently recalculated for a different
   // date range, organization or employee subset. Such a change requires an
   // explicit review workflow; keep the original financial scope immutable here.
-  if (!/^\\d{4}-(0[1-9]|1[0-2])$/.test(body.period)) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(body.period)) {
     return NextResponse.json({ success: false, message: "صيغة الفترة يجب أن تكون YYYY-MM" }, { status: 400 });
   }
   if (body.employeeIds !== undefined && (!Array.isArray(body.employeeIds) || !body.employeeIds.every(id => typeof id === "string" && id.trim().length > 0) || new Set(body.employeeIds).size !== body.employeeIds.length)) {
@@ -77,6 +77,9 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  const existingIds = run ? (await prisma.payrollItem.findMany({ where: { payrollRunId: run.id }, select: { employeeId: true } })).map(item => item.employeeId) : undefined;
+  if (run && !existingIds?.length) return NextResponse.json({ success: false, message: "لا يمكن إعادة احتساب مسير بلا قائمة موظفين محفوظة" }, { status: 409 });
+
   if (!run) {
     run = await prisma.payrollRun.create({
       data: {
@@ -96,7 +99,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { employeeCount, items, errorCount } = await computeAndUpsertPayrollItems(run.id, startDate, endDate, {
-    employeeIds: body.employeeIds,
+    employeeIds: existingIds ?? body.employeeIds,
     companyId: body.companyId,
     branchId: body.branchId,
     departmentId: body.departmentId,
