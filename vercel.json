@@ -11,11 +11,15 @@
   "crons": [
     {
       "path": "/api/integrations/odoo/cron-sync",
-      "schedule": "0 2 * * *"
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/integrations/queue/process-jobs",
-      "schedule": "0 3 * * *"
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/integrations/odoo/cron-reconcile",
+      "schedule": "0 2 * * *"
     }
   ],
   "headers": [
