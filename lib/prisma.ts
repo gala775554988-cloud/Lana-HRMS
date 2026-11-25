@@ -193,3 +193,6 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 export { prisma, ensureSchemaReady };
+
+// Interactive transaction client with the same model extensions as the app singleton.
+export type AppTransaction = Omit<typeof prisma,"$connect"|"$disconnect"|"$on"|"$transaction"|"$use"|"$extends">;

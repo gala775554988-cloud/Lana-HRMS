@@ -2,45 +2,45 @@
 
 Baseline: c0a67b1e8957082a556f9f0df3cd4928dac6e2ba. CI: https://github.com/gala775554988-cloud/Lana-HRMS/actions/runs/45606420607 (passed). No production verification claimed. Unverified means existing functionality may be present but acceptance evidence is missing.
 
-| # | Original requirement | Status / files / evidence |
-|---|---|---|
-| 1 | بيانات المشروع الحالي | Repository and branch established |
-| 2 | تعليمات التنفيذ الإلزامية | Partial: no production deployment or destructive migration |
-| 3 | إصلاح تسجيل الدخول والصلاحيات | Pending verification and remaining implementation |
-| 4 | المزامنة التلقائية الشاملة مع Odoo | Partial: vercel.json; app/api/integrations/odoo/cron-sync/route.ts; cron-reconcile; production cadence unverified |
-| 5 | إصلاح أخطاء المزامنة السابقة | Partial: cron-repair and retry-errors endpoints; actual 70 records unresolved/unverified |
-| 6 | إنشاء محرك مركزي لجميع طلبات الموظفين | Partial: lib/enterprise/workflow.ts; tests/workflows/workflow.test.mjs |
-| 7 | الربط التلقائي للإجازات | Partial: leave approval event; attendance/payroll reconciliation still needs verification |
-| 8 | الربط التلقائي للسلف والقروض | Pending verification and remaining implementation |
-| 9 | الربط التلقائي لجميع الطلبات الأخرى | Pending verification and remaining implementation |
-| 10 | تطوير نظام الرواتب بالكامل | Partial: payroll settlement ledger; full calculations unverified |
-| 11 | مسيرات الرواتب والاعتمادات | Partial: app/api/enterprise/payroll/run/[id]/route.ts |
-| 12 | التأمينات الاجتماعية والالتزام النظامي | Pending verification and remaining implementation |
-| 13 | العمل الإضافي والحضور والانصراف | Partial: overtime approval event; payroll integration needs verification |
-| 14 | الحساب المالي الموحد لكل موظف | Partial: lib/enterprise/employee-financial-ledger.ts; tests/payroll/employee-ledger.test.mjs; ledger APIs |
-| 15 | الملف الموحد للموظف | Partial: request execution timeline API; full profile integration pending |
-| 16 | الموظفون المؤرشفون والمنتهية خدماتهم | Pending verification and remaining implementation |
-| 17 | المخالصة النهائية ونهاية الخدمة | Pending verification and remaining implementation |
-| 18 | قسائم الرواتب والتحويلات البنكية | Pending verification and remaining implementation |
-| 19 | الربط المحاسبي والمالي | Pending verification and remaining implementation |
-| 20 | الميزانيات وسلم الرواتب والتكاليف | Pending verification and remaining implementation |
-| 21 | التقارير ولوحات التحكم | Pending verification and remaining implementation |
-| 22 | الاستيراد والتصدير | Pending verification and remaining implementation |
-| 23 | الخدمة الذاتية للموظفين | Partial: app/api/employee/financial-ledger/route.ts |
-| 24 | محرك قواعد الأتمتة | Pending verification and remaining implementation |
-| 25 | منع التكرار والأخطاء | Partial: unique source/effect keys in prisma/schema.prisma and additive migration; ledger tests |
-| 26 | الإلغاء والتعديل والتسويات | Partial: informational approval revocation; monetary reversals pending |
-| 27 | الإشعارات والمراقبة | Partial: automation-health page and API |
-| 28 | الذكاء الاصطناعي والتحقق المالي | Pending verification and remaining implementation |
-| 29 | الصلاحيات والأمان وسجل التدقيق | Partial: scoped ledger API; full RBAC audit pending |
-| 30 | تطوير التصميم والهوية البصرية | Partial: app/globals.css; automation-health page |
-| 31 | تحسين الأداء والسرعة | Pending verification and remaining implementation |
-| 32 | المحافظة على جميع البيانات الحالية | Partial: additive migration tested in CI; production backup and verification pending |
-| 33 | الاختبارات الشاملة قبل النشر | Partial: CI run 45606420607 passed at c0a67b1; E2E and production verification pending |
-| 34 | خطة التنفيذ المتواصل | In progress: this tracker |
-| 35 | الرفع والدمج والنشر النهائي مرة واحدة | Pending: merge and production deployment gated |
-| 36 | التقرير النهائي المطلوب | Pending: final report |
-| 37 | إدارة المهام والتكليفات – LANA PRO V9.5 Smart Workflow | Deferred until original 36 acceptance; reference file identified; no implementation or import claimed |
+| # | المتطلب | الحالة | التنفيذ والاختبارات المثبتة | المتبقي / العائق |
+|---|---|---|---|---|
+| 1 | بيانات المشروع الحالي | محدد | المستودع والفرع والنطاق محددة؛ CI 45624237702 على 3241561. | لا يوجد |
+| 2 | تعليمات التنفيذ الإلزامية | جارٍ | حماية البيانات، دفعات ذرية، عدم نشر الإنتاج؛ الاختبارات المعزولة فقط. | إتمام بوابة الإصدار |
+| 3 | إصلاح تسجيل الدخول والصلاحيات | جزئي | ترحيل sidebarHue وWebAuthn؛ اختبارات auth ضمن 206 ناجحة. | اختبار دخول الأدمن الفعلي وRBAC في المعاينة |
+| 4 | المزامنة التلقائية الشاملة مع Odoo | جزئي | جدولة GitHub Actions مشروطة، قفل قاعدة البيانات؛ لم يثبت التشغيل. | سر الجدولة وتفعيلها بعد النشر؛ خطة Vercel غير معلومة |
+| 5 | إصلاح أخطاء المزامنة السابقة | عائق خارجي | تشخيص الأخطاء وإعادة المحاولة حسب السجل؛ اختبارات Odoo ضمن 206 ناجحة. | لا وصول موثق لسجلات الإنتاج الـ70 ولا إثبات إصلاح |
+| 6 | إنشاء محرك مركزي لجميع طلبات الموظفين | جزئي | محرك الاعتماد المحلي والمعاملات؛ تكامل PostgreSQL ناجح. | توحيد باقي الطلبات والتكامل الخارجي |
+| 7 | الربط التلقائي للإجازات | جزئي | رصيد سنوي وإلغاء مرة واحدة وشرائح مرضية وغير مدفوعة؛ تكامل ناجح. | مطابقة الأرصدة الفعلية وجميع الأنواع والحضور |
+| 8 | الربط التلقائي للسلف والقروض | جزئي | فصل الاعتماد والصرف، مراجعة تاريخية إلزامية؛ اختبار تسوية PostgreSQL ناجح. | مستندات الصرف الحقيقية ومطابقة Odoo |
+| 9 | الربط التلقائي لجميع الطلبات الأخرى | جزئي | سجل أثر الاعتماد؛ لم يثبت أثر كل نوع مستقل. | ربط تنفيذ الطلبات الوظيفية والمالية الباقية |
+| 10 | تطوير نظام الرواتب بالكامل | جزئي | احتساب وتجميد الرواتب والخصومات؛ تكامل تسوية ناجح. | قبول شامل للحالات والاستحقاقات |
+| 11 | مسيرات الرواتب والاعتمادات | جزئي | مسارات اعتماد وصرف وقفل، منع ازدواج الخصم؛ تكامل ناجح. | قبول واجهات وأدوار ومراجعة مراجع الصرف |
+| 12 | التأمينات الاجتماعية والالتزام النظامي | جزئي | شرائح سعودية فعالة زمنياً وفئات خليجية قابلة للضبط؛ اختبارات الحساب ناجحة. | اعتماد إعدادات الإنتاج والفئات الخاصة |
+| 13 | العمل الإضافي والحضور والانصراف | جزئي | ربط الإضافي والإجازات والحضور بالحساب؛ اختبارات وحدات ناجحة. | قبول الحضور الفعلي والمبالغ النظامية |
+| 14 | الحساب المالي الموحد لكل موظف | جزئي | قيود مفصلة ومفاتيح فريدة وملخص عملة؛ تكامل ناجح. | مطابقة التاريخ والقيود الخارجية |
+| 15 | الملف الموحد للموظف | جزئي | سجل تنفيذ الطلبات والحساب المالي. | دمج كامل في ملف الموظف واختبار الواجهة |
+| 16 | الموظفون المؤرشفون والمنتهية خدماتهم | جزئي | نطاق صلاحيات المؤرشفين وتصحيح آخر نشاط. | قبول سجل التاريخ وقياس سرعة فعلي |
+| 17 | المخالصة النهائية ونهاية الخدمة | جزئي | مخالصة واعتماد وصرف موثق ومراجعة الدين؛ اختبارات الحساب ناجحة. | اختبار دورة المخالصة الفعلية كاملة |
+| 18 | قسائم الرواتب والتحويلات البنكية | جزئي | PDF ثنائي اللغة ومراجعة البنك وحفظ الملف؛ تصدير 2/2 ناجح. | ملف مصرفي حقيقي، ختم غير متحقق ومدد غير مرسل |
+| 19 | الربط المحاسبي والمالي | جزئي | دليل ربط Odoo وoutbox وقيود الرواتب؛ لم يثبت ترحيل فعلي. | قبول القيود ومراكز التكلفة ومطابقة Odoo |
+| 20 | الميزانيات وسلم الرواتب والتكاليف | جزئي | ميزانيات وسلم رواتب وضوابط إلزامية؛ اختبارات حساب ناجحة. | قبول إعدادات المراكز والسياسات الحقيقية |
+| 21 | التقارير ولوحات التحكم | جزئي | تقارير مجمعة بالعملة والفترة ومركز التكلفة، PDF/XLSX؛ تصدير ناجح. | قبول التقارير التاريخية وكامل الإدارات |
+| 22 | الاستيراد والتصدير | جزئي | تصدير مالي؛ الاستيراد الجماعي غير مغلق. | معاينة وتحقيق الاستيراد ومنع التكرار |
+| 23 | الخدمة الذاتية للموظفين | جزئي | كشف مالي وقسائم وطلبات وإلغاء؛ تكامل الطلبات ناجح. | جميع الخدمات والأدوار على الواجهة |
+| 24 | محرك قواعد الأتمتة | جزئي | قواعد تنبيه محفوظة ومفاتيح تكرار؛ اختبارات وحدات ناجحة. | تشغيل الجدولة الفعلي وباقي قواعد الأتمتة |
+| 25 | منع التكرار والأخطاء | جزئي | مفاتيح فريدة ومعاملات وقفل؛ اختبار الدفع المتزامن ناجح. | اختبارات كل مصادر الأثر والاستيراد |
+| 26 | الإلغاء والتعديل والتسويات | جزئي | إلغاء إجازة وتسوية محمية؛ تكامل ناجح. | التصحيحات النقدية والقيود العكسية |
+| 27 | الإشعارات والمراقبة | جزئي | تنبيهات عقود ومستندات وطلبات وأخطاء؛ اختبارات قواعد ناجحة. | تفعيل الإنتاج واختبار التسليم |
+| 28 | الذكاء الاصطناعي والتحقق المالي | جزئي | مطابقة البنك والميزانية والتقارير واكتشاف الشذوذ. | توسيع التحقق ومراجعة بشرية |
+| 29 | الصلاحيات والأمان وسجل التدقيق | جزئي | صلاحيات وحماية قسائم وسجل تدقيق؛ اختبارات auth ناجحة. | اختبار مصفوفة الأدوار كاملة |
+| 30 | تطوير التصميم والهوية البصرية | جزئي | ألوان خضراء مركزية وتقارير وأتمتة ورواتب. | فحص جميع الصفحات والأجهزة |
+| 31 | تحسين الأداء والسرعة | جزئي | بحث مؤرشفين محدود وترقيم صفحات؛ لا قياس قبول. | اختبار حمل وفهارس وخفض الاستعلامات |
+| 32 | المحافظة على جميع البيانات الحالية | جزئي | ترحيلات إضافية PostgreSQL ناجحة؛ فحص drift تشخيصي فقط. | نسخة احتياطية إنتاجية ومراجعة الفروقات دون إسقاط فهارس |
+| 33 | الاختبارات الشاملة قبل النشر | جارٍ | 206/206، تكاملان PostgreSQL، تصدير 2/2 وLint ناجحة في 45624237702؛ TypeScript فشل، Build لم يبدأ. | إعادة CI بعد إصلاح الأنواع، E2E ومعاينة |
+| 34 | خطة التنفيذ المتواصل | جارٍ | جدول 37 محدّث ومراحل التنفيذ محفوظة. | استمرار إغلاق المهام |
+| 35 | الرفع والدمج والنشر النهائي مرة واحدة | مؤجل | لم يدمج أو ينشر. | نجاح كل بوابات القبول |
+| 36 | التقرير النهائي المطلوب | مؤجل | تقارير مرحلية فقط. | تقرير قبول نهائي ونشر مؤكد |
+| 37 | إدارة المهام والتكليفات – LANA PRO V9.5 Smart Workflow | مؤجل | مرجع Smart Workflow محدد؛ لم تبدأ برمجة المتطلب. | بعد إكمال الوظائف الداخلية الأصلية حسب ترتيب المستخدم |
 
 ## Release gate
 Do not merge until all 37 acceptance criteria, isolated tests, backup and preview checks pass. Implement #37 after completing original 36 as requested. No real transfers or destructive operations during tests.
@@ -135,3 +135,6 @@ Do not merge until all 37 acceptance criteria, isolated tests, backup and previe
 
 ## Schema drift uncovered by actual integration
 - CI 45623609108 passed all stages (including original revocation test, migrations, lint and build). CI 45623786141 passed fixture tests, then failed actual local PostgreSQL integration with Prisma P2022: User.sidebarHue missing. Added idempotent additive migration for User.sidebarHue/currentChallenge and BiometricCredential table/index/FK. Existing rows and passkeys retained. Added non-mutating schema diff diagnostic to CI; further discrepancies must be reviewed, never automatically applied to production. Latest expanded integration suite not yet confirmed. #3/#29/#32/#33 remain gated.
+
+## Batch after 3241561
+- CI 45624237702: 206/206 fixture tests, both PostgreSQL integrations, 2/2 exports, migrations and lint passed; standalone typecheck failed 21 diagnostics, build skipped. Addressed extended Prisma transaction typing, explicit bigint reductions, nullable run capture and loan-only installment narrowing. No typecheck suppression or test deletion. Main tracker rewritten with per-item implementation, evidence and blockers. New CI pending.

@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "قيمة غير صالحة: " + field }, { status: 400 });
     }
   }
+  const requestedPeriod = body.period;
   const startDate = new Date(body.startDate);
   const endDate = new Date(body.endDate);
   if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || startDate > endDate) {
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
   if (run && run.status === "DRAFT") {
     const fields = ["periodId", "companyId", "branchId", "departmentId", "costCenterId"] as const;
     const changed = run.periodStartDate?.getTime() !== startDate.getTime() || run.periodEndDate?.getTime() !== endDate.getTime() ||
-      fields.some(field => (run[field] ?? null) !== (body[field] ?? null));
+      fields.some(field => (run?.[field] ?? null) !== (body[field] ?? null));
     if (changed || body.employeeIds !== undefined) {
       return NextResponse.json({ success: false, message: "لا يمكن تغيير نطاق مسير موجود أثناء إعادة الاحتساب؛ راجع الفترة والجهة وقائمة الموظفين" }, { status: 409 });
     }
@@ -111,7 +112,7 @@ export async function POST(request: NextRequest) {
       const created = await tx.payrollRun.create({
       data: {
         name: body.name || `مسير رواتب ${body.period}`,
-        period: body.period,
+        period: requestedPeriod,
         periodId: body.periodId,
         periodStartDate: startDate,
         periodEndDate: endDate,

@@ -1,3 +1,4 @@
+import type { AppTransaction } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
 const response = (body: object, status = 200) => NextResponse.json(body, { status, headers: { "Cache-Control": "private, no-store" } });
 
 
-async function readSources(tx: Prisma.TransactionClient, employeeId:string) {
+async function readSources(tx: AppTransaction, employeeId:string) {
   const [loans,advances,leave,paid] = await Promise.all([
     tx.loan.findMany({where:{employeeId,status:"ACTIVE",OR:[{disbursementRequired:false},{disbursedAt:{not:null}}]},orderBy:{id:"asc"},include:{repaymentSchedule:true}}),
     tx.employeeSalaryAdvance.findMany({where:{employeeId,status:"APPROVED",OR:[{disbursementRequired:false},{disbursedAt:{not:null}}]},orderBy:{id:"asc"}}),
@@ -93,7 +94,7 @@ export async function PATCH(request: Request) {
         if(!frozen.success)throw Error("لقطة المصادر قديمة؛ يلزم إعادة المراجعة");
         const current=await readSources(tx,old.employeeId);
         if(JSON.stringify(settlementDebtSnapshot.parse(current))!==JSON.stringify(frozen.data))throw Error("تغيرت مصادر المخالصة؛ يلزم إرجاعها وإعادة المراجعة");
-        if(current.debtSources.some(row=>row.external&&!row.installmentIds))throw Error("يلزم إعادة مطابقة أقساط Odoo");
+        if(current.debtSources.some(row=>row.kind==="LOAN"&&row.external&&!row.installmentIds))throw Error("يلزم إعادة مطابقة أقساط Odoo");
         const pending=await tx.payrollItem.findFirst({where:{employeeId:old.employeeId,payrollRun:{status:{in:["DRAFT","PROCESSING","APPROVED"]}}},select:{id:true}});
         if(pending)throw Error("توجد مسيرات غير مقفلة للموظف؛ يلزم مراجعتها أولا");
         const employee=await tx.employee.findUnique({where:{id:old.employeeId},select:{hireDate:true,terminationDate:true}});

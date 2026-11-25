@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import type { AppTransaction } from "@/lib/prisma";
 export type MoneyValue={toString():string}|string|number;
 function cents(value:MoneyValue):bigint {
  const raw=String(value);
@@ -8,12 +8,12 @@ function cents(value:MoneyValue):bigint {
 }
 function display(n:bigint){const sign=n<BigInt(0)?"-":"";const abs=n<BigInt(0)?-n:n;return sign+(abs/BigInt(100)).toString()+"."+(abs%BigInt(100)).toString().padStart(2,"0");}
 export function compareBudget(ceiling:MoneyValue,committed:MoneyValue[],proposed:MoneyValue[]){
- const limit=cents(ceiling),used=committed.reduce((n,v)=>n+cents(v),BigInt(0)),next=proposed.reduce((n,v)=>n+cents(v),BigInt(0));
+ const limit=cents(ceiling),used=committed.reduce<bigint>((n,v)=>n+cents(v),BigInt(0)),next=proposed.reduce<bigint>((n,v)=>n+cents(v),BigInt(0));
  return {ceiling:display(limit),committed:display(used),proposed:display(next),remaining:display(limit-used-next),exceeded:used+next>limit};
 }
 export function outsideBand(salary:MoneyValue,min:MoneyValue,max:MoneyValue){return cents(salary)<cents(min)||cents(salary)>cents(max);}
 type Item={employeeId:string;costCenterId:string|null;currency:string;baseSalary:MoneyValue;grossPay:MoneyValue;employerInsurance:MoneyValue};
-export async function inspectPayrollControls(tx:Prisma.TransactionClient,run:{id:string;periodId:string|null;costCenterId:string|null},items:Item[]){
+export async function inspectPayrollControls(tx:AppTransaction,run:{id:string;periodId:string|null;costCenterId:string|null},items:Item[]){
  const [budgets,bands,employees]=await Promise.all([
   run.periodId?tx.payrollBudgetLimit.findMany({where:{periodId:run.periodId}}):Promise.resolve([]),
   tx.payrollSalaryBand.findMany(),

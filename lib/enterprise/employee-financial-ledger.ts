@@ -1,3 +1,4 @@
+import type { AppTransaction } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
@@ -21,7 +22,7 @@ export type FinancialEffectInput = {
  * Each (sourceType, sourceId, effectType) can be processed exactly once.
  * Callers must not confuse request approval with payout or payroll settlement.
  */
-async function assertSourceApproved(tx: Prisma.TransactionClient, input: FinancialEffectInput) {
+async function assertSourceApproved(tx: AppTransaction, input: FinancialEffectInput) {
   if (input.sourceType === "LEAVE") {
     const record = await tx.leaveRequest.findUnique({ where: { id: input.sourceId }, select: { employeeId: true, status: true } });
     if (!record || record.employeeId !== input.employeeId || record.status !== "APPROVED") throw new Error("Leave is not approved for this employee");
@@ -54,7 +55,7 @@ function validate(input: FinancialEffectInput): Prisma.Decimal {
   return amount;
 }
 
-export async function postApprovedEffectInTransaction(tx: Prisma.TransactionClient, input: FinancialEffectInput) {
+export async function postApprovedEffectInTransaction(tx: AppTransaction, input: FinancialEffectInput) {
   const amount = validate(input);
   await assertSourceApproved(tx, input);
   await tx.employeeRequestExecution.create({
