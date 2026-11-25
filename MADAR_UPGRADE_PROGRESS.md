@@ -22,7 +22,7 @@ Baseline: c0a67b1e8957082a556f9f0df3cd4928dac6e2ba. CI: https://github.com/gala7
 | 16 | الموظفون المؤرشفون والمنتهية خدماتهم | جزئي | نطاق صلاحيات المؤرشفين وتصحيح آخر نشاط. | قبول سجل التاريخ وقياس سرعة فعلي |
 | 17 | المخالصة النهائية ونهاية الخدمة | جزئي | مخالصة واعتماد وصرف موثق ومراجعة الدين؛ اختبارات الحساب ناجحة. | اختبار دورة المخالصة الفعلية كاملة |
 | 18 | قسائم الرواتب والتحويلات البنكية | جزئي | PDF ثنائي اللغة ومراجعة البنك وحفظ الملف؛ تصدير 2/2 ناجح. | ملف مصرفي حقيقي، ختم غير متحقق ومدد غير مرسل |
-| 19 | الربط المحاسبي والمالي | جزئي | دليل ربط Odoo وoutbox وقيود الرواتب؛ لم يثبت ترحيل فعلي. | قبول القيود ومراكز التكلفة ومطابقة Odoo |
+| 19 | الربط المحاسبي والمالي | جزئي | قيد تصنيفي محلي متوازن محفوظ لكل مسير جديد عند الاعتماد، ومركز تكلفة وعملة، وتصدير Excel؛ اختبارات جديدة قيد التحقق. دليل ربط Odoo وoutbox قائم. | اعتماد دليل الحسابات الفعلي والقيود العكسية ومطابقة Odoo |
 | 20 | الميزانيات وسلم الرواتب والتكاليف | جزئي | ميزانيات وسلم رواتب وضوابط إلزامية؛ اختبارات حساب ناجحة. | قبول إعدادات المراكز والسياسات الحقيقية |
 | 21 | التقارير ولوحات التحكم | جزئي | تقارير مجمعة بالعملة والفترة ومركز التكلفة، PDF/XLSX؛ تصدير ناجح. | قبول التقارير التاريخية وكامل الإدارات |
 | 22 | الاستيراد والتصدير | جزئي | تصدير مالي؛ الاستيراد الجماعي غير مغلق. | معاينة وتحقيق الاستيراد ومنع التكرار |
@@ -138,3 +138,5 @@ Do not merge until all 37 acceptance criteria, isolated tests, backup and previe
 
 ## Batch after 3241561
 - CI 45624237702: 206/206 fixture tests, both PostgreSQL integrations, 2/2 exports, migrations and lint passed; standalone typecheck failed 21 diagnostics, build skipped. Addressed extended Prisma transaction typing, explicit bigint reductions, nullable run capture and loan-only installment narrowing. No typecheck suppression or test deletion. Main tracker rewritten with per-item implementation, evidence and blockers. New CI pending.
+
+- #19/#11/#25/#26: local accrual classification persisted atomically upon approval for newly calculated local runs, by currency and cost center. Employer insurance balanced separately, loan recovery classified as receivable. Export only, not statutory GL posting. Approved cancellation blocked if external accounting outbox exists (possibly posted), local-only cancellation marks snapshot VOID; payment updates status, no new bank posting. Imported/historic runs are not backfilled. New migration, unit and PostgreSQL integration tests pending.

@@ -945,6 +945,7 @@ model PayrollRun {
   costCenter     PayrollCostCenter? @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
   items          PayrollItem[]
   bankEvidence   PayrollBankEvidence[]
+  localJournal   PayrollLocalJournal?
 
   @@unique([period])
   @@index([status])
@@ -2991,4 +2992,16 @@ model PayrollDebtReview {
   reviewedAt DateTime @default(now())
   @@unique([sourceType,sourceId])
   @@index([employeeId])
+}
+
+model PayrollLocalJournal {
+  id String @id @default(cuid())
+  payrollRunId String @unique
+  status String @default("ACCRUED")
+  lines Json
+  totals Json
+  createdById String
+  createdAt DateTime @default(now())
+  voidedAt DateTime?
+  payrollRun PayrollRun @relation(fields:[payrollRunId],references:[id],onDelete:Restrict)
 }

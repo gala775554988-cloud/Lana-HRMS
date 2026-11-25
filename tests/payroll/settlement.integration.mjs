@@ -32,7 +32,7 @@ try {
    'next/server':{NextResponse}, '@/auth':{auth:async()=>({user:{id:user.id,roles:['SUPER_ADMIN']}})}, '@/lib/prisma':{prisma},
    '@/lib/audit':{writeAuditLog:async()=>{}}, '@/lib/enterprise/payroll-engine':{computeAndUpsertPayrollItems:async()=>{throw new Error('Must not recompute approved figures');}},
    '@/lib/enterprise/notifications':{notifyRole:async()=>{}}, '@/lib/enterprise/payroll-permissions':{canManagePayroll:()=>true,canApprovePayroll:()=>true,canViewPayroll:()=>true},
-   '@/lib/payroll/settlement':settlement, '@/lib/payroll/budget-control': await load('lib/payroll/budget-control.ts'), '@/lib/payroll/journal':{accountingMappingSchema:{safeParse:()=>({success:false})},postConfiguredPayrollJournal:async()=>{throw new Error('No remote posting');}}, '@/lib/payroll/connection':{getPayrollOdooClient:async()=>{throw new Error('No remote operations in tests');}},
+   '@/lib/payroll/settlement':settlement, '@/lib/payroll/local-journal':await load('lib/payroll/local-journal.ts',{'./settlement':settlement}), '@/lib/payroll/budget-control': await load('lib/payroll/budget-control.ts'), '@/lib/payroll/journal':{accountingMappingSchema:{safeParse:()=>({success:false})},postConfiguredPayrollJournal:async()=>{throw new Error('No remote posting');}}, '@/lib/payroll/connection':{getPayrollOdooClient:async()=>{throw new Error('No remote operations in tests');}},
    '@/lib/payroll/odoo-payroll':{odooPayrollSource:()=>'',reconcileAccountingOutbox:async()=>{throw new Error('No remote operations in tests');}},
  });
  const patch = action => route.PATCH({json:async()=>({action})},{params:Promise.resolve({id:run.id})});
@@ -43,6 +43,7 @@ try {
  broken = false;
  await engine.computeAndUpsertPayrollItems(run.id, new Date('2026-11-01'), new Date('2026-11-30'), { employeeIds: [employee.id] });
  const approval=await patch('approve');assert.equal(approval.status,200,JSON.stringify(approval.data));
+ const journal=await prisma.payrollLocalJournal.findUniqueOrThrow({where:{payrollRunId:run.id}});assert.equal(journal.status,"ACCRUED");assert.equal(journal.totals[0].debit,journal.totals[0].credit);
  await prisma.loan.update({where:{id:loan.id},data:{outstandingAmount:350}});
  assert.equal((await patch('pay')).status,409);
  assert.equal((await prisma.payrollRun.findUniqueOrThrow({where:{id:run.id}})).status,'APPROVED');
@@ -54,10 +55,11 @@ try {
  assert.equal((await prisma.employeeSalaryAdvance.findUniqueOrThrow({where:{id:advance.id}})).paidInstallments,1);
  assert.equal(Number((await prisma.payrollItem.findUniqueOrThrow({where:{id:item.id}})).netPay),875);
  assert.equal((await patch('pay')).status,409);
+ assert.equal((await prisma.payrollLocalJournal.findUniqueOrThrow({where:{payrollRunId:run.id}})).status,"PAID");
  console.log('PASS: frozen approved values, source conflict rolls back all effects, concurrent pay consumes loan/advance exactly once');
 } finally {
  if(employee){await prisma.payrollDebtReview.deleteMany({where:{employeeId:employee.id}});await prisma.employeeFinancialEntry.deleteMany({where:{employeeId:employee.id}});await prisma.employeeRequestExecution.deleteMany({where:{employeeId:employee.id}});}
- if(run){await prisma.appSetting.deleteMany({where:{key:{in:[`payroll.compute.${run.id}`,`payroll.scope.${run.id}`]}}});await prisma.auditLog.deleteMany({where:{entity:'payrollRun',entityId:run.id}});await prisma.payrollRun.delete({where:{id:run.id}});}
+ if(run){await prisma.payrollLocalJournal.deleteMany({where:{payrollRunId:run.id}});await prisma.appSetting.deleteMany({where:{key:{in:[`payroll.compute.${run.id}`,`payroll.scope.${run.id}`]}}});await prisma.auditLog.deleteMany({where:{entity:'payrollRun',entityId:run.id}});await prisma.payrollRun.delete({where:{id:run.id}});}
  if(employee) await prisma.employee.delete({where:{id:employee.id}});
  if(user) await prisma.user.delete({where:{id:user.id}});
  await prisma.$disconnect();

@@ -9,6 +9,7 @@ import { getPayrollOdooClient } from "@/lib/payroll/connection";
 import { odooPayrollSource, reconcileAccountingOutbox } from "@/lib/payroll/odoo-payroll";
 import { accountingMappingSchema, postConfiguredPayrollJournal } from "@/lib/payroll/journal";
 import { consumeApprovedPayroll, buildPayrollLedgerBreakdown } from "@/lib/payroll/settlement";
+import { buildLocalPayrollJournal } from "@/lib/payroll/local-journal";
 import { inspectPayrollControls } from "@/lib/payroll/budget-control";
 import type { PayrollBreakdown } from "@/lib/enterprise/payroll-engine";
 import type { PayrollStatus } from "@prisma/client";
@@ -158,6 +159,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     updated = await prisma.$transaction(async (tx) => {
       const claimed = await tx.payrollRun.updateMany({ where: { id, status: run.status, updatedAt: run.updatedAt }, data });
       if (claimed.count !== 1) throw new Error("تغير المسير أثناء الإجراء؛ حدّث الصفحة");
+      if(action==="cancel"&&run.status==="APPROVED"){
+        const outbox=await tx.payrollAccountingOutbox.findUnique({where:{payrollRunId:id}});
+        if(outbox)throw Error("توجد مهمة محاسبية للمسير؛ يلزم مطابقة القيد أو إجراء عكس محاسبي معتمد قبل الإلغاء");
+        await tx.payrollLocalJournal.updateMany({where:{payrollRunId:id,status:"ACCRUED"},data:{status:"VOID",voidedAt:now}});
+      }
       if (action === "submit" || action === "approve" || action === "pay") {
         if (run.periodId) {
           const period = await tx.payrollPeriod.findUnique({ where: { id: run.periodId }, select: { status: true } });
@@ -229,6 +235,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             });
           }
         }
+        if(action==="approve"&&items.every(item=>item.odooPayslipId===null)){
+          const journal=buildLocalPayrollJournal(items.map(item=>({id:item.id,employeeId:item.employeeId,currency:item.currency,costCenterId:item.costCenterId,employerInsurance:Number(item.employerInsurance),snapshot:item.calculationSnapshot as unknown as PayrollBreakdown})),run.costCenterId);
+          await tx.payrollLocalJournal.create({data:{payrollRunId:id,lines:journal.lines,totals:journal.totals,createdById:session.user.id}});
+        }
+        if(action==="pay")await tx.payrollLocalJournal.updateMany({where:{payrollRunId:id,status:"ACCRUED"},data:{status:"PAID"}});
         const mapping = await tx.appSetting.findUnique({ where: { key: "payroll.odooAccounting" } });
         if (action === "approve" && (items.some(item => item.odooPayslipId !== null) || (mapping?.value as { mode?: string } | null)?.mode === "POST_JOURNAL")) {
           await tx.payrollAccountingOutbox.upsert({ where: { payrollRunId: id }, create: { payrollRunId: id, payload: { runId: id, payslipIds: items.map(item => item.odooPayslipId).filter(Boolean), action: items.some(item => item.odooPayslipId !== null) ? "RECONCILE_APPROVED" : "POST_LOCAL" } }, update: {} });
