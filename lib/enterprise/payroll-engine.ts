@@ -308,7 +308,12 @@ export async function computeAndUpsertPayrollItems(
     if (editable.count !== 1) throw new Error("تغير المسير أثناء الاحتساب؛ أعد المحاولة");
     const summary = { employeeCount: employees.length, errorCount, errors: items.filter(item => item.error).map(item => ({ employeeId: item.employeeId, error: item.error! })) };
     await tx.appSetting.upsert({ where: { key: `payroll.compute.${runId}` }, create: { key: `payroll.compute.${runId}`, value: summary }, update: { value: summary } });
-    if (errorCount) return; // Never publish a partial calculation over a valid draft.
+    const scopeKey = `payroll.scope.${runId}`;
+    const savedScope = await tx.appSetting.findUnique({ where: { key: scopeKey } });
+    if (!savedScope && (scope.employeeIds?.length || employees.length)) {
+      await tx.appSetting.create({ data: { key: scopeKey, value: { employeeIds: scope.employeeIds ?? employees.map(employee => employee.id) } } });
+    }
+    if (errorCount || !employees.length) return; // Never publish a partial or empty calculation over a valid draft.
     for (const { employeeId, breakdown } of calculated) {
       const data = {
         calculationSnapshot: JSON.parse(JSON.stringify(breakdown)), employerInsurance: breakdown.gosi.employerAmount,
