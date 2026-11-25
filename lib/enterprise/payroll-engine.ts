@@ -271,7 +271,7 @@ export async function computeAndUpsertPayrollItems(
   const run = await prisma.payrollRun.findUniqueOrThrow({ where: { id: runId } });
   if (!["DRAFT", "PROCESSING"].includes(run.status)) throw new Error("المسير معتمد أو مقفل");
   if (await prisma.payrollItem.count({ where: { payrollRunId: runId, odooPayslipId: { not: null } } })) throw new Error("مسير مستورد من Odoo؛ حدّثه من كشوف Odoo بدلاً من إعادة احتسابه محلياً");
-  const employeeWhere: Record<string, unknown> = { status: "ACTIVE" };
+  const employeeWhere: Record<string, unknown> = { status: "ACTIVE", archivedAt: null, hireDate: { lte: periodEndDate }, OR: [{ terminationDate: null }, { terminationDate: { gte: periodStartDate } }] };
   if (scope.employeeIds !== undefined) employeeWhere.id = { in: scope.employeeIds };
   if (scope.companyId) employeeWhere.companyId = scope.companyId;
   if (scope.branchId) employeeWhere.branchId = scope.branchId;
