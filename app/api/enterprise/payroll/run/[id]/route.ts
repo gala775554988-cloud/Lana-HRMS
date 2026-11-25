@@ -82,6 +82,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const action = body?.action;
   if (typeof action !== "string" || !action) return NextResponse.json({ success: false, message: "action is required" }, { status: 400 });
 
+  if (body?.reason !== undefined && (typeof body.reason !== "string" || body.reason.length > 2000)) return NextResponse.json({ success: false, message: "سبب الإجراء غير صالح" }, { status: 400 });
   const run = await prisma.payrollRun.findUnique({ where: { id } });
   if (!run) return NextResponse.json({ success: false, message: "Not found" }, { status: 404 });
 
@@ -200,7 +201,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return tx.payrollRun.findUniqueOrThrow({ where: { id } });
     }, { isolationLevel: "Serializable" });
   } catch (error) {
-    return NextResponse.json({ success: false, message: error instanceof Error ? error.message : "تعذر تنفيذ العملية" }, { status: 409 });
+    return NextResponse.json({ success: false, message: typeof error === "object" && error !== null && "code" in error ? "تعذر تنفيذ العملية بسبب تعارض أو خطأ في قاعدة البيانات؛ حدّث الصفحة وأعد المحاولة" : error instanceof Error ? error.message : "تعذر تنفيذ العملية" }, { status: 409 });
   }
 
 
