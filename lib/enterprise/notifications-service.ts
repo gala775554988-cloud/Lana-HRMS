@@ -37,15 +37,15 @@ export async function sendPushNotification(
       where: { employeeId: employee.id }
     });
 
-    const fcmToken = userDevice?.fcmToken || process.env.FCM_DEFAULT_TEST_TOKEN;
+    const fcmToken = userDevice?.fcmToken;
     if (!fcmToken) {
       return false;
     }
 
     const serverKey = process.env.FCM_SERVER_KEY || process.env.FIREBASE_CLOUD_MESSAGING_KEY;
     if (!serverKey) {
-      console.log(`[PushNotificationService] FCM_SERVER_KEY not set. Simulated push to device ${userDevice?.deviceId || fcmToken}: "${title}" -> "${body}"`);
-      return true;
+      // Missing credentials is not a delivered push. Never log tokens or notification contents.
+      return false;
     }
 
     // 2. Dispatch push via FCM REST API

@@ -13,7 +13,7 @@ jobs:
   sync:
     if: github.ref == 'refs/heads/main' && vars.MADAR_SCHEDULER_ENABLED == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     env:
       SYNC_TOKEN: ${{ secrets.MADAR_SYNC_TOKEN }}
       SCHEDULE: ${{ github.event.schedule }}
@@ -36,7 +36,10 @@ jobs:
             echo "Maintenance endpoint $path confirmed success"
           }
           case "$SCHEDULE" in
-            '17,47 * * * *') call /api/integrations/odoo/cron-repair ;;
+            '17,47 * * * *') result=0
+               call /api/integrations/odoo/cron-repair || result=1
+               call /api/integrations/automation/cron-alerts || result=1
+               exit "$result" ;;
             '23 2 * * *') call /api/integrations/odoo/cron-reconcile ;;
             *) result=0
                call /api/integrations/odoo/cron-sync || result=1

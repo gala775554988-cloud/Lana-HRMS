@@ -1206,6 +1206,7 @@ model Announcement {
 
 model Notification {
   id        String           @id @default(cuid())
+  automationKey String?      @unique
   userId    String?
   title     String
   body      String
