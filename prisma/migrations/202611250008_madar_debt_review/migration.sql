@@ -1,0 +1,3 @@
+CREATE TABLE "PayrollDebtReview" ("id" TEXT NOT NULL,"sourceType" TEXT NOT NULL,"sourceId" TEXT NOT NULL,"employeeId" TEXT NOT NULL,"principal" DECIMAL(12,2) NOT NULL,"currency" TEXT NOT NULL,"decision" TEXT NOT NULL,"evidenceReference" TEXT,"reviewedById" TEXT NOT NULL,"note" TEXT NOT NULL,"reviewedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,CONSTRAINT "PayrollDebtReview_pkey" PRIMARY KEY ("id"),CONSTRAINT "PayrollDebtReview_decision_check" CHECK ("decision" IN ('VERIFIED','UNVERIFIED','NOT_DISBURSED')));
+CREATE UNIQUE INDEX "PayrollDebtReview_sourceType_sourceId_key" ON "PayrollDebtReview"("sourceType","sourceId");
+CREATE INDEX "PayrollDebtReview_employeeId_idx" ON "PayrollDebtReview"("employeeId");

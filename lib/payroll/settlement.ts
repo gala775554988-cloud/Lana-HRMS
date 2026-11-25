@@ -1,5 +1,6 @@
 import type { prisma } from "@/lib/prisma";
 import type { PayrollBreakdown } from "@/lib/enterprise/payroll-engine";
+import { requireLegacyDebtReview } from "./debt-review";
 import { money, advanceSchedule } from "./calculations";
 type Transaction = Omit<typeof prisma, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 export async function consumeApprovedPayroll(tx: Transaction, snapshot: PayrollBreakdown, employeeId: string, now: Date) {
@@ -17,6 +18,9 @@ export async function consumeApprovedPayroll(tx: Transaction, snapshot: PayrollB
     if (changed.count !== snapshot.bonusIds.length) throw new Error("سبق صرف بعض المكافآت");
   }
   for (const row of snapshot.loanAllocations) {
+    const source=await tx.loan.findUnique({where:{id:row.id}});
+    if(!source||source.employeeId!==employeeId)throw Error("مرجع القرض غير مطابق");
+    if(!source.odooSource&&!source.disbursementRequired&&!source.disbursedAt)await requireLegacyDebtReview(tx,[{sourceType:"LOAN",sourceId:source.id,employeeId,principal:source.principalAmount,currency:source.currency}]);
     const remaining = money(row.outstanding - row.amount);
     if (!Number.isFinite(remaining) || remaining < 0 || row.amount <= 0) throw new Error("قسط غير صالح");
     const changed = await tx.loan.updateMany({ where: { id: row.id, employeeId, status: "ACTIVE", outstandingAmount: row.outstanding, OR:[{disbursementRequired:false},{disbursedAt:{not:null}}] }, data: { outstandingAmount: remaining, status: remaining === 0 ? "PAID" : "ACTIVE" } });
@@ -31,6 +35,7 @@ export async function consumeApprovedPayroll(tx: Transaction, snapshot: PayrollB
   for (const row of snapshot.advanceAllocations) {
     const advance = await tx.employeeSalaryAdvance.findUnique({ where: { id: row.id } });
     if (!advance || advance.employeeId !== employeeId || advance.status !== "APPROVED" || (advance.disbursementRequired&&!advance.disbursedAt) || advance.paidInstallments !== row.paidInstallments || row.amount <= 0) throw new Error("تغير قسط السلفة بعد الاعتماد");
+    if(!advance.disbursementRequired&&!advance.disbursedAt)await requireLegacyDebtReview(tx,[{sourceType:"ADVANCE",sourceId:advance.id,employeeId,principal:advance.amount,currency:"SAR"}]);
     const schedule = advanceSchedule({ amount: Number(advance.amount), monthlyDeduction: Number(advance.monthlyDeduction), installments: advance.installments, paidInstallments: advance.paidInstallments });
     if (schedule.next !== row.amount) throw new Error("تغير قسط السلفة بعد الاعتماد؛ أعد احتساب المسير");
     const paid = advance.paidInstallments + 1;

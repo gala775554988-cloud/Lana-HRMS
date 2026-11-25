@@ -6,17 +6,19 @@ const url = new URL(process.env.PAYROLL_TEST_DATABASE_URL ?? '');
 if (!['localhost','127.0.0.1'].includes(url.hostname) || !url.pathname.endsWith('_test')) throw new Error('Disposable local *_test database required');
 const prisma = new PrismaClient({ datasourceUrl: url.href });
 const calculations = await load('lib/payroll/calculations.ts');
-const settlement = await load('lib/payroll/settlement.ts', { './calculations': calculations });
+const review=await load('lib/payroll/debt-review.ts');
+const settlement = await load('lib/payroll/settlement.ts', { './calculations': calculations,'./debt-review':review });
 const id = randomUUID(); let employee, run, user;
 try {
  user = await prisma.user.create({ data: { username: `payroll-${id}` } });
  employee = await prisma.employee.create({ data: { employeeNumber: `PAY-${id}`, nationalId: `PAY-${id}`, firstName:'Payroll', lastName:'Test', hireDate:new Date("2026-01-01"), userId:user.id } });
  const loan = await prisma.loan.create({ data: { employeeId:employee.id, loanNumber:`LN-${id}`, principalAmount:400, outstandingAmount:400, installmentAmount:100, currency:'SAR', issuedAt:new Date("2026-11-01"), status:'ACTIVE' } });
  const advance = await prisma.employeeSalaryAdvance.create({ data: { employeeId:employee.id, amount:100, monthlyDeduction:25, installments:4, reason:'Test', startDate:new Date("2026-11-01"), status:'APPROVED' } });
+ await prisma.payrollDebtReview.createMany({data:[{sourceType:"LOAN",sourceId:loan.id,employeeId:employee.id,principal:400,currency:"SAR",decision:"VERIFIED",evidenceReference:"TEST-LOAN",reviewedById:user.id,note:"Disposable fixture only"},{sourceType:"ADVANCE",sourceId:advance.id,employeeId:employee.id,principal:100,currency:"SAR",decision:"VERIFIED",evidenceReference:"TEST-ADVANCE",reviewedById:user.id,note:"Disposable fixture only"}]});
  run = await prisma.payrollRun.create({ data: { name:'Frozen payroll integration', period:`TEST-${id}`,periodStartDate:new Date("2026-11-01"),periodEndDate:new Date("2026-11-30T23:59:59.999Z"), status:'PROCESSING' } });
  let broken = false;
  const engine = await load('lib/enterprise/payroll-engine.ts', {
-   '@/lib/prisma': { prisma }, '@/lib/payroll/calculations': calculations,
+   '@/lib/prisma': { prisma }, '@/lib/payroll/calculations': calculations,'@/lib/payroll/debt-review':review,
    '@/lib/employee/salary-profile-store': { getEmployeeSalaryProfile: async () => { if (broken) throw new Error('Missing salary source'); return { salaryBase: 1000 }; } },
    '@/lib/employee/salary-profile': { calculateNetSalary: () => 1000 },
  });
@@ -53,7 +55,7 @@ try {
  assert.equal((await patch('pay')).status,409);
  console.log('PASS: frozen approved values, source conflict rolls back all effects, concurrent pay consumes loan/advance exactly once');
 } finally {
- if(employee){await prisma.employeeFinancialEntry.deleteMany({where:{employeeId:employee.id}});await prisma.employeeRequestExecution.deleteMany({where:{employeeId:employee.id}});}
+ if(employee){await prisma.payrollDebtReview.deleteMany({where:{employeeId:employee.id}});await prisma.employeeFinancialEntry.deleteMany({where:{employeeId:employee.id}});await prisma.employeeRequestExecution.deleteMany({where:{employeeId:employee.id}});}
  if(run){await prisma.appSetting.deleteMany({where:{key:{in:[`payroll.compute.${run.id}`,`payroll.scope.${run.id}`]}}});await prisma.auditLog.deleteMany({where:{entity:'payrollRun',entityId:run.id}});await prisma.payrollRun.delete({where:{id:run.id}});}
  if(employee) await prisma.employee.delete({where:{id:employee.id}});
  if(user) await prisma.user.delete({where:{id:user.id}});

@@ -2976,3 +2976,19 @@ model PayrollDebtDisbursement {
   @@unique([sourceType,sourceId])
   @@index([employeeId])
 }
+
+model PayrollDebtReview {
+  id String @id @default(cuid())
+  sourceType String
+  sourceId String
+  employeeId String
+  principal Decimal @db.Decimal(12,2)
+  currency String
+  decision String
+  evidenceReference String?
+  reviewedById String
+  note String
+  reviewedAt DateTime @default(now())
+  @@unique([sourceType,sourceId])
+  @@index([employeeId])
+}

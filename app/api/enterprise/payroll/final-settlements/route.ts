@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { canApprovePayroll } from "@/lib/enterprise/payroll-permissions";
 import { finalSettlementInput, makeFinalSettlementSnapshot, settlementPaymentInput, settlementDebtSnapshot, buildFinalSettlementEntries, calculateLeaveEncashment, reconcileOdooSettlementInstallments } from "@/lib/payroll/final-settlement";
+import { requireLegacyDebtReview } from "@/lib/payroll/debt-review";
 import { advanceSchedule, money } from "@/lib/payroll/calculations";
 import { Prisma } from "@prisma/client";
 export const runtime = "nodejs";
@@ -16,6 +17,10 @@ async function readSources(tx: Prisma.TransactionClient, employeeId:string) {
     tx.employeeSalaryAdvance.findMany({where:{employeeId,status:"APPROVED",OR:[{disbursementRequired:false},{disbursedAt:{not:null}}]},orderBy:{id:"asc"}}),
     tx.employeeLeaveBalance.findUnique({where:{employeeId},select:{accrued:true,used:true,updatedAt:true}}),
     tx.payrollItem.findFirst({where:{employeeId,payrollRun:{paidAt:{not:null}}},orderBy:[{payrollRun:{paidAt:"desc"}},{id:"desc"}],select:{id:true,payrollRun:{select:{paidAt:true}}}})
+  ]);
+  await requireLegacyDebtReview(tx,[
+    ...loans.filter(l=>!l.odooSource&&!l.disbursementRequired&&!l.disbursedAt&&Number(l.outstandingAmount)>0).map(l=>({sourceType:"LOAN" as const,sourceId:l.id,employeeId:l.employeeId,principal:l.principalAmount,currency:l.currency})),
+    ...advances.filter(a=>!a.disbursementRequired&&!a.disbursedAt&&a.paidInstallments<a.installments).map(a=>({sourceType:"ADVANCE" as const,sourceId:a.id,employeeId:a.employeeId,principal:a.amount,currency:"SAR"}))
   ]);
   if(loans.some(row=>row.currency!=="SAR"))throw Error("تحتاج القروض بعملة أخرى إلى تسوية معتمدة");
   const debtSources=[

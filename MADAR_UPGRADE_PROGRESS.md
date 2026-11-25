@@ -127,3 +127,6 @@ Do not merge until all 37 acceptance criteria, isolated tests, backup and previe
 
 ## Database integration and payroll query correction
 - #7/#10/#13: corrected reversed Promise.all attendance/approvedLeave bindings (production logic, not test bypass), and reject SAR advance deduction against non-SAR salary. Payslip uses snapshot basic once, not duplicated. #33: CI now executes real Prisma workflow and payroll settlement scripts on ephemeral localhost hrms_test with guarded cleanup; restored missing ledger adapter, fixed fixture dates and restrictive FK cleanup, added explicit typecheck. All stages must pass before merge. New CI pending.
+
+## Historical debt evidence review
+- #8/#10/#17/#25/#29: additive separate debt-review records with evidence reference, source identity, principal/currency, review decision, role guard, no self-review and audit. Payroll calculation and settlement and final settlement refuse unverified historical local debts; no mutation of historic loan/advance balances or proof fabricated. This may block payroll until reviewers document outstanding local debts; no retrospective changes. Odoo-origin debt remains on existing external installment reconciliation path and still needs external evidence. New tests and migration pending. #37 deferred.

@@ -1,5 +1,6 @@
 import { calculateGosi, resolveGosiCohort, advanceSchedule, calculateLeavePayroll, saudiCalendarDay, resolveNonSaudiGosiCohort } from "@/lib/payroll/calculations";
 import { prisma } from "@/lib/prisma";
+import { requireLegacyDebtReview } from "@/lib/payroll/debt-review";
 import { getEmployeeSalaryProfile } from "@/lib/employee/salary-profile-store";
 import { calculateNetSalary } from "@/lib/employee/salary-profile";
 
@@ -180,6 +181,10 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
   });
   const insuranceDeduction = gosi.employeeAmount;
 
+  await requireLegacyDebtReview(prisma,[
+    ...loans.filter(l=>!l.odooSource&&!l.disbursementRequired&&!l.disbursedAt&&Number(l.outstandingAmount)>0).map(l=>({sourceType:"LOAN" as const,sourceId:l.id,employeeId:l.employeeId,principal:l.principalAmount,currency:l.currency})),
+    ...advances.filter(a=>!a.disbursementRequired&&!a.disbursedAt&&a.paidInstallments<a.installments).map(a=>({sourceType:"ADVANCE" as const,sourceId:a.id,employeeId:a.employeeId,principal:a.amount,currency:"SAR"}))
+  ]);
   const loanAllocations = loans.map(loan => {
     if (loan.currency !== currency) throw new Error("عملة السلفة لا تطابق عملة الراتب؛ يلزم تحويل معتمد قبل الخصم");
     const scheduled = loan.repaymentSchedule.reduce((sum, row) => sum + Number(row.amount), 0);
