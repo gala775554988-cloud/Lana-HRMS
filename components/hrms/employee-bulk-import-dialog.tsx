@@ -41,6 +41,7 @@ export function EmployeeBulkImportDialog({ open, onOpenChange, locale = "ar" }: 
   const isAr = locale === "ar";
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [preview,setPreview]=useState("");
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [message, setMessage] = useState("");
@@ -49,7 +50,7 @@ export function EmployeeBulkImportDialog({ open, onOpenChange, locale = "ar" }: 
   const [autoCreateReferences, setAutoCreateReferences] = useState(false);
   const [duplicateStrategy, setDuplicateStrategy] = useState<"skip" | "update" | "ignore">("skip");
 
-  const canImport = useMemo(() => Boolean(file && analysis && analysis.errors.length === 0), [analysis, file]);
+  const canImport = useMemo(() => Boolean(file && preview && analysis && analysis.errors.length === 0), [analysis, file,preview]);
 
   const labels = {
     title: isAr ? "استيراد الموظفين" : "Bulk Import Employees",
@@ -60,7 +61,7 @@ export function EmployeeBulkImportDialog({ open, onOpenChange, locale = "ar" }: 
     autoCreate: isAr ? "إنشاء العناصر الناقصة تلقائياً" : "Auto-create missing references",
     duplicate: isAr ? "الموظف الموجود مسبقاً" : "Existing employee handling",
     skip: isAr ? "تخطي الموجود" : "Skip existing",
-    update: isAr ? "تحديث الموجود" : "Update existing",
+    update: isAr ? "تحديث البيانات الأساسية فقط" : "Update basic fields only",
     ignore: isAr ? "تجاهل الصف" : "Ignore row",
     errorReport: isAr ? "تحميل تقرير الأخطاء" : "Download Error Report",
     report: isAr ? "تحميل التقرير" : "Download Report"
@@ -88,7 +89,7 @@ export function EmployeeBulkImportDialog({ open, onOpenChange, locale = "ar" }: 
       setMessage(data.message || "Failed to analyze file");
       return;
     }
-    setAnalysis(data.analysis);
+    setAnalysis(data.analysis);setPreview(data.preview??"");
   }
 
   async function startImport() {
@@ -99,6 +100,7 @@ export function EmployeeBulkImportDialog({ open, onOpenChange, locale = "ar" }: 
     const formData = new FormData();
     formData.append("file", file);
     formData.append("mode", "import");
+    formData.append("preview",preview);
     formData.append("options", options());
     setProgress(20);
     const response = await fetch("/api/enterprise/bulk-import/employees", { method: "POST", body: formData });
@@ -140,18 +142,18 @@ export function EmployeeBulkImportDialog({ open, onOpenChange, locale = "ar" }: 
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" onClick={downloadTemplate} className="gap-2"><Download className="h-4 w-4" />{labels.template}</Button>
             <Button type="button" variant="outline" onClick={() => fileRef.current?.click()}>{labels.choose}</Button>
-            <input ref={fileRef} type="file" accept=".xlsx,.csv" className="hidden" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setAnalysis(null); setResult(null); setProgress(0); }} />
+            <input ref={fileRef} type="file" accept=".xlsx,.csv" className="hidden" onChange={(event) => { setFile(event.target.files?.[0] ?? null);setPreview(""); setAnalysis(null); setResult(null); setProgress(0); }} />
             {file ? <span className="rounded-xl border px-3 py-2 text-sm text-muted-foreground">{file.name}</span> : null}
           </div>
 
           <div className="grid gap-3 md:grid-cols-3">
             <label className="flex items-center gap-2 rounded-xl border p-3 text-sm md:col-span-2">
-              <input type="checkbox" checked={autoCreateReferences} onChange={(event) => setAutoCreateReferences(event.target.checked)} />
+              <input type="checkbox" checked={autoCreateReferences} onChange={(event) => {setAutoCreateReferences(event.target.checked);setPreview("");setAnalysis(null);}} />
               {labels.autoCreate}
             </label>
             <label className="grid gap-1 text-sm">
               <span>{labels.duplicate}</span>
-              <select value={duplicateStrategy} onChange={(event) => setDuplicateStrategy(event.target.value as any)} className="h-10 rounded-xl border bg-background px-3">
+              <select value={duplicateStrategy} onChange={(event) => {setDuplicateStrategy(event.target.value as any);setPreview("");setAnalysis(null);}} className="h-10 rounded-xl border bg-background px-3">
                 <option value="skip">{labels.skip}</option>
                 <option value="update">{labels.update}</option>
                 <option value="ignore">{labels.ignore}</option>

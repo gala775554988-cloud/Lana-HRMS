@@ -25,7 +25,7 @@ Baseline: c0a67b1e8957082a556f9f0df3cd4928dac6e2ba. CI: https://github.com/gala7
 | 19 | الربط المحاسبي والمالي | جزئي | قيد تصنيفي محلي متوازن محفوظ لكل مسير جديد عند الاعتماد، ومركز تكلفة وعملة، وتصدير Excel؛ اختبارات جديدة قيد التحقق. دليل ربط Odoo وoutbox قائم. | اعتماد دليل الحسابات الفعلي والقيود العكسية ومطابقة Odoo |
 | 20 | الميزانيات وسلم الرواتب والتكاليف | جزئي | ميزانيات وسلم رواتب وضوابط إلزامية؛ اختبارات حساب ناجحة. | قبول إعدادات المراكز والسياسات الحقيقية |
 | 21 | التقارير ولوحات التحكم | جزئي | تقارير مجمعة بالعملة والفترة ومركز التكلفة، PDF/XLSX؛ تصدير ناجح. | قبول التقارير التاريخية وكامل الإدارات |
-| 22 | الاستيراد والتصدير | جزئي | تصدير مالي؛ الاستيراد الجماعي غير مغلق. | معاينة وتحقيق الاستيراد ومنع التكرار |
+| 22 | الاستيراد والتصدير | جزئي | إصلاح معاينة الاستيراد والتحقق من تطابق الهوية والرقم، منع تعديل السجلات المتخطاة وملفات الرواتب التاريخية، تدقيق ذري؛ الاختبارات الجديدة قيد التحقق. | قبول الاستيراد الفعلي بملفات اختبار، مطابقة المراجع والأرصدة |
 | 23 | الخدمة الذاتية للموظفين | جزئي | كشف مالي وقسائم وطلبات وإلغاء؛ تكامل الطلبات ناجح. | جميع الخدمات والأدوار على الواجهة |
 | 24 | محرك قواعد الأتمتة | جزئي | قواعد تنبيه محفوظة ومفاتيح تكرار؛ اختبارات وحدات ناجحة. | تشغيل الجدولة الفعلي وباقي قواعد الأتمتة |
 | 25 | منع التكرار والأخطاء | جزئي | مفاتيح فريدة ومعاملات وقفل؛ اختبار الدفع المتزامن ناجح. | اختبارات كل مصادر الأثر والاستيراد |
@@ -140,3 +140,6 @@ Do not merge until all 37 acceptance criteria, isolated tests, backup and previe
 - CI 45624237702: 206/206 fixture tests, both PostgreSQL integrations, 2/2 exports, migrations and lint passed; standalone typecheck failed 21 diagnostics, build skipped. Addressed extended Prisma transaction typing, explicit bigint reductions, nullable run capture and loan-only installment narrowing. No typecheck suppression or test deletion. Main tracker rewritten with per-item implementation, evidence and blockers. New CI pending.
 
 - #19/#11/#25/#26: local accrual classification persisted atomically upon approval for newly calculated local runs, by currency and cost center. Employer insurance balanced separately, loan recovery classified as receivable. Export only, not statutory GL posting. Approved cancellation blocked if external accounting outbox exists (possibly posted), local-only cancellation marks snapshot VOID; payment updates status, no new bank posting. Imported/historic runs are not backfilled. New migration, unit and PostgreSQL integration tests pending.
+
+## Import safety batch after cd93236
+- #22/#25/#29: explicit preview fingerprint and reanalysis, reject over-limit rather than truncate, reject conflicting identity keys and pre-existing synthetic login, skip strategy now excludes all secondary writes and password-change flags, existing salary profiles preserved, empty status no longer reactivates records, atomic audit and serializable transaction. Whole-organization import restricted to SUPER_ADMIN. Auto-created reference records still precede import transaction; preview is a consistency fingerprint, not a security credential. New CI pending.

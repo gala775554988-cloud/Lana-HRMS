@@ -6,6 +6,7 @@ import { saveEmployeeSalaryProfile } from "@/lib/employee/salary-profile-store";
 import { requirePasswordChange } from "@/lib/auth/password-change-policy";
 import { getHierarchyStore, type HierarchyStore } from "@/lib/enterprise/hierarchy";
 import { writeAuditLog } from "@/lib/audit";
+import { classifyImportIdentity } from "./import-identity";
 
 export type DuplicateStrategy = "skip" | "update" | "ignore";
 
@@ -137,7 +138,7 @@ function getNumber(row: Record<string, unknown>, key: string) {
   if (!value) return undefined;
   const normalized = value.replace(/,/g, "");
   const numberValue = Number(normalized);
-  return Number.isNaN(numberValue) ? undefined : numberValue;
+  return Number.isFinite(numberValue) ? numberValue : undefined;
 }
 
 function getBoolean(row: Record<string, unknown>, key: string) {
@@ -170,7 +171,7 @@ function splitFullName(fullName: string) {
 
 function normalizeStatus(value: string) {
   const normalized = normalizeLookup(value);
-  if (!normalized) return "ACTIVE";
+  if (!normalized) return "";
   if (["active", "نشط"].includes(normalized)) return "ACTIVE";
   if (["on_leave", "onleave", "فيإجازة", "اجازة", "إجازة"].includes(normalized)) return "ON_LEAVE";
   if (["terminated", "منتهي", "موقوف"].includes(normalized)) return "TERMINATED";
@@ -190,6 +191,7 @@ export function parseEmployeeImportFile(buffer: Buffer, fileName: string): Parse
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   if (!sheet) return [];
   const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "", raw: false });
+  if(rawRows.length>5000)throw Error("الحد الأقصى 5000 صف؛ قسّم الملف دون حذف صفوف");
   return rawRows.map((raw, index) => {
     const normalized: Record<string, unknown> = {};
     for (const [header, value] of Object.entries(raw)) {
@@ -204,7 +206,7 @@ export function parseEmployeeImportFile(buffer: Buffer, fileName: string): Parse
       salaryTransportAllowance: getNumber(normalized, "salaryTransportAllowance"),
       salaryOtherAllowances: getNumber(normalized, "salaryOtherAllowances"),
       salaryDeductions: getNumber(normalized, "salaryDeductions"),
-      salaryDeductInsurance: getBoolean(normalized, "salaryDeductInsurance"),
+      salaryDeductInsurance: getString(normalized,"salaryDeductInsurance") ? getBoolean(normalized, "salaryDeductInsurance") : undefined,
       salaryTotal: getNumber(normalized, "salaryTotal"),
       salaryCosts: getNumber(normalized, "salaryCosts")
     };
@@ -295,6 +297,8 @@ export async function analyzeEmployeeImport(rows: ParsedEmployeeRow[], options: 
   const employeeMap = indexEmployees(references.employees);
   const fileEmployeeRefs = new Set<string>();
   const errors: BulkImportError[] = [];
+  const existingById=new Map(references.employees.map(e=>[normalizeLookup(e.nationalId),e.id]));
+  const existingByNumber=new Map(references.employees.map(e=>[normalizeLookup(e.employeeNumber),e.id]));
   const seenNationalIds = new Map<string, number>();
   const seenEmployeeNumbers = new Map<string, number>();
   let duplicates = 0;
@@ -322,6 +326,10 @@ export async function analyzeEmployeeImport(rows: ParsedEmployeeRow[], options: 
     if (row.personalEmail && !isValidEmail(row.personalEmail)) errors.push({ row: row.rowNumber, field: "البريد الشخصي", message: "البريد الإلكتروني غير صحيح." });
 
     const nationalKey = normalizeLookup(row.nationalId);
+    if(row.status&&!["ACTIVE","ON_LEAVE","TERMINATED","INACTIVE"].includes(row.status))errors.push({row:row.rowNumber,field:"الحالة",message:"حالة غير صالحة"});
+    if(classifyImportIdentity(existingById.get(nationalKey),existingByNumber.get(normalizeLookup(row.employeeNumber)))==="CONFLICT")errors.push({row:row.rowNumber,field:"الهوية والرقم الوظيفي",message:"لا يتطابق المعرفان مع موظف واحد؛ يلزم تصحيح الملف"});
+    if(row.contractStartDate&&row.contractEndDate&&row.contractEndDate<row.contractStartDate)errors.push({row:row.rowNumber,field:"العقد",message:"تاريخ نهاية العقد يسبق البداية"});
+    if([row.leaveBalance,row.leaveUsed,...Object.values(row.salaryValues)].some(v=>typeof v==="number"&&(!Number.isFinite(v)||v<0)))errors.push({row:row.rowNumber,field:"المبالغ والأرصدة",message:"قيمة سالبة أو غير صالحة"});
     const employeeKey = normalizeLookup(row.employeeNumber);
     if (nationalKey && seenNationalIds.has(nationalKey)) {
       duplicates++;
@@ -353,7 +361,7 @@ export async function analyzeEmployeeImport(rows: ParsedEmployeeRow[], options: 
 
   return {
     totalRows: rows.length,
-    validRows: Math.max(rows.length - errors.filter((error) => error.row > 0).length, 0),
+    validRows: errors.some(e=>e.row===0)?0:Math.max(rows.length-new Set(errors.filter(e=>e.row>0).map(e=>e.row)).size,0),
     errorRows: new Set(errors.filter((error) => error.row > 0).map((error) => error.row)).size,
     duplicates: duplicates + existingRows.length,
     newEmployees: newRows.length,
@@ -401,8 +409,7 @@ export async function importEmployees(rows: ParsedEmployeeRow[], options: BulkIm
   const duplicateStrategy = options.duplicateStrategy ?? "skip";
   const analysis = await analyzeEmployeeImport(rows, options);
   const errorRows = new Set(analysis.errors.filter((error) => error.row > 0).map((error) => error.row));
-  rows = rows.filter((row) => !errorRows.has(row.rowNumber));
-  if (!rows.length) return { success: false, analysis, result: { added: 0, updated: 0, skipped: 0, errors: errorRows.size, total: 0 } };
+  if (analysis.errors.length || !rows.length) return { success: false, analysis, result: { added: 0, updated: 0, skipped: 0, errors: errorRows.size, total: 0 } };
 
   const references = await ensureReferences(rows, Boolean(options.autoCreateReferences));
   const departmentMap = indexRefs(references.departments);
@@ -412,7 +419,7 @@ export async function importEmployees(rows: ParsedEmployeeRow[], options: BulkIm
   const nationalityMap = indexRefs(references.nationalities);
   const existingEmployeeByNationalId = new Map(references.employees.map((employee) => [normalizeLookup(employee.nationalId), employee]));
   const existingEmployeeByNumber = new Map(references.employees.map((employee) => [normalizeLookup(employee.employeeNumber), employee]));
-  const passwordHashes = await getPasswordHashes(rows);
+  const passwordHashes = await getPasswordHashes(rows.filter(row=>!existingEmployeeByNationalId.has(normalizeLookup(row.nationalId))&&!existingEmployeeByNumber.has(normalizeLookup(row.employeeNumber))));
   const employeeEmailCounts = new Map<string, number>();
   const existingEmployeeEmails = new Set(references.employees.map((employee) => normalizeLookup(employee.email ?? "")).filter(Boolean));
   for (const row of rows) {
@@ -437,6 +444,16 @@ export async function importEmployees(rows: ParsedEmployeeRow[], options: BulkIm
     const existingRows = rows.filter((row) => existingEmployeeByNationalId.has(normalizeLookup(row.nationalId)) || existingEmployeeByNumber.has(normalizeLookup(row.employeeNumber)));
 
     const userEmails = newRows.map((row) => `employee.${row.nationalId}@lana.local`);
+    // Recheck both identity columns inside the write transaction. Never attach
+    // a new employee to a pre-existing login with a matching synthetic email.
+    const current=await tx.employee.findMany({where:{OR:[{nationalId:{in:rows.map(r=>r.nationalId)}},{employeeNumber:{in:rows.map(r=>r.employeeNumber)}}]},select:{id:true,nationalId:true,employeeNumber:true}});
+    const currentById=new Map(current.map(e=>[normalizeLookup(e.nationalId),e.id]));
+    const currentByNumber=new Map(current.map(e=>[normalizeLookup(e.employeeNumber),e.id]));
+    for(const row of rows){
+      const id=normalizeLookup(row.nationalId),number=normalizeLookup(row.employeeNumber);
+      if(currentById.get(id)!==existingEmployeeByNationalId.get(id)?.id||currentByNumber.get(number)!==existingEmployeeByNumber.get(number)?.id||classifyImportIdentity(currentById.get(id),currentByNumber.get(number))==="CONFLICT")throw Error("تغيرت هوية موظف منذ المعاينة؛ أعد التحليل");
+    }
+    if(userEmails.length&&await tx.user.count({where:{email:{in:userEmails}}}))throw Error("يوجد حساب دخول سابق لأحد الموظفين الجدد؛ راجع الربط يدوياً");
     await tx.user.createMany({
       data: newRows.map((row, index) => ({
         name: row.fullName,
@@ -445,7 +462,7 @@ export async function importEmployees(rows: ParsedEmployeeRow[], options: BulkIm
         passwordHash: passwordHashes.get(row.nationalId)!,
         isActive: true
       })),
-      skipDuplicates: true
+      skipDuplicates: false
     });
     const users = await tx.user.findMany({ where: { email: { in: userEmails } }, select: { id: true, email: true } });
     const userByEmail = new Map(users.map((user) => [normalizeLookup(user.email), user]));
@@ -461,7 +478,7 @@ export async function importEmployees(rows: ParsedEmployeeRow[], options: BulkIm
         gender: row.gender || null,
         dateOfBirth: row.dateOfBirth,
         hireDate: row.contractStartDate ?? new Date(),
-        status: row.status as any,
+        status: (row.status||"ACTIVE") as any,
         address: row.address || null,
         profilePhotoUrl: row.profilePhotoUrl || null,
         userId: userByEmail.get(normalizeLookup(userEmails[index]))?.id,
@@ -472,7 +489,7 @@ export async function importEmployees(rows: ParsedEmployeeRow[], options: BulkIm
         nationalityId: row.nationality ? nationalityMap.get(normalizeLookup(row.nationality))?.id : null,
         sponsor: row.sponsor || null
       })),
-      skipDuplicates: true
+      skipDuplicates: false
     });
     added = newRows.length;
 
@@ -490,7 +507,7 @@ export async function importEmployees(rows: ParsedEmployeeRow[], options: BulkIm
             gender: row.gender || undefined,
             dateOfBirth: row.dateOfBirth,
             hireDate: row.contractStartDate ?? undefined,
-            status: row.status as any,
+            status: (row.status||undefined) as any,
             address: row.address || undefined,
             profilePhotoUrl: row.profilePhotoUrl || undefined,
             departmentId: row.department ? departmentMap.get(normalizeLookup(row.department))?.id : undefined,
@@ -507,8 +524,9 @@ export async function importEmployees(rows: ParsedEmployeeRow[], options: BulkIm
       skipped = existingRows.length;
     }
 
+    const appliedRows=duplicateStrategy==="update"?rows:newRows;
     const affectedEmployees = await tx.employee.findMany({
-      where: { OR: [{ nationalId: { in: rows.map((row) => row.nationalId) } }, { employeeNumber: { in: rows.map((row) => row.employeeNumber) } }] },
+      where: { OR: [{ nationalId: { in: appliedRows.map((row) => row.nationalId) } }, { employeeNumber: { in: appliedRows.map((row) => row.employeeNumber) } }] },
       select: { id: true, employeeNumber: true, nationalId: true, firstName: true, lastName: true, email: true, userId: true, branchId: true, departmentId: true }
     });
     const affectedByNationalId = new Map(affectedEmployees.map((employee) => [normalizeLookup(employee.nationalId), employee]));
@@ -517,29 +535,32 @@ export async function importEmployees(rows: ParsedEmployeeRow[], options: BulkIm
 
     if (employeeRole) {
       await tx.userRole.createMany({
-        data: affectedEmployees.filter((employee) => employee.userId).map((employee) => ({ userId: employee.userId!, roleId: employeeRole.id })),
+        data: affectedEmployees.filter((employee) => employee.userId&&newRows.some(row=>normalizeLookup(row.nationalId)===normalizeLookup(employee.nationalId))).map((employee) => ({ userId: employee.userId!, roleId: employeeRole.id })),
         skipDuplicates: true
       });
     }
 
-    for (const row of rows) {
+    for (const row of appliedRows) {
       const employee = affectedByNationalId.get(normalizeLookup(row.nationalId)) ?? affectedByNumber.get(normalizeLookup(row.employeeNumber));
       if (!employee) continue;
+      const extraKey=`employee.extra.${employee.id}`;
+      const oldExtra=await tx.appSetting.findUnique({where:{key:extraKey}});
+      const patch=Object.fromEntries(Object.entries(row.extraValues).filter(([,v])=>v!==undefined&&v!==null&&v!==""));
       await tx.appSetting.upsert({
-        where: { key: `employee.extra.${employee.id}` },
-        update: { value: row.extraValues as any },
+        where: { key: extraKey },
+        update: { value: {...(oldExtra?.value as Record<string,unknown>??{}),...patch} as any },
         create: { key: `employee.extra.${employee.id}`, value: row.extraValues as any, description: "Bulk imported employee extra fields" }
       });
-      await tx.appSetting.upsert({
-        where: { key: `employee.salary.${employee.id}` },
-        update: { value: extractSalaryProfile(row.salaryValues) },
-        create: { key: `employee.salary.${employee.id}`, value: extractSalaryProfile(row.salaryValues), description: "Employee salary profile" }
-      });
+      // Existing salary terms are never overwritten by a blank spreadsheet.
+      // Existing financial profiles require a separate reviewed salary-change workflow.
+      if(newRows.some(r=>normalizeLookup(r.nationalId)===normalizeLookup(row.nationalId))&&Object.values(row.salaryValues).some(v=>v!==undefined)){
+        await tx.appSetting.create({data:{key:`employee.salary.${employee.id}`,value:extractSalaryProfile(row.salaryValues),description:"Employee salary profile"}});
+      }
     }
 
     const hierarchy = await getHierarchyStore();
     const hierarchyDraft: HierarchyStore = JSON.parse(JSON.stringify(hierarchy));
-    for (const row of rows) {
+    for (const row of appliedRows) {
       const employee = affectedByNationalId.get(normalizeLookup(row.nationalId)) ?? affectedByNumber.get(normalizeLookup(row.employeeNumber));
       if (!employee) continue;
       const supervisor = row.supervisor ? employeeLookup.get(normalizeLookup(row.supervisor)) : null;
@@ -565,20 +586,22 @@ export async function importEmployees(rows: ParsedEmployeeRow[], options: BulkIm
 
     const passwordSetting = await tx.appSetting.findUnique({ where: { key: "employee.passwordChangeRequired" } }).catch(() => null);
     const passwordStore = passwordSetting?.value && typeof passwordSetting.value === "object" ? passwordSetting.value as Record<string, boolean> : {};
-    for (const employee of affectedEmployees) if (employee.userId) passwordStore[employee.userId] = true;
+    const newEmployees=affectedEmployees.filter(e=>newRows.some(r=>normalizeLookup(r.nationalId)===normalizeLookup(e.nationalId)));
+    for (const employee of newEmployees) if (employee.userId) passwordStore[employee.userId] = true;
     await tx.appSetting.upsert({
       where: { key: "employee.passwordChangeRequired" },
       update: { value: passwordStore },
       create: { key: "employee.passwordChangeRequired", value: passwordStore, description: "Users required to change auto-generated employee password" }
     });
 
-    return { affectedEmployees };
-  }, { timeout: 120_000 });
+    await tx.auditLog.create({data:{actorUserId,action:"bulk-import",entity:"employee",metadata:{added,updated,skipped,total:rows.length}}});
+    return { affectedEmployees:newEmployees };
+  }, { timeout: 120_000,isolationLevel:"Serializable" });
 
   for (const employee of result.affectedEmployees) {
     if (employee.userId) await requirePasswordChange(employee.userId).catch(() => null);
   }
-  await writeAuditLog({ actorUserId, action: "bulk-import", entity: "employee", metadata: { added, updated, skipped, total: rows.length } }).catch(() => null);
+  // Audit was written inside the transaction.
 
   return { success: true, analysis, result: { added, updated, skipped, errors: errorRows.size, total: rows.length } };
 }
