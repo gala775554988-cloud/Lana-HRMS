@@ -13,7 +13,9 @@ async function getAuthorization(userId: string) {
     where: { userId },
     select: { role: { select: { name: true } } },
   });
-  const roles = Array.from(new Set(assignments.map((a) => a.role.name)));
+  // Role names come exclusively from persisted assignments. Normalize legacy
+  // casing so an administrator is not misrouted as an employee after login.
+  const roles = Array.from(new Set(assignments.map((a) => a.role.name.trim().toUpperCase())));
   if (roles.length === 0) roles.push("EMPLOYEE");
 
   // Keep a compact routing flag in the JWT, not the full permission list.
@@ -24,8 +26,10 @@ async function getAuthorization(userId: string) {
   try {
     const effectivePermissions = await getCachedEffectivePermissions(userId, roles);
     const employeeBaseline = new Set<string>(PERMISSION_TEMPLATES.EMPLOYEE);
+    // A wildcard or a non-employee grant is sufficient for routing into
+    // the management shell, but never replaces its server-side RBAC checks.
     hasGrantedAdminAccess = effectivePermissions.some(
-      (permission) => !employeeBaseline.has(permission)
+      (permission) => permission === "*:*" || !employeeBaseline.has(permission)
     );
   } catch (error) {
     // Permission lookups must never turn a valid login into a failed login.
