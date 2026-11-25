@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { hasPermission } from "@/lib/rbac";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -12,6 +13,8 @@ export async function GET(request: NextRequest) {
     if (!session?.user?.id) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
+
+    if (!hasPermission(session.user.permissions, { action: "read", resource: "employees" }, session.user.roles)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
 
     const searchParams = request.nextUrl.searchParams;
     const page = Math.max(Number(searchParams.get("page") || 1), 1);

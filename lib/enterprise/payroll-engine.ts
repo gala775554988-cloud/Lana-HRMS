@@ -95,7 +95,9 @@ async function resolveBaseSalary(employeeId: string): Promise<{ base: number; cu
  * so this function is purely a read+sum, safe to re-run (idempotent) until
  * `markPayrollSourcesConsumed` is called for a specific run. */
 export async function computeEmployeePayroll(employeeId: string, periodStart: Date, periodEnd: Date): Promise<PayrollBreakdown> {
+  if (!Number.isFinite(periodStart.getTime()) || !Number.isFinite(periodEnd.getTime()) || periodEnd < periodStart) throw new Error("فترة المسير غير صالحة");
   const { base: baseSalary, currency, profileAllowanceTotal } = await resolveBaseSalary(employeeId);
+  if (![baseSalary, profileAllowanceTotal].every(value => Number.isFinite(value) && value >= 0)) throw new Error("بيانات الراتب غير صالحة");
 
   const [allAllowances, allDeductions, overtimeRequests, bonuses, socialInsurance, loans, advances, attendance] = await Promise.all([
     prisma.allowance.findMany({
@@ -195,9 +197,10 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
   const absenceDeduction = round2(absenceDays * dailyRate);
   const hourlyRate = baseSalary > 0 ? baseSalary / 240 : 0;
   const lateDeduction = round2(attendance.filter((row) => row.status === "LATE").reduce((sum, row) => {
-    if (!row.checkIn) return sum + dailyRate / 4;
+    if (!row.checkIn) throw new Error("سجل تأخير دون وقت حضور؛ راجع البصمة قبل اعتماد المسير");
     const assignment = row.employee.shiftAssignments.find((item) => item.effectiveFrom <= row.workDate && (!item.effectiveTo || item.effectiveTo >= row.workDate));
-    const lateMinutes = Math.max(0, riyadhMinutes(row.checkIn) - timeToMinutes(assignment?.shift.startTime));
+    if (!assignment?.shift.startTime) throw new Error("لا يوجد جدول دوام صالح لسجل التأخير؛ راجع الدوام قبل احتساب المسير");
+    const lateMinutes = Math.max(0, riyadhMinutes(row.checkIn) - timeToMinutes(assignment.shift.startTime));
     return sum + Math.min(dailyRate, hourlyRate * (lateMinutes / 60));
   }, 0));
 
@@ -206,6 +209,8 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
     insuranceDeduction + taxTotal + loanDeduction + advanceDeduction + absenceDeduction + lateDeduction + penaltyDeduction + otherDeductionTotal
   );
   const netPay = round2(grossPay - deductionTotal);
+  if (![grossPay, deductionTotal, netPay].every(Number.isFinite) || grossPay < 0 || deductionTotal < 0) throw new Error("إجماليات المسير غير صالحة");
+  if (netPay < 0) throw new Error("صافي الراتب سالب؛ راجع الاستقطاعات والتسويات قبل اعتماد المسير");
 
   return {
     baseSalary: round2(baseSalary),
@@ -265,29 +270,50 @@ export async function computeAndUpsertPayrollItems(
 ) {
   const run = await prisma.payrollRun.findUniqueOrThrow({ where: { id: runId } });
   if (!["DRAFT", "PROCESSING"].includes(run.status)) throw new Error("المسير معتمد أو مقفل");
+  if (run.periodId) {
+    const period = await prisma.payrollPeriod.findUnique({ where: { id: run.periodId }, select: { status: true } });
+    if (!period || period.status !== "OPEN") throw new Error("فترة الرواتب مغلقة أو غير موجودة");
+  }
   if (await prisma.payrollItem.count({ where: { payrollRunId: runId, odooPayslipId: { not: null } } })) throw new Error("مسير مستورد من Odoo؛ حدّثه من كشوف Odoo بدلاً من إعادة احتسابه محلياً");
-  const employeeWhere: Record<string, unknown> = { status: "ACTIVE" };
-  if (scope.employeeIds?.length) employeeWhere.id = { in: scope.employeeIds };
+  const employeeWhere: Record<string, unknown> = { status: "ACTIVE", archivedAt: null, hireDate: { lte: periodEndDate }, OR: [{ terminationDate: null }, { terminationDate: { gte: periodStartDate } }] };
+  if (scope.employeeIds !== undefined) employeeWhere.id = { in: scope.employeeIds };
   if (scope.companyId) employeeWhere.companyId = scope.companyId;
   if (scope.branchId) employeeWhere.branchId = scope.branchId;
   if (scope.departmentId) employeeWhere.departmentId = scope.departmentId;
   const employees = await prisma.employee.findMany({ where: employeeWhere, select: { id: true } });
   const items: Array<{ employeeId: string; netPay: number; error?: string }> = [];
   const calculated: Array<{ employeeId: string; breakdown: PayrollBreakdown }> = [];
+  const matchedIds = new Set(employees.map(employee => employee.id));
+  for (const employeeId of scope.employeeIds ?? []) {
+    if (!matchedIds.has(employeeId)) items.push({ employeeId, netPay: 0, error: "الموظف غير مؤهل ضمن نطاق المسير أو الفترة المحددة" });
+  }
   for (const employee of employees) {
     try {
       const breakdown = await computeEmployeePayroll(employee.id, periodStartDate, periodEndDate);
+      for (const field of ["baseSalary", "allowanceTotal", "grossPay", "deductionTotal", "netPay"] as const) {
+        if (!Number.isFinite(breakdown[field])) throw new Error("قيمة مالية غير صالحة: " + field);
+      }
+      if (breakdown.netPay < 0) throw new Error("صافي الراتب سالب؛ يلزم مراجعة الاستقطاعات");
       calculated.push({ employeeId: employee.id, breakdown });
       items.push({ employeeId: employee.id, netPay: breakdown.netPay });
     } catch (error) { items.push({ employeeId: employee.id, netPay: 0, error: error instanceof Error ? error.message : "تعذر الاحتساب" }); }
   }
   const errorCount = items.filter(item => item.error).length;
   await prisma.$transaction(async tx => {
+    if (run.periodId) {
+      const period = await tx.payrollPeriod.findUnique({ where: { id: run.periodId }, select: { status: true } });
+      if (!period || period.status !== "OPEN") throw new Error("تغيرت حالة الفترة أثناء الاحتساب");
+    }
     const editable = await tx.payrollRun.updateMany({ where: { id: runId, status: run.status, updatedAt: run.updatedAt }, data: { updatedAt: new Date() } });
     if (editable.count !== 1) throw new Error("تغير المسير أثناء الاحتساب؛ أعد المحاولة");
     const summary = { employeeCount: employees.length, errorCount, errors: items.filter(item => item.error).map(item => ({ employeeId: item.employeeId, error: item.error! })) };
     await tx.appSetting.upsert({ where: { key: `payroll.compute.${runId}` }, create: { key: `payroll.compute.${runId}`, value: summary }, update: { value: summary } });
-    if (errorCount) return; // Never publish a partial calculation over a valid draft.
+    const scopeKey = `payroll.scope.${runId}`;
+    const savedScope = await tx.appSetting.findUnique({ where: { key: scopeKey } });
+    if (!savedScope && (scope.employeeIds?.length || employees.length)) {
+      await tx.appSetting.create({ data: { key: scopeKey, value: { employeeIds: scope.employeeIds ?? employees.map(employee => employee.id) } } });
+    }
+    if (errorCount || !employees.length) return; // Never publish a partial or empty calculation over a valid draft.
     for (const { employeeId, breakdown } of calculated) {
       const data = {
         calculationSnapshot: JSON.parse(JSON.stringify(breakdown)), employerInsurance: breakdown.gosi.employerAmount,
@@ -301,6 +327,6 @@ export async function computeAndUpsertPayrollItems(
     }
     // A changed employee selection must not retain stale employees in a draft.
     await tx.payrollItem.deleteMany({ where: { payrollRunId: runId, employeeId: { notIn: calculated.map(row => row.employeeId) } } });
-  }, { timeout: 30000 });
+  }, { timeout: 30000, isolationLevel: "Serializable" });
   return { employeeCount: employees.length, items, errorCount };
 }

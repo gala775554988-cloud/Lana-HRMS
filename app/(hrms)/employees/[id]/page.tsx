@@ -69,13 +69,16 @@ export default async function EmployeeProfilePage({
 
   if (!employee) notFound();
 
+  const isArchived = employee.status === "INACTIVE" || employee.status === "TERMINATED" || !!employee.archivedAt || !!employee.terminationDate;
+  if (isArchived && !hasPermission(session.user.permissions, { action: "read", resource: "employees" }, session.user.roles)) notFound();
+
   // Lazy Load Details on Demand (ID-First Optimization)
   // If linked to Odoo (odooId exists), check if detailed profile (photo, birthday, custom fields) is stale (>1 hr) or missing.
   // Bounded with a timeout: this is a live external call, and an unreachable/slow Odoo
   // instance must never be able to stall the whole profile page — worst case, the
   // page renders with the last-synced data and the sync simply completes in the
   // background (or gets picked up by the ODOO_EMPLOYEE_DETAIL_SYNC queue instead).
-  if (typeof employee.odooId === "number" && employee.odooId > 0) {
+  if (!isArchived && typeof employee.odooId === "number" && employee.odooId > 0) {
     const odooId = employee.odooId;
     const isStale = !employee.odooRawDataSyncedAt || (Date.now() - new Date(employee.odooRawDataSyncedAt).getTime() > 3600_000);
     if (isStale) {
@@ -113,7 +116,7 @@ export default async function EmployeeProfilePage({
   const now = new Date();
   let yearsOfService = "-";
   if (hireDate) {
-    const diffMs = now.getTime() - hireDate.getTime();
+    const diffMs = Math.max(0, (isArchived && employee.terminationDate ? new Date(employee.terminationDate) : now).getTime() - hireDate.getTime());
     const years = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 365.25));
     const months = Math.floor((diffMs % (1000 * 60 * 60 * 24 * 365.25)) / (1000 * 60 * 60 * 24 * 30.44));
     yearsOfService = `${years} سنة ${months} شهر`;
@@ -255,6 +258,8 @@ export default async function EmployeeProfilePage({
   }, ...otherLeaveBalances];
 
   return (
+    <>
+    {isArchived && <section className="mb-4 rounded-xl border bg-card p-4 space-y-2"><h2 className="font-bold">سجل الأرشفة وانتهاء الخدمة</h2><p>تاريخ الأرشفة: {employee.archivedAt ? new Date(employee.archivedAt).toLocaleDateString("ar-SA", { calendar: "gregory" }) : "غير مسجل"}</p><p>سبب الأرشفة: {employee.archiveReason || "غير مسجل"}</p><p>تاريخ انتهاء الخدمة المسجل: {employee.terminationDate ? new Date(employee.terminationDate).toLocaleDateString("ar-SA", { calendar: "gregory" }) : "غير مسجل"}</p><p>من قام بالأرشفة: {auditLogs.find(log => log.action === "EMPLOYEE_ARCHIVED")?.actor?.name || "غير مسجل"}</p></section>}
     <EmployeeProfileDashboard
       employee={visibleEmployee as any}
       salaryProfile={salaryProfile}
@@ -284,9 +289,10 @@ export default async function EmployeeProfilePage({
       canEditProfile={hasPermission(session.user.permissions, { action: "edit", resource: "employees" }, session.user.roles)}
       canManageDocuments={hasPermission(session.user.permissions, { action: "manage", resource: "documents" }, session.user.roles)}
       initialTab={typeof query.tab === "string" ? query.tab : "overview"}
-      backHref={backHref}
+      backHref={isArchived ? "/employees" : backHref}
       dictionary={dictionary}
       locale={locale}
     />
+    </>
   );
 }

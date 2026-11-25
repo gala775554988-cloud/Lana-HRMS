@@ -82,6 +82,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const action = body?.action;
   if (typeof action !== "string" || !action) return NextResponse.json({ success: false, message: "action is required" }, { status: 400 });
 
+  if (body?.reason !== undefined && (typeof body.reason !== "string" || body.reason.length > 2000)) return NextResponse.json({ success: false, message: "سبب الإجراء غير صالح" }, { status: 400 });
   const run = await prisma.payrollRun.findUnique({ where: { id } });
   if (!run) return NextResponse.json({ success: false, message: "Not found" }, { status: 404 });
 
@@ -98,7 +99,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!run.periodStartDate || !run.periodEndDate) {
       return NextResponse.json({ success: false, message: "لا يمكن إعادة الاحتساب -- الفترة الزمنية للمسير غير محددة" }, { status: 409 });
     }
+    let employeeIds = (await prisma.payrollItem.findMany({ where: { payrollRunId: id }, select: { employeeId: true } })).map(item => item.employeeId);
+    if (!employeeIds.length) {
+      const saved = await prisma.appSetting.findUnique({ where: { key: `payroll.scope.${id}` } });
+      const scope = saved?.value as { employeeIds?: string[] } | null;
+      if (!scope || !Array.isArray(scope.employeeIds) || !scope.employeeIds.length || !scope.employeeIds.every(value => typeof value === "string" && value.trim())) return NextResponse.json({ success: false, message: "لا توجد قائمة موظفين محفوظة لإعادة الاحتساب" }, { status: 409 });
+      employeeIds = scope.employeeIds;
+    }
     const { employeeCount, items, errorCount } = await computeAndUpsertPayrollItems(id, run.periodStartDate, run.periodEndDate, {
+      employeeIds,
       companyId: run.companyId ?? undefined,
       branchId: run.branchId ?? undefined,
       departmentId: run.departmentId ?? undefined,
@@ -111,7 +120,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       entityId: id,
       metadata: { employeeCount, errors: errorCount }
     });
-    return NextResponse.json({ success: true, computed: items.length, errors: errorCount });
+    return NextResponse.json({ success: errorCount === 0 && employeeCount > 0, computed: errorCount ? 0 : items.length, errors: errorCount, ...(errorCount || !employeeCount ? { message: "لم يكتمل إعادة الاحتساب؛ راجع أخطاء المسير" } : {}) }, { status: errorCount || !employeeCount ? 422 : 200 });
   }
 
   const transitions: Record<string, { from: PayrollStatus[]; to: PayrollStatus; requiresApprover?: boolean }> = {
@@ -148,11 +157,33 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     updated = await prisma.$transaction(async (tx) => {
       const claimed = await tx.payrollRun.updateMany({ where: { id, status: run.status, updatedAt: run.updatedAt }, data });
       if (claimed.count !== 1) throw new Error("تغير المسير أثناء الإجراء؛ حدّث الصفحة");
-      if (action === "approve" || action === "pay") {
+      if (action === "submit" || action === "approve" || action === "pay") {
+        if (run.periodId) {
+          const period = await tx.payrollPeriod.findUnique({ where: { id: run.periodId }, select: { status: true } });
+          if (!period || period.status !== "OPEN") throw new Error("فترة الرواتب مغلقة أو غير موجودة");
+        }
         const computation = await tx.appSetting.findUnique({ where: { key: `payroll.compute.${id}` } });
         if (Number((computation?.value as { errorCount?: number } | null)?.errorCount ?? 0) > 0) throw new Error("توجد أخطاء احتساب غير معالجة؛ أعد احتساب المسير قبل الاعتماد");
         const items = await tx.payrollItem.findMany({ where: { payrollRunId: id } });
         if (!items.length) throw new Error("لا يمكن اعتماد أو صرف مسير فارغ");
+        if (items.every(item => item.odooPayslipId === null)) {
+          const summary = computation?.value as { employeeCount?: number; errorCount?: number } | null | undefined;
+          if (!summary || summary.errorCount !== 0 || summary.employeeCount !== items.length) throw new Error("نتائج الاحتساب غير مكتملة؛ أعد احتساب المسير قبل المتابعة");
+        }
+        if (!run.periodStartDate || !run.periodEndDate) throw new Error("الفترة الزمنية للمسير غير محددة");
+        const duplicate = await tx.payrollItem.findFirst({
+          where: {
+            employeeId: { in: items.map(item => item.employeeId) },
+            payrollRun: {
+              id: { not: id },
+              paidAt: { not: null },
+              periodStartDate: { lte: run.periodEndDate },
+              periodEndDate: { gte: run.periodStartDate }
+            }
+          },
+          select: { employeeId: true }
+        });
+        if (duplicate) throw new Error("يوجد موظف سبق صرف راتبه في فترة متداخلة؛ راجع المسير قبل الاعتماد أو الصرف");
         for (const item of items) {
           const snapshot = item.calculationSnapshot as unknown as PayrollBreakdown;
           if (!snapshot || !Number.isFinite(snapshot.netPay) || Math.abs(Number(item.netPay) - snapshot.netPay) > 0.005 || !Array.isArray(snapshot.loanAllocations)) throw new Error("أعد احتساب المسير؛ لقطة الحساب غير مكتملة");
@@ -168,9 +199,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       if (action === "pay") await tx.payrollItem.updateMany({ where: { payrollRunId: id }, data: { payslipIssuedAt: now } });
       await tx.auditLog.create({ data: { actorUserId: session.user.id, action: `payroll_${action}`, entity: "payrollRun", entityId: id, metadata: { from: run.status, to: transition.to, reason: body?.reason ?? null } } });
       return tx.payrollRun.findUniqueOrThrow({ where: { id } });
-    });
+    }, { isolationLevel: "Serializable" });
   } catch (error) {
-    return NextResponse.json({ success: false, message: error instanceof Error ? error.message : "تعذر تنفيذ العملية" }, { status: 409 });
+    return NextResponse.json({ success: false, message: typeof error === "object" && error !== null && "code" in error ? "تعذر تنفيذ العملية بسبب تعارض أو خطأ في قاعدة البيانات؛ حدّث الصفحة وأعد المحاولة" : error instanceof Error ? error.message : "تعذر تنفيذ العملية" }, { status: 409 });
   }
 
 

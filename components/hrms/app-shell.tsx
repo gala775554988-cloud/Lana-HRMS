@@ -1,4 +1,5 @@
 "use client";
+import { FloatingBackButton } from "@/components/ui/floating-back-button";
 
 import { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
@@ -303,7 +304,8 @@ export function AppShell({ children, dictionary }: AppShellProps) {
 
       <main className="hrms-workspace relative min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-background p-4 lg:p-6">
         <nav aria-label="موقعك في النظام" className="lana-workspace-hero mb-5 flex items-center gap-2 rounded-2xl px-5 py-4 text-sm">
-          <span className="text-indigo-200">أنت في</span><span aria-hidden className="text-indigo-200">/</span><strong className="text-white">{visibleNavItems.find(item => isActive(item.href))?.label || "مساحة العمل"}</strong>
+          <span className="opacity-80">أنت في</span><span aria-hidden className="opacity-80">/</span><strong className="font-semibold">{visibleNavItems.find(item => isActive(item.href))?.label || "مساحة العمل"}</strong>
+          <FloatingBackButton />
         </nav>
         {children}
       </main>
