@@ -76,3 +76,7 @@ Do not merge until all acceptance criteria, isolated tests, backup and preview c
 - #17/#14/#8/#25/#26/#29: additive payment-confirmation columns and unique reference; external payment attestation by another approver, frozen source identities, changed-source check, local debt closure and itemized ledger posting in serializable transaction. No bank call. Odoo-origin debt blocks confirmation until reconciled; legacy snapshots need review; manual leave encashment and unpaid wage amounts remain reviewed inputs (no automatic leave balance write-off). Revised/cancelled drafts retain previous snapshots in audit. Payroll blocks settlement after confirmed final settlement; pending payroll blocks final settlement.
 - #23/#30: employee ledger labels and settlement confirmation form.
 - #33: CI 45614957546 passed; new tests and migration pending CI.
+
+## Batch after 780be44
+- #17/#7/#8/#25/#26: final settlement now computes full documented leave balance cash-out, checks pending leave and unchanged source balance and consumes days atomically upon confirmed external payment. Missing structured balance blocks cash-out; no fabricated balance. Odoo loans use exactly reconciled unpaid installment IDs and existing localPaidAt migration reconciliation mechanism; no remote paid flag mutation or external transfer. Approved unpaid settlements can return for reviewed revision, with audit. Production reconciliation still unverified.
+- #33: CI 45615826979 and 45615356147 passed. Added cash-out and Odoo installment reconciliation tests; new CI pending.

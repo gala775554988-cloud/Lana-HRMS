@@ -29,3 +29,15 @@ test("payment attestation requires reviewed sources, amount and reference",()=>{
  assert.equal(api.settlementPaymentInput.safeParse({...base,reviewedSources:false}).success,false);
  assert.equal(api.settlementPaymentInput.safeParse({...base,confirmedAmount:-1}).success,false);
 });
+
+test("leave cash-out is based on documented balance and rounds only the final amount",()=>{
+ const result=api.calculateLeaveEncashment({accrued:30,used:12.5},6000);
+ assert.equal(result.days,17.5);assert.equal(result.amount,3500);
+ assert.equal(api.calculateLeaveEncashment({accrued:10,used:12},6000).amount,0);
+ assert.throws(()=>api.calculateLeaveEncashment(null,6000));
+});
+test("Odoo settlement only consumes unpaid and not locally deducted installments",()=>{
+ const lines=[{id:"a",amount:30,remotePaid:true,localPaidAt:null},{id:"b",amount:20,remotePaid:false,localPaidAt:new Date()},{id:"c",amount:50,remotePaid:false,localPaidAt:null}];
+ assert.equal(api.reconcileOdooSettlementInstallments(50,lines).join(","),"c");
+ assert.throws(()=>api.reconcileOdooSettlementInstallments(70,lines));
+});
