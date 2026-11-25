@@ -46,6 +46,9 @@ jobs:
       - run: npm install
       - run: npx prisma generate
       - run: npx prisma migrate deploy
+      - name: Inspect migration-to-schema differences (no database changes)
+        run: npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --script
+
       - name: Verify application workflows with fixtures
         run: node --experimental-vm-modules --test tests/auth/*.test.mjs tests/attendance/*.test.mjs tests/payroll/*.test.mjs tests/recruitment/*.test.mjs tests/workflows/*.test.mjs tests/odoo-requests/*.test.mjs tests/odoo-migration/*.test.mjs tests/odoo/*.test.mjs
       - name: Verify actual database workflow and payroll settlement
