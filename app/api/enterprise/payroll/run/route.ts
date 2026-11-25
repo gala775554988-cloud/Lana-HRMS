@@ -38,6 +38,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, message: "period, startDate and endDate are required" }, { status: 400 });
   }
 
+  for (const field of ["name", "period", "startDate", "endDate", "periodId", "companyId", "branchId", "departmentId", "costCenterId"] as const) {
+    const value = body[field];
+    if (value !== undefined && (typeof value !== "string" || !value.trim())) {
+      return NextResponse.json({ success: false, message: "قيمة غير صالحة: " + field }, { status: 400 });
+    }
+  }
   const startDate = new Date(body.startDate);
   const endDate = new Date(body.endDate);
   if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || startDate > endDate) {
@@ -50,7 +56,7 @@ export async function POST(request: NextRequest) {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(body.period)) {
     return NextResponse.json({ success: false, message: "صيغة الفترة يجب أن تكون YYYY-MM" }, { status: 400 });
   }
-  if (body.employeeIds !== undefined && (!Array.isArray(body.employeeIds) || !body.employeeIds.every(id => typeof id === "string" && id.trim().length > 0) || new Set(body.employeeIds).size !== body.employeeIds.length)) {
+  if (body.employeeIds !== undefined && (!Array.isArray(body.employeeIds) || body.employeeIds.length === 0 || !body.employeeIds.every(id => typeof id === "string" && id.trim().length > 0) || new Set(body.employeeIds).size !== body.employeeIds.length)) {
     return NextResponse.json({ success: false, message: "قائمة الموظفين غير صالحة أو تحتوي تكرارات" }, { status: 400 });
   }
   if (body.periodId) {
