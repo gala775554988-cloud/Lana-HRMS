@@ -14,30 +14,30 @@ export function resolveRoleDashboard(
   hasGrantedAdminAccess = false
 ): string {
   if (!userRoles || !Array.isArray(userRoles)) return DEFAULT_LOGIN_REDIRECT;
-  const roleSet = new Set(userRoles);
+  const roleSet = new Set(userRoles.map((role) => role.trim().toUpperCase()));
 
   // SUPER_ADMIN is always sent to the Central Executive Dashboard.
   if (roleSet.has("SUPER_ADMIN")) return "/dashboard";
 
-  // Finance-only roles start in the payroll workspace.
-  if (!roleSet.has("HR_MANAGER") && !roleSet.has("HR") &&
-      (roleSet.has("PAYROLL_MANAGER") || roleSet.has("PAYROLL_OFFICER"))) return "/payroll";
+  // Resolve privileged roles before EMPLOYEE. Most staff with an HR or
+  // management role also carry EMPLOYEE for self-service; the reverse order
+  // accidentally sends these users to a portal that requires an Employee row.
+  if (roleSet.has("HR_MANAGER") || roleSet.has("HR") || roleSet.has("RECRUITER")) {
+    return "/hr/dashboard";
+  }
+  if (roleSet.has("PAYROLL_MANAGER") || roleSet.has("PAYROLL_OFFICER")) {
+    return "/payroll";
+  }
+  if (MANAGER_DASHBOARD_ROLES.some((role) => roleSet.has(role))) {
+    return "/manager/dashboard";
+  }
 
-  // Direct per-user grants are intentionally independent of a user's job
-  // role. An EMPLOYEE who was granted access to an HR module must enter the
-  // admin shell, otherwise the role-only redirect strands them in the
-  // employee portal even though their permissions are valid.
+  // Per-user grants are computed from server-authoritative permissions,
+  // never inferred from a username, email, or an unlinked employee profile.
   if (hasGrantedAdminAccess) return "/dashboard";
 
-  // Employees with no additional admin grant stay in the Employee Portal.
-  if (roleSet.has("EMPLOYEE")) return "/employee/dashboard";
-
-  // HR-type roles get the HR Dashboard (company-wide employee/contract/
-  // document/recruitment view); pure manager-type roles get the Manager
-  // Dashboard (their own team's approvals/attendance/reports). A user
-  // holding both lands on the broader HR view.
-  if (userRoles.some((role) => HR_DASHBOARD_ROLES.includes(role))) return "/hr/dashboard";
-  if (userRoles.some((role) => MANAGER_DASHBOARD_ROLES.includes(role))) return "/manager/dashboard";
+  // Self-service is the only default for employees and unknown roles.
+  // Never promote an unknown role to administrator.
   return DEFAULT_LOGIN_REDIRECT;
 }
 
