@@ -81,3 +81,17 @@ test("an approved advance does not book cash until disbursement", async () => {
     effectType: "APPROVAL", direction: "CREDIT", amount: "200.00"
   }), /not evidence of disbursement/);
 });
+
+test("financial summaries preserve cents beyond safe JavaScript integer range", async () => {
+  const db = setup();
+  db.prisma.employeeFinancialEntry.groupBy = async () => [
+    { currency: "SAR", direction: "CREDIT", _sum: { amount: new Prisma.Decimal("9007199254740993.25") } },
+    { currency: "SAR", direction: "DEBIT", _sum: { amount: new Prisma.Decimal("9007199254740993.24") } },
+    { currency: "USD", direction: "CREDIT", _sum: { amount: new Prisma.Decimal("12.30") } }
+  ];
+  const api = await service(db);
+  assert.deepEqual(await api.employeeFinancialSummary("e"), [
+    { currency: "SAR", credits: "9007199254740993.25", debits: "9007199254740993.24", net: "0.01" },
+    { currency: "USD", credits: "12.30", debits: "0.00", net: "12.30" }
+  ]);
+});
