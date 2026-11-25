@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { writeAuditLog } from "@/lib/audit";
+
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,7 +23,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   const { id } = await params;
-  const period = await prisma.payrollPeriod.findUnique({ where: { id }, include: { runs: { select: { id: true, status: true, name: true } } } });
+  try {
+  return await prisma.$transaction(async (tx) => {
+  const period = await tx.payrollPeriod.findUnique({ where: { id }, include: { runs: { select: { id: true, status: true, name: true } } } });
   if (!period) return NextResponse.json({ success: false, message: "Not found" }, { status: 404 });
   if (period.status === "CLOSED") return NextResponse.json({ success: false, message: "الفترة مغلقة بالفعل" }, { status: 409 });
 
@@ -36,18 +38,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }, { status: 409 });
   }
 
-  const updated = await prisma.payrollPeriod.update({
+  const updated = await tx.payrollPeriod.update({
     where: { id },
-    data: { status: "CLOSED", closedAt: new Date(), closedById: session.user.id }
+    data: { status: "CLOSED", closedAt: new Date(), closedById: session.user.id! }
   });
 
-  await writeAuditLog({
-    actorUserId: session.user.id,
+  await tx.auditLog.create({ data: {
+    actorUserId: session.user.id!,
     action: "close",
     entity: "payrollPeriod",
     entityId: id,
     metadata: { runCount: period.runs.length }
-  });
+  } });
 
   return NextResponse.json({ success: true, period: updated });
+  }, { isolationLevel: "Serializable" });
+  } catch (error) {
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "P2034") return NextResponse.json({ success: false, message: "تغيرت الفترة أثناء الإغلاق؛ أعد المحاولة" }, { status: 409 });
+    throw error;
+  }
 }
