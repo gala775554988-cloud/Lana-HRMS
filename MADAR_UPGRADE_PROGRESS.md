@@ -66,3 +66,8 @@ Do not merge until all acceptance criteria, isolated tests, backup and preview c
 - #8/#10/#11/#14/#25: payroll settlement generates itemized ledger postings for basic salary, allowances, bonus, overtime, insurance, absence, late, other deductions and each loan/advance installment. Frozen snapshot reconciliation rejects mismatches before approval/payment. Existing historical aggregate postings are preserved and not duplicated. No bank transfer performed.
 - #15/#23/#29: self-service ledger displays effect type and request type; scoped admin API includes safe request-type metadata, no raw workflow metadata. Payroll detail private no-store.
 - #33: CI 45612836696, 45612503614, 45612390089 and 45611964293 completed successfully. New ledger-breakdown tests pending CI.
+
+## Batch after 5a576e3
+- #17/#29/#32: additive EmployeeFinalSettlement model and migration; HR-only draft and independent approval, persisted calculation snapshot, outstanding active loan/advance calculation, transactional audit and approval timeline. UI at /final-settlements linked from payroll settings. No actual payment, contract closure or debt writeoff. ACT/365 estimate requires HR review; official reference https://www.hrsd.gov.sa/media-center/media/lerightseocontract . Existing records preserved. Cancellation/revision and payment reconciliation need further implementation.
+- #30: payroll page navigation and primary actions changed to green.
+- #33: added final settlement validation and calculation tests; CI pending. 5a576e3 CI was still running at last check.

@@ -330,6 +330,7 @@ model Nationality {
 
 model Employee {
   financialEntries       EmployeeFinancialEntry[]
+  finalSettlements       EmployeeFinalSettlement[]
   requestExecutions      EmployeeRequestExecution[]
   id                     String                  @id @default(cuid())
   employeeNumber         String                  @unique
@@ -2887,4 +2888,23 @@ model EmployeeRequestExecution {
   @@unique([sourceType, sourceId, effectType])
   @@index([employeeId, createdAt])
   @@index([state])
+}
+
+model EmployeeFinalSettlement {
+  id String @id @default(cuid())
+  employeeId String
+  terminationDate DateTime
+  status String @default("DRAFT")
+  currency String @default("SAR")
+  snapshot Json
+  netAmount Decimal @db.Decimal(18,2)
+  createdById String
+  approvedById String?
+  approvedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@unique([employeeId, terminationDate])
+  @@index([status, createdAt])
 }
