@@ -156,6 +156,20 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         if (Number((computation?.value as { errorCount?: number } | null)?.errorCount ?? 0) > 0) throw new Error("توجد أخطاء احتساب غير معالجة؛ أعد احتساب المسير قبل الاعتماد");
         const items = await tx.payrollItem.findMany({ where: { payrollRunId: id } });
         if (!items.length) throw new Error("لا يمكن اعتماد أو صرف مسير فارغ");
+        if (!run.periodStartDate || !run.periodEndDate) throw new Error("الفترة الزمنية للمسير غير محددة");
+        const duplicate = await tx.payrollItem.findFirst({
+          where: {
+            employeeId: { in: items.map(item => item.employeeId) },
+            payrollRun: {
+              id: { not: id },
+              paidAt: { not: null },
+              periodStartDate: { lte: run.periodEndDate },
+              periodEndDate: { gte: run.periodStartDate }
+            }
+          },
+          select: { employeeId: true }
+        });
+        if (duplicate) throw new Error("يوجد موظف سبق صرف راتبه في فترة متداخلة؛ راجع المسير قبل الاعتماد أو الصرف");
         for (const item of items) {
           const snapshot = item.calculationSnapshot as unknown as PayrollBreakdown;
           if (!snapshot || !Number.isFinite(snapshot.netPay) || Math.abs(Number(item.netPay) - snapshot.netPay) > 0.005 || !Array.isArray(snapshot.loanAllocations)) throw new Error("أعد احتساب المسير؛ لقطة الحساب غير مكتملة");
@@ -171,7 +185,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       if (action === "pay") await tx.payrollItem.updateMany({ where: { payrollRunId: id }, data: { payslipIssuedAt: now } });
       await tx.auditLog.create({ data: { actorUserId: session.user.id, action: `payroll_${action}`, entity: "payrollRun", entityId: id, metadata: { from: run.status, to: transition.to, reason: body?.reason ?? null } } });
       return tx.payrollRun.findUniqueOrThrow({ where: { id } });
-    });
+    }, { isolationLevel: "Serializable" });
   } catch (error) {
     return NextResponse.json({ success: false, message: error instanceof Error ? error.message : "تعذر تنفيذ العملية" }, { status: 409 });
   }
