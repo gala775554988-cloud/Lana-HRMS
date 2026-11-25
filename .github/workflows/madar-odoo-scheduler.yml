@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   sync:
-    if: github.ref == 'refs/heads/main' && vars.MADAR_SCHEDULER_ENABLED == 'true'
+    if: false # Temporary release hold: re-enable only after Odoo reconciliation and explicit approval
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:

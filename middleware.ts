@@ -95,6 +95,35 @@ export async function middleware(request: NextRequest) {
     if (!isApi && !isRoot && ((p === "/careers" || p.startsWith("/careers/")) || p.startsWith("/login") || p.startsWith("/forgot-password") || p.startsWith("/reset-password") || p.startsWith("/verify-email"))) {
       return NextResponse.next();
     }
+    // Temporary production release hold: the owner authorized postponing
+    // Odoo reconciliation, not approval of unverified financial data.
+    // Preserve reads, task operations and request intake; block write routes
+    // capable of financial approvals and external synchronization.
+    if (isApi && process.env.MADAR_RELEASE_FINANCE_HOLD === "true") {
+      const mutation = !["GET","HEAD","OPTIONS"].includes(request.method);
+      const scheduled = p.startsWith("/api/integrations/odoo/cron-") ||
+        p === "/api/integrations/queue/process-jobs" ||
+        p === "/api/integrations/automation/cron-alerts" ||
+        p.startsWith("/api/internal/odoo-") ||
+        p === "/api/internal/sync-odoo-documents" ||
+        p === "/api/attendance/odoo-sync" ||
+        p.startsWith("/api/integrations/odoo/sync") ||
+        p.startsWith("/api/integrations/webhooks/odoo");
+      const financialWrite = mutation && (
+        p.startsWith("/api/enterprise/payroll") ||
+        p.startsWith("/api/enterprise/workflows/") ||
+        p.startsWith("/api/enterprise/odoo") ||
+        p.startsWith("/api/enterprise/requests") ||
+        p.startsWith("/api/enterprise/overtime") ||
+        p.startsWith("/api/employee/advances") ||
+        p.startsWith("/api/integrations/") ||
+        p.startsWith("/api/public/") ||
+        p.startsWith("/api/enterprise-erp/")
+      );
+      if (scheduled || financialWrite) return NextResponse.json({
+        success:false,message:"متوقف مؤقتاً لحين مطابقة بيانات Odoo المالية؛ البيانات محفوظة"
+      },{status:423});
+    }
     if (isApi && isPublicApiRoute(p)) {
       return NextResponse.next();
     }
