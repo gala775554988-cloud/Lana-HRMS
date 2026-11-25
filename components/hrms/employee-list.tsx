@@ -51,7 +51,8 @@ interface EmployeeListProps {
 export function EmployeeList({ resource, records, totalCount, page, pageCount, search: initialSearch, filters = {}, pageSize, dictionary, locale, fromHref, filterOptions = {} }: EmployeeListProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const activeTab = (searchParams.get("tab") as TabType) || "all";
+  const [localTab, setLocalTab] = useState<TabType | null>(null);
+  const activeTab = localTab ?? ((["archived", "duplicates", "active"].includes(searchParams.get("tab") || "") ? searchParams.get("tab") : "all") as TabType);
   const [viewMode, setViewMode] = useState<ViewMode>("card");
   const [search, setSearch] = useState(initialSearch);
   const deferredSearch = useDeferredValue(search);
@@ -106,6 +107,9 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
   }, [filters, pageSize, search, searchParams]);
 
   const switchTab = useCallback((tab: TabType) => {
+    setLocalTab(tab);
+    if (tab === "archived" || tab === "duplicates") return;
+    router.refresh();
     // Immediate UI feedback
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", tab);
@@ -324,8 +328,6 @@ export function EmployeeList({ resource, records, totalCount, page, pageCount, s
                         <option value="">{isAr ? "نشط / غير نشط" : "Any status"}</option>
                         <option value="ACTIVE">{isAr ? "نشط" : "Active"}</option>
                         <option value="ON_LEAVE">{isAr ? "في إجازة" : "On leave"}</option>
-                        <option value="TERMINATED">{isAr ? "منتهي الخدمة" : "Terminated"}</option>
-                        <option value="INACTIVE">{isAr ? "غير نشط" : "Inactive"}</option>
                       </select>
                     ) : (
                       <>
