@@ -132,5 +132,5 @@ export async function POST(request: NextRequest) {
     metadata: { period: body.period, employeeCount, errors: errorCount }
   });
 
-  return NextResponse.json({ success: true, run, computed: items.length, errors: errorCount, items });
+  return NextResponse.json({ success: errorCount === 0 && employeeCount > 0, run, computed: errorCount ? 0 : items.length, errors: errorCount, items, ...(errorCount || !employeeCount ? { message: "لم يكتمل احتساب المسير؛ راجع الموظفين والأخطاء قبل الاعتماد" } : {}) }, { status: errorCount || !employeeCount ? 422 : 200 });
 }
