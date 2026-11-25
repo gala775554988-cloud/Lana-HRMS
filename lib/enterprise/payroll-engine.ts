@@ -1,4 +1,4 @@
-import { calculateGosi, resolveGosiCohort, advanceSchedule, calculateLeavePayroll, saudiCalendarDay } from "@/lib/payroll/calculations";
+import { calculateGosi, resolveGosiCohort, advanceSchedule, calculateLeavePayroll, saudiCalendarDay, resolveNonSaudiGosiCohort } from "@/lib/payroll/calculations";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeSalaryProfile } from "@/lib/employee/salary-profile-store";
 import { calculateNetSalary } from "@/lib/employee/salary-profile";
@@ -171,8 +171,7 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
   const cutoffs = [...new Set(policies.map(policy => policy.newSystemCutoff?.toISOString()).filter((value): value is string => Boolean(value)))];
   if (cutoffs.length > 1) throw new Error("تواريخ فصل نظام التأمينات متعارضة؛ راجع السياسات");
   const cutoff = cutoffs.length ? new Date(cutoffs[0]) : null;
-  const cohort = saudi && active ? resolveGosiCohort(socialInsurance?.coverageCohort ?? null, socialInsurance?.firstCoverageDate ?? null, cutoff) : active ? socialInsurance?.coverageCohort ?? "" : "";
-  if(active && !saudi && cohort!=="NON_SAUDI_HAZARDS")throw Error("حدد شريحة الأخطار المهنية لغير السعودي بعد التحقق من عدم خضوعه لنظام خليجي خاص");
+  const cohort = saudi && active ? resolveGosiCohort(socialInsurance?.coverageCohort ?? null, socialInsurance?.firstCoverageDate ?? null, cutoff) : active ? resolveNonSaudiGosiCohort(employee.nationality?.code??"",socialInsurance?.coverageCohort??null) : "";
   if(active && socialInsurance?.currency!==currency)throw Error("عملة أجر التأمينات لا تطابق الراتب");
   const gosi = calculateGosi({ saudi, active, cohort, asOf: periodEnd, basic: baseSalary,
     ...(active && Number(socialInsurance?.subjectWage)>0?{registeredWage:Number(socialInsurance?.subjectWage)}:{}),

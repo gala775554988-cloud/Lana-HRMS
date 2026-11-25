@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { canManagePayroll, canApprovePayroll } from "@/lib/enterprise/payroll-permissions";
-import { calculateEosb, calculateFinalSettlement, standardSaudiGosiSchedule } from "@/lib/payroll/calculations";
+import { calculateEosb, calculateFinalSettlement, standardSaudiGosiSchedule, gccGosiCohorts } from "@/lib/payroll/calculations";
 import { accountingMappingSchema } from "@/lib/payroll/journal";
 import { z } from "zod";
 const policySchema = z.object({ cohort: z.string().regex(/^[A-Z_]{2,30}$/), effectiveFrom: z.coerce.date(), effectiveTo: z.coerce.date().nullable(), employeeRate: z.number().min(0).max(100), employerRate: z.number().min(0).max(100), minimumWage: z.number().nonnegative(), maximumWage: z.number().positive(), housingIncluded: z.boolean(), newSystemCutoff: z.coerce.date().nullable() }).strict();
@@ -74,13 +74,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     }
     if (body.action !== "policy") throw new Error("إجراء غير صالح");
-    const data = policySchema.parse(body.data);
+    const {sourceReference,reviewed,...rawPolicy}=body.data??{};
+    const data = policySchema.parse(rawPolicy);
+    if(gccGosiCohorts.some(cohort=>cohort===data.cohort)){
+      if(reviewed!==true || typeof sourceReference!=="string" || sourceReference.trim().length<10 || sourceReference.length>1000)throw Error("وثق مرجع مؤسسة التأمينات في دولة الموطن والنسب والسقف المعتمد للمنشأة قبل الحفظ");
+    }
     if (data.maximumWage < data.minimumWage || (data.effectiveTo && data.effectiveTo < data.effectiveFrom)) throw new Error("تحقق من حدود الأجر والتواريخ");
     await prisma.$transaction(async tx => {
       const overlap = await tx.gosiSetting.findFirst({ where: { cohort: data.cohort, effectiveFrom: { lte: data.effectiveTo ?? new Date("9999-12-31") }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: data.effectiveFrom } }] } });
       if (overlap) throw new Error("توجد سياسة متداخلة؛ حدد فترة غير متداخلة");
       const policy = await tx.gosiSetting.create({ data });
-      await tx.auditLog.create({ data: { actorUserId: session.user.id, action: "payroll:gosi-policy", entity: "gosiSetting", entityId: policy.id, metadata: { cohort: data.cohort, employeeRate: data.employeeRate, employerRate: data.employerRate } } });
+      await tx.auditLog.create({ data: { actorUserId: session.user.id, action: "payroll:gosi-policy", entity: "gosiSetting", entityId: policy.id, metadata: { cohort: data.cohort, employeeRate: data.employeeRate, employerRate: data.employerRate, ...(typeof sourceReference==="string"?{sourceReference:sourceReference.slice(0,1000)}:{}) } } });
     }, { isolationLevel: "Serializable" });
     return NextResponse.json({ success: true });
   } catch (error) { return NextResponse.json({ success: false, message: error instanceof z.ZodError ? "بيانات غير صالحة" : error instanceof Error ? error.message : "تعذر الحفظ" }, { status: 400 }); }

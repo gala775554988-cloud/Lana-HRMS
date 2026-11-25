@@ -102,3 +102,12 @@ test("sick leave tiers carry across payroll periods and unpaid days are not dupl
  const result=api.calculateLeavePayroll(new Date("2026-02-01"),new Date("2026-02-28"),[sick,unpaid],6000);
  assert.equal(result.sickQuarterDays,9);assert.equal(result.unpaidDays,2);assert.equal(result.deduction,850);assert.equal(result.coveredDays.length,11);
 });
+
+test("GCC coverage must match nationality and use registered wage with a reviewed policy",()=>{
+ const cohort=api.resolveNonSaudiGosiCohort("OMN","GCC_OM");assert.equal(cohort,"GCC_OM");
+ assert.throws(()=>api.resolveNonSaudiGosiCohort("OM","GCC_QA"));
+ const gcc={...policy,cohort:"GCC_OM",employeeRate:7,employerRate:9};
+ assert.throws(()=>api.calculateGosi({...input,saudi:false,cohort,policies:[gcc]}));
+ const result=api.calculateGosi({...input,saudi:false,cohort,registeredWage:8000,policies:[gcc]});
+ assert.equal(result.employeeAmount,560);assert.equal(result.employerAmount,720);
+});

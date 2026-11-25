@@ -3,10 +3,19 @@ export function money(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 export type GosiPolicyInput = { id: string; cohort: string; effectiveFrom: Date; effectiveTo?: Date | null; employeeRate: number; employerRate: number; minimumWage: number; maximumWage: number; housingIncluded: boolean };
+export const gccGosiCohorts = ["GCC_AE","GCC_BH","GCC_KW","GCC_OM","GCC_QA"] as const;
+export function resolveNonSaudiGosiCohort(nationality:string,cohort:string|null) {
+ const aliases:Record<string,string>={AE:"AE",ARE:"AE",BH:"BH",BHR:"BH",KW:"KW",KWT:"KW",OM:"OM",OMN:"OM",QA:"QA",QAT:"QA"};
+ const country=aliases[nationality.toUpperCase()];
+ if(country){if(cohort!=="GCC_"+country && cohort!=="NON_SAUDI_HAZARDS")throw Error("حدد التغطية الخليجية المطابقة لجنسية الموظف أو وثق عدم انطباقها");return cohort;}
+ if(cohort!=="NON_SAUDI_HAZARDS")throw Error("حدد شريحة الأخطار المهنية لغير السعودي");
+ return cohort;
+}
 export function calculateGosi(input: { saudi: boolean; active: boolean; cohort: string; asOf: Date; basic: number; housing: number; registeredWage?: number; policies: GosiPolicyInput[] }) {
-  if ((!input.saudi && input.cohort !== "NON_SAUDI_HAZARDS") || !input.active) return { applicable: false, subjectWage: 0, employeeRate: null, employerRate: null, employeeAmount: 0, employerAmount: 0, policyId: null };
+  if ((!input.saudi && input.cohort !== "NON_SAUDI_HAZARDS" && !gccGosiCohorts.some(cohort=>cohort===input.cohort)) || !input.active) return { applicable: false, subjectWage: 0, employeeRate: null, employerRate: null, employeeAmount: 0, employerAmount: 0, policyId: null };
   if (![input.basic, input.housing].every(value => Number.isFinite(value) && value >= 0)) throw new Error("أجر التأمينات غير صالح");
   if(input.registeredWage!==undefined && (!Number.isFinite(input.registeredWage)||input.registeredWage<=0)) throw Error("الأجر المسجل في التأمينات غير صالح");
+  if(gccGosiCohorts.some(cohort=>cohort===input.cohort) && (input.saudi || input.registeredWage===undefined))throw Error("التغطية الخليجية تتطلب أجراً مسجلاً وسياسة معتمدة لدولة الموطن");
   const candidates = input.policies.filter(policy => policy.cohort === input.cohort && policy.effectiveFrom <= input.asOf && (!policy.effectiveTo || policy.effectiveTo >= input.asOf));
   if (candidates.length !== 1) throw new Error("يجب تحديد سياسة تأمينات واحدة سارية لشريحة الموظف");
   const policy = candidates[0];
