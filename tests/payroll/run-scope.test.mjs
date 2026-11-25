@@ -43,3 +43,17 @@ test('settlement checks previously paid overlapping runs', () => {
   assert.ok(detail.includes('periodEndDate: { gte: run.periodStartDate }'));
   assert.ok(detail.includes('isolationLevel: "Serializable"'));
 });
+
+const engine = await readFile(new URL('../../lib/enterprise/payroll-engine.ts', import.meta.url), 'utf8');
+test('failed calculations are not reported as successful', () => {
+  for (const source of [route, detail]) {
+    assert.ok(source.includes('success: errorCount === 0 && employeeCount > 0'));
+    assert.ok(source.includes('status: errorCount || !employeeCount ? 422 : 200'));
+  }
+});
+test('local payroll requires complete calculation and preserves drafts on errors', () => {
+  assert.ok(detail.includes('summary.employeeCount !== items.length'));
+  assert.ok(engine.includes('if (errorCount) return'));
+  assert.ok(engine.includes('!Number.isFinite(breakdown[field])'));
+  assert.ok(engine.includes('!matchedIds.has(employeeId)'));
+});
