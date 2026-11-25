@@ -329,3 +329,20 @@
 }
 
 .request-dialog { animation: none; }
+
+/* Requests header: explicit readable foregrounds on the soft apple surface. */
+.lana-workspace-hero.approvals-hero {
+  background: linear-gradient(115deg, #f4f8ee, #e5efd7);
+  color: #244536;
+  border: 1px solid #cfdfc1;
+}
+.approvals-hero .approvals-hero-eyebrow { color: #46633c; }
+.approvals-hero .approvals-hero-description { color: #405647; }
+.approvals-hero .approvals-hero-action { color: #fff; background: #2f5743; border: 1px solid #2f5743; transition: background-color 160ms ease; }
+.approvals-hero .approvals-hero-action:hover { background: #234635; }
+.approvals-hero .approvals-hero-action:focus-visible { outline: 2px solid #456a37; outline-offset: 3px; }
+.dark .lana-workspace-hero.approvals-hero { background: #293e30; color: #f1f6eb; border-color: #526a48; }
+.dark .approvals-hero .approvals-hero-eyebrow { color: #c6e2a8; }
+.dark .approvals-hero .approvals-hero-description { color: #d9e6d3; }
+.dark .approvals-hero .approvals-hero-action { background: #c6e2a8; border-color: #c6e2a8; color: #233d2d; }
+.dark .approvals-hero .approvals-hero-action:hover { background: #d8edc0; }

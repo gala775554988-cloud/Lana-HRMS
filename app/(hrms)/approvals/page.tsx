@@ -25,11 +25,11 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
   const canConfigure = Boolean(session?.user && canManageApprovalRouting(session.user.roles, session.user.permissions));
   return (
     <div className="space-y-5" dir="rtl">
-      <header className="lana-workspace-hero rounded-3xl p-6 sm:p-9">
-        <p className="text-sm font-semibold text-indigo-200">مساحة المسؤول في Lana</p>
-        <h1 className="mt-2 text-3xl sm:text-4xl">الطلبات والموافقات</h1>
-        <p className="mt-3 text-sm text-slate-200">وارد الموظفين للمراجعة، والطلبات المرسلة لأودو لمتابعة التنفيذ، والمزامنة لإدارة الاتصال والاستيراد.</p>
-        <Link href="/approvals?tab=new" className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-white px-5 text-sm font-bold text-primary">تقديم طلب جديد</Link>
+      <header className="lana-workspace-hero approvals-hero rounded-2xl p-5 sm:p-7">
+        <p className="approvals-hero-eyebrow text-sm font-semibold">مساحة المسؤول في مدار HR</p>
+        <h1 className="mt-2 text-2xl font-bold leading-tight sm:text-3xl">الطلبات والموافقات</h1>
+        <p className="approvals-hero-description mt-3 max-w-3xl text-sm leading-7 sm:text-base">وارد الموظفين للمراجعة، والطلبات المرسلة لأودو لمتابعة التنفيذ، والمزامنة لإدارة الاتصال والاستيراد.</p>
+        <Link href="/approvals?tab=new" className="approvals-hero-action mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl px-5 text-sm font-semibold">تقديم طلب جديد</Link>
       </header>
       <MergedModuleTabs
         defaultValue="center"
