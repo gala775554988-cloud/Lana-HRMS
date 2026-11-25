@@ -59,3 +59,19 @@ test('bank review rejects duplicate employee rows and whitespace-prefixed formul
   assert.throws(() => api.buildBankReviewCsv([row, {...row}]));
   assert.throws(() => api.buildBankReviewCsv([{...row, employeeNumber: '  =1+1'}]));
 });
+
+test("advance final installment clears both upward and downward rounding", () => {
+  for (const [amount, monthlyDeduction, installments, expected] of [[100,33.33,3,[33.33,33.33,33.34]], [100,16.67,6,[16.67,16.67,16.67,16.67,16.67,16.65]], [0.01,0.01,1,[0.01]]]) {
+    const amounts = expected.map((_,paidInstallments) => api.advanceSchedule({amount,monthlyDeduction,installments,paidInstallments}).next);
+    assert.deepEqual(amounts,expected);
+    assert.equal(Math.round(amounts.reduce((a,b)=>a+b,0)*100),Math.round(amount*100));
+    assert.equal(api.advanceSchedule({amount,monthlyDeduction,installments,paidInstallments:installments}).next,0);
+  }
+});
+test("advance stops once principal is reached and rejects inconsistent counts", () => {
+  const input={amount:0.03,monthlyDeduction:0.02,installments:3,paidInstallments:1};
+  assert.equal(api.advanceSchedule(input).next,0.01);
+  assert.equal(api.advanceSchedule(input).completeAfterNext,true);
+  assert.equal(api.advanceSchedule({...input,paidInstallments:2}).next,0);
+  assert.throws(()=>api.advanceSchedule({...input,paidInstallments:4}));
+});

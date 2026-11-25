@@ -60,3 +60,20 @@ export function calculateFinalSettlement(input: { eosb: number; unpaidSalary: nu
   const deductions = money(input.deductions + input.outstandingLoans);
   return { entitlements, deductions, netSettlement: money(entitlements - deductions), requiresHrReview: true };
 }
+
+/** Calculate the scheduled balance in integer halalas. Prior installments are
+ * assumed to have used the stored monthly amount; the last one absorbs rounding.
+ * Previously closed records are not reopened automatically. */
+export function advanceSchedule(input: { amount: number; monthlyDeduction: number; installments: number; paidInstallments: number }) {
+  const { amount, monthlyDeduction, installments, paidInstallments } = input;
+  const principal = Math.round(amount * 100), monthly = Math.round(monthlyDeduction * 100);
+  if (!Number.isSafeInteger(principal) || principal <= 0 || !Number.isSafeInteger(monthly) || monthly <= 0 ||
+      !Number.isSafeInteger(installments) || installments < 1 || !Number.isSafeInteger(paidInstallments) || paidInstallments < 0 || paidInstallments > installments) {
+    throw new Error("بيانات أقساط السلفة غير صالحة");
+  }
+  // Avoid multiplication overflow for large installment counts.
+  const paidBeforeFinal = Math.min(paidInstallments, installments - 1, Math.ceil(principal / monthly));
+  const remaining = paidInstallments === installments ? 0 : Math.max(0, principal - paidBeforeFinal * monthly);
+  const next = paidInstallments === installments - 1 ? remaining : Math.min(monthly, remaining);
+  return { remaining: remaining / 100, next: next / 100, completeAfterNext: next === remaining };
+}

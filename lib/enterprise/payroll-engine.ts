@@ -1,4 +1,4 @@
-import { calculateGosi, resolveGosiCohort } from "@/lib/payroll/calculations";
+import { calculateGosi, resolveGosiCohort, advanceSchedule } from "@/lib/payroll/calculations";
 import { prisma } from "@/lib/prisma";
 import { getEmployeeSalaryProfile } from "@/lib/employee/salary-profile-store";
 import { calculateNetSalary } from "@/lib/employee/salary-profile";
@@ -184,13 +184,11 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
   }).filter(row => row.amount > 0);
   const loanDeduction = round2(loanAllocations.reduce((sum, row) => sum + row.amount, 0));
 
-  const advanceDeduction = round2(
-    advances.reduce((sum, adv) => {
-      const remaining = Number(adv.amount) - Number(adv.monthlyDeduction) * adv.paidInstallments;
-      if (remaining <= 0 || adv.paidInstallments >= adv.installments) return sum;
-      return sum + Math.min(Number(adv.monthlyDeduction), remaining);
-    }, 0)
-  );
+  const advanceAllocations = advances.map(adv => ({
+    id: adv.id, paidInstallments: adv.paidInstallments,
+    amount: advanceSchedule({ amount: Number(adv.amount), monthlyDeduction: Number(adv.monthlyDeduction), installments: adv.installments, paidInstallments: adv.paidInstallments }).next,
+  })).filter(row => row.amount > 0);
+  const advanceDeduction = round2(advanceAllocations.reduce((sum, row) => sum + row.amount, 0));
 
   const dailyRate = baseSalary > 0 ? baseSalary / 30 : 0;
   const absenceDays = attendance.filter((a) => a.status === "ABSENT").length + attendance.filter((a) => a.status === "HALF_DAY").length * 0.5;
@@ -247,7 +245,7 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
       { code: "ADVANCE", name: "أقساط السلف", kind: "DEDUCTION", amount: advanceDeduction },
     ].filter(row => row.amount !== 0),
     loanAllocations,
-    advanceAllocations: advances.filter(row => row.paidInstallments < row.installments).map(row => ({ id: row.id, amount: round2(Math.min(Number(row.monthlyDeduction), Number(row.amount) - Number(row.monthlyDeduction) * row.paidInstallments)), paidInstallments: row.paidInstallments })).filter(row => row.amount > 0),
+    advanceAllocations,
   };
 }
 

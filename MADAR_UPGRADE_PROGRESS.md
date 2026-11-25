@@ -48,3 +48,7 @@ Do not merge until all acceptance criteria, isolated tests, backup and preview c
 - #5: migration retry now counts source read failures, transactionally reconciles counters/audit, and both retry endpoints verify persisted resolution. Actual production errors remain unverified.
 - #14/#23/#30: employee salary page displays session-scoped ledger, exact decimal totals, pagination and recent execution events; no payment action. API private no-store. Historical backfill not yet implemented.
 - #33: exact decimal regression normalizes VM realm values; payroll command includes all payroll unit tests. CI pending for this batch.
+
+## Batch after a43b2d67
+- #8/#10/#11/#14: shared advanceSchedule integer-halalas calculation in payroll engine, settlement and employee salary display. Last installment absorbs rounding; paid advances stop; frozen amount changes require recomputation. Existing closed records are not reopened. Disbursement approval separation still pending.
+- #33: added final-installment regression tests. Prior CI 45611964293 passed fixture and export stages; full build not yet confirmed.

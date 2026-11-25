@@ -1,6 +1,6 @@
 import type { prisma } from "@/lib/prisma";
 import type { PayrollBreakdown } from "@/lib/enterprise/payroll-engine";
-import { money } from "./calculations";
+import { money, advanceSchedule } from "./calculations";
 type Transaction = Omit<typeof prisma, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 export async function consumeApprovedPayroll(tx: Transaction, snapshot: PayrollBreakdown, employeeId: string, now: Date) {
   if (!snapshot || !Array.isArray(snapshot.loanAllocations) || !Array.isArray(snapshot.advanceAllocations) || !Array.isArray(snapshot.overtimeRequestIds) || !Array.isArray(snapshot.bonusIds)) throw new Error("أعد احتساب المسير قبل اعتماده؛ لقطة المصادر مفقودة");
@@ -30,9 +30,11 @@ export async function consumeApprovedPayroll(tx: Transaction, snapshot: PayrollB
   }
   for (const row of snapshot.advanceAllocations) {
     const advance = await tx.employeeSalaryAdvance.findUnique({ where: { id: row.id } });
-    if (!advance || advance.employeeId !== employeeId || advance.status !== "APPROVED" || advance.paidInstallments !== row.paidInstallments || row.amount <= 0 || money(Math.min(Number(advance.monthlyDeduction), Number(advance.amount) - Number(advance.monthlyDeduction) * advance.paidInstallments)) !== row.amount) throw new Error("تغير قسط السلفة بعد الاعتماد");
+    if (!advance || advance.employeeId !== employeeId || advance.status !== "APPROVED" || advance.paidInstallments !== row.paidInstallments || row.amount <= 0) throw new Error("تغير قسط السلفة بعد الاعتماد");
+    const schedule = advanceSchedule({ amount: Number(advance.amount), monthlyDeduction: Number(advance.monthlyDeduction), installments: advance.installments, paidInstallments: advance.paidInstallments });
+    if (schedule.next !== row.amount) throw new Error("تغير قسط السلفة بعد الاعتماد؛ أعد احتساب المسير");
     const paid = advance.paidInstallments + 1;
-    const changed = await tx.employeeSalaryAdvance.updateMany({ where: { id: row.id, paidInstallments: row.paidInstallments, status: "APPROVED" }, data: { paidInstallments: paid, status: paid >= advance.installments || money(Number(advance.amount) - Number(advance.monthlyDeduction) * paid) <= 0 ? "PAID" : "APPROVED" } });
+    const changed = await tx.employeeSalaryAdvance.updateMany({ where: { id: row.id, employeeId, paidInstallments: row.paidInstallments, status: "APPROVED", amount: advance.amount, monthlyDeduction: advance.monthlyDeduction, installments: advance.installments }, data: { paidInstallments: paid, status: schedule.completeAfterNext ? "PAID" : "APPROVED" } });
     if (changed.count !== 1) throw new Error("تغيرت السلفة أثناء الصرف");
   }
 }
