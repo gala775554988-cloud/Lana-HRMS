@@ -18,11 +18,21 @@ test('edits reject mass assignment, reversed/invalid dates and invalid money; le
   const loan = lifecycle.parseRequestEdit('LOAN', { principalAmount: 1200, notes: '' });
   assert.equal(loan.outstandingAmount, 1200); assert.equal(loan.installmentAmount, 100);
 });
-function cancellation({ type = 'LEAVE', status = 'APPROVED', code = 'ANNUAL', payroll = false } = {}) {
-  let used = 5; let changed = false;
+function cancellation({ type = 'LEAVE', status = 'APPROVED', code = 'ANNUAL', payroll = false, paidPeriod = false, finalPaid = false } = {}) {
+  let used = 5; let changed = false; const checks=[];
   const model = { findUnique: async () => ({ id: 'r', employeeId: 'e', status, includedInPayrollAt: payroll ? new Date() : null }), updateMany: async () => { if (changed) return { count: 0 }; changed = true; status = 'CANCELLED'; return { count: 1 }; } };
-  const tx = { leaveRequest: { ...model, findUniqueOrThrow: async () => ({ days: 3, leaveType: { code } }) }, overtimeRequest: model, loan: model, employeeLeaveBalance: { updateMany: async () => { used -= 3; } } };
-  return { cancel: () => lifecycle.cancelEntity(tx, { id: 'w', type, entityId: 'r', employeeId: 'e' }, true), used: () => used };
+  const tx = {
+    leaveRequest: { ...model, findUniqueOrThrow: async () => ({ days: 3, startDate:new Date("2026-11-01"), endDate:new Date("2026-11-03"), leaveType: { code } }) },
+    overtimeRequest: model, loan: model,
+    payrollItem:{findFirst:async args=>{checks.push(args.where);return paidPeriod?{id:"paid-run"}:null;}},
+    employeeFinalSettlement:{findFirst:async args=>{checks.push(args.where);return finalPaid?{id:"paid-settlement"}:null;}},
+    employeeLeaveBalance: { updateMany: async ({where,data}) => {
+      assert.equal(where.employeeId,"e");
+      if(used<Number(where.used.gte))return {count:0};
+      used-=data.used.decrement;return {count:1};
+    } }
+  };
+  return { cancel: () => lifecycle.cancelEntity(tx, { id: 'w', type, entityId: 'r', employeeId: 'e' }, true), used: () => used, status:()=>status, checks };
 }
 test('approved revocation credits annual balance once; sick leave does not credit annual balance', async () => {
   const annual = cancellation(); await annual.cancel(); assert.equal(annual.used(), 2); await assert.rejects(annual.cancel()); assert.equal(annual.used(), 2);
@@ -31,4 +41,9 @@ test('approved revocation credits annual balance once; sick leave does not credi
 test('financially settled overtime and active loans cannot be silently reversed', async () => {
   await assert.rejects(cancellation({ type: 'OVERTIME', payroll: true }).cancel(), /الرواتب/);
   await assert.rejects(cancellation({ type: 'LOAN', status: 'ACTIVE' }).cancel(), /تسوية/);
+});
+
+test("paid payroll periods and paid final settlements block revocation before changing leave or balance",async()=>{
+  const paid=cancellation({paidPeriod:true}); await assert.rejects(paid.cancel(),/مسير مصروف/);assert.equal(paid.used(),5);assert.equal(paid.status(),"APPROVED");assert.equal(paid.checks[0].employeeId,"e");assert.equal(paid.checks[0].payrollRun.paidAt.not,null);assert.equal(paid.checks[0].payrollRun.periodStartDate.lte.toISOString(),"2026-11-03T00:00:00.000Z");
+  const final=cancellation({finalPaid:true});await assert.rejects(final.cancel(),/مخالصة نهائية/);assert.equal(final.used(),5);assert.equal(final.status(),"APPROVED");assert.equal(final.checks[1].status,"PAID");
 });
