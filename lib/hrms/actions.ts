@@ -296,7 +296,7 @@ export async function listModuleRecords(input: QueryInput) {
 
   if (resource.key === "employees") {
     const filters = input.filters ?? {};
-    const employeeAnd: Record<string, unknown>[] = [];
+    const employeeAnd: Record<string, unknown>[] = [{ status: { notIn: ["INACTIVE", "TERMINATED"] }, archivedAt: null, terminationDate: null }];
     const relationContains = (relation: string, field: string, value?: string) => {
       if (value) employeeAnd.push({ [relation]: { [field]: { contains: value, mode: "insensitive" } } });
     };

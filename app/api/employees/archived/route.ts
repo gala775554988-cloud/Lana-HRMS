@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
 
     const validSortFields = ["firstName", "lastName", "employeeNumber", "hireDate", "terminationDate", "lastActiveDate", "archivedAt", "createdAt", "updatedAt"];
     const orderByField = validSortFields.includes(sortBy) ? sortBy : "archivedAt";
-    const orderBy = { [orderByField]: sortOrder };
+    const orderBy = [{ [orderByField]: sortOrder }, { id: "asc" as const }];
 
     const [records, total] = await Promise.all([
       prisma.employee.findMany({
@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
     ]);
 
     // Calculate lastActiveDate if not present - try to get from attendance/leave (bulk, not per-row)
-    const missingIds = records
+    const missingIds = (searchParams.get("summary") === "1" ? [] : records)
       .filter((emp: any) => !emp.lastActiveDate && (emp.status === "INACTIVE" || emp.status === "TERMINATED" || emp.archivedAt))
       .map((emp: any) => emp.id);
 

@@ -16,16 +16,22 @@ interface ArchivedEmployee {
 export function ArchivedEmployees() {
   const [employees, setEmployees] = useState<ArchivedEmployee[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pageCount, setPageCount] = useState(1);
+  const [error, setError] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setError(false);
     try {
-      const res = await fetch("/api/employees/archived?pageSize=500");
+      const res = await fetch(`/api/employees/archived?pageSize=24&page=${page}&summary=1`);
       const json = await res.json();
-      if (json.success) setEmployees(json.records || []);
-    } catch { /* silent */ }
+      if (!res.ok || !json.success) throw new Error("Archive fetch failed");
+      setEmployees(json.records || []);
+      setPageCount(json.pageCount || 1);
+    } catch { setError(true); }
     finally { setLoading(false); }
-  }, []);
+  }, [page]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -36,7 +42,7 @@ export function ArchivedEmployees() {
         body: JSON.stringify({ employeeId: id, unarchive: true }),
       });
       const data = await res.json();
-      if (data.success) setEmployees(prev => prev.filter(e => e.id !== id));
+      if (data.success) { if (employees.length === 1 && page > 1) setPage(page - 1); else await fetchData(); }
       else alert(data.message);
     } catch { alert("خطأ"); }
   };
@@ -49,6 +55,8 @@ export function ArchivedEmployees() {
     </div>
   );
 
+  if (error) return <Button onClick={fetchData}>تعذر التحميل، إعادة المحاولة</Button>;
+
   if (!employees.length) return (
     <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
       <Archive className="h-12 w-12 mb-3 opacity-40" />
@@ -57,7 +65,7 @@ export function ArchivedEmployees() {
   );
 
   return (
-    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="space-y-4"><div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {employees.map((emp) => (
         <Card key={emp.id} className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 shadow-sm hover:shadow-md transition-all dark:border-slate-800 dark:bg-slate-900/85">
           <CardContent className="p-4">
@@ -86,6 +94,6 @@ export function ArchivedEmployees() {
           </CardContent>
         </Card>
       ))}
-    </div>
+    </div><div className="flex items-center justify-center gap-3"><Button disabled={page <= 1} onClick={() => setPage(p => p - 1)}>السابق</Button><span>{page} / {pageCount}</span><Button disabled={page >= pageCount} onClick={() => setPage(p => p + 1)}>التالي</Button></div></div>
   );
 }

@@ -22,8 +22,8 @@ export const fetchCache = "default-no-store";
 type Query = Record<string, string | string[] | undefined>;
 
 const getCachedEmployeeTotal = unstable_cache(
-  async () => prisma.employee.count({ where: { status: { not: "INACTIVE" } } }).catch(() => 0),
-  ["employees-active-total-count-v1"],
+  async () => prisma.employee.count({ where: { status: { notIn: ["INACTIVE", "TERMINATED"] }, archivedAt: null, terminationDate: null } }).catch(() => 0),
+  ["employees-active-total-count-v2"],
   { revalidate: 60 }
 );
 
@@ -38,7 +38,7 @@ const getEmployeeFilterOptions = unstable_cache(
       prisma.position.findMany({ where: { isActive: true }, select: { title: true }, orderBy: { title: "asc" }, take: 1000 }),
       prisma.nationality.findMany({ where: { isActive: true }, select: { name: true }, orderBy: { name: "asc" }, take: 1000 }),
       prisma.employmentType.findMany({ where: { isActive: true }, select: { name: true }, orderBy: { name: "asc" }, take: 1000 }),
-      prisma.employee.findMany({ where: { status: { not: "INACTIVE" } }, select: { id: true, employeeNumber: true, firstName: true, lastName: true }, orderBy: [{ firstName: "asc" }, { lastName: "asc" }], take: 1000 }),
+      prisma.employee.findMany({ where: { status: { notIn: ["INACTIVE", "TERMINATED"] }, archivedAt: null, terminationDate: null }, select: { id: true, employeeNumber: true, firstName: true, lastName: true }, orderBy: [{ firstName: "asc" }, { lastName: "asc" }], take: 1000 }),
     ]);
     const named = (rows: Array<{ name: string }>) => rows.map(({ name }) => ({ value: name, label: name }));
     return {
@@ -52,7 +52,7 @@ const getEmployeeFilterOptions = unstable_cache(
       manager: managers.map((manager) => ({ value: manager.id, label: `${manager.firstName} ${manager.lastName} · ${manager.employeeNumber}` })),
     };
   },
-  ["employee-filter-options-v1"],
+  ["employee-filter-options-v2"],
   { revalidate: 300 }
 );
 
@@ -83,7 +83,7 @@ function buildFastEmployeeWhere(query: Query) {
     status: one(query.status)?.trim(),
   };
 
-  const and: Record<string, unknown>[] = [];
+  const and: Record<string, unknown>[] = [{ status: { notIn: ["INACTIVE", "TERMINATED"] }, archivedAt: null, terminationDate: null }];
   if (search) {
     and.push({
       OR: [
@@ -98,7 +98,7 @@ function buildFastEmployeeWhere(query: Query) {
   }
   if (tab === "active") and.push({ status: "ACTIVE" });
   else if (filters.status) and.push({ status: filters.status });
-  else and.push({ status: { not: "INACTIVE" } });
+  
 
   const hospitalParam = one(query.hospitalId)?.trim() || filters.hospital;
   if (hospitalParam) {
@@ -194,9 +194,7 @@ async function getFastEmployees(query: Query) {
     },
   });
 
-  const total = built.hasAnyFilter || page > 1
-    ? await prisma.employee.count({ where: built.where }).catch(() => records.length)
-    : await getCachedEmployeeTotal();
+  const total = await prisma.employee.count({ where: built.where });
 
   return {
     records: records.map(serializeEmployee),
@@ -239,7 +237,8 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
   const roles = (session.user.roles as string[] | undefined) ?? [];
   const canUseFastPath = roles.includes("SUPER_ADMIN") || roles.includes("HR_MANAGER");
   const isSuperAdmin = roles.includes("SUPER_ADMIN");
-  const activeTab = one(query.tab) ?? "directory";
+  const requestedTab = one(query.tab);
+  const activeTab = requestedTab === "hierarchy" || requestedTab === "my-team" ? requestedTab : "directory";
   const hospitalFilterId = one(query.hospitalId)?.trim() || one(query.hospital)?.trim();
   const hospitalName = hospitalFilterId ? (await prisma.hospital.findUnique({ where: { id: hospitalFilterId } }).catch(() => null))?.name || hospitalFilterId : null;
   const filterOptions = activeTab === "directory" ? await getEmployeeFilterOptions().catch(() => ({})) : {};
