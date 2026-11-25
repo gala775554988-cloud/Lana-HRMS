@@ -14,15 +14,20 @@ export function calculateGosi(input: { saudi: boolean; active: boolean; cohort: 
   return { applicable: true, subjectWage, employeeRate: policy.employeeRate, employerRate: policy.employerRate, employeeAmount: money(subjectWage * policy.employeeRate / 100), employerAmount: money(subjectWage * policy.employerRate / 100), policyId: policy.id };
 }
 export function resolveGosiCohort(explicit: string | null, firstCoverageDate: Date | null, newSystemCutoff: Date | null) {
-  if (explicit) return explicit;
-  if (!firstCoverageDate || !newSystemCutoff) throw new Error("حدد شريحة التأمينات أو تاريخ أول اشتراك وتاريخ سريان النظام الجديد");
+  if (explicit) {
+    if (!["NEW", "LEGACY"].includes(explicit)) throw new Error("شريحة التأمينات غير صالحة");
+    return explicit;
+  }
+  if (!firstCoverageDate || !newSystemCutoff || !Number.isFinite(firstCoverageDate.getTime()) || !Number.isFinite(newSystemCutoff.getTime())) throw new Error("حدد شريحة التأمينات أو تاريخ أول اشتراك وتاريخ سريان النظام الجديد");
   return firstCoverageDate >= newSystemCutoff ? "NEW" : "LEGACY";
 }
 export function calculateEosb(input: { startDate: Date; endDate: Date; monthlyWage: number; reason: "RESIGNATION" | "NON_RENEWAL" | "TERMINATION"; excludedDays?: number; article80?: boolean; fullEntitlementException?: boolean }) {
   if (!Number.isFinite(input.startDate.getTime()) || !Number.isFinite(input.endDate.getTime()) || input.endDate < input.startDate || !Number.isFinite(input.monthlyWage) || input.monthlyWage < 0 || !["RESIGNATION", "NON_RENEWAL", "TERMINATION"].includes(input.reason)) throw new Error("بيانات التصفية غير صالحة");
   const excluded = input.excludedDays ?? 0;
   if (!Number.isSafeInteger(excluded) || excluded < 0) throw new Error("أيام الاستبعاد غير صالحة");
-  const days = Math.max(0, Math.floor((input.endDate.getTime() - input.startDate.getTime()) / 86400000) - excluded);
+  const elapsedDays = Math.floor((input.endDate.getTime() - input.startDate.getTime()) / 86400000);
+  if (excluded > elapsedDays) throw new Error("أيام الاستبعاد تتجاوز مدة الخدمة");
+  const days = elapsedDays - excluded;
   const years = days / 365; // Explicit ACT/365 estimate; final statutory calendar review required.
   const gross = money(input.monthlyWage * (Math.min(years, 5) / 2 + Math.max(years - 5, 0)));
   const fraction = input.article80 ? 0 : input.reason !== "RESIGNATION" || input.fullEntitlementException ? 1 : years < 2 ? 0 : years < 5 ? 1 / 3 : years < 10 ? 2 / 3 : 1;
@@ -39,6 +44,12 @@ export function validSaudiIban(value: string) {
 export function buildBankReviewCsv(rows: { employeeNumber: string; iban: string; net: number; currency: string }[]) {
   if (!rows.length) throw new Error("المسير فارغ");
   const escape = (value: string) => `"${value.replace(/"/g, '""')}"`;
+  const employeeNumbers = new Set<string>();
+  for (const row of rows) {
+    const key = row.employeeNumber.trim();
+    if (!key || employeeNumbers.has(key) || /^[=+@\-]/.test(key)) throw new Error("رقم موظف مكرر أو غير صالح في ملف التحويل");
+    employeeNumbers.add(key);
+  }
   for (const row of rows) if (!validSaudiIban(row.iban) || !Number.isFinite(row.net) || row.net <= 0 || row.currency !== "SAR" || /^[=+@\-\t\r\n]/.test(row.employeeNumber)) throw new Error(`بيانات التحويل غير صالحة للموظف ${row.employeeNumber}`);
   return '\uFEFF' + ['employee_number,iban,currency,net_amount', ...rows.map(row => [escape(row.employeeNumber), escape(row.iban.replace(/\s/g, '').toUpperCase()), 'SAR', money(row.net).toFixed(2)].join(','))].join('\r\n');
 }
