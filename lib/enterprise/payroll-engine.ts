@@ -279,6 +279,10 @@ export async function computeAndUpsertPayrollItems(
   const employees = await prisma.employee.findMany({ where: employeeWhere, select: { id: true } });
   const items: Array<{ employeeId: string; netPay: number; error?: string }> = [];
   const calculated: Array<{ employeeId: string; breakdown: PayrollBreakdown }> = [];
+  const matchedIds = new Set(employees.map(employee => employee.id));
+  for (const employeeId of scope.employeeIds ?? []) {
+    if (!matchedIds.has(employeeId)) items.push({ employeeId, netPay: 0, error: "الموظف غير مؤهل ضمن نطاق المسير أو الفترة المحددة" });
+  }
   for (const employee of employees) {
     try {
       const breakdown = await computeEmployeePayroll(employee.id, periodStartDate, periodEndDate);
