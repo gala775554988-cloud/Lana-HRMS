@@ -8,6 +8,7 @@ if (!['localhost', '127.0.0.1'].includes(url.hostname) || !url.pathname.endsWith
 const prisma = new PrismaClient({ datasourceUrl: url.href });
 const lifecycle = await load('lib/self-service/lifecycle.ts', { zod: await import('zod'), '@/lib/employee/hr-approval-services': { isHRPaymentType: () => false } });
 const metadata = await load('lib/enterprise/workflow-step-metadata.ts');
+const ledger = await load('lib/enterprise/employee-financial-ledger.ts', {'@prisma/client':await import('@prisma/client'),'@/lib/prisma':{prisma}});
 const suffix = randomUUID();
 let employee; let leaveType; const users = [];
 let actor;
@@ -22,7 +23,7 @@ try {
     '@/lib/integrations/odoo/requests/routing': { usesOdooRouting: async () => false },
     '@/lib/integrations/odoo/requests/service': { enqueueWorkflowRequest: async () => {}, dispatchWorkflowRequest: async () => {}, assertLocalWorkflow: async () => {} },
     '@/lib/integrations/odoo/requests/store': { getLink: async () => null },
-    '@/lib/prisma': { prisma }, '@/lib/self-service/lifecycle': lifecycle,
+    '@/lib/prisma': { prisma }, '@/lib/self-service/lifecycle': lifecycle, '@/lib/enterprise/employee-financial-ledger':ledger,
     './request-routing-policy': { ApprovalRoutingError }, './workflow-step-metadata': metadata,
     '@/lib/enterprise/hierarchy': { resolveApprovalChain: async () => approvers },
     '@/lib/enterprise/notifications': { createEnterpriseNotification: async () => {}, notifyUsers: async () => {} },
@@ -66,6 +67,8 @@ try {
     const instances = await prisma.workflowInstance.findMany({ where: { employeeId: employee.id }, select: { id: true } });
     await prisma.auditLog.deleteMany({ where: { entity: 'workflowInstance', entityId: { in: instances.map(row => row.id) } } });
     await prisma.workflowInstance.deleteMany({ where: { employeeId: employee.id } });
+    await prisma.employeeFinancialEntry.deleteMany({where:{employeeId:employee.id}});
+    await prisma.employeeRequestExecution.deleteMany({where:{employeeId:employee.id}});
     await prisma.employee.delete({ where: { id: employee.id } });
   }
   if (leaveType) await prisma.leaveType.delete({ where: { id: leaveType.id } });

@@ -10,10 +10,10 @@ const settlement = await load('lib/payroll/settlement.ts', { './calculations': c
 const id = randomUUID(); let employee, run, user;
 try {
  user = await prisma.user.create({ data: { username: `payroll-${id}` } });
- employee = await prisma.employee.create({ data: { employeeNumber: `PAY-${id}`, nationalId: `PAY-${id}`, firstName:'Payroll', lastName:'Test', hireDate:new Date(), userId:user.id } });
- const loan = await prisma.loan.create({ data: { employeeId:employee.id, loanNumber:`LN-${id}`, principalAmount:400, outstandingAmount:400, installmentAmount:100, currency:'SAR', issuedAt:new Date(), status:'ACTIVE' } });
- const advance = await prisma.employeeSalaryAdvance.create({ data: { employeeId:employee.id, amount:100, monthlyDeduction:25, installments:4, reason:'Test', startDate:new Date(), status:'APPROVED' } });
- run = await prisma.payrollRun.create({ data: { name:'Frozen payroll integration', period:`TEST-${id}`, status:'PROCESSING' } });
+ employee = await prisma.employee.create({ data: { employeeNumber: `PAY-${id}`, nationalId: `PAY-${id}`, firstName:'Payroll', lastName:'Test', hireDate:new Date("2026-01-01"), userId:user.id } });
+ const loan = await prisma.loan.create({ data: { employeeId:employee.id, loanNumber:`LN-${id}`, principalAmount:400, outstandingAmount:400, installmentAmount:100, currency:'SAR', issuedAt:new Date("2026-11-01"), status:'ACTIVE' } });
+ const advance = await prisma.employeeSalaryAdvance.create({ data: { employeeId:employee.id, amount:100, monthlyDeduction:25, installments:4, reason:'Test', startDate:new Date("2026-11-01"), status:'APPROVED' } });
+ run = await prisma.payrollRun.create({ data: { name:'Frozen payroll integration', period:`TEST-${id}`,periodStartDate:new Date("2026-11-01"),periodEndDate:new Date("2026-11-30T23:59:59.999Z"), status:'PROCESSING' } });
  let broken = false;
  const engine = await load('lib/enterprise/payroll-engine.ts', {
    '@/lib/prisma': { prisma }, '@/lib/payroll/calculations': calculations,
@@ -28,7 +28,7 @@ try {
  const route = await load('app/api/enterprise/payroll/run/[id]/route.ts', {
    'next/server':{NextResponse}, '@/auth':{auth:async()=>({user:{id:user.id,roles:['SUPER_ADMIN']}})}, '@/lib/prisma':{prisma},
    '@/lib/audit':{writeAuditLog:async()=>{}}, '@/lib/enterprise/payroll-engine':{computeAndUpsertPayrollItems:async()=>{throw new Error('Must not recompute approved figures');}},
-   '@/lib/enterprise/notifications':{notifyRole:async()=>{}}, '@/lib/enterprise/payroll-permissions':{canManagePayroll:()=>true,canApprovePayroll:()=>true},
+   '@/lib/enterprise/notifications':{notifyRole:async()=>{}}, '@/lib/enterprise/payroll-permissions':{canManagePayroll:()=>true,canApprovePayroll:()=>true,canViewPayroll:()=>true},
    '@/lib/payroll/settlement':settlement, '@/lib/payroll/budget-control': await load('lib/payroll/budget-control.ts'), '@/lib/payroll/journal':{accountingMappingSchema:{safeParse:()=>({success:false})},postConfiguredPayrollJournal:async()=>{throw new Error('No remote posting');}}, '@/lib/payroll/connection':{getPayrollOdooClient:async()=>{throw new Error('No remote operations in tests');}},
    '@/lib/payroll/odoo-payroll':{odooPayrollSource:()=>'',reconcileAccountingOutbox:async()=>{throw new Error('No remote operations in tests');}},
  });
@@ -53,7 +53,8 @@ try {
  assert.equal((await patch('pay')).status,409);
  console.log('PASS: frozen approved values, source conflict rolls back all effects, concurrent pay consumes loan/advance exactly once');
 } finally {
- if(run){await prisma.appSetting.deleteMany({where:{key:`payroll.compute.${run.id}`}});await prisma.auditLog.deleteMany({where:{entity:'payrollRun',entityId:run.id}});await prisma.payrollRun.delete({where:{id:run.id}});}
+ if(employee){await prisma.employeeFinancialEntry.deleteMany({where:{employeeId:employee.id}});await prisma.employeeRequestExecution.deleteMany({where:{employeeId:employee.id}});}
+ if(run){await prisma.appSetting.deleteMany({where:{key:{in:[`payroll.compute.${run.id}`,`payroll.scope.${run.id}`]}}});await prisma.auditLog.deleteMany({where:{entity:'payrollRun',entityId:run.id}});await prisma.payrollRun.delete({where:{id:run.id}});}
  if(employee) await prisma.employee.delete({where:{id:employee.id}});
  if(user) await prisma.user.delete({where:{id:user.id}});
  await prisma.$disconnect();

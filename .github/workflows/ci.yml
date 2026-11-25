@@ -15,7 +15,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: hrms
+          POSTGRES_DB: hrms_test
         ports:
           - 5432:5432
         options: >-
@@ -24,8 +24,8 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/hrms?schema=public
-      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/hrms?schema=public
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/hrms_test?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/hrms_test?schema=public
       AUTH_SECRET: ci-secret-change-me
       NEXTAUTH_SECRET: ci-secret-change-me
       NEXTAUTH_URL: http://localhost:3000
@@ -48,7 +48,16 @@ jobs:
       - run: npx prisma migrate deploy
       - name: Verify application workflows with fixtures
         run: node --experimental-vm-modules --test tests/auth/*.test.mjs tests/attendance/*.test.mjs tests/payroll/*.test.mjs tests/recruitment/*.test.mjs tests/workflows/*.test.mjs tests/odoo-requests/*.test.mjs
+      - name: Verify actual database workflow and payroll settlement
+        env:
+          SELF_SERVICE_TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/hrms_test?schema=public
+          PAYROLL_TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/hrms_test?schema=public
+        run: |
+          node --experimental-vm-modules tests/workflows/self-service.integration.mjs
+          node --experimental-vm-modules tests/payroll/settlement.integration.mjs
       - name: Verify tabular export files
         run: node --import tsx --test tests/exports/*.integration.mjs
       - run: npm run lint
+      - name: TypeScript validation
+        run: npm run typecheck
       - run: npm run build

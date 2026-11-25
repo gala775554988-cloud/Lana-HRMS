@@ -100,7 +100,7 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
   const { base: baseSalary, currency, profileAllowanceTotal } = await resolveBaseSalary(employeeId);
   if (![baseSalary, profileAllowanceTotal].every(value => Number.isFinite(value) && value >= 0)) throw new Error("بيانات الراتب غير صالحة");
 
-  const [allAllowances, allDeductions, overtimeRequests, bonuses, socialInsurance, loans, advances, attendance, approvedLeaves] = await Promise.all([
+  const [allAllowances, allDeductions, overtimeRequests, bonuses, socialInsurance, loans, advances, approvedLeaves, attendance] = await Promise.all([
     prisma.allowance.findMany({
       where: { employeeId, NOT: { source: "ODOO", odooPayslipLineId: { not: null } }, effectiveFrom: { lte: periodEnd }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: periodStart } }] }
     }),
@@ -188,6 +188,7 @@ export async function computeEmployeePayroll(employeeId: string, periodStart: Da
   }).filter(row => row.amount > 0);
   const loanDeduction = round2(loanAllocations.reduce((sum, row) => sum + row.amount, 0));
 
+  if(advances.length && currency!=="SAR")throw Error("عملة السلفة بالريال لا تطابق عملة الراتب؛ يلزم تحويل معتمد");
   const advanceAllocations = advances.map(adv => ({
     id: adv.id, paidInstallments: adv.paidInstallments,
     amount: advanceSchedule({ amount: Number(adv.amount), monthlyDeduction: Number(adv.monthlyDeduction), installments: adv.installments, paidInstallments: adv.paidInstallments }).next,

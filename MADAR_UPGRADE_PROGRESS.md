@@ -124,3 +124,6 @@ Do not merge until all 37 acceptance criteria, isolated tests, backup and previe
 
 ## CI recovery after 5410d7f
 - #33: run 45621755008 confirmed 184/185 tests passed, migrations passed, fixture failure caused by outdated self-service test transaction missing payrollItem.findFirst and employeeFinalSettlement.findFirst, and updateMany result count. Updated the fixture with explicit dates, realistic guards and count; preserved original annual/sick/double-revoke assertions and added paid payroll/final settlement rejection tests. No weakening of production checks. CI reruns on push; lint/build not yet verified. #37 remains deferred per requested sequence.
+
+## Database integration and payroll query correction
+- #7/#10/#13: corrected reversed Promise.all attendance/approvedLeave bindings (production logic, not test bypass), and reject SAR advance deduction against non-SAR salary. Payslip uses snapshot basic once, not duplicated. #33: CI now executes real Prisma workflow and payroll settlement scripts on ephemeral localhost hrms_test with guarded cleanup; restored missing ledger adapter, fixed fixture dates and restrictive FK cleanup, added explicit typecheck. All stages must pass before merge. New CI pending.
