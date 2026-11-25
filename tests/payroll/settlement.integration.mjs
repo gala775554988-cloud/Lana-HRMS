@@ -22,7 +22,8 @@ try {
    '@/lib/employee/salary-profile-store': { getEmployeeSalaryProfile: async () => { if (broken) throw new Error('Missing salary source'); return { salaryBase: 1000 }; } },
    '@/lib/employee/salary-profile': { calculateNetSalary: () => 1000 },
  });
- await engine.computeAndUpsertPayrollItems(run.id, new Date('2026-11-01'), new Date('2026-11-30'), { employeeIds: [employee.id] });
+ const computed=await engine.computeAndUpsertPayrollItems(run.id, new Date('2026-11-01'), new Date('2026-11-30'), { employeeIds: [employee.id] });
+ assert.equal(computed.errorCount,0,JSON.stringify(computed.items));
  const item = await prisma.payrollItem.findUniqueOrThrow({ where: { payrollRunId_employeeId: { payrollRunId: run.id, employeeId: employee.id } } });
  assert.equal(Number(item.netPay), 875);
 
@@ -41,14 +42,14 @@ try {
  assert.equal(Number((await prisma.payrollItem.findUniqueOrThrow({where:{id:item.id}})).netPay),875);
  broken = false;
  await engine.computeAndUpsertPayrollItems(run.id, new Date('2026-11-01'), new Date('2026-11-30'), { employeeIds: [employee.id] });
- assert.equal((await patch('approve')).status,200);
+ const approval=await patch('approve');assert.equal(approval.status,200,JSON.stringify(approval.data));
  await prisma.loan.update({where:{id:loan.id},data:{outstandingAmount:350}});
  assert.equal((await patch('pay')).status,409);
  assert.equal((await prisma.payrollRun.findUniqueOrThrow({where:{id:run.id}})).status,'APPROVED');
  assert.equal((await prisma.employeeSalaryAdvance.findUniqueOrThrow({where:{id:advance.id}})).paidInstallments,0);
  await prisma.loan.update({where:{id:loan.id},data:{outstandingAmount:400}});
  const responses = await Promise.all([patch('pay'),patch('pay')]);
- assert.equal(responses.filter(response=>response.status===200).length,1);
+ assert.equal(responses.filter(response=>response.status===200).length,1,JSON.stringify(responses));
  assert.equal(Number((await prisma.loan.findUniqueOrThrow({where:{id:loan.id}})).outstandingAmount),300);
  assert.equal((await prisma.employeeSalaryAdvance.findUniqueOrThrow({where:{id:advance.id}})).paidInstallments,1);
  assert.equal(Number((await prisma.payrollItem.findUniqueOrThrow({where:{id:item.id}})).netPay),875);

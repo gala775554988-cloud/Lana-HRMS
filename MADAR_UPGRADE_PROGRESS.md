@@ -130,3 +130,5 @@ Do not merge until all 37 acceptance criteria, isolated tests, backup and previe
 
 ## Historical debt evidence review
 - #8/#10/#17/#25/#29: additive separate debt-review records with evidence reference, source identity, principal/currency, review decision, role guard, no self-review and audit. Payroll calculation and settlement and final settlement refuse unverified historical local debts; no mutation of historic loan/advance balances or proof fabricated. This may block payroll until reviewers document outstanding local debts; no retrospective changes. Odoo-origin debt remains on existing external installment reconciliation path and still needs external evidence. New tests and migration pending. #37 deferred.
+
+- CI coverage extended to existing Odoo and Odoo migration test suites; ledger fixture updated for real historical review dependency. Database integration asserts detailed failure diagnostics rather than masking them. New CI pending.

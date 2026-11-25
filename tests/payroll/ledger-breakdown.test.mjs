@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "../workflows/helpers.mjs";
 const calculations = await load("lib/payroll/calculations.ts");
-const { buildPayrollLedgerBreakdown } = await load("lib/payroll/settlement.ts", {"./calculations": calculations});
+const { buildPayrollLedgerBreakdown } = await load("lib/payroll/settlement.ts", {"./calculations": calculations,"./debt-review":await load("lib/payroll/debt-review.ts")});
 const snapshot = {baseSalary:1000,allowanceTotal:200,bonusTotal:50,overtimeTotal:25,grossPay:1275,insuranceDeduction:100,taxTotal:0,absenceDeduction:10,lateDeduction:5,penaltyDeduction:0,otherDeductionTotal:0,loanDeduction:20,advanceDeduction:33.34,deductionTotal:168.34,netPay:1106.66,loanAllocations:[{id:"loan",amount:20}],advanceAllocations:[{id:"advance",amount:33.34}]};
 test("itemized postings reconcile exactly without duplicating totals",()=>{
   const rows=buildPayrollLedgerBreakdown(snapshot);
