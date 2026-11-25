@@ -33,6 +33,7 @@ export function FloatingBackButton() {
 
   if (!isInternalPage(pathname) || pathname === "/" || !previous) return null;
   return <button type="button" className="lana-back-control" aria-label="الرجوع إلى الصفحة السابقة" onClick={() => router.push(previous)} dir="ltr">
-    <ArrowLeft aria-hidden="true" className="h-5 w-5 shrink-0" />
+    <ArrowLeft aria-hidden="true" className="h-4 w-4 shrink-0" />
+    <span>رجوع</span>
   </button>;
 }
