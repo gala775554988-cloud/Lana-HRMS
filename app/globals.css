@@ -251,42 +251,36 @@
 
 /* Explicit surfaces survive the workspace's gradient reset. */
 .lana-contrast-banner {
-  background-color: #102544;
-  background-image: linear-gradient(110deg, #102544, #172554 65%, #1e1b4b);
-  color: #ffffff;
+  background: linear-gradient(110deg, #edf4e4, #dcebc8 70%, #e6f1d9);
+  color: #284b35;
+  border: 1px solid #cbdcba;
 }
+.lana-contrast-banner :is(.text-white, .text-blue-100, .text-indigo-200, .text-indigo-950) { color: #355744; }
+.lana-contrast-banner a.bg-white:hover { background-color: #f3f8ed; }
+.dark .lana-contrast-banner { background: linear-gradient(110deg, #263d30, #354d32); color: #eef6e8; border-color: #526a48; }
+.dark .lana-contrast-banner :is(.text-white, .text-blue-100, .text-indigo-200) { color: #e3efd8; }
 .lana-finance-highlight {
   background-color: #3730a3;
   color: #ffffff;
 }
 .lana-back-control {
-  position: fixed;
-  left: 1rem;
-  top: calc(4.75rem + env(safe-area-inset-top));
-  z-index: 45;
-  display: flex;
-  align-items: center;
-  gap: .625rem;
-  border: 1px solid #64748b;
-  border-radius: 1rem;
-  padding: .5rem;
-  background: hsl(var(--background));
-  color: hsl(var(--foreground));
-  box-shadow: 0 8px 24px #0f172a33;
-  transition: background-color 180ms ease, box-shadow 180ms ease;
+  display: inline-flex; align-items: center; gap: .45rem;
+  min-height: 40px; padding: .4rem .8rem; margin-inline-start: auto;
+  border: 1px solid #b7cba5; border-radius: .75rem;
+  background: #f7faf3; color: #355744; font-weight: 600;
+  transition: background-color 180ms ease;
 }
-.lana-back-control:hover, .lana-back-control:focus-visible {
-  background: #312e81;
-  box-shadow: 0 10px 28px #312e8140;
-}
-.lana-back-control:focus-visible { outline: 3px solid #818cf8; outline-offset: 4px; }
+.lana-back-control:hover { background: #dcebc8; }
+.lana-back-control:focus-visible { outline: 2px solid #527b40; outline-offset: 3px; }
 @media print { .lana-back-control { display: none; } }
 
 @layer components {
   .lana-workspace-hero {
-    color: white;
-    background: radial-gradient(ellipse at 12% 0%, #404a8b 0, transparent 60%), #182342;
+    color: #355744;
+    background: linear-gradient(110deg, #f0f6e8, #dcebc8);
+    border: 1px solid #cbdcba;
   }
+  .dark .lana-workspace-hero { color: #e3efd8; background: #304735; border-color: #526a48; }
 }
 
 /* Payroll content must shrink inside both the desktop shell and portal layouts. */
