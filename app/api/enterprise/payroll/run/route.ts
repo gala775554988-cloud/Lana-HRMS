@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
   if (run && !existingIds?.length) {
     const saved = await prisma.appSetting.findUnique({ where: { key: `payroll.scope.${run.id}` } });
     const scope = saved?.value as { employeeIds?: string[] } | null;
-    if (!scope || !Array.isArray(scope.employeeIds) || !scope.employeeIds.length) return NextResponse.json({ success: false, message: "لا يمكن إعادة احتساب مسير بلا قائمة موظفين محفوظة" }, { status: 409 });
+    if (!scope || !Array.isArray(scope.employeeIds) || !scope.employeeIds.length || !scope.employeeIds.every(id => typeof id === "string" && id.trim()) || new Set(scope.employeeIds).size !== scope.employeeIds.length) return NextResponse.json({ success: false, message: "لا يمكن إعادة احتساب مسير بلا قائمة موظفين محفوظة" }, { status: 409 });
     existingIds = scope.employeeIds;
   }
 
@@ -98,6 +98,16 @@ export async function POST(request: NextRequest) {
         const linked = await tx.payrollPeriod.findUnique({ where: { id: body.periodId } });
         if (!linked || linked.status !== "OPEN" || linked.startDate.getTime() !== startDate.getTime() || linked.endDate.getTime() !== endDate.getTime()) return null;
       }
+      const selected = await tx.employee.findMany({ where: {
+        status: "ACTIVE", archivedAt: null, hireDate: { lte: endDate },
+        OR: [{ terminationDate: null }, { terminationDate: { gte: startDate } }],
+        ...(body.companyId ? { companyId: body.companyId } : {}),
+        ...(body.branchId ? { branchId: body.branchId } : {}),
+        ...(body.departmentId ? { departmentId: body.departmentId } : {}),
+        ...(body.employeeIds ? { id: { in: body.employeeIds } } : {})
+      }, select: { id: true } });
+      if (!selected.length || (body.employeeIds && selected.length !== body.employeeIds.length)) throw new Error("PAYROLL_SCOPE_INVALID");
+      existingIds = selected.map(employee => employee.id);
       const created = await tx.payrollRun.create({
       data: {
         name: body.name || `مسير رواتب ${body.period}`,
@@ -113,10 +123,11 @@ export async function POST(request: NextRequest) {
         status: "DRAFT"
       }
       });
-      if (body.employeeIds?.length) await tx.appSetting.create({ data: { key: `payroll.scope.${created.id}`, value: { employeeIds: body.employeeIds } } });
+      await tx.appSetting.create({ data: { key: `payroll.scope.${created.id}`, value: { employeeIds: existingIds } } });
       return created;
     }, { isolationLevel: "Serializable" });
     } catch (error) {
+      if (error instanceof Error && error.message === "PAYROLL_SCOPE_INVALID") return NextResponse.json({ success: false, message: "لا يوجد موظفون مؤهلون أو أن القائمة تتضمن موظفين خارج النطاق" }, { status: 422 });
       if (typeof error === "object" && error !== null && "code" in error && ["P2034", "P2002"].includes(String(error.code))) return NextResponse.json({ success: false, message: "تغيرت الفترة أو تم إنشاء مسير بالتزامن؛ أعد المحاولة" }, { status: 409 });
       throw error;
     }
