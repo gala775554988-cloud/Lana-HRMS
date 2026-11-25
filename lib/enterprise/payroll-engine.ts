@@ -270,6 +270,10 @@ export async function computeAndUpsertPayrollItems(
 ) {
   const run = await prisma.payrollRun.findUniqueOrThrow({ where: { id: runId } });
   if (!["DRAFT", "PROCESSING"].includes(run.status)) throw new Error("المسير معتمد أو مقفل");
+  if (run.periodId) {
+    const period = await prisma.payrollPeriod.findUnique({ where: { id: run.periodId }, select: { status: true } });
+    if (!period || period.status !== "OPEN") throw new Error("فترة الرواتب مغلقة أو غير موجودة");
+  }
   if (await prisma.payrollItem.count({ where: { payrollRunId: runId, odooPayslipId: { not: null } } })) throw new Error("مسير مستورد من Odoo؛ حدّثه من كشوف Odoo بدلاً من إعادة احتسابه محلياً");
   const employeeWhere: Record<string, unknown> = { status: "ACTIVE", archivedAt: null, hireDate: { lte: periodEndDate }, OR: [{ terminationDate: null }, { terminationDate: { gte: periodStartDate } }] };
   if (scope.employeeIds !== undefined) employeeWhere.id = { in: scope.employeeIds };
@@ -296,6 +300,10 @@ export async function computeAndUpsertPayrollItems(
   }
   const errorCount = items.filter(item => item.error).length;
   await prisma.$transaction(async tx => {
+    if (run.periodId) {
+      const period = await tx.payrollPeriod.findUnique({ where: { id: run.periodId }, select: { status: true } });
+      if (!period || period.status !== "OPEN") throw new Error("تغيرت حالة الفترة أثناء الاحتساب");
+    }
     const editable = await tx.payrollRun.updateMany({ where: { id: runId, status: run.status, updatedAt: run.updatedAt }, data: { updatedAt: new Date() } });
     if (editable.count !== 1) throw new Error("تغير المسير أثناء الاحتساب؛ أعد المحاولة");
     const summary = { employeeCount: employees.length, errorCount, errors: items.filter(item => item.error).map(item => ({ employeeId: item.employeeId, error: item.error! })) };
@@ -314,6 +322,6 @@ export async function computeAndUpsertPayrollItems(
     }
     // A changed employee selection must not retain stale employees in a draft.
     await tx.payrollItem.deleteMany({ where: { payrollRunId: runId, employeeId: { notIn: calculated.map(row => row.employeeId) } } });
-  }, { timeout: 30000 });
+  }, { timeout: 30000, isolationLevel: "Serializable" });
   return { employeeCount: employees.length, items, errorCount };
 }
