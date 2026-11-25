@@ -3026,6 +3026,7 @@ model MadarWorkTask {
  comments MadarWorkTaskComment[]
  checklist MadarWorkTaskCheck[]
  attachments MadarWorkTaskFile[]
+ legacyImport MadarLegacyTaskImport?
  repeatEvery String?
  repeatUntil DateTime?
  nextDueAt DateTime?
@@ -3064,4 +3065,15 @@ model MadarWorkTaskFile {
  sizeBytes Int
  createdAt DateTime @default(now())
  @@unique([taskId,sha256])
+}
+
+model MadarLegacyTaskImport {
+ id String @id @default(cuid())
+ sourceKey String @unique
+ taskId String @unique
+ task MadarWorkTask @relation(fields:[taskId],references:[id],onDelete:Restrict)
+ sourceHash String
+ sourceJson Json
+ importedById String
+ createdAt DateTime @default(now())
 }

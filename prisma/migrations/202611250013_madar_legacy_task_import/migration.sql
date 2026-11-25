@@ -1,0 +1,3 @@
+CREATE TABLE "MadarLegacyTaskImport" ("id" TEXT NOT NULL,"sourceKey" TEXT NOT NULL,"taskId" TEXT NOT NULL,"sourceHash" TEXT NOT NULL,"sourceJson" JSONB NOT NULL,"importedById" TEXT NOT NULL,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,CONSTRAINT "MadarLegacyTaskImport_pkey" PRIMARY KEY ("id"),CONSTRAINT "MadarLegacyTaskImport_taskId_fkey" FOREIGN KEY ("taskId") REFERENCES "MadarWorkTask"("id") ON DELETE RESTRICT ON UPDATE CASCADE);
+CREATE UNIQUE INDEX "MadarLegacyTaskImport_sourceKey_key" ON "MadarLegacyTaskImport"("sourceKey");
+CREATE UNIQUE INDEX "MadarLegacyTaskImport_taskId_key" ON "MadarLegacyTaskImport"("taskId");

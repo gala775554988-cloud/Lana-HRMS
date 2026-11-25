@@ -15,7 +15,7 @@ async function actor(){
  const assignments=employee?await prisma.supervisorAssignment.findMany({where:{employeeId:employee.id,isActive:true,startDate:{lte:new Date()},OR:[{endDate:null},{endDate:{gte:new Date()}}]},select:{entityType:true,entityId:true}}):[];
  const scope:Prisma.EmployeeWhereInput[]=[];
  for(const x of assignments){if(x.entityType==="DEPARTMENT")scope.push({departmentId:x.entityId});else if(x.entityType==="BRANCH")scope.push({branchId:x.entityId});else if(x.entityType==="HOSPITAL")scope.push({hospitalId:x.entityId});else if(x.entityType==="PROJECT")scope.push({projectId:x.entityId});}
- return {userId,employeeId:employee?.id,global,scope,canAssign:global||scope.length>0};
+ return {userId,employeeId:employee?.id,global,scope,canImportLegacy:roles.includes("SUPER_ADMIN"),canAssign:global||scope.length>0};
 }
 type Actor=NonNullable<Awaited<ReturnType<typeof actor>>>;
 const access=(a:Actor):Prisma.MadarWorkTaskWhereInput=>({OR:[...(a.employeeId?[{employeeId:a.employeeId}]:[]),{reviewerId:a.userId},{createdById:a.userId},...(a.global?[{id:{not:""}}]:[])]});
@@ -27,7 +27,7 @@ export async function GET(request:Request){
   if(!a.canAssign)return json({success:false},403);
   const employees=await prisma.employee.findMany({where:{status:"ACTIVE",archivedAt:null,id:{not:a.employeeId??""},...(a.global?{}:{OR:a.scope})},select:{id:true,employeeNumber:true,firstName:true,lastName:true,departmentId:true},orderBy:{employeeNumber:"asc"},take:500});
   const departments=await prisma.department.findMany({where:{id:{in:[...new Set(employees.flatMap(e=>e.departmentId?[e.departmentId]:[]))]}},select:{id:true,name:true}});
-  return json({success:true,employees,departments});
+  return json({success:true,employees,departments,canImportLegacy:a.canImportLegacy});
  }
  const raw=Number(q.get("page")??1),page=Number.isSafeInteger(raw)&&raw>0?Math.min(raw,100000):1,where:Prisma.MadarWorkTaskWhereInput={AND:[access(a),...(q.get("mine")==="true"?[{employeeId:a.employeeId??"__none__"}]:[]),...(q.get("employeeId")?[{employeeId:q.get("employeeId")!}]:[])]};
  const from=q.get("from"),to=q.get("to");
